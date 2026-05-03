@@ -1,0 +1,22 @@
+:host {
+  display: inline-flex;
+}
+
+.cdf-avatar-frame {
+  position: relative;
+  display: inline-flex;
+
+  &__level {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    z-index: 1;
+  }
+}
+
+// Tighten the badge offset on the smallest sizes so it doesn't dominate.
+:host([data-size='xs']) .cdf-avatar-frame__level,
+:host([data-size='sm']) .cdf-avatar-frame__level {
+  bottom: -2px;
+  right: -2px;
+}

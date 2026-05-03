@@ -1,0 +1,46 @@
+:host {
+  display: inline-flex;
+
+  --ring-color: var(--cdf-color-primary);
+  --ring-bg: var(--cdf-color-surface);
+}
+
+.cdf-level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--cdf-radius-circle);
+  background: var(--ring-bg);
+  color: var(--ring-color);
+  font-weight: var(--cdf-font-weight-bold);
+  font-feature-settings: 'tnum';
+  border: 2px solid var(--ring-color);
+  position: relative;
+  box-shadow: 0 0 0 2px var(--cdf-color-bg);
+
+  &__num {
+    line-height: 1;
+  }
+}
+
+// Sizes
+:host([data-size='sm']) .cdf-level-badge { width: 24px; height: 24px; font-size: 11px; border-width: 2px; }
+:host([data-size='md']) .cdf-level-badge { width: 32px; height: 32px; font-size: 13px; border-width: 2px; }
+:host([data-size='lg']) .cdf-level-badge { width: 44px; height: 44px; font-size: 16px; border-width: 3px; }
+:host([data-size='xl']) .cdf-level-badge { width: 64px; height: 64px; font-size: 22px; border-width: 3px; }
+
+// Tier colors — semantic ring colors per docs/07-gamification.md §4 visual milestones.
+:host([data-tier='tier-bronze'])   { --ring-color: #cd7f32; }
+:host([data-tier='tier-silver'])   { --ring-color: #9aa3ad; }
+:host([data-tier='tier-gold'])     { --ring-color: #d4af37; }
+:host([data-tier='tier-platinum']) { --ring-color: #2dd4bf; }
+:host([data-tier='tier-diamond'])  { --ring-color: #38bdf8; }
+:host([data-tier='tier-mythic'])   { --ring-color: #d946ef; }
+:host([data-tier='tier-prestige']) {
+  --ring-color: var(--cdf-color-premium);
+
+  .cdf-level-badge {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #78350f;
+  }
+}

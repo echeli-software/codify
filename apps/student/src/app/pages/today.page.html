@@ -14,26 +14,17 @@
 </ion-header>
 
 <ion-content [fullscreen]="true" class="ion-padding">
-  <div class="hero">
-    <cdf-app-chip variant="warning">
-      <cdf-icon name="flame" size="sm" />
-      <span>{{ demoStreak }} day streak</span>
-    </cdf-app-chip>
-    <cdf-app-chip variant="primary">
-      <cdf-icon name="trophy" size="sm" />
-      <span>{{ demoTier() }} · Level {{ demoLevel() }}</span>
-    </cdf-app-chip>
-  </div>
+  <header class="hero">
+    <cdf-avatar-with-frame name="Maria Souza" size="lg" [level]="14" />
+    <div class="hero__copy">
+      <h1>Hi, Maria 👋</h1>
+      <cdf-streak-chip [days]="demoStreak" [freezes]="demoFreezes" />
+    </div>
+  </header>
 
   <cdf-app-card>
-    <div class="level-row">
-      <strong>Level {{ demoLevel() }}</strong>
-      <ion-note>{{ demoLevelProgress() }}% to next</ion-note>
-    </div>
-    <cdf-app-progress-bar [value]="demoLevelProgress()" variant="xp" size="lg" label="XP toward next level" />
-
+    <cdf-xp-bar [xp]="demoXp" />
     <div class="stats">
-      <cdf-xp-badge [value]="demoXp" size="md" />
       <cdf-coin-badge [value]="demoCoins" size="md" [showLabel]="true" />
     </div>
   </cdf-app-card>
@@ -42,60 +33,87 @@
   @if (catalogLoading()) {
   <ion-list inset="true">
     @for (i of [0, 1]; track i) {
-    <ion-item>
-      <ion-label>
-        <cdf-app-skeleton shape="text" width="60%" height="14px" />
-        <p style="margin-top: 6px;">
-          <cdf-app-skeleton shape="text" width="80%" height="11px" />
-        </p>
-      </ion-label>
-      <cdf-app-skeleton slot="end" shape="text" width="40px" height="11px" />
-    </ion-item>
+    <cdf-app-skeleton shape="rect" width="100%" height="64px" style="margin: 4px 0;" />
     }
   </ion-list>
   } @else {
   <ion-list inset="true">
-    <ion-item button="true" detail="true">
-      <ion-label>
-        <h3>Hooks intro</h3>
-        <p>React Fundamentals · Lesson 4 of 12</p>
-      </ion-label>
-      <ion-note slot="end">5 min</ion-note>
-    </ion-item>
-    <ion-item button="true" detail="true">
-      <ion-label>
-        <h3>Conditional rendering</h3>
-        <p>React Fundamentals · Lesson 5 of 12</p>
-      </ion-label>
-      <ion-note slot="end">7 min</ion-note>
-    </ion-item>
+    @for (lesson of continueLessons; track lesson.title) {
+    <cdf-lesson-item
+      [title]="lesson.title"
+      [subtitle]="lesson.subtitle"
+      [type]="lesson.type"
+      [status]="lesson.status"
+      [estimateMinutes]="lesson.estimateMinutes"
+      [isFree]="lesson.isFree"
+    />
+    }
   </ion-list>
   }
 
   <h2>Daily quests</h2>
   <ion-list inset="true">
-    <ion-item>
-      <ion-label>
-        <h3>Complete 1 React lesson</h3>
-        <cdf-app-progress-bar [value]="0" variant="primary" size="sm" />
-      </ion-label>
-      <cdf-coin-badge slot="end" [value]="20" size="sm" />
-    </ion-item>
-    <ion-item>
-      <ion-label>
-        <h3>Earn 100 XP today</h3>
-        <cdf-app-progress-bar [value]="20" variant="success" size="sm" />
-      </ion-label>
-      <cdf-coin-badge slot="end" [value]="20" size="sm" />
-    </ion-item>
-    <ion-item>
-      <ion-label>
-        <h3>Pass an exercise</h3>
-        <cdf-app-progress-bar [value]="0" variant="primary" size="sm" />
-      </ion-label>
-      <cdf-coin-badge slot="end" [value]="20" size="sm" />
-    </ion-item>
+    <cdf-lesson-item
+      title="Complete 1 React lesson"
+      subtitle="0 / 1"
+      type="reading"
+      status="not-started"
+      [estimateMinutes]="null"
+    />
+    <cdf-lesson-item
+      title="Earn 100 XP today"
+      subtitle="20 / 100"
+      type="quiz"
+      status="in-progress"
+      [estimateMinutes]="null"
+    />
+    <cdf-lesson-item
+      title="Pass an exercise"
+      subtitle="0 / 1"
+      type="exercise"
+      status="not-started"
+      [estimateMinutes]="null"
+    />
   </ion-list>
+
+  <h2>Recent reward</h2>
+  <div class="reward-row">
+    <cdf-reward-toast [xp]="20" [coins]="10" [multiplier]="2" />
+    <span class="muted small">From completing your last lesson</span>
+  </div>
+
+  <h2>
+    Recommended for you
+    <cdf-app-button kind="ghost" size="sm" (buttonClick)="toggleRecommendations()">
+      {{ noRecommendations() ? 'Show' : 'Hide' }} demo empty
+    </cdf-app-button>
+  </h2>
+  @if (noRecommendations()) {
+  <cdf-empty-state
+    icon="search"
+    title="No recommendations yet"
+    description="Complete a few lessons so we can suggest what to learn next."
+  >
+    <cdf-app-button kind="primary">
+      <cdf-icon name="school" size="sm" /> Browse catalog
+    </cdf-app-button>
+  </cdf-empty-state>
+  } @else {
+  <div class="rec-grid">
+    @for (rec of recommendations; track rec.id) {
+    <cdf-course-card
+      [title]="rec.title"
+      [author]="rec.author"
+      [lessonCount]="rec.lessonCount"
+      [estimatedMinutes]="rec.estimatedMinutes"
+      [difficulty]="rec.difficulty"
+      [categories]="rec.categories"
+      [hasFreePreview]="rec.hasFreePreview"
+      [premiumOnly]="rec.premiumOnly ?? false"
+    />
+    }
+  </div>
+  }
 
   <h2>Settings</h2>
   <cdf-app-card>

@@ -1,0 +1,22 @@
+:host {
+  display: block;
+
+  ion-item {
+    --background: var(--cdf-color-surface);
+    --color: var(--cdf-color-text);
+  }
+
+  cdf-icon[slot='start'] {
+    color: var(--cdf-color-primary);
+    margin-inline-end: var(--cdf-space-3);
+  }
+
+  cdf-icon[slot='end'] {
+    color: var(--cdf-color-success);
+    margin-inline-start: var(--cdf-space-2);
+  }
+
+  cdf-app-badge {
+    margin-top: var(--cdf-space-1);
+  }
+}

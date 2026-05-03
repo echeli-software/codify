@@ -1,0 +1,48 @@
+:host {
+  display: block;
+}
+
+.cdf-course-card {
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--cdf-space-2);
+    margin-bottom: var(--cdf-space-2);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-md);
+    font-weight: var(--cdf-font-weight-semibold);
+    color: var(--cdf-color-text);
+  }
+
+  &__author {
+    margin: 2px 0 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-1);
+    margin-bottom: var(--cdf-space-2);
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-3);
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text-muted);
+    margin-bottom: var(--cdf-space-2);
+
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--cdf-space-1);
+    }
+  }
+}

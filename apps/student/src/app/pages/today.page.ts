@@ -7,26 +7,51 @@ import {
   IonContent,
   IonButton,
   IonButtons,
-  IonItem,
   IonList,
-  IonNote,
-  IonLabel,
 } from '@ionic/angular/standalone';
 import {
+  AppButton,
   AppCard,
   AppCheckbox,
-  AppChip,
-  AppProgressBar,
   AppSelect,
   type AppSelectOption,
   AppSkeleton,
   AppToggle,
+  AvatarWithFrame,
   CoinBadge,
+  CourseCard,
+  type CourseCategoryRef,
+  EmptyState,
   Icon,
-  XpBadge,
+  LessonItem,
+  type LessonItemStatus,
+  type LessonItemType,
+  RewardToast,
+  StreakChip,
+  XpBar,
 } from '@codify/ui-ionic';
 import { I18nService, type Locale } from '@codify/i18n';
-import { levelFromXp, levelProgressPct, tierForLevel } from '@codify/ui-core';
+
+interface ContinueLessonRow {
+  title: string;
+  subtitle: string;
+  type: LessonItemType;
+  status: LessonItemStatus;
+  estimateMinutes: number;
+  isFree: boolean;
+}
+
+interface Recommendation {
+  id: string;
+  title: string;
+  author: string;
+  lessonCount: number;
+  estimatedMinutes: number;
+  difficulty: string;
+  categories: CourseCategoryRef[];
+  hasFreePreview: boolean;
+  premiumOnly?: boolean;
+}
 
 type Theme = 'light' | 'dark' | 'system';
 const THEME_STORAGE_KEY = 'codify.theme';
@@ -40,20 +65,22 @@ const THEME_STORAGE_KEY = 'codify.theme';
     IonContent,
     IonButton,
     IonButtons,
-    IonItem,
     IonList,
-    IonNote,
-    IonLabel,
+    AppButton,
     AppCard,
     AppCheckbox,
-    AppChip,
-    AppProgressBar,
     AppSelect,
     AppSkeleton,
     AppToggle,
+    AvatarWithFrame,
     CoinBadge,
+    CourseCard,
+    EmptyState,
     Icon,
-    XpBadge,
+    LessonItem,
+    RewardToast,
+    StreakChip,
+    XpBar,
   ],
   templateUrl: './today.page.html',
   styleUrl: './today.page.scss',
@@ -67,9 +94,7 @@ export class TodayPage {
   protected readonly demoXp = 1750;
   protected readonly demoCoins = 320;
   protected readonly demoStreak = 12;
-  protected readonly demoLevel = computed(() => levelFromXp(this.demoXp));
-  protected readonly demoLevelProgress = computed(() => levelProgressPct(this.demoXp));
-  protected readonly demoTier = computed(() => tierForLevel(this.demoLevel()));
+  protected readonly demoFreezes = 2;
 
   // Form-controls demo state.
   protected readonly notifyDaily = signal(true);
@@ -79,8 +104,74 @@ export class TodayPage {
     (m) => ({ value: m.code, label: m.nativeName }),
   );
 
-  // Skeleton loading-state simulation.
+  // Continue learning + recommendations (mock data — wired to API in Phase 5).
   protected readonly catalogLoading = signal(true);
+  protected readonly continueLessons: ContinueLessonRow[] = [
+    {
+      title: 'Hooks intro',
+      subtitle: 'React Fundamentals · Lesson 4 of 12',
+      type: 'reading',
+      status: 'in-progress',
+      estimateMinutes: 5,
+      isFree: false,
+    },
+    {
+      title: 'Conditional rendering',
+      subtitle: 'React Fundamentals · Lesson 5 of 12',
+      type: 'quiz',
+      status: 'not-started',
+      estimateMinutes: 7,
+      isFree: false,
+    },
+    {
+      title: 'Building a counter',
+      subtitle: 'React Fundamentals · Lesson 6 of 12',
+      type: 'exercise',
+      status: 'locked',
+      estimateMinutes: 12,
+      isFree: false,
+    },
+  ];
+
+  protected readonly recommendations: Recommendation[] = [
+    {
+      id: 'r1',
+      title: 'Prompt engineering with AI',
+      author: 'Ana T.',
+      lessonCount: 8,
+      estimatedMinutes: 95,
+      difficulty: 'Intermediário',
+      categories: [{ id: 'ai', label: 'AI usage' }],
+      hasFreePreview: true,
+    },
+    {
+      id: 'r2',
+      title: 'Capacitor for Angular devs',
+      author: 'Lucas K.',
+      lessonCount: 10,
+      estimatedMinutes: 140,
+      difficulty: 'Avançado',
+      categories: [
+        { id: 'mobile', label: 'Mobile' },
+        { id: 'frontend', label: 'Frontend' },
+      ],
+      hasFreePreview: false,
+      premiumOnly: true,
+    },
+    {
+      id: 'r3',
+      title: 'Reading code reviews',
+      author: 'Priya M.',
+      lessonCount: 5,
+      estimatedMinutes: 60,
+      difficulty: 'Iniciante',
+      categories: [{ id: 'soft', label: 'Soft skills' }],
+      hasFreePreview: true,
+    },
+  ];
+
+  protected readonly noRecommendations = signal(false);
+
   constructor() {
     this.applyTheme(this.theme());
     setTimeout(() => this.catalogLoading.set(false), 1500);
@@ -102,6 +193,10 @@ export class TodayPage {
       this.localeChoice.set(value);
       this.i18n.setLocale(value);
     }
+  }
+
+  protected toggleRecommendations(): void {
+    this.noRecommendations.update((v) => !v);
   }
 
   private applyTheme(theme: Theme): void {

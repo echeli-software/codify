@@ -47,3 +47,21 @@ export {
 // ─── Atoms — gamification ────────────────────────────────────────────────
 export { XpBadge } from './lib/atoms/xp-badge/xp-badge.js';
 export { CoinBadge } from './lib/atoms/coin-badge/coin-badge.js';
+
+// ─── Molecules ───────────────────────────────────────────────────────────
+export { FormField } from './lib/molecules/form-field/form-field.js';
+export { LevelBadge } from './lib/molecules/level-badge/level-badge.js';
+export { StreakChip } from './lib/molecules/streak-chip/streak-chip.js';
+export { XpBar } from './lib/molecules/xp-bar/xp-bar.js';
+export {
+  LessonItem,
+  type LessonItemType,
+  type LessonItemStatus,
+} from './lib/molecules/lesson-item/lesson-item.js';
+export {
+  CourseCard,
+  type CourseCategoryRef,
+} from './lib/molecules/course-card/course-card.js';
+export { EmptyState } from './lib/molecules/empty-state/empty-state.js';
+export { RewardToast } from './lib/molecules/reward-toast/reward-toast.js';
+export { AvatarWithFrame } from './lib/molecules/avatar-with-frame/avatar-with-frame.js';

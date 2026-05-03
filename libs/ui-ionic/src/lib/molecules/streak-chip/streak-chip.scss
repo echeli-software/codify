@@ -1,0 +1,76 @@
+:host {
+  display: inline-flex;
+
+  --flame-color: var(--cdf-color-flame);
+  --bg: rgba(249, 115, 22, 0.1);
+  --border: rgba(249, 115, 22, 0.3);
+}
+
+.cdf-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-1);
+  padding: var(--cdf-space-1) var(--cdf-space-3);
+  background: var(--bg);
+  color: var(--cdf-color-text);
+  border-radius: var(--cdf-radius-pill);
+  font-weight: var(--cdf-font-weight-semibold);
+  font-size: var(--cdf-font-size-sm);
+  border: 1px solid var(--border);
+  font-feature-settings: 'tnum';
+
+  cdf-icon {
+    color: var(--flame-color);
+  }
+
+  &__days {
+    color: var(--flame-color);
+  }
+
+  &__label,
+  &__sep {
+    color: var(--cdf-color-text-muted);
+    font-weight: var(--cdf-font-weight-normal);
+  }
+
+  &__freezes {
+    color: #38bdf8;
+    font-weight: var(--cdf-font-weight-medium);
+  }
+}
+
+// Tier escalation: brighter at week, glow at month, prestige at year.
+:host([data-tier='week']) {
+  --flame-color: #ea580c;
+  --bg: rgba(234, 88, 12, 0.12);
+}
+
+:host([data-tier='month']) {
+  --flame-color: #dc2626;
+  --bg: rgba(220, 38, 38, 0.14);
+  --border: rgba(220, 38, 38, 0.35);
+
+  .cdf-streak {
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.2),
+                0 0 12px rgba(220, 38, 38, 0.15);
+  }
+}
+
+:host([data-tier='century']),
+:host([data-tier='year']) {
+  --flame-color: var(--cdf-color-premium);
+  --bg: linear-gradient(90deg, rgba(212, 175, 55, 0.18), rgba(249, 115, 22, 0.18));
+  --border: rgba(212, 175, 55, 0.5);
+
+  .cdf-streak {
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.3),
+                0 0 16px rgba(249, 115, 22, 0.2);
+  }
+}
+
+// Cold (no streak today) — flame goes grey, no glow.
+:host([data-cold]) {
+  --flame-color: var(--cdf-color-text-subtle);
+  --bg: var(--cdf-color-surface);
+  --border: var(--cdf-color-border);
+}

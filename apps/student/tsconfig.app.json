@@ -14,9 +14,6 @@
   ],
   "references": [
     {
-      "path": "../../libs/ui-core/tsconfig.lib.json"
-    },
-    {
       "path": "../../libs/ui-ionic/tsconfig.lib.json"
     },
     {
