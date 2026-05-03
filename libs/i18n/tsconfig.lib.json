@@ -8,7 +8,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "lib": ["es2022", "dom"],
-    "types": ["node"]
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*.ts", "src/**/*.json"],
   "references": [],

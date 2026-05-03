@@ -271,9 +271,15 @@ importers:
 
   libs/i18n:
     dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
+      '@angular/common':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)
+      '@ngx-translate/core':
+        specifier: ^17.0.0
+        version: 17.0.0(@angular/common@21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2))
 
   libs/lesson-schema:
     dependencies:
@@ -304,9 +310,9 @@ importers:
 
   libs/ui-core:
     dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
+      zod:
+        specifier: ^4.4.2
+        version: 4.4.2
 
   libs/ui-tokens: {}
 
