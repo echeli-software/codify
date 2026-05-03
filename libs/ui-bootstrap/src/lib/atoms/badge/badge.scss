@@ -1,0 +1,90 @@
+:host {
+  display: inline-flex;
+}
+
+.cdf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-1);
+  padding: 2px var(--cdf-space-2);
+  border-radius: var(--cdf-radius-pill);
+  font-size: var(--cdf-font-size-xs);
+  font-weight: var(--cdf-font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+
+  // Solid variants — strong color, white text
+  &--neutral {
+    background: var(--cdf-color-text-muted);
+    color: var(--cdf-color-bg);
+  }
+  &--primary {
+    background: var(--cdf-color-primary);
+    color: var(--cdf-color-primary-on);
+  }
+  &--success {
+    background: var(--cdf-color-success);
+    color: #fff;
+  }
+  &--warning {
+    background: var(--cdf-color-warning);
+    color: #000;
+  }
+  &--danger {
+    background: var(--cdf-color-danger);
+    color: #fff;
+  }
+  &--info {
+    background: var(--cdf-color-info);
+    color: #fff;
+  }
+  &--coin {
+    background: var(--cdf-color-coin);
+    color: #000;
+  }
+  &--xp {
+    background: var(--cdf-color-xp);
+    color: #fff;
+  }
+  &--premium {
+    background: var(--cdf-color-premium);
+    color: #000;
+  }
+
+  // Subtle variants — muted background, colored text
+  &--subtle {
+    background: var(--cdf-color-surface);
+    border-color: var(--cdf-color-border);
+
+    &.cdf-badge--primary {
+      color: var(--cdf-color-primary);
+      background: var(--cdf-color-primary-subtle);
+      border-color: transparent;
+    }
+    &.cdf-badge--success {
+      color: var(--cdf-color-success);
+    }
+    &.cdf-badge--warning {
+      color: var(--cdf-color-warning);
+    }
+    &.cdf-badge--danger {
+      color: var(--cdf-color-danger);
+    }
+    &.cdf-badge--info {
+      color: var(--cdf-color-info);
+    }
+    &.cdf-badge--coin {
+      color: var(--cdf-color-coin);
+    }
+    &.cdf-badge--xp {
+      color: var(--cdf-color-xp);
+    }
+    &.cdf-badge--premium {
+      color: var(--cdf-color-premium);
+    }
+    &.cdf-badge--neutral {
+      color: var(--cdf-color-text-muted);
+    }
+  }
+}

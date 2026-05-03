@@ -1,49 +1,113 @@
 <main class="shell">
   <header class="topbar">
-    <div class="brand">Codify · Admin</div>
+    <div class="brand">
+      <cdf-icon name="gear" size="md" />
+      <span>Codify · Admin</span>
+    </div>
 
-    <div class="actions">
-      <label class="control">
-        {{ 'common.language' | translate }}
-        <select [value]="locale()" (change)="setLocale($any($event.target).value)">
-          @for (loc of availableLocales; track loc.code) {
-          <option [value]="loc.code">{{ loc.nativeName }}</option>
-          }
-        </select>
-      </label>
-
-      <fieldset class="theme-toggle">
-        <legend class="visually-hidden">{{ 'common.theme.label' | translate }}</legend>
-        <button
-          type="button"
-          [class.active]="theme() === 'light'"
-          (click)="setTheme('light')"
-        >
-          {{ 'common.theme.light' | translate }}
-        </button>
-        <button
-          type="button"
-          [class.active]="theme() === 'dark'"
-          (click)="setTheme('dark')"
-        >
-          {{ 'common.theme.dark' | translate }}
-        </button>
-        <button
-          type="button"
-          [class.active]="theme() === 'system'"
-          (click)="setTheme('system')"
-        >
-          {{ 'common.theme.system' | translate }}
-        </button>
-      </fieldset>
+    <div class="user">
+      <cdf-avatar name="Maria Souza" size="md" />
+      <span class="user__name">Maria Souza</span>
+      <cdf-badge variant="premium" [subtle]="true">Premium</cdf-badge>
     </div>
   </header>
 
   <section class="content">
-    <h1>{{ 'common.settings' | translate }}</h1>
-    <p class="muted">
-      Phase 1 demo · tokens + i18n wired. Switch the theme and language above to verify.
-    </p>
+    <h1>Phase 2 atoms</h1>
+    <p class="muted">All atoms below come from <code>&#64;codify/ui-bootstrap</code>.</p>
+
+    <div class="row">
+      <label class="control">
+        {{ 'common.language' | translate }}
+        <cdf-input [ngModel]="locale()" [readonly]="true" />
+      </label>
+      <select [value]="locale()" (change)="setLocale($any($event.target).value)" aria-label="Locale">
+        @for (loc of availableLocales; track loc.code) {
+        <option [value]="loc.code">{{ loc.nativeName }}</option>
+        }
+      </select>
+    </div>
+
+    <h2>Buttons</h2>
+    <div class="row">
+      <cdf-button kind="primary"><cdf-icon name="plus" size="sm" />New course</cdf-button>
+      <cdf-button kind="secondary">{{ 'common.save' | translate }}</cdf-button>
+      <cdf-button kind="ghost"><cdf-icon name="pencil" size="sm" />Edit</cdf-button>
+      <cdf-button kind="danger"><cdf-icon name="trash" size="sm" />Delete</cdf-button>
+      <cdf-button kind="link">Link</cdf-button>
+      <cdf-button kind="primary" [loading]="true">Saving</cdf-button>
+      <cdf-button kind="primary" [disabled]="true">Disabled</cdf-button>
+    </div>
+
+    <h2>Sizes</h2>
+    <div class="row">
+      <cdf-button size="sm">Small</cdf-button>
+      <cdf-button size="md">Medium</cdf-button>
+      <cdf-button size="lg">Large</cdf-button>
+    </div>
+
+    <h2>Badges</h2>
+    <div class="row">
+      <cdf-badge variant="primary">Primary</cdf-badge>
+      <cdf-badge variant="success">Published</cdf-badge>
+      <cdf-badge variant="warning">Draft</cdf-badge>
+      <cdf-badge variant="danger">Failing</cdf-badge>
+      <cdf-badge variant="info">New</cdf-badge>
+      <cdf-badge variant="coin">+25 coins</cdf-badge>
+      <cdf-badge variant="xp">+10 XP</cdf-badge>
+      <cdf-badge variant="premium">Premium only</cdf-badge>
+      <cdf-badge variant="success" [subtle]="true">Subtle</cdf-badge>
+    </div>
+
+    <h2>Tags</h2>
+    <div class="row">
+      @for (tag of tags(); track tag) {
+      <cdf-tag [removable]="true" (remove)="removeTag(tag)">{{ tag }}</cdf-tag>
+      }
+    </div>
+
+    <h2>Form controls</h2>
+    <div class="form-grid">
+      <label class="control">
+        Display name
+        <cdf-input [(ngModel)]="nameValue" placeholder="e.g. Maria Souza" />
+      </label>
+
+      <label class="control">
+        Bio
+        <cdf-textarea [(ngModel)]="bioValue" placeholder="A short blurb…" [rows]="3" />
+      </label>
+
+      <cdf-checkbox [(ngModel)]="acceptTerms" label="I accept the terms" />
+
+      <cdf-toggle [(ngModel)]="notifyOn" label="Email notifications" />
+
+      <cdf-input [ngModel]="''" [invalid]="true" placeholder="Invalid example" />
+    </div>
+
+    <h2>Spinner & icons</h2>
+    <div class="row">
+      <cdf-spinner size="sm" label="Loading" />
+      <cdf-spinner label="Loading" />
+      <cdf-spinner size="lg" label="Loading" />
+      <cdf-icon name="check-circle" size="xl" />
+      <cdf-icon name="warning" size="xl" />
+      <cdf-icon name="x-circle" size="xl" />
+    </div>
+
+    <h2>Theme + locale</h2>
+    <div class="row">
+      <cdf-button kind="ghost" (click)="setTheme('light')" [class.active]="theme() === 'light'">
+        <cdf-icon name="sun" size="sm" /> {{ 'common.theme.light' | translate }}
+      </cdf-button>
+      <cdf-button kind="ghost" (click)="setTheme('dark')" [class.active]="theme() === 'dark'">
+        <cdf-icon name="moon" size="sm" /> {{ 'common.theme.dark' | translate }}
+      </cdf-button>
+      <cdf-button kind="ghost" (click)="setTheme('system')" [class.active]="theme() === 'system'">
+        {{ 'common.theme.system' | translate }}
+      </cdf-button>
+    </div>
+
     <router-outlet />
   </section>
 </main>

@@ -1,4 +1,5 @@
 @use 'pkg:@codify/ui-tokens' as cdf;
+@use 'pkg:@codify/ui-bootstrap/scss/bootstrap';
 
 :root {
   @include cdf.theme-light;
