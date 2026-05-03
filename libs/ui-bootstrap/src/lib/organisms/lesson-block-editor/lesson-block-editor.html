@@ -1,0 +1,173 @@
+<div class="cdf-lesson-editor" [class.cdf-lesson-editor--readonly]="readonly()">
+  @if (!readonly()) {
+  <div class="cdf-lesson-editor__toolbar" role="toolbar" aria-label="Lesson editor">
+    <div class="cdf-lesson-editor__group">
+      <cdf-icon-button
+        icon="pencil"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Heading 2"
+        cdfTooltip="Heading 2"
+        [pressed]="state().h2"
+        (click)="toggleHeading(2)"
+      />
+      <cdf-icon-button
+        icon="pencil"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Heading 3"
+        cdfTooltip="Heading 3"
+        [pressed]="state().h3"
+        (click)="toggleHeading(3)"
+      />
+      <cdf-icon-button
+        icon="menu"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Paragraph"
+        cdfTooltip="Paragraph"
+        [pressed]="state().paragraph && !state().h2 && !state().h3"
+        (click)="toggleParagraph()"
+      />
+    </div>
+
+    <span class="cdf-lesson-editor__sep" aria-hidden="true"></span>
+
+    <div class="cdf-lesson-editor__group">
+      <button
+        type="button"
+        class="cdf-lesson-editor__btn"
+        [class.cdf-lesson-editor__btn--active]="state().bold"
+        (click)="toggleMark('bold')"
+        cdfTooltip="Bold"
+      >
+        <strong>B</strong>
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__btn"
+        [class.cdf-lesson-editor__btn--active]="state().italic"
+        (click)="toggleMark('italic')"
+        cdfTooltip="Italic"
+      >
+        <em>I</em>
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__btn cdf-lesson-editor__btn--mono"
+        [class.cdf-lesson-editor__btn--active]="state().code"
+        (click)="toggleMark('code')"
+        cdfTooltip="Inline code"
+      >
+        &lt;/&gt;
+      </button>
+      <cdf-icon-button
+        icon="pencil"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Link"
+        cdfTooltip="Link"
+        [pressed]="state().link"
+        (click)="setLink()"
+      />
+    </div>
+
+    <span class="cdf-lesson-editor__sep" aria-hidden="true"></span>
+
+    <div class="cdf-lesson-editor__group">
+      <cdf-icon-button
+        icon="menu"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Bulleted list"
+        cdfTooltip="Bulleted list"
+        [pressed]="state().bulletList"
+        (click)="toggleList('bulletList')"
+      />
+      <cdf-icon-button
+        icon="menu"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Numbered list"
+        cdfTooltip="Numbered list"
+        [pressed]="state().orderedList"
+        (click)="toggleList('orderedList')"
+      />
+      <cdf-icon-button
+        icon="pencil"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Quote"
+        cdfTooltip="Quote"
+        [pressed]="state().blockquote"
+        (click)="toggleBlockquote()"
+      />
+      <cdf-icon-button
+        icon="pencil"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Code block"
+        cdfTooltip="Code block"
+        [pressed]="state().codeBlock"
+        (click)="toggleCodeBlock()"
+      />
+      <cdf-icon-button
+        icon="menu"
+        kind="ghost"
+        size="sm"
+        ariaLabel="Divider"
+        cdfTooltip="Insert divider"
+        (click)="insertDivider()"
+      />
+    </div>
+
+    <span class="cdf-lesson-editor__sep" aria-hidden="true"></span>
+
+    <div class="cdf-lesson-editor__group">
+      <button
+        type="button"
+        class="cdf-lesson-editor__callout cdf-lesson-editor__callout--info"
+        [class.cdf-lesson-editor__btn--active]="state().callout"
+        (click)="setCallout('info')"
+        cdfTooltip="Info callout"
+      >
+        <cdf-icon name="info" size="xs" /> Info
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__callout cdf-lesson-editor__callout--tip"
+        (click)="setCallout('tip')"
+        cdfTooltip="Tip callout"
+      >
+        <cdf-icon name="check-circle" size="xs" /> Tip
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__callout cdf-lesson-editor__callout--warn"
+        (click)="setCallout('warn')"
+        cdfTooltip="Warning callout"
+      >
+        <cdf-icon name="warning" size="xs" /> Warn
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__callout cdf-lesson-editor__callout--danger"
+        (click)="setCallout('danger')"
+        cdfTooltip="Danger callout"
+      >
+        <cdf-icon name="x-circle" size="xs" /> Danger
+      </button>
+      <button
+        type="button"
+        class="cdf-lesson-editor__callout cdf-lesson-editor__callout--success"
+        (click)="setCallout('success')"
+        cdfTooltip="Success callout"
+      >
+        <cdf-icon name="check-circle" size="xs" /> Success
+      </button>
+    </div>
+  </div>
+  }
+
+  <div #editorHost class="cdf-lesson-editor__surface"></div>
+</div>

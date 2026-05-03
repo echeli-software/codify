@@ -73,3 +73,5 @@ export {
   type PlanCategoryRef,
 } from './lib/organisms/plan-feature-list/plan-feature-list.js';
 export { JsonEditor } from './lib/organisms/json-editor/json-editor.js';
+export { LessonBlockEditor } from './lib/organisms/lesson-block-editor/lesson-block-editor.js';
+export { LessonBlockRenderer } from './lib/organisms/lesson-block-renderer/lesson-block-renderer.js';

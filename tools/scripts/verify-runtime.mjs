@@ -58,6 +58,16 @@ const APPS = [
           '.cdf-table th', // sortable headers rendered
         ],
       },
+      {
+        path: '/lessons',
+        expectSelectors: [
+          'app-root',
+          '.cdf-shell',
+          '.cdf-lesson-editor',
+          '.cdf-lesson-editor__toolbar',
+          '.cdf-lesson-editor__surface .ProseMirror',
+        ],
+      },
     ],
     ignoreConsole: [
       /\[vite\]/i,

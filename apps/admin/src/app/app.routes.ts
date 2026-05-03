@@ -9,5 +9,9 @@ export const appRoutes: Route[] = [
     path: 'courses',
     loadComponent: () => import('./pages/courses.page').then((m) => m.CoursesPage),
   },
+  {
+    path: 'lessons',
+    loadComponent: () => import('./pages/lessons.page').then((m) => m.LessonsPage),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'playground' },
 ];

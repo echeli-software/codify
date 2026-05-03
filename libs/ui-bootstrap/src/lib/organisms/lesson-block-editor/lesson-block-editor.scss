@@ -1,0 +1,118 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cdf-lesson-editor {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-md);
+  background: var(--cdf-color-surface);
+  overflow: hidden;
+
+  &--readonly {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    padding: var(--cdf-space-2);
+    background: var(--cdf-color-bg);
+    border-bottom: 1px solid var(--cdf-color-border);
+    position: sticky;
+    top: 0;
+    z-index: var(--cdf-z-sticky);
+  }
+
+  &__group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 20px;
+    background: var(--cdf-color-border);
+    margin: 0 var(--cdf-space-1);
+  }
+
+  &__btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 var(--cdf-space-2);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--cdf-radius-sm);
+    color: var(--cdf-color-text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--cdf-font-size-sm);
+
+    &:hover {
+      background: var(--cdf-color-primary-subtle);
+      color: var(--cdf-color-primary);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &--active {
+      background: var(--cdf-color-primary);
+      color: var(--cdf-color-primary-on);
+
+      &:hover {
+        background: var(--cdf-color-primary-hover);
+        color: var(--cdf-color-primary-on);
+      }
+    }
+
+    &--mono {
+      font-family: var(--cdf-font-family-mono);
+      font-size: 0.85em;
+    }
+  }
+
+  &__callout {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    padding: 0 var(--cdf-space-2);
+    height: 28px;
+    border-radius: var(--cdf-radius-sm);
+    font-family: inherit;
+    font-size: var(--cdf-font-size-xs);
+    font-weight: var(--cdf-font-weight-medium);
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text-muted);
+
+    &:hover {
+      background: var(--cdf-color-bg);
+    }
+
+    &--info    { color: var(--cdf-color-info); }
+    &--tip     { color: var(--cdf-color-success); }
+    &--warn    { color: var(--cdf-color-warning); }
+    &--danger  { color: var(--cdf-color-danger); }
+    &--success { color: var(--cdf-color-success); }
+  }
+
+  // The actual prose styling for `.ProseMirror` content lives in the global
+  // `lesson-prose.scss` (so the read-only renderer can share it). Here we
+  // only set the surface chrome.
+  &__surface {
+    padding: var(--cdf-space-5) var(--cdf-space-6);
+    min-height: 280px;
+    overflow-y: auto;
+    color: var(--cdf-color-text);
+  }
+}

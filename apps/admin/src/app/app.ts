@@ -24,6 +24,7 @@ export class App {
       label: 'Catalog',
       items: [
         { label: 'Courses', icon: 'pencil', routerLink: ['/courses'], badge: '5' },
+        { label: 'Lesson editor', icon: 'pencil', routerLink: ['/lessons'] },
       ],
     },
   ];

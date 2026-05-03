@@ -1,0 +1,121 @@
+// Prose styling for Tiptap-rendered lesson content. Applied globally because:
+//   1. Tiptap creates `.ProseMirror`-classed DOM inside our editor component;
+//      Angular's component-scoped SCSS can't reach it without ::ng-deep.
+//   2. The read-only renderer mounts the same DOM structure — both surfaces
+//      should look identical.
+//
+// Apps import via:  @use 'pkg:@codify/ui-bootstrap/scss/lesson-prose';
+
+.cdf-prose,
+.ProseMirror {
+  outline: none;
+  font-size: var(--cdf-font-size-base);
+  line-height: var(--cdf-line-height-relaxed);
+  color: var(--cdf-color-text);
+
+  > * + * {
+    margin-top: var(--cdf-space-3);
+  }
+
+  h2 {
+    font-size: var(--cdf-font-size-2xl);
+    font-weight: var(--cdf-font-weight-semibold);
+    margin-top: var(--cdf-space-6);
+    margin-bottom: var(--cdf-space-2);
+    line-height: var(--cdf-line-height-snug);
+  }
+
+  h3 {
+    font-size: var(--cdf-font-size-xl);
+    font-weight: var(--cdf-font-weight-semibold);
+    margin-top: var(--cdf-space-5);
+    margin-bottom: var(--cdf-space-2);
+    line-height: var(--cdf-line-height-snug);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--cdf-color-primary);
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--cdf-color-primary-hover);
+    }
+  }
+
+  code {
+    font-family: var(--cdf-font-family-mono);
+    background: var(--cdf-color-bg);
+    padding: 1px 6px;
+    border-radius: var(--cdf-radius-sm);
+    border: 1px solid var(--cdf-color-border);
+    font-size: 0.9em;
+  }
+
+  pre {
+    background: var(--cdf-color-text);
+    color: var(--cdf-color-bg);
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    border-radius: var(--cdf-radius-md);
+    overflow-x: auto;
+
+    code {
+      background: transparent;
+      border: none;
+      color: inherit;
+      font-size: var(--cdf-font-size-sm);
+      padding: 0;
+    }
+  }
+
+  blockquote {
+    border-left: 3px solid var(--cdf-color-primary);
+    padding-left: var(--cdf-space-4);
+    color: var(--cdf-color-text-muted);
+    font-style: italic;
+    margin: 0;
+  }
+
+  ul, ol {
+    padding-left: var(--cdf-space-6);
+  }
+
+  li > p {
+    margin: 0;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--cdf-color-border);
+    margin: var(--cdf-space-6) 0;
+  }
+
+  .cdf-callout {
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    border-radius: var(--cdf-radius-md);
+    border-left: 4px solid var(--cdf-color-info);
+    background: var(--cdf-color-bg);
+
+    &[data-callout='info']    { border-left-color: var(--cdf-color-info); }
+    &[data-callout='tip']     { border-left-color: var(--cdf-color-success); }
+    &[data-callout='warn']    { border-left-color: var(--cdf-color-warning); }
+    &[data-callout='danger']  { border-left-color: var(--cdf-color-danger); }
+    &[data-callout='success'] { border-left-color: var(--cdf-color-success); }
+
+    > * + * {
+      margin-top: var(--cdf-space-2);
+    }
+  }
+
+  // Tiptap Placeholder extension
+  p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--cdf-color-text-subtle);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}

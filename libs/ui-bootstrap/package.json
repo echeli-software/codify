@@ -13,6 +13,7 @@
       "default": "./src/index.ts"
     },
     "./scss/bootstrap": "./src/scss/bootstrap.scss",
+    "./scss/lesson-prose": "./src/scss/lesson-prose.scss",
     "./package.json": "./package.json"
   },
   "nx": {

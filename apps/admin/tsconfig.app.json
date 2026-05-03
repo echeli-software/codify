@@ -14,6 +14,9 @@
   ],
   "references": [
     {
+      "path": "../../libs/lesson-schema/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/ui-bootstrap/tsconfig.lib.json"
     },
     {

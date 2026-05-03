@@ -18,6 +18,9 @@
   ],
   "references": [
     {
+      "path": "../lesson-schema/tsconfig.lib.json"
+    },
+    {
       "path": "../ui-core/tsconfig.lib.json"
     },
     {
