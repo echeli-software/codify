@@ -63,6 +63,25 @@
   @media (min-width: 1024px) {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  &__btn {
+    all: unset;
+    cursor: pointer;
+    display: block;
+    border-radius: var(--cdf-radius-lg);
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--cdf-color-bg);
 }
 
 h2 {

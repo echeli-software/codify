@@ -84,11 +84,30 @@ const APPS = [
         expectSelectors: [
           'app-root',
           'ion-app',
-          'ion-router-outlet',
+          'ion-tabs',
+          'ion-tab-bar',
           'ion-content',
           'ion-card',
           'ion-progress-bar',
+          'cdf-streak-widget',
+          'cdf-daily-quest-list',
         ],
+      },
+      {
+        path: '/catalog',
+        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
+      },
+      {
+        path: '/avatar',
+        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
+      },
+      {
+        path: '/shop',
+        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
+      },
+      {
+        path: '/profile',
+        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
       },
     ],
     ignoreConsole: [/\[vite\]/i, /Angular is running in development mode/i],

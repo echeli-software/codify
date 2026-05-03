@@ -1,0 +1,66 @@
+.cdf-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cdf-space-3);
+  margin-bottom: var(--cdf-space-2);
+}
+
+.cdf-preview__author {
+  margin: 0;
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text-muted);
+}
+
+.cdf-preview__desc {
+  margin: 0 0 var(--cdf-space-3);
+  font-size: var(--cdf-font-size-md);
+  color: var(--cdf-color-text);
+  line-height: var(--cdf-line-height-relaxed, 1.5);
+}
+
+.cdf-preview__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cdf-space-1);
+  margin-bottom: var(--cdf-space-3);
+}
+
+.cdf-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cdf-space-3);
+  margin-bottom: var(--cdf-space-3);
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text-muted);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.cdf-preview__section-title {
+  margin: var(--cdf-space-3) 0 var(--cdf-space-2);
+  font-size: var(--cdf-font-size-md);
+  font-weight: var(--cdf-font-weight-semibold);
+}
+
+.cdf-preview__more {
+  margin: var(--cdf-space-2) 0 0;
+  text-align: center;
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text-muted);
+}
+
+.cdf-preview__cta {
+  display: flex;
+  justify-content: stretch;
+  margin-top: var(--cdf-space-4);
+
+  cdf-app-button,
+  ::ng-deep cdf-app-button > * {
+    width: 100%;
+  }
+}

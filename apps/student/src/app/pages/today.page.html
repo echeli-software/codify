@@ -29,6 +29,13 @@
     </div>
   </cdf-app-card>
 
+  <h2>Streak</h2>
+  <cdf-streak-widget
+    [currentDays]="demoStreak"
+    [freezes]="demoFreezes"
+    [week]="streakWeek"
+  />
+
   <h2>Continue learning</h2>
   @if (catalogLoading()) {
   <ion-list inset="true">
@@ -52,29 +59,7 @@
   }
 
   <h2>Daily quests</h2>
-  <ion-list inset="true">
-    <cdf-lesson-item
-      title="Complete 1 React lesson"
-      subtitle="0 / 1"
-      type="reading"
-      status="not-started"
-      [estimateMinutes]="null"
-    />
-    <cdf-lesson-item
-      title="Earn 100 XP today"
-      subtitle="20 / 100"
-      type="quiz"
-      status="in-progress"
-      [estimateMinutes]="null"
-    />
-    <cdf-lesson-item
-      title="Pass an exercise"
-      subtitle="0 / 1"
-      type="exercise"
-      status="not-started"
-      [estimateMinutes]="null"
-    />
-  </ion-list>
+  <cdf-daily-quest-list [quests]="dailyQuests" />
 
   <h2>Recent reward</h2>
   <div class="reward-row">
@@ -101,19 +86,33 @@
   } @else {
   <div class="rec-grid">
     @for (rec of recommendations; track rec.id) {
-    <cdf-course-card
-      [title]="rec.title"
-      [author]="rec.author"
-      [lessonCount]="rec.lessonCount"
-      [estimatedMinutes]="rec.estimatedMinutes"
-      [difficulty]="rec.difficulty"
-      [categories]="rec.categories"
-      [hasFreePreview]="rec.hasFreePreview"
-      [premiumOnly]="rec.premiumOnly ?? false"
-    />
+    <button type="button" class="rec-grid__btn" (click)="openPreview(rec)">
+      <cdf-course-card
+        [title]="rec.title"
+        [author]="rec.author"
+        [lessonCount]="rec.lessonCount"
+        [estimatedMinutes]="rec.estimatedMinutes"
+        [difficulty]="rec.difficulty"
+        [categories]="rec.categories"
+        [hasFreePreview]="rec.hasFreePreview"
+        [premiumOnly]="rec.premiumOnly ?? false"
+      />
+    </button>
     }
   </div>
   }
+
+  <h2>Try the surfaces</h2>
+  <cdf-app-card>
+    <div class="settings-grid">
+      <cdf-app-button kind="primary" (buttonClick)="paywallOpen.set(true)">
+        Open paywall
+      </cdf-app-button>
+      <cdf-app-button kind="secondary" (buttonClick)="onboardingOpen.set(true)">
+        Open onboarding
+      </cdf-app-button>
+    </div>
+  </cdf-app-card>
 
   <h2>Settings</h2>
   <cdf-app-card>
@@ -128,4 +127,30 @@
       <cdf-app-checkbox [(ngModel)]="acceptTerms" label="Sync progress across devices" />
     </div>
   </cdf-app-card>
+
+  <cdf-course-preview-modal
+    [open]="previewCourse() !== null"
+    [course]="previewCourse()"
+    (closed)="previewCourse.set(null)"
+    (startClicked)="onPreviewStart($event)"
+    (unlockClicked)="onPreviewUnlock($event)"
+  />
+
+  <cdf-paywall-sheet
+    [open]="paywallOpen()"
+    reason="soft"
+    [content]="paywallContent"
+    (dismissed)="paywallOpen.set(false)"
+    (selected)="onPaywallSelected($event)"
+  />
+
+  @if (onboardingOpen()) {
+  <div class="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Onboarding">
+    <cdf-onboarding-carousel
+      [slides]="onboardingSlides"
+      (skipped)="onboardingOpen.set(false)"
+      (completed)="onboardingOpen.set(false)"
+    />
+  </div>
+  }
 </ion-content>

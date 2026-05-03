@@ -1,0 +1,45 @@
+:host {
+  display: block;
+}
+
+.cdf-quest {
+  --padding-start: var(--cdf-space-3);
+  --inner-padding-end: var(--cdf-space-3);
+  --background: var(--cdf-color-surface);
+
+  cdf-icon[slot='start'] {
+    color: var(--cdf-color-primary);
+    margin-inline-end: var(--cdf-space-3);
+  }
+
+  &--done {
+    cdf-icon[slot='start'] {
+      color: var(--cdf-color-success);
+    }
+    ion-label h3,
+    .cdf-quest__count {
+      color: var(--cdf-color-text-muted);
+      text-decoration: line-through;
+    }
+  }
+}
+
+.cdf-quest__progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--cdf-space-2);
+  margin: var(--cdf-space-1) 0 var(--cdf-space-1);
+}
+
+.cdf-quest__count {
+  font-size: var(--cdf-font-size-xs);
+  color: var(--cdf-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cdf-quest__rewards {
+  display: flex;
+  align-items: center;
+  gap: var(--cdf-space-2);
+  margin-inline-start: var(--cdf-space-3);
+}

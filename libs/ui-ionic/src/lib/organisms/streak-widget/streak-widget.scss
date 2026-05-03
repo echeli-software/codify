@@ -1,0 +1,89 @@
+:host {
+  display: block;
+}
+
+.cdf-streak-widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-3);
+  padding: var(--cdf-space-4);
+  background: var(--cdf-color-surface);
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-lg);
+}
+
+.cdf-streak-widget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cdf-space-3);
+}
+
+.cdf-streak-widget__title {
+  font-size: var(--cdf-font-size-md);
+  font-weight: var(--cdf-font-weight-semibold);
+  margin: 0;
+}
+
+.cdf-streak-widget__week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--cdf-space-1);
+}
+
+.cdf-streak-widget__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cdf-streak-widget__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cdf-color-bg);
+  border: 1px solid var(--cdf-color-border);
+  color: var(--cdf-color-text-muted);
+  font-size: 14px;
+}
+
+.cdf-streak-widget__day--done .cdf-streak-widget__dot {
+  background: linear-gradient(135deg, #ff7a00, #ff3b30);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.18);
+}
+
+.cdf-streak-widget__day--frozen .cdf-streak-widget__dot {
+  background: var(--cdf-color-info-subtle, #e3f2fd);
+  color: var(--cdf-color-info, #0288d1);
+  border-color: var(--cdf-color-info, #0288d1);
+}
+
+.cdf-streak-widget__day-label {
+  font-size: var(--cdf-font-size-xs);
+  color: var(--cdf-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cdf-streak-widget__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cdf-space-3);
+  padding-top: var(--cdf-space-2);
+  border-top: 1px solid var(--cdf-color-border);
+}
+
+.cdf-streak-widget__msg {
+  margin: 0;
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text);
+}

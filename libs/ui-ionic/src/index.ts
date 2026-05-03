@@ -65,3 +65,30 @@ export {
 export { EmptyState } from './lib/molecules/empty-state/empty-state.js';
 export { RewardToast } from './lib/molecules/reward-toast/reward-toast.js';
 export { AvatarWithFrame } from './lib/molecules/avatar-with-frame/avatar-with-frame.js';
+
+// ─── Organisms ───────────────────────────────────────────────────────────
+export { AppShell, type ShellTab } from './lib/organisms/app-shell/app-shell.js';
+export {
+  DailyQuestList,
+  type DailyQuest,
+  type DailyQuestKind,
+} from './lib/organisms/daily-quest-list/daily-quest-list.js';
+export {
+  StreakWidget,
+  type StreakDay,
+} from './lib/organisms/streak-widget/streak-widget.js';
+export {
+  CoursePreviewModal,
+  type CoursePreview,
+  type CoursePreviewLesson,
+} from './lib/organisms/course-preview-modal/course-preview-modal.js';
+export {
+  PaywallSheet,
+  type PaywallReason,
+  type PaywallPlan,
+  type PaywallContent,
+} from './lib/organisms/paywall-sheet/paywall-sheet.js';
+export {
+  OnboardingCarousel,
+  type OnboardingSlide,
+} from './lib/organisms/onboarding-carousel/onboarding-carousel.js';
