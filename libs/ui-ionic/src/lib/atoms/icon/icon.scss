@@ -1,0 +1,17 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  color: currentColor;
+
+  ion-icon {
+    color: currentColor;
+  }
+}
+
+:host([data-size='xs']) ion-icon { font-size: 12px; }
+:host([data-size='sm']) ion-icon { font-size: 16px; }
+:host([data-size='md']) ion-icon { font-size: 20px; }
+:host([data-size='lg']) ion-icon { font-size: 24px; }
+:host([data-size='xl']) ion-icon { font-size: 32px; }

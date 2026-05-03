@@ -94,6 +94,7 @@
     "@codify/i18n": "workspace:*",
     "@codify/ui-bootstrap": "workspace:*",
     "@codify/ui-core": "workspace:*",
+    "@codify/ui-ionic": "workspace:*",
     "@codify/ui-tokens": "workspace:*",
     "@ionic/angular": "^8.8.5",
     "@ionic/core": "^8.8.5",

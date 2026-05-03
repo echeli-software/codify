@@ -1,0 +1,21 @@
+:host {
+  display: block;
+
+  ion-card {
+    --background: var(--cdf-color-surface);
+    --color: var(--cdf-color-text);
+    border-radius: var(--cdf-radius-lg);
+    margin: 0 0 var(--cdf-space-3);
+    box-shadow: var(--cdf-shadow-2);
+  }
+}
+
+:host([data-elevation='flat']) ion-card {
+  box-shadow: none;
+  border: 1px solid var(--cdf-color-border);
+}
+
+:host([data-padding='none']) ion-card-content { padding: 0; }
+:host([data-padding='compact']) ion-card-content { padding: var(--cdf-space-3); }
+:host([data-padding='normal']) ion-card-content { padding: var(--cdf-space-4); }
+:host([data-padding='spacious']) ion-card-content { padding: var(--cdf-space-6); }

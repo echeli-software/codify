@@ -12,7 +12,12 @@ module.exports = {
       },
     ],
   },
-  transformIgnorePatterns: ['node_modules/(?!.*\\.mjs$)'],
+  // Ionic + ionicons + @stencil ship native ESM `.js` files that Jest
+  // can't parse without transformation. Pattern handles pnpm's `.pnpm/`
+  // nested layout via leading `.*` wildcards.
+  transformIgnorePatterns: [
+    'node_modules/(?!(?:.*\\.mjs$|.*@ionic|.*ionicons|.*@stencil))',
+  ],
   snapshotSerializers: [
     'jest-preset-angular/build/serializers/no-ng-attributes',
     'jest-preset-angular/build/serializers/ng-snapshot',

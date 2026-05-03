@@ -1,0 +1,24 @@
+:host {
+  display: inline-flex;
+  color: var(--cdf-color-primary);
+
+  ion-spinner {
+    color: currentColor;
+  }
+}
+
+:host([data-size='sm']) ion-spinner { width: 16px; height: 16px; }
+:host([data-size='md']) ion-spinner { width: 24px; height: 24px; }
+:host([data-size='lg']) ion-spinner { width: 36px; height: 36px; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

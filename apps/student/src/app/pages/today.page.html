@@ -4,9 +4,9 @@
     <ion-buttons slot="end">
       <ion-button (click)="toggleTheme()" aria-label="Toggle theme">
         @if (theme() === 'dark') {
-        <ion-icon slot="icon-only" name="sunny" />
+        <cdf-icon slot="icon-only" name="sun" />
         } @else {
-        <ion-icon slot="icon-only" name="moon" />
+        <cdf-icon slot="icon-only" name="moon" />
         }
       </ion-button>
     </ion-buttons>
@@ -15,38 +15,28 @@
 
 <ion-content [fullscreen]="true" class="ion-padding">
   <div class="hero">
-    <ion-chip color="warning">
-      <ion-icon name="flame" />
-      <ion-label>{{ demoStreak }} day streak</ion-label>
-    </ion-chip>
-    <ion-chip color="primary">
-      <ion-icon name="trophy" />
-      <ion-label>{{ demoTier() }} · Level {{ demoLevel() }}</ion-label>
-    </ion-chip>
+    <cdf-app-chip variant="warning">
+      <cdf-icon name="flame" size="sm" />
+      <span>{{ demoStreak }} day streak</span>
+    </cdf-app-chip>
+    <cdf-app-chip variant="primary">
+      <cdf-icon name="trophy" size="sm" />
+      <span>{{ demoTier() }} · Level {{ demoLevel() }}</span>
+    </cdf-app-chip>
   </div>
 
-  <ion-card>
-    <ion-card-content>
-      <div class="level-row">
-        <strong>Level {{ demoLevel() }}</strong>
-        <ion-note>{{ demoLevelProgress() }}% to next</ion-note>
-      </div>
-      <ion-progress-bar [value]="progressFraction()" color="primary" />
+  <cdf-app-card>
+    <div class="level-row">
+      <strong>Level {{ demoLevel() }}</strong>
+      <ion-note>{{ demoLevelProgress() }}% to next</ion-note>
+    </div>
+    <ion-progress-bar [value]="progressFraction()" color="primary" />
 
-      <div class="stats">
-        <div class="stat">
-          <ion-icon name="sparkles" />
-          <span class="stat__value">{{ xpLabel() }}</span>
-          <span class="stat__label">XP</span>
-        </div>
-        <div class="stat">
-          <span class="coin">●</span>
-          <span class="stat__value">{{ coinLabel() }}</span>
-          <span class="stat__label">coins</span>
-        </div>
-      </div>
-    </ion-card-content>
-  </ion-card>
+    <div class="stats">
+      <cdf-xp-badge [value]="demoXp" size="md" />
+      <cdf-coin-badge [value]="demoCoins" size="md" [showLabel]="true" />
+    </div>
+  </cdf-app-card>
 
   <h2>Continue learning</h2>
 
@@ -72,20 +62,23 @@
     <ion-item>
       <ion-label>
         <h3>Complete 1 React lesson</h3>
-        <p>0 / 1 · 20 coins</p>
+        <p>0 / 1</p>
       </ion-label>
+      <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
     <ion-item>
       <ion-label>
         <h3>Earn 100 XP today</h3>
-        <p>0 / 100 · 20 coins</p>
+        <p>0 / 100</p>
       </ion-label>
+      <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
     <ion-item>
       <ion-label>
         <h3>Pass an exercise</h3>
-        <p>0 / 1 · 20 coins</p>
+        <p>0 / 1</p>
       </ion-label>
+      <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
   </ion-list>
 </ion-content>

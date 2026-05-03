@@ -1,0 +1,24 @@
+:host {
+  display: inline-flex;
+
+  ion-chip {
+    --background: var(--cdf-color-surface);
+    --color: var(--cdf-color-text);
+    border: 1px solid var(--cdf-color-border);
+    margin: 0;
+    height: auto;
+    padding: var(--cdf-space-1) var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+
+    ion-icon {
+      cursor: pointer;
+      color: var(--cdf-color-text-muted);
+      margin-inline-start: var(--cdf-space-1);
+      font-size: 14px;
+
+      &:hover {
+        color: var(--cdf-color-text);
+      }
+    }
+  }
+}

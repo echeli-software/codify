@@ -41,6 +41,9 @@ importers:
       '@codify/ui-core':
         specifier: workspace:*
         version: link:libs/ui-core
+      '@codify/ui-ionic':
+        specifier: workspace:*
+        version: link:libs/ui-ionic
       '@codify/ui-tokens':
         specifier: workspace:*
         version: link:libs/ui-tokens
@@ -358,6 +361,24 @@ importers:
       zod:
         specifier: ^4.4.2
         version: 4.4.2
+
+  libs/ui-ionic:
+    dependencies:
+      '@angular/common':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1)
+      '@angular/forms':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/common@21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1))(rxjs@7.8.2))(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1))(@angular/platform-browser@21.2.11(@angular/common@21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1))(rxjs@7.8.2))(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1)))(rxjs@7.8.2)
+      '@ionic/angular':
+        specifier: ^8.0.0
+        version: 8.8.5(e3e864a80823983da093118b4ee78307)
+      ionicons:
+        specifier: ^7.0.0
+        version: 7.4.0
 
   libs/ui-tokens: {}
 

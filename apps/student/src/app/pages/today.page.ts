@@ -4,28 +4,23 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonCard,
-  IonCardContent,
-  IonChip,
-  IonLabel,
   IonProgressBar,
   IonButton,
   IonButtons,
-  IonIcon,
   IonItem,
   IonList,
   IonNote,
+  IonLabel,
 } from '@ionic/angular/standalone';
-import { addIcons } from 'ionicons';
-import { flame, sparkles, trophy, sunny, moon } from 'ionicons/icons';
-import { I18nService } from '@codify/i18n';
 import {
-  formatCoins,
-  formatXp,
-  levelFromXp,
-  levelProgressPct,
-  tierForLevel,
-} from '@codify/ui-core';
+  AppCard,
+  AppChip,
+  CoinBadge,
+  Icon,
+  XpBadge,
+} from '@codify/ui-ionic';
+import { I18nService } from '@codify/i18n';
+import { levelFromXp, levelProgressPct, tierForLevel } from '@codify/ui-core';
 
 type Theme = 'light' | 'dark' | 'system';
 const THEME_STORAGE_KEY = 'codify.theme';
@@ -36,17 +31,18 @@ const THEME_STORAGE_KEY = 'codify.theme';
     IonToolbar,
     IonTitle,
     IonContent,
-    IonCard,
-    IonCardContent,
-    IonChip,
-    IonLabel,
     IonProgressBar,
     IonButton,
     IonButtons,
-    IonIcon,
     IonItem,
     IonList,
     IonNote,
+    IonLabel,
+    AppCard,
+    AppChip,
+    CoinBadge,
+    Icon,
+    XpBadge,
   ],
   templateUrl: './today.page.html',
   styleUrl: './today.page.scss',
@@ -56,19 +52,16 @@ export class TodayPage {
   protected readonly theme = signal<Theme>(this.readPersistedTheme());
   protected readonly locale = computed(() => this.i18n.currentLocale());
 
-  // Demo gamification numbers — proves ui-core works end-to-end.
+  // Demo gamification numbers — proves ui-core + ui-ionic work end-to-end.
   protected readonly demoXp = 1750;
   protected readonly demoCoins = 320;
   protected readonly demoStreak = 12;
   protected readonly demoLevel = computed(() => levelFromXp(this.demoXp));
   protected readonly demoLevelProgress = computed(() => levelProgressPct(this.demoXp));
   protected readonly demoTier = computed(() => tierForLevel(this.demoLevel()));
-  protected readonly xpLabel = computed(() => formatXp(this.demoXp, this.locale()));
-  protected readonly coinLabel = computed(() => formatCoins(this.demoCoins, this.locale()));
   protected readonly progressFraction = computed(() => this.demoLevelProgress() / 100);
 
   constructor() {
-    addIcons({ flame, sparkles, trophy, sunny, moon });
     this.applyTheme(this.theme());
   }
 
@@ -80,12 +73,6 @@ export class TodayPage {
       localStorage.setItem(THEME_STORAGE_KEY, next);
     } catch {
       /* private browsing — ignore */
-    }
-  }
-
-  protected setLocale(value: string): void {
-    if (value === 'pt-BR' || value === 'en-US') {
-      this.i18n.setLocale(value);
     }
   }
 

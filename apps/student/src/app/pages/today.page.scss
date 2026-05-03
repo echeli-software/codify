@@ -22,33 +22,7 @@
   gap: var(--cdf-space-6);
   margin-top: var(--cdf-space-3);
   align-items: center;
-}
-
-.stat {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--cdf-space-1);
-  font-size: var(--cdf-font-size-sm);
-  color: var(--cdf-color-text-muted);
-
-  ion-icon {
-    color: var(--cdf-color-xp);
-    font-size: 1.1em;
-  }
-
-  .coin {
-    color: var(--cdf-color-coin);
-    font-size: 0.7em;
-  }
-
-  &__value {
-    color: var(--cdf-color-text);
-    font-weight: var(--cdf-font-weight-semibold);
-  }
-
-  &__label {
-    color: var(--cdf-color-text-muted);
-  }
+  flex-wrap: wrap;
 }
 
 h2 {

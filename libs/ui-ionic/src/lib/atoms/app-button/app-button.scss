@@ -1,0 +1,15 @@
+:host {
+  display: inline-flex;
+
+  ion-button {
+    --border-radius: var(--cdf-radius-md);
+    --padding-start: var(--cdf-space-4);
+    --padding-end: var(--cdf-space-4);
+    margin: 0;
+  }
+}
+
+:host([fullWidth]) ion-button {
+  --padding-start: var(--cdf-space-4);
+  --padding-end: var(--cdf-space-4);
+}

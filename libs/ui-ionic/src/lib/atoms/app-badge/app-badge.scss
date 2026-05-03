@@ -1,0 +1,43 @@
+:host {
+  display: inline-flex;
+
+  ion-badge {
+    border-radius: var(--cdf-radius-pill);
+    padding: 2px var(--cdf-space-2);
+    font-size: var(--cdf-font-size-xs);
+    font-weight: var(--cdf-font-weight-medium);
+  }
+}
+
+// Codify-specific accent variants override Ion's color attribute.
+:host([data-variant='coin']) ion-badge {
+  --background: var(--cdf-color-coin);
+  --color: #000;
+}
+:host([data-variant='xp']) ion-badge {
+  --background: var(--cdf-color-xp);
+  --color: #fff;
+}
+:host([data-variant='premium']) ion-badge {
+  --background: var(--cdf-color-premium);
+  --color: #000;
+}
+
+// Subtle variants — pale background, colored text.
+:host([data-subtle]) ion-badge {
+  --background: var(--cdf-color-surface);
+  --color: var(--cdf-color-text);
+  border: 1px solid var(--cdf-color-border);
+}
+:host([data-subtle][data-variant='primary']) ion-badge {
+  --color: var(--cdf-color-primary);
+  --background: var(--cdf-color-primary-subtle);
+  border-color: transparent;
+}
+:host([data-subtle][data-variant='success']) ion-badge { --color: var(--cdf-color-success); }
+:host([data-subtle][data-variant='warning']) ion-badge { --color: var(--cdf-color-warning); }
+:host([data-subtle][data-variant='danger'])  ion-badge { --color: var(--cdf-color-danger); }
+:host([data-subtle][data-variant='info'])    ion-badge { --color: var(--cdf-color-info); }
+:host([data-subtle][data-variant='coin'])    ion-badge { --color: var(--cdf-color-coin); }
+:host([data-subtle][data-variant='xp'])      ion-badge { --color: var(--cdf-color-xp); }
+:host([data-subtle][data-variant='premium']) ion-badge { --color: var(--cdf-color-premium); }

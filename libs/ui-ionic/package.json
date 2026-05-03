@@ -1,0 +1,27 @@
+{
+  "name": "@codify/ui-ionic",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "@codify/source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "nx": {
+    "name": "ui-ionic"
+  },
+  "peerDependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@ionic/angular": "^8.0.0",
+    "ionicons": "^7.0.0"
+  }
+}

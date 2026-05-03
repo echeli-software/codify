@@ -1,0 +1,37 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-1);
+  color: var(--cdf-color-xp);
+  font-weight: var(--cdf-font-weight-semibold);
+  font-feature-settings: 'tnum';
+
+  cdf-icon {
+    color: var(--cdf-color-xp);
+  }
+}
+
+:host([data-size='sm']) { font-size: var(--cdf-font-size-sm); }
+:host([data-size='md']) { font-size: var(--cdf-font-size-base); }
+:host([data-size='lg']) { font-size: var(--cdf-font-size-lg); }
+
+.cdf-xp-badge__value {
+  color: inherit;
+}
+
+.cdf-xp-badge__label {
+  color: var(--cdf-color-text-muted);
+  font-weight: var(--cdf-font-weight-normal);
+  font-size: 0.85em;
+}
+
+:host([data-tone='gain']) {
+  color: var(--cdf-color-success);
+
+  cdf-icon { color: var(--cdf-color-success); }
+}
+
+:host([data-tone='large']) {
+  font-size: var(--cdf-font-size-2xl);
+  font-weight: var(--cdf-font-weight-bold);
+}
