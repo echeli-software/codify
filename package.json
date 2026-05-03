@@ -3,6 +3,22 @@
   "version": "0.0.0",
   "license": "UNLICENSED",
   "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "puppeteer",
+      "@swc/core",
+      "@parcel/watcher",
+      "@nestjs/core",
+      "esbuild",
+      "@prisma/engines",
+      "prisma",
+      "less",
+      "lmdb",
+      "msgpackr-extract",
+      "unrs-resolver",
+      "nx"
+    ]
+  },
   "scripts": {
     "nx": "NX_IGNORE_UNSUPPORTED_TS_SETUP=true nx",
     "format": "nx format:write",
@@ -12,7 +28,8 @@
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma"
+    "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "verify:runtime": "node tools/scripts/verify-runtime.mjs"
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
@@ -52,6 +69,7 @@
     "jsonc-eslint-parser": "^2.1.0",
     "nx": "22.7.0",
     "prettier": "^3.8.1",
+    "puppeteer": "^24.42.0",
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
