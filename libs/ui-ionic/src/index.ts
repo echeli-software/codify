@@ -24,6 +24,26 @@ export {
   type AppSpinnerVariant,
 } from './lib/atoms/app-spinner/app-spinner.js';
 
+// ─── Atoms — form controls ───────────────────────────────────────────────
+export { AppInput, type AppInputType } from './lib/atoms/app-input/app-input.js';
+export {
+  AppSelect,
+  type AppSelectOption,
+} from './lib/atoms/app-select/app-select.js';
+export { AppCheckbox } from './lib/atoms/app-checkbox/app-checkbox.js';
+export { AppToggle } from './lib/atoms/app-toggle/app-toggle.js';
+
+// ─── Atoms — state ───────────────────────────────────────────────────────
+export {
+  AppSkeleton,
+  type AppSkeletonShape,
+} from './lib/atoms/app-skeleton/app-skeleton.js';
+export {
+  AppProgressBar,
+  type AppProgressBarVariant,
+  type AppProgressBarSize,
+} from './lib/atoms/app-progress-bar/app-progress-bar.js';
+
 // ─── Atoms — gamification ────────────────────────────────────────────────
 export { XpBadge } from './lib/atoms/xp-badge/xp-badge.js';
 export { CoinBadge } from './lib/atoms/coin-badge/coin-badge.js';

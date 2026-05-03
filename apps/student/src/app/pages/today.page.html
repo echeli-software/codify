@@ -30,7 +30,7 @@
       <strong>Level {{ demoLevel() }}</strong>
       <ion-note>{{ demoLevelProgress() }}% to next</ion-note>
     </div>
-    <ion-progress-bar [value]="progressFraction()" color="primary" />
+    <cdf-app-progress-bar [value]="demoLevelProgress()" variant="xp" size="lg" label="XP toward next level" />
 
     <div class="stats">
       <cdf-xp-badge [value]="demoXp" size="md" />
@@ -39,7 +39,21 @@
   </cdf-app-card>
 
   <h2>Continue learning</h2>
-
+  @if (catalogLoading()) {
+  <ion-list inset="true">
+    @for (i of [0, 1]; track i) {
+    <ion-item>
+      <ion-label>
+        <cdf-app-skeleton shape="text" width="60%" height="14px" />
+        <p style="margin-top: 6px;">
+          <cdf-app-skeleton shape="text" width="80%" height="11px" />
+        </p>
+      </ion-label>
+      <cdf-app-skeleton slot="end" shape="text" width="40px" height="11px" />
+    </ion-item>
+    }
+  </ion-list>
+  } @else {
   <ion-list inset="true">
     <ion-item button="true" detail="true">
       <ion-label>
@@ -56,29 +70,44 @@
       <ion-note slot="end">7 min</ion-note>
     </ion-item>
   </ion-list>
+  }
 
   <h2>Daily quests</h2>
   <ion-list inset="true">
     <ion-item>
       <ion-label>
         <h3>Complete 1 React lesson</h3>
-        <p>0 / 1</p>
+        <cdf-app-progress-bar [value]="0" variant="primary" size="sm" />
       </ion-label>
       <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
     <ion-item>
       <ion-label>
         <h3>Earn 100 XP today</h3>
-        <p>0 / 100</p>
+        <cdf-app-progress-bar [value]="20" variant="success" size="sm" />
       </ion-label>
       <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
     <ion-item>
       <ion-label>
         <h3>Pass an exercise</h3>
-        <p>0 / 1</p>
+        <cdf-app-progress-bar [value]="0" variant="primary" size="sm" />
       </ion-label>
       <cdf-coin-badge slot="end" [value]="20" size="sm" />
     </ion-item>
   </ion-list>
+
+  <h2>Settings</h2>
+  <cdf-app-card>
+    <div class="settings-grid">
+      <cdf-app-select
+        [options]="localeOptions"
+        [ngModel]="localeChoice()"
+        (ngModelChange)="onLocaleChange($event)"
+        ionLabel="Language"
+      />
+      <cdf-app-toggle [(ngModel)]="notifyDaily" label="Daily reminder push" />
+      <cdf-app-checkbox [(ngModel)]="acceptTerms" label="Sync progress across devices" />
+    </div>
+  </cdf-app-card>
 </ion-content>

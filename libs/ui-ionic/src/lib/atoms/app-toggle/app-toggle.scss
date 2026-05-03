@@ -1,0 +1,8 @@
+:host {
+  display: inline-flex;
+
+  ion-toggle {
+    --background-checked: var(--cdf-color-primary);
+    --handle-background-checked: var(--cdf-color-bg);
+  }
+}

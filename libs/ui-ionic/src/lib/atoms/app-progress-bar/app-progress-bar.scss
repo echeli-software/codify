@@ -1,0 +1,19 @@
+:host {
+  display: block;
+  width: 100%;
+
+  ion-progress-bar {
+    --background: var(--cdf-color-border);
+    border-radius: var(--cdf-radius-pill);
+    overflow: hidden;
+  }
+}
+
+:host([data-size='sm']) ion-progress-bar { --progress-bar-height: 4px; }
+:host([data-size='md']) ion-progress-bar { --progress-bar-height: 8px; }
+:host([data-size='lg']) ion-progress-bar { --progress-bar-height: 12px; }
+
+// XP variant uses the brand gradient instead of an Ionic palette color.
+:host([data-variant='xp']) ion-progress-bar {
+  --progress-background: linear-gradient(90deg, var(--cdf-color-xp), var(--cdf-color-primary));
+}

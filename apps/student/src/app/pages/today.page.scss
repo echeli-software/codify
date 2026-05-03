@@ -25,6 +25,12 @@
   flex-wrap: wrap;
 }
 
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-3);
+}
+
 h2 {
   font-size: var(--cdf-font-size-md);
   color: var(--cdf-color-text-muted);

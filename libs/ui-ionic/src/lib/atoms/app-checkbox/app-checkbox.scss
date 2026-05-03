@@ -1,0 +1,10 @@
+:host {
+  display: inline-flex;
+
+  ion-checkbox {
+    --checkbox-background-checked: var(--cdf-color-primary);
+    --border-color-checked: var(--cdf-color-primary);
+    --border-color: var(--cdf-color-border);
+    --border-radius: var(--cdf-radius-sm);
+  }
+}

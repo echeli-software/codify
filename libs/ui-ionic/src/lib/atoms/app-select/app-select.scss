@@ -1,0 +1,20 @@
+:host {
+  display: block;
+  width: 100%;
+
+  ion-select {
+    --background: var(--cdf-color-surface);
+    --color: var(--cdf-color-text);
+    --placeholder-color: var(--cdf-color-text-subtle);
+    --border-color: var(--cdf-color-border);
+    --border-radius: var(--cdf-radius-md);
+    --highlight-color-focused: var(--cdf-color-primary);
+    --padding-start: var(--cdf-space-3);
+    --padding-end: var(--cdf-space-3);
+  }
+}
+
+:host([data-invalid]) ion-select {
+  --border-color: var(--cdf-color-danger);
+  --highlight-color-focused: var(--cdf-color-danger);
+}

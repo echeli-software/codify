@@ -1,0 +1,14 @@
+:host {
+  display: inline-block;
+
+  ion-skeleton-text {
+    --background: var(--cdf-color-border);
+    --background-rgb: 209, 213, 219;
+    margin: 0;
+  }
+}
+
+:host([data-shape='rect']) ion-skeleton-text { border-radius: var(--cdf-radius-md); }
+:host([data-shape='text']) ion-skeleton-text { border-radius: var(--cdf-radius-sm); }
+:host([data-shape='circle']) ion-skeleton-text { border-radius: var(--cdf-radius-circle); }
+:host([data-shape='pill']) ion-skeleton-text { border-radius: var(--cdf-radius-pill); }
