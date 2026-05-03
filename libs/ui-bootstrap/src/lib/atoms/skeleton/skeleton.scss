@@ -1,0 +1,32 @@
+:host {
+  display: inline-block;
+}
+
+.cdf-skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    var(--cdf-color-border) 0%,
+    var(--cdf-color-surface-elev) 50%,
+    var(--cdf-color-border) 100%
+  );
+  background-size: 200% 100%;
+  animation: cdf-skeleton-shimmer 1.5s ease-in-out infinite;
+
+  &--rect { border-radius: var(--cdf-radius-md); }
+  &--text { border-radius: var(--cdf-radius-sm); }
+  &--circle { border-radius: var(--cdf-radius-circle); }
+  &--pill { border-radius: var(--cdf-radius-pill); }
+}
+
+@keyframes cdf-skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdf-skeleton {
+    animation: none;
+    background: var(--cdf-color-border);
+  }
+}

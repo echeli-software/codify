@@ -7,15 +7,27 @@ import {
   Badge,
   Button,
   Checkbox,
+  Divider,
   Icon,
+  IconButton,
   Input,
+  Kbd,
+  ProgressBar,
+  RadioGroup,
+  type RadioOption,
+  Select,
+  type SelectOption,
+  Skeleton,
   Spinner,
   Tag,
   Textarea,
   Toggle,
+  Tooltip,
 } from '@codify/ui-bootstrap';
 
 type Theme = 'light' | 'dark' | 'system';
+type Difficulty = '1' | '2' | '3' | '4' | '5';
+type CategoryId = 'frontend' | 'mobile' | 'ai' | 'soft';
 
 const THEME_STORAGE_KEY = 'codify.theme';
 
@@ -28,12 +40,20 @@ const THEME_STORAGE_KEY = 'codify.theme';
     Badge,
     Button,
     Checkbox,
+    Divider,
     Icon,
+    IconButton,
     Input,
+    Kbd,
+    ProgressBar,
+    RadioGroup,
+    Select,
+    Skeleton,
     Spinner,
     Tag,
     Textarea,
     Toggle,
+    Tooltip,
   ],
   selector: 'app-root',
   templateUrl: './app.html',
@@ -51,6 +71,25 @@ export class App {
   protected readonly notifyOn = signal(true);
   protected readonly acceptTerms = signal(false);
   protected readonly tags = signal(['Frontend', 'AI', 'Soft skills']);
+
+  protected readonly category = signal<CategoryId>('frontend');
+  protected readonly categoryOptions: SelectOption<CategoryId>[] = [
+    { value: 'frontend', label: 'Frontend' },
+    { value: 'mobile', label: 'Mobile' },
+    { value: 'ai', label: 'AI usage' },
+    { value: 'soft', label: 'Soft skills' },
+  ];
+
+  protected readonly difficulty = signal<Difficulty>('3');
+  protected readonly difficultyOptions: RadioOption<Difficulty>[] = [
+    { value: '1', label: 'Iniciante' },
+    { value: '2', label: 'Básico' },
+    { value: '3', label: 'Intermediário' },
+    { value: '4', label: 'Avançado' },
+    { value: '5', label: 'Expert' },
+  ];
+
+  protected readonly progressValue = signal(72);
 
   constructor() {
     this.applyTheme(this.theme());

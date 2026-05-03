@@ -1,0 +1,20 @@
+:host {
+  display: inline-flex;
+}
+
+.cdf-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  padding: 1px 6px;
+  font-family: var(--cdf-font-family-mono);
+  font-size: 0.85em;
+  font-weight: var(--cdf-font-weight-medium);
+  color: var(--cdf-color-text);
+  background: var(--cdf-color-surface-elev);
+  border: 1px solid var(--cdf-color-border);
+  border-bottom-width: 2px;
+  border-radius: var(--cdf-radius-sm);
+  line-height: 1.4;
+}

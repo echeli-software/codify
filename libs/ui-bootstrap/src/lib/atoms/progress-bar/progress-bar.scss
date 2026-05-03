@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cdf-progress {
+  display: block;
+  width: 100%;
+  background: var(--cdf-color-border);
+  border-radius: var(--cdf-radius-pill);
+  overflow: hidden;
+  position: relative;
+
+  &--sm { height: 4px; }
+  &--md { height: 8px; }
+  &--lg { height: 12px; }
+
+  &__bar {
+    height: 100%;
+    background: var(--cdf-color-primary);
+    transition: width var(--cdf-motion-duration-slow) var(--cdf-motion-easing-emphasized);
+    border-radius: inherit;
+  }
+
+  &--success &__bar { background: var(--cdf-color-success); }
+  &--warning &__bar { background: var(--cdf-color-warning); }
+  &--danger  &__bar { background: var(--cdf-color-danger); }
+  &--xp      &__bar { background: linear-gradient(90deg, var(--cdf-color-xp), var(--cdf-color-primary)); }
+
+  &--indeterminate &__bar {
+    width: 30%;
+    animation: cdf-progress-indeterminate 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes cdf-progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdf-progress--indeterminate .cdf-progress__bar {
+    animation-duration: 3s;
+  }
+}
