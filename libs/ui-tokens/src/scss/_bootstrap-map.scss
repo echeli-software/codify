@@ -1,0 +1,59 @@
+// Maps Codify tokens onto Bootstrap 5 SCSS variables. Consumers should
+// `@use` this BEFORE importing Bootstrap so the variables override defaults.
+
+@use './color' as *;
+@use './spacing' as *;
+@use './radius' as *;
+@use './typography' as *;
+@use './breakpoints' as *;
+
+// Bootstrap variables are conventionally global ($primary, $border-radius, etc.)
+// We `@use` Bootstrap's _variables.scss with these overrides so themes line up.
+
+$primary:           $color-primary !default;
+$secondary:         $color-accent !default;
+$success:           $color-success !default;
+$info:              $color-info !default;
+$warning:           $color-warning !default;
+$danger:            $color-danger !default;
+$light:             $color-bg-light !default;
+$dark:              $color-text-light !default;
+
+$body-bg:           $color-bg-light !default;
+$body-color:        $color-text-light !default;
+
+$font-family-base:  $font-family-sans !default;
+$font-family-code:  $font-family-mono !default;
+$font-size-base:    1rem !default;
+
+$border-radius:     $radius-md !default;
+$border-radius-sm:  $radius-sm !default;
+$border-radius-lg:  $radius-lg !default;
+$border-radius-xl:  $radius-xl !default;
+$border-radius-pill: $radius-pill !default;
+
+// Spacer scale (4px base — matches our scale)
+$spacer:            $space-4 !default;
+$spacers: (
+  0: $space-0,
+  1: $space-1,
+  2: $space-2,
+  3: $space-3,
+  4: $space-4,
+  5: $space-5,
+  6: $space-6,
+  8: $space-8,
+  10: $space-10,
+  12: $space-12,
+  16: $space-16,
+) !default;
+
+// Grid breakpoints (Bootstrap names; we keep our 6-breakpoint set incl. xxl)
+$grid-breakpoints: (
+  xs:  $bp-xs,
+  sm:  $bp-sm,
+  md:  $bp-md,
+  lg:  $bp-lg,
+  xl:  $bp-xl,
+  xxl: $bp-xxl,
+) !default;

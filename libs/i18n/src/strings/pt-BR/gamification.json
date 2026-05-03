@@ -1,0 +1,43 @@
+{
+  "gamification": {
+    "xp": {
+      "label": "XP",
+      "earned": "+{value} XP"
+    },
+    "coin": {
+      "label": "moedas",
+      "labelOne": "moeda",
+      "earned": "+{value} moedas",
+      "earnedOne": "+1 moeda"
+    },
+    "level": {
+      "label": "Nível {level}",
+      "up": "Subiu de nível!",
+      "progress": "{current} / {next} XP"
+    },
+    "streak": {
+      "label": "Ofensiva",
+      "daysOne": "1 dia",
+      "daysOther": "{count} dias",
+      "saved": "Ofensiva mantida!",
+      "freeze": "Proteção usada"
+    },
+    "multiplier": {
+      "label": "{value}x impulso",
+      "premium": "Impulso Premium",
+      "streakTier": "Impulso de ofensiva",
+      "coursePromo": "Promoção do curso",
+      "lessonPromo": "Promoção da aula",
+      "campaign": "Evento especial"
+    },
+    "badge": {
+      "unlocked": "Conquista desbloqueada!",
+      "newBadge": "{name}"
+    },
+    "league": {
+      "promoted": "Promovido para {tier}!",
+      "demoted": "Rebaixado para {tier}",
+      "rank": "Posição #{rank}"
+    }
+  }
+}

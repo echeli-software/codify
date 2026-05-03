@@ -1,0 +1,34 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "yes": "Yes",
+    "no": "No",
+    "search": "Search",
+    "settings": "Settings",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "language": "Language",
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "error": {
+      "unknown": "Something went wrong. Please try again.",
+      "network": "You appear to be offline.",
+      "notFound": "Not found.",
+      "forbidden": "You don't have access to this."
+    }
+  }
+}

@@ -1,2 +1,54 @@
-<app-nx-welcome></app-nx-welcome>
-<router-outlet></router-outlet>
+<main class="shell">
+  <header class="topbar">
+    <div class="brand">Codify</div>
+
+    <div class="stats">
+      <span class="chip xp">
+        <span class="dot"></span>
+        {{ xpLabel() }} XP
+      </span>
+      <span class="chip coin">
+        <span class="dot"></span>
+        {{ coinLabel() }}
+      </span>
+      <span class="chip level" [attr.data-tier]="demoTier()">
+        {{ 'gamification.level.label' | translate: { level: demoLevel() } }}
+      </span>
+    </div>
+
+    <div class="actions">
+      <select [value]="locale()" (change)="setLocale($any($event.target).value)" aria-label="Language">
+        @for (loc of availableLocales; track loc.code) {
+        <option [value]="loc.code">{{ loc.nativeName }}</option>
+        }
+      </select>
+
+      <fieldset class="theme-toggle">
+        <button type="button" [class.active]="theme() === 'light'" (click)="setTheme('light')">
+          {{ 'common.theme.light' | translate }}
+        </button>
+        <button type="button" [class.active]="theme() === 'dark'" (click)="setTheme('dark')">
+          {{ 'common.theme.dark' | translate }}
+        </button>
+        <button type="button" [class.active]="theme() === 'system'" (click)="setTheme('system')">
+          {{ 'common.theme.system' | translate }}
+        </button>
+      </fieldset>
+    </div>
+  </header>
+
+  <section class="content">
+    <h1>Codify</h1>
+    <p class="muted">Phase 1 demo · tokens + i18n + ui-core wired.</p>
+
+    <div class="card">
+      <div class="card-head">
+        <strong>{{ 'gamification.level.label' | translate: { level: demoLevel() } }}</strong>
+        <span class="muted">{{ demoLevelProgress() }}%</span>
+      </div>
+      <div class="bar"><span [style.width.%]="demoLevelProgress()"></span></div>
+    </div>
+
+    <router-outlet />
+  </section>
+</main>

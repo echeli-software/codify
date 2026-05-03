@@ -1,20 +1,20 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideI18n } from '@codify/i18n';
 import { App } from './app';
-import { NxWelcome } from './nx-welcome';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [App, NxWelcome],
+      imports: [App],
+      providers: [provideRouter([]), provideI18n()],
     }).compileComponents();
   });
 
-  it('should render title', async () => {
+  it('renders the brand', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain(
-      'Welcome student',
-    );
+    expect(compiled.querySelector('.brand')?.textContent).toContain('Codify');
   });
 });

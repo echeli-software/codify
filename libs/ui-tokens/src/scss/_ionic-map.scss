@@ -1,0 +1,45 @@
+// Maps Codify CSS custom properties onto Ionic's CSS variable system.
+// Import in the student app's global styles AFTER `theme.scss` so it
+// applies on top of Ionic defaults.
+
+@use './color' as *;
+
+:root {
+  // Primary
+  --ion-color-primary:           var(--cdf-color-primary);
+  --ion-color-primary-rgb:       124, 77, 255;
+  --ion-color-primary-contrast:  var(--cdf-color-primary-on);
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade:     var(--cdf-color-primary-active);
+  --ion-color-primary-tint:      var(--cdf-color-primary-hover);
+
+  // Secondary = Codify accent
+  --ion-color-secondary:         var(--cdf-color-accent);
+  --ion-color-secondary-rgb:     245, 158, 11;
+  --ion-color-secondary-contrast: var(--cdf-color-accent-on);
+  --ion-color-secondary-contrast-rgb: 17, 24, 39;
+  --ion-color-secondary-shade:   var(--cdf-color-accent-hover);
+  --ion-color-secondary-tint:    var(--cdf-color-accent);
+
+  // Success / warning / danger
+  --ion-color-success:           var(--cdf-color-success);
+  --ion-color-warning:           var(--cdf-color-warning);
+  --ion-color-danger:            var(--cdf-color-danger);
+
+  // Background + text
+  --ion-background-color:        var(--cdf-color-bg);
+  --ion-background-color-rgb:    249, 250, 251;
+  --ion-text-color:              var(--cdf-color-text);
+  --ion-text-color-rgb:          17, 24, 39;
+
+  // Item / card surfaces
+  --ion-item-background:         var(--cdf-color-surface);
+  --ion-card-background:         var(--cdf-color-surface);
+  --ion-toolbar-background:      var(--cdf-color-surface-elev);
+
+  // Border
+  --ion-border-color:            var(--cdf-color-border);
+
+  // Font
+  --ion-font-family:             var(--cdf-font-family-sans);
+}

@@ -1,0 +1,18 @@
+{
+  "billing": {
+    "perMonth": "{price}/mo",
+    "perYear": "{price}/yr",
+    "monthlyEquivalent": "{price}/mo equivalent",
+    "saveAmount": "save {pct}%",
+    "installments": "{price} or {count}x of {per} interest-free",
+    "subscribe": "Subscribe",
+    "manageSubscription": "Manage subscription",
+    "currentPlan": "Current plan",
+    "trialEnds": "Trial ends {date}",
+    "renewsOn": "Renews on {date}",
+    "cancelsOn": "Cancels on {date}",
+    "freePreview": "Free preview",
+    "premiumOnly": "Premium",
+    "includedIn": "Included in {plans}"
+  }
+}

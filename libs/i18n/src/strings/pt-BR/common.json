@@ -1,0 +1,34 @@
+{
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "close": "Fechar",
+    "loading": "Carregando…",
+    "retry": "Tentar de novo",
+    "back": "Voltar",
+    "next": "Próximo",
+    "skip": "Pular",
+    "yes": "Sim",
+    "no": "Não",
+    "search": "Buscar",
+    "settings": "Configurações",
+    "signIn": "Entrar",
+    "signOut": "Sair",
+    "language": "Idioma",
+    "theme": {
+      "label": "Tema",
+      "light": "Claro",
+      "dark": "Escuro",
+      "system": "Sistema"
+    },
+    "error": {
+      "unknown": "Algo deu errado. Tente de novo.",
+      "network": "Você parece estar offline.",
+      "notFound": "Não encontrado.",
+      "forbidden": "Você não tem acesso a isso."
+    }
+  }
+}

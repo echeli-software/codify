@@ -1,0 +1,18 @@
+// Elevation 0–4 + a focus ring used for keyboard focus visibility.
+
+$shadow-0: none;
+$shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-2: 0 2px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+$shadow-3: 0 4px 8px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+$shadow-4: 0 12px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+
+$shadow-focus-ring: 0 0 0 3px rgba(124, 77, 255, 0.35); // primary @ 35%
+
+@mixin emit-shadow-vars() {
+  --cdf-shadow-0: #{$shadow-0};
+  --cdf-shadow-1: #{$shadow-1};
+  --cdf-shadow-2: #{$shadow-2};
+  --cdf-shadow-3: #{$shadow-3};
+  --cdf-shadow-4: #{$shadow-4};
+  --cdf-shadow-focus-ring: #{$shadow-focus-ring};
+}

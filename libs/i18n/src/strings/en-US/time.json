@@ -1,0 +1,16 @@
+{
+  "time": {
+    "unit": {
+      "second": "{value, plural, one {1 second} other {# seconds}}",
+      "minute": "{value, plural, one {1 minute} other {# minutes}}",
+      "hour": "{value, plural, one {1 hour} other {# hours}}",
+      "day": "{value, plural, one {1 day} other {# days}}"
+    },
+    "ago": "{value} ago",
+    "in": "in {value}",
+    "now": "just now",
+    "today": "today",
+    "yesterday": "yesterday",
+    "tomorrow": "tomorrow"
+  }
+}

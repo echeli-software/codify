@@ -1,0 +1,18 @@
+{
+  "billing": {
+    "perMonth": "{price}/mês",
+    "perYear": "{price}/ano",
+    "monthlyEquivalent": "{price}/mês equivalente",
+    "saveAmount": "economize {pct}%",
+    "installments": "{price} ou em até {count}x de {per} sem juros",
+    "subscribe": "Assinar",
+    "manageSubscription": "Gerenciar assinatura",
+    "currentPlan": "Plano atual",
+    "trialEnds": "Teste termina em {date}",
+    "renewsOn": "Renova em {date}",
+    "cancelsOn": "Cancela em {date}",
+    "freePreview": "Prévia grátis",
+    "premiumOnly": "Premium",
+    "includedIn": "Incluído em {plans}"
+  }
+}

@@ -1,0 +1,54 @@
+// Public entry for `@codify/ui-tokens`.
+// Apps import this from their global stylesheet:
+//
+//   @use '@codify/ui-tokens' as cdf;
+//   @include cdf.theme-light;
+//   .dark { @include cdf.theme-dark; }
+//
+// Sass variables, mixins, and CSS custom properties are all exported.
+
+@forward './color';
+@forward './spacing';
+@forward './radius';
+@forward './shadow';
+@forward './typography';
+@forward './breakpoints';
+@forward './motion';
+@forward './z';
+
+@use './color';
+@use './spacing';
+@use './radius';
+@use './shadow';
+@use './typography';
+@use './motion';
+@use './z';
+
+// ─── Theme builders ──────────────────────────────────────────────────────
+// `theme-light` and `theme-dark` set every CSS custom property the design
+// system needs. Apply on `:root` (default), or scope to a parent for theme
+// switching (e.g. `.dark { @include theme-dark; }`).
+
+@mixin theme-light {
+  @include color.emit-static-vars;
+  @include color.emit-light-vars;
+  @include spacing.emit-spacing-vars;
+  @include radius.emit-radius-vars;
+  @include shadow.emit-shadow-vars;
+  @include typography.emit-typography-vars;
+  @include motion.emit-motion-vars;
+  @include z.emit-z-vars;
+  color-scheme: light;
+}
+
+@mixin theme-dark {
+  @include color.emit-static-vars;
+  @include color.emit-dark-vars;
+  @include spacing.emit-spacing-vars;
+  @include radius.emit-radius-vars;
+  @include shadow.emit-shadow-vars;
+  @include typography.emit-typography-vars;
+  @include motion.emit-motion-vars;
+  @include z.emit-z-vars;
+  color-scheme: dark;
+}

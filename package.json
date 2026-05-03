@@ -60,6 +60,9 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@codify/ui-tokens": "workspace:*",
+    "@codify/ui-core": "workspace:*",
+    "@codify/i18n": "workspace:*",
     "@angular/common": "~21.2.0",
     "@angular/compiler": "~21.2.0",
     "@angular/core": "~21.2.0",
@@ -70,7 +73,9 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@ngx-translate/core": "^17.0.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "zod": "^4.4.2"
   }
 }

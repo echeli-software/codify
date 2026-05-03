@@ -1,0 +1,43 @@
+{
+  "gamification": {
+    "xp": {
+      "label": "XP",
+      "earned": "+{value} XP"
+    },
+    "coin": {
+      "label": "coins",
+      "labelOne": "coin",
+      "earned": "+{value} coins",
+      "earnedOne": "+1 coin"
+    },
+    "level": {
+      "label": "Level {level}",
+      "up": "Level up!",
+      "progress": "{current} / {next} XP"
+    },
+    "streak": {
+      "label": "Day streak",
+      "daysOne": "1 day",
+      "daysOther": "{count} days",
+      "saved": "Streak saved!",
+      "freeze": "Freeze used"
+    },
+    "multiplier": {
+      "label": "{value}x boost",
+      "premium": "Premium boost",
+      "streakTier": "Streak boost",
+      "coursePromo": "Course promo",
+      "lessonPromo": "Lesson promo",
+      "campaign": "Event boost"
+    },
+    "badge": {
+      "unlocked": "Badge unlocked!",
+      "newBadge": "{name}"
+    },
+    "league": {
+      "promoted": "Promoted to {tier}!",
+      "demoted": "Moved to {tier}",
+      "rank": "Rank #{rank}"
+    }
+  }
+}

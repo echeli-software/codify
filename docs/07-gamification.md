@@ -124,7 +124,7 @@ Sample:
 | 5 | 1100 | ~325 |
 | 10 | 4725 | ~875 |
 | 25 | 30600 | ~2575 |
-| 50 | 124725 | ~5125 |
+| 50 | 123725 | ~5125 |
 
 Level 50 should take a determined daily learner ~6 months at default rates. Above L50 we still award levels (no cap) but the visual treatment changes (prestige rings, etc.) to keep the journey feeling alive.
 

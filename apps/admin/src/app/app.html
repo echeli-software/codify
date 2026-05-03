@@ -1,2 +1,49 @@
-<app-nx-welcome></app-nx-welcome>
-<router-outlet></router-outlet>
+<main class="shell">
+  <header class="topbar">
+    <div class="brand">Codify · Admin</div>
+
+    <div class="actions">
+      <label class="control">
+        {{ 'common.language' | translate }}
+        <select [value]="locale()" (change)="setLocale($any($event.target).value)">
+          @for (loc of availableLocales; track loc.code) {
+          <option [value]="loc.code">{{ loc.nativeName }}</option>
+          }
+        </select>
+      </label>
+
+      <fieldset class="theme-toggle">
+        <legend class="visually-hidden">{{ 'common.theme.label' | translate }}</legend>
+        <button
+          type="button"
+          [class.active]="theme() === 'light'"
+          (click)="setTheme('light')"
+        >
+          {{ 'common.theme.light' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="theme() === 'dark'"
+          (click)="setTheme('dark')"
+        >
+          {{ 'common.theme.dark' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="theme() === 'system'"
+          (click)="setTheme('system')"
+        >
+          {{ 'common.theme.system' | translate }}
+        </button>
+      </fieldset>
+    </div>
+  </header>
+
+  <section class="content">
+    <h1>{{ 'common.settings' | translate }}</h1>
+    <p class="muted">
+      Phase 1 demo · tokens + i18n wired. Switch the theme and language above to verify.
+    </p>
+    <router-outlet />
+  </section>
+</main>

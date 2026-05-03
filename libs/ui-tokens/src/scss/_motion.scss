@@ -1,0 +1,30 @@
+// Motion durations + easing curves used by `RewardOrchestrator` (gamification-engine)
+// and components. Honor `prefers-reduced-motion` at the consumer level.
+
+$motion-duration-instant: 0ms;
+$motion-duration-fast:    120ms;
+$motion-duration-base:    200ms;
+$motion-duration-slow:    320ms;
+$motion-duration-slower:  500ms;
+$motion-duration-slowest: 800ms;
+
+$motion-easing-standard:  cubic-bezier(0.2, 0, 0, 1);
+$motion-easing-emphasized: cubic-bezier(0.3, 0, 0, 1);
+$motion-easing-decelerate: cubic-bezier(0, 0, 0, 1);
+$motion-easing-accelerate: cubic-bezier(0.3, 0, 1, 1);
+$motion-easing-bounce:    cubic-bezier(0.34, 1.56, 0.64, 1);
+
+@mixin emit-motion-vars() {
+  --cdf-motion-duration-instant: #{$motion-duration-instant};
+  --cdf-motion-duration-fast:    #{$motion-duration-fast};
+  --cdf-motion-duration-base:    #{$motion-duration-base};
+  --cdf-motion-duration-slow:    #{$motion-duration-slow};
+  --cdf-motion-duration-slower:  #{$motion-duration-slower};
+  --cdf-motion-duration-slowest: #{$motion-duration-slowest};
+
+  --cdf-motion-easing-standard:   #{$motion-easing-standard};
+  --cdf-motion-easing-emphasized: #{$motion-easing-emphasized};
+  --cdf-motion-easing-decelerate: #{$motion-easing-decelerate};
+  --cdf-motion-easing-accelerate: #{$motion-easing-accelerate};
+  --cdf-motion-easing-bounce:     #{$motion-easing-bounce};
+}

@@ -1,0 +1,36 @@
+// 4px-based spacing scale.
+// $space-N where N corresponds to 4*N px (with selected non-multiple stops).
+
+$space-base: 4px;
+
+$space-0:  0;
+$space-1:  4px;
+$space-2:  8px;
+$space-3:  12px;
+$space-4:  16px;
+$space-5:  20px;
+$space-6:  24px;
+$space-8:  32px;
+$space-10: 40px;
+$space-12: 48px;
+$space-16: 64px;
+$space-20: 80px;
+$space-24: 96px;
+$space-32: 128px;
+
+@mixin emit-spacing-vars() {
+  --cdf-space-0:  #{$space-0};
+  --cdf-space-1:  #{$space-1};
+  --cdf-space-2:  #{$space-2};
+  --cdf-space-3:  #{$space-3};
+  --cdf-space-4:  #{$space-4};
+  --cdf-space-5:  #{$space-5};
+  --cdf-space-6:  #{$space-6};
+  --cdf-space-8:  #{$space-8};
+  --cdf-space-10: #{$space-10};
+  --cdf-space-12: #{$space-12};
+  --cdf-space-16: #{$space-16};
+  --cdf-space-20: #{$space-20};
+  --cdf-space-24: #{$space-24};
+  --cdf-space-32: #{$space-32};
+}

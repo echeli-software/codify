@@ -1,0 +1,16 @@
+{
+  "time": {
+    "unit": {
+      "second": "{value, plural, one {1 segundo} other {# segundos}}",
+      "minute": "{value, plural, one {1 minuto} other {# minutos}}",
+      "hour": "{value, plural, one {1 hora} other {# horas}}",
+      "day": "{value, plural, one {1 dia} other {# dias}}"
+    },
+    "ago": "há {value}",
+    "in": "em {value}",
+    "now": "agora mesmo",
+    "today": "hoje",
+    "yesterday": "ontem",
+    "tomorrow": "amanhã"
+  }
+}

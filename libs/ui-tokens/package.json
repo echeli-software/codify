@@ -7,10 +7,13 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "sass": "./src/scss/index.scss",
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./scss": "./src/scss/index.scss",
+    "./scss/*": "./src/scss/*",
     "./package.json": "./package.json"
   },
   "nx": {

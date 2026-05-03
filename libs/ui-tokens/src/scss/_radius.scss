@@ -1,0 +1,19 @@
+$radius-none:   0;
+$radius-sm:     4px;
+$radius-md:     8px;
+$radius-lg:     12px;
+$radius-xl:     16px;
+$radius-2xl:    24px;
+$radius-pill:   9999px;
+$radius-circle: 50%;
+
+@mixin emit-radius-vars() {
+  --cdf-radius-none:   #{$radius-none};
+  --cdf-radius-sm:     #{$radius-sm};
+  --cdf-radius-md:     #{$radius-md};
+  --cdf-radius-lg:     #{$radius-lg};
+  --cdf-radius-xl:     #{$radius-xl};
+  --cdf-radius-2xl:    #{$radius-2xl};
+  --cdf-radius-pill:   #{$radius-pill};
+  --cdf-radius-circle: #{$radius-circle};
+}
