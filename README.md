@@ -28,8 +28,35 @@ Specs live under [`docs/`](./docs). Read in order on first pass; cross-reference
 
 ## Quick reference
 
-- **Stack**: Nx monorepo · Angular 18+ · Ionic 8 · Capacitor 6 · NestJS · Prisma · PostgreSQL · Redis · Clerk · Stripe · Judge0 · Tiptap
+- **Stack**: Nx monorepo · Angular 21 · Ionic (TBD) · Capacitor (TBD) · NestJS 11 · Prisma · PostgreSQL · Redis · Clerk · Stripe · Judge0 · Tiptap
 - **UI**: Bootstrap (ng-bootstrap) for admin · Ionic for student · shared SCSS tokens
 - **Hosting**: DigitalOcean (São Paulo) + Coolify · Cloudflare in front · DO Managed Postgres
 - **Initial locales**: pt-BR, en-US (architecture supports more)
 - **Initial content**: text + image (video pipeline deferred)
+
+## Local dev
+
+Prerequisites: Node 22+, pnpm 10+, Docker.
+
+```bash
+pnpm install               # Install workspace deps
+pnpm db:up                 # Start Postgres + Redis (docker-compose.dev.yml)
+cp .env.example .env       # Fill in Clerk / Stripe / R2 keys later
+pnpm prisma:migrate        # Apply migrations to local DB
+pnpm build                 # Build all 13 projects
+pnpm nx serve api          # Run the NestJS API (http://localhost:3000)
+pnpm nx serve admin        # Run the admin app
+pnpm nx serve student      # Run the student app
+```
+
+Workspace layout:
+```
+apps/{admin,student,api}    Angular admin · Angular student · NestJS api
+libs/                       Shared libs per docs/03-shared-libraries.md
+prisma/                     Schema + migrations
+docs/                       Specs (see index above)
+```
+
+### Known issue
+
+The `typecheck` target fails for Angular projects (`admin`, `student`, `ui-bootstrap`, `ui-ionic`) because the `@nx/js` workspace's TypeScript-references setup is incompatible with the Angular compiler. Build does typechecking implicitly via Angular CLI, so this isn't blocking. Tracked for a follow-up fix in Phase 1.

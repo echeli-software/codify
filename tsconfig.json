@@ -1,0 +1,49 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/api"
+    },
+    {
+      "path": "./libs/ui-tokens"
+    },
+    {
+      "path": "./libs/ui-core"
+    },
+    {
+      "path": "./libs/lesson-schema"
+    },
+    {
+      "path": "./libs/api-client"
+    },
+    {
+      "path": "./libs/auth"
+    },
+    {
+      "path": "./libs/i18n"
+    },
+    {
+      "path": "./libs/billing"
+    },
+    {
+      "path": "./libs/domain"
+    },
+    {
+      "path": "./libs/gamification-engine"
+    },
+    {
+      "path": "./libs/ui-bootstrap"
+    },
+    {
+      "path": "./libs/ui-ionic"
+    },
+    {
+      "path": "./apps/student"
+    },
+    {
+      "path": "./apps/admin"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+// Phase 0 initial schema: User + AuditLog only.
+// Full schema is specced in /docs/02-data-model.md; subsequent phases will
+// migrate the rest in. Enable uuid-ossp + uuidv7 SQL function via the
+// 0001_extensions migration before any table that uses uuid_generate_v7().
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  SUPPORT
+  ADMIN
+}
+
+model User {
+  id                  String    @id @default(dbgenerated("uuid_generate_v7()"))
+  clerkId             String    @unique
+  email               String    @unique
+  displayName         String
+  locale              String    @default("pt-BR")
+  timezone            String    @default("America/Sao_Paulo")
+  role                UserRole  @default(STUDENT)
+  /// Quiet-hours window in user-local minutes-from-midnight. Null = defaults
+  /// (22:00–08:00). See /docs/10-engagement.md §3.
+  quietHoursStart     Int?
+  quietHoursEnd       Int?
+  marketingEmailOptIn Boolean   @default(false)
+  onboardedAt         DateTime?
+  lastSeenAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  auditedActions AuditLog[]
+
+  @@index([role])
+  @@index([lastSeenAt])
+}
+
+model AuditLog {
+  id        String    @id @default(dbgenerated("uuid_generate_v7()"))
+  actorId   String?
+  actor     User?     @relation(fields: [actorId], references: [id])
+  actorRole UserRole?
+  action    String
+  entity    String?
+  entityId  String?
+  diff      Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
+}

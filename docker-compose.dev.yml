@@ -1,0 +1,39 @@
+# Local dev stack: Postgres + Redis. Mailpit + Judge0 will join as later
+# phases need them. See /docs/13-deployment.md §13.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codify-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codify
+      POSTGRES_PASSWORD: codify
+      POSTGRES_DB: codify_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - codify_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U codify -d codify_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: codify-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - codify_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  codify_pg_data:
+  codify_redis_data:
