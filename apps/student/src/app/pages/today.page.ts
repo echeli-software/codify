@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   IonHeader,
@@ -41,6 +41,13 @@ import {
   XpBar,
 } from '@codify/ui-ionic';
 import { I18nService, type Locale } from '@codify/i18n';
+import {
+  CoinService,
+  CoinTarget,
+  RewardOrchestrator,
+  XpService,
+  StreakService,
+} from '@codify/gamification-engine';
 
 interface ContinueLessonRow {
   title: string;
@@ -84,6 +91,7 @@ const THEME_STORAGE_KEY = 'codify.theme';
     AppToggle,
     AvatarWithFrame,
     CoinBadge,
+    CoinTarget,
     CourseCard,
     CoursePreviewModal,
     DailyQuestList,
@@ -102,14 +110,15 @@ const THEME_STORAGE_KEY = 'codify.theme';
 })
 export class TodayPage {
   private readonly i18n = inject(I18nService);
+  private readonly orchestrator = inject(RewardOrchestrator);
+  protected readonly xpSvc = inject(XpService);
+  protected readonly coinSvc = inject(CoinService);
+  protected readonly streakSvc = inject(StreakService);
   protected readonly theme = signal<Theme>(this.readPersistedTheme());
   protected readonly locale = computed(() => this.i18n.currentLocale());
 
-  // Gamification demo state.
-  protected readonly demoXp = 1750;
-  protected readonly demoCoins = 320;
-  protected readonly demoStreak = 12;
-  protected readonly demoFreezes = 2;
+  // Reward demo button — used as the source point for coin-fly.
+  protected readonly rewardBtn = viewChild('rewardBtn', { read: ElementRef });
 
   // Last 7 days of streak (oldest first; today is last).
   protected readonly streakWeek: StreakDay[] = [
@@ -341,6 +350,42 @@ export class TodayPage {
   protected onPaywallSelected(planId: string): void {
     console.log('[demo] paywall selected', planId);
     this.paywallOpen.set(false);
+  }
+
+  protected triggerReward(): void {
+    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
+    void this.orchestrator.grant({
+      kind: 'lessonComplete',
+      canonical: { xp: 25, coins: 10, multiplier: 1 },
+      sourceEl,
+    });
+  }
+
+  protected triggerLevelUp(): void {
+    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
+    void this.orchestrator.grant({
+      kind: 'levelUp',
+      canonical: { xp: 200, coins: 50 },
+      levelUp: { newLevel: this.xpSvc.level() + 1, xpForNextLevel: 350 },
+      sourceEl,
+    });
+  }
+
+  protected triggerBadge(): void {
+    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
+    void this.orchestrator.grant({
+      kind: 'badgeUnlock',
+      canonical: { xp: 0, coins: 25 },
+      badgesUnlocked: [
+        {
+          id: 'streak-7',
+          name: 'Week Warrior',
+          icon: 'flame',
+          description: 'Held a 7-day learning streak.',
+        },
+      ],
+      sourceEl,
+    });
   }
 
   private applyTheme(theme: Theme): void {

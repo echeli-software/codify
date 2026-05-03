@@ -14,6 +14,9 @@
   ],
   "references": [
     {
+      "path": "../../libs/gamification-engine/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/ui-ionic/tsconfig.lib.json"
     },
     {

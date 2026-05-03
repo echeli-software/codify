@@ -15,24 +15,32 @@
 
 <ion-content [fullscreen]="true" class="ion-padding">
   <header class="hero">
-    <cdf-avatar-with-frame name="Maria Souza" size="lg" [level]="14" />
+    <cdf-avatar-with-frame name="Maria Souza" size="lg" [level]="xpSvc.level()" />
     <div class="hero__copy">
       <h1>Hi, Maria 👋</h1>
-      <cdf-streak-chip [days]="demoStreak" [freezes]="demoFreezes" />
+      <cdf-streak-chip
+        [days]="streakSvc.currentDays()"
+        [freezes]="streakSvc.freezesAvailable()"
+      />
     </div>
   </header>
 
   <cdf-app-card>
-    <cdf-xp-bar [xp]="demoXp" />
+    <cdf-xp-bar [xp]="xpSvc.displayed()" />
     <div class="stats">
-      <cdf-coin-badge [value]="demoCoins" size="md" [showLabel]="true" />
+      <cdf-coin-badge
+        cdfCoinTarget
+        [value]="coinSvc.displayed()"
+        size="md"
+        [showLabel]="true"
+      />
     </div>
   </cdf-app-card>
 
   <h2>Streak</h2>
   <cdf-streak-widget
-    [currentDays]="demoStreak"
-    [freezes]="demoFreezes"
+    [currentDays]="streakSvc.currentDays()"
+    [freezes]="streakSvc.freezesAvailable()"
     [week]="streakWeek"
   />
 
@@ -105,10 +113,19 @@
   <h2>Try the surfaces</h2>
   <cdf-app-card>
     <div class="settings-grid">
-      <cdf-app-button kind="primary" (buttonClick)="paywallOpen.set(true)">
+      <cdf-app-button #rewardBtn kind="primary" (buttonClick)="triggerReward()">
+        Grant +25 XP / +10 coins
+      </cdf-app-button>
+      <cdf-app-button kind="secondary" (buttonClick)="triggerLevelUp()">
+        Trigger level-up
+      </cdf-app-button>
+      <cdf-app-button kind="secondary" (buttonClick)="triggerBadge()">
+        Trigger badge unlock
+      </cdf-app-button>
+      <cdf-app-button kind="ghost" (buttonClick)="paywallOpen.set(true)">
         Open paywall
       </cdf-app-button>
-      <cdf-app-button kind="secondary" (buttonClick)="onboardingOpen.set(true)">
+      <cdf-app-button kind="ghost" (buttonClick)="onboardingOpen.set(true)">
         Open onboarding
       </cdf-app-button>
     </div>

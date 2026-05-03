@@ -32,6 +32,9 @@ importers:
       '@capacitor/core':
         specifier: ^6.2.1
         version: 6.2.1
+      '@codify/gamification-engine':
+        specifier: workspace:*
+        version: link:libs/gamification-engine
       '@codify/i18n':
         specifier: workspace:*
         version: link:libs/i18n
@@ -313,6 +316,12 @@ importers:
 
   libs/gamification-engine:
     dependencies:
+      '@angular/common':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/core@21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: ^21.0.0
+        version: 21.2.11(@angular/compiler@21.2.11)(rxjs@7.8.2)(zone.js@0.16.1)
       tslib:
         specifier: ^2.3.0
         version: 2.8.1

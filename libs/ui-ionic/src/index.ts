@@ -92,3 +92,5 @@ export {
   OnboardingCarousel,
   type OnboardingSlide,
 } from './lib/organisms/onboarding-carousel/onboarding-carousel.js';
+export { LevelUpModal } from './lib/organisms/level-up-modal/level-up-modal.js';
+export { BadgeUnlockOverlay } from './lib/organisms/badge-unlock-overlay/badge-unlock-overlay.js';
