@@ -1,0 +1,22 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cdf-money {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-2);
+  width: 100%;
+
+  &__symbol {
+    color: var(--cdf-color-text-muted);
+    font-weight: var(--cdf-font-weight-medium);
+    flex-shrink: 0;
+  }
+
+  &__field {
+    flex: 1;
+    min-width: 0;
+  }
+}

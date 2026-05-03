@@ -1,0 +1,95 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cdf-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-md);
+  background: var(--cdf-color-surface);
+}
+
+.cdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text);
+
+  thead {
+    background: var(--cdf-color-bg);
+    border-bottom: 1px solid var(--cdf-color-border);
+  }
+
+  th {
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    font-weight: var(--cdf-font-weight-semibold);
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+
+    &.cdf-table__th--sortable {
+      cursor: pointer;
+      user-select: none;
+
+      &:hover { color: var(--cdf-color-text); }
+    }
+  }
+
+  td {
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    border-top: 1px solid var(--cdf-color-border);
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    transition: background-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard);
+
+    &:hover { background: var(--cdf-color-bg); }
+  }
+
+  &__tr--selected {
+    background: var(--cdf-color-primary-subtle) !important;
+  }
+
+  &__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    padding: 0;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+      border-radius: var(--cdf-radius-sm);
+    }
+  }
+
+  &__select {
+    width: 40px;
+    text-align: center;
+  }
+
+  &__actions {
+    width: 1px;
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  &__empty {
+    text-align: center;
+    color: var(--cdf-color-text-muted);
+    padding: var(--cdf-space-12) var(--cdf-space-4);
+  }
+}

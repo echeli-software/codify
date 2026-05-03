@@ -1,0 +1,43 @@
+.cdf-modal {
+  display: flex;
+  flex-direction: column;
+  background: var(--cdf-color-surface);
+  color: var(--cdf-color-text);
+  max-height: 90vh;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cdf-space-3);
+    padding: var(--cdf-space-4) var(--cdf-space-5);
+    border-bottom: 1px solid var(--cdf-color-border);
+    flex-shrink: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-lg);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--cdf-space-5);
+  }
+
+  &__foot {
+    padding: var(--cdf-space-3) var(--cdf-space-5);
+    border-top: 1px solid var(--cdf-color-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--cdf-space-2);
+    flex-shrink: 0;
+    background: var(--cdf-color-bg);
+
+    &:empty {
+      display: none;
+    }
+  }
+}

@@ -2,10 +2,12 @@
 /**
  * Headless-Chrome runtime verification.
  *
- * Loads each app's dev URL, waits for content to render, and asserts:
+ * For each configured app, navigates through one or more routes, waits for
+ * content to render, and asserts:
  *   - No console.error / console.warn emitted (configurable per-app)
  *   - No uncaught page errors
- *   - At least one expected DOM element is present (per-app sanity check)
+ *   - No failed network requests
+ *   - Required DOM selectors present per route
  *
  * Usage (assumes dev servers already running on the URLs below):
  *   node tools/scripts/verify-runtime.mjs admin     # check admin only
@@ -18,31 +20,60 @@
 import puppeteer from 'puppeteer';
 
 /**
+ * @typedef {Object} RouteCheck
+ * @property {string} path             URL path (without origin).
+ * @property {string[]} expectSelectors Selectors that must exist on this route.
+ *
  * @typedef {Object} AppCheck
  * @property {string} name
- * @property {string} url
- * @property {string[]} expectSelectors  At least one element matching each must exist.
- * @property {RegExp[]} ignoreConsole    Console messages matching these are not errors.
+ * @property {string} origin
+ * @property {RouteCheck[]} routes
+ * @property {RegExp[]} ignoreConsole  Console messages matching these are not errors.
  */
 
 /** @type {AppCheck[]} */
 const APPS = [
   {
     name: 'admin',
-    url: 'http://localhost:4202',
-    expectSelectors: ['app-root', '.brand', '.cdf-button', '.cdf-badge', '.cdf-input'],
+    origin: 'http://localhost:4202',
+    routes: [
+      {
+        path: '/playground',
+        expectSelectors: [
+          'app-root',
+          '.cdf-shell',
+          '.cdf-shell__brand',
+          '.cdf-button',
+          '.cdf-badge',
+          '.cdf-input',
+          '.cdf-form-field',
+        ],
+      },
+      {
+        path: '/courses',
+        expectSelectors: [
+          'app-root',
+          '.cdf-shell',
+          '.cdf-table',
+          '.cdf-table th', // sortable headers rendered
+        ],
+      },
+    ],
     ignoreConsole: [
-      // Vite dev hints — not real errors.
       /\[vite\]/i,
       /Angular is running in development mode/i,
-      // ngx-translate warns about missing keys during locale switch transitions
       /TranslationKey\b.*not found/i,
     ],
   },
   {
     name: 'student',
-    url: 'http://localhost:4201',
-    expectSelectors: ['app-root', '.brand', '.shell'],
+    origin: 'http://localhost:4201',
+    routes: [
+      {
+        path: '/',
+        expectSelectors: ['app-root', '.brand', '.shell'],
+      },
+    ],
     ignoreConsole: [/\[vite\]/i, /Angular is running in development mode/i],
   },
 ];
@@ -60,48 +91,47 @@ const browser = await puppeteer.launch({ headless: 'shell' });
 let failed = 0;
 
 for (const app of targets) {
-  const page = await browser.newPage();
-  /** @type {string[]} */
-  const errors = [];
-  page.on('console', (msg) => {
-    if (!['error', 'warning'].includes(msg.type())) return;
-    const text = msg.text();
-    if (app.ignoreConsole.some((re) => re.test(text))) return;
-    errors.push(`[console.${msg.type()}] ${text}`);
-  });
-  page.on('pageerror', (err) => {
-    errors.push(`[pageerror] ${err.message}`);
-  });
-  page.on('requestfailed', (req) => {
-    errors.push(`[requestfailed] ${req.url()} — ${req.failure()?.errorText ?? 'unknown'}`);
-  });
+  for (const route of app.routes) {
+    const url = app.origin + route.path;
+    const page = await browser.newPage();
+    /** @type {string[]} */
+    const errors = [];
+    page.on('console', (msg) => {
+      if (!['error', 'warning'].includes(msg.type())) return;
+      const text = msg.text();
+      if (app.ignoreConsole.some((re) => re.test(text))) return;
+      errors.push(`[console.${msg.type()}] ${text}`);
+    });
+    page.on('pageerror', (err) => {
+      errors.push(`[pageerror] ${err.message}`);
+    });
+    page.on('requestfailed', (req) => {
+      errors.push(`[requestfailed] ${req.url()} — ${req.failure()?.errorText ?? 'unknown'}`);
+    });
 
-  let appFailed = false;
-  try {
-    process.stdout.write(`Checking ${app.name} @ ${app.url} … `);
-    await page.goto(app.url, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS });
-
-    for (const sel of app.expectSelectors) {
-      const found = await page.$(sel);
-      if (!found) {
-        errors.push(`[missing-element] selector "${sel}" not found`);
+    try {
+      process.stdout.write(`Checking ${app.name} ${route.path} … `);
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS });
+      for (const sel of route.expectSelectors) {
+        const found = await page.$(sel);
+        if (!found) {
+          errors.push(`[missing-element] selector "${sel}" not found`);
+        }
       }
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      errors.push(`[navigation] ${err.message}`);
+    } finally {
+      await page.close();
     }
-    // Brief settle for any deferred init
-    await new Promise((r) => setTimeout(r, 500));
-  } catch (err) {
-    errors.push(`[navigation] ${err.message}`);
-  } finally {
-    await page.close();
-  }
 
-  if (errors.length > 0) {
-    appFailed = true;
-    failed += 1;
-    console.log('FAIL');
-    for (const e of errors) console.log('   ' + e);
-  } else {
-    console.log('OK');
+    if (errors.length > 0) {
+      failed += 1;
+      console.log('FAIL');
+      for (const e of errors) console.log('   ' + e);
+    } else {
+      console.log('OK');
+    }
   }
 }
 

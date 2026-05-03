@@ -47,3 +47,29 @@ export {
   ConfirmDialogService,
   type ConfirmDialogOptions,
 } from './lib/molecules/confirm-dialog/confirm-dialog.js';
+
+// ─── Organisms ────────────────────────────────────────────────────────────
+export {
+  AppShell,
+  type NavItem,
+  type NavSection,
+} from './lib/organisms/app-shell/app-shell.js';
+export {
+  ModalService,
+  type OpenModalOptions,
+} from './lib/organisms/modal/modal.service.js';
+export { ModalFrame } from './lib/organisms/modal/modal-frame.js';
+export {
+  DataTable,
+  DataTableCell,
+  type DataTableColumn,
+  type SortDirection,
+  type SortState,
+} from './lib/organisms/data-table/data-table.js';
+export { MoneyInput } from './lib/organisms/money-input/money-input.js';
+export {
+  PlanFeatureList,
+  type PlanFeature,
+  type PlanCategoryRef,
+} from './lib/organisms/plan-feature-list/plan-feature-list.js';
+export { JsonEditor } from './lib/organisms/json-editor/json-editor.js';

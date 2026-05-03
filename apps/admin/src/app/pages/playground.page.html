@@ -1,0 +1,171 @@
+<cdf-breadcrumb-bar [crumbs]="crumbs" />
+<h1>Component playground</h1>
+<p class="muted">Atoms, molecules, and organisms from <code>&#64;codify/ui-bootstrap</code>.</p>
+
+<h2>Search</h2>
+<cdf-search-bar
+  placeholder="{{ 'common.search' | translate }} courses, lessons, items…"
+  (query)="onSearch($event)"
+/>
+@if (searchQuery()) {
+<p class="muted small">Debounced query: <code>{{ searchQuery() }}</code></p>
+}
+
+<h2>Buttons</h2>
+<div class="row">
+  <cdf-button kind="primary"><cdf-icon name="plus" size="sm" />New course</cdf-button>
+  <cdf-button kind="secondary">{{ 'common.save' | translate }}</cdf-button>
+  <cdf-button kind="ghost"><cdf-icon name="pencil" size="sm" />Edit</cdf-button>
+  <cdf-button kind="danger" (click)="confirmDelete()">
+    <cdf-icon name="trash" size="sm" />Delete
+  </cdf-button>
+  <cdf-button kind="link">Link</cdf-button>
+  <cdf-button kind="primary" [loading]="true">Saving</cdf-button>
+  <cdf-button kind="primary" [disabled]="true">Disabled</cdf-button>
+</div>
+
+<h2>Toasts</h2>
+<div class="row">
+  <cdf-button kind="secondary" (click)="showToast('success')">Show success</cdf-button>
+  <cdf-button kind="secondary" (click)="showToast('info')">Show info</cdf-button>
+  <cdf-button kind="secondary" (click)="showToast('warn')">Show warning</cdf-button>
+  <cdf-button kind="secondary" (click)="showToast('error')">Show error</cdf-button>
+</div>
+
+<h2>Badges</h2>
+<div class="row">
+  <cdf-badge variant="primary">Primary</cdf-badge>
+  <cdf-badge variant="success">Published</cdf-badge>
+  <cdf-badge variant="warning">Draft</cdf-badge>
+  <cdf-badge variant="danger">Failing</cdf-badge>
+  <cdf-badge variant="info">New</cdf-badge>
+  <cdf-badge variant="coin">+25 coins</cdf-badge>
+  <cdf-badge variant="xp">+10 XP</cdf-badge>
+  <cdf-badge variant="premium" [subtle]="true">Premium only</cdf-badge>
+</div>
+
+<h2>Tags</h2>
+<div class="row">
+  @for (tag of tags(); track tag) {
+  <cdf-tag [removable]="true" (remove)="removeTag(tag)">{{ tag }}</cdf-tag>
+  }
+</div>
+
+<h2>Form fields</h2>
+<div class="form-grid">
+  <cdf-form-field label="Display name" [required]="true" help="Shown to other learners.">
+    <cdf-input [(ngModel)]="nameValue" placeholder="e.g. Maria Souza" />
+  </cdf-form-field>
+
+  <cdf-form-field label="Email" [required]="true" [error]="emailError()">
+    <cdf-input
+      [(ngModel)]="emailValue"
+      (blur)="validateEmail()"
+      [invalid]="!!emailError()"
+      type="email"
+      placeholder="you@example.com"
+    />
+  </cdf-form-field>
+
+  <cdf-form-field label="Bio" help="Optional. Markdown supported.">
+    <cdf-textarea [(ngModel)]="bioValue" placeholder="A short blurb…" [rows]="3" />
+  </cdf-form-field>
+
+  <cdf-form-field label="Category">
+    <cdf-select [options]="categoryOptions" [(ngModel)]="category" />
+  </cdf-form-field>
+
+  <cdf-form-field label="Difficulty">
+    <cdf-radio-group
+      [options]="difficultyOptions"
+      [(ngModel)]="difficulty"
+      ariaLabel="Difficulty"
+    />
+  </cdf-form-field>
+
+  <cdf-form-field label="Monthly price" help="In cents internally.">
+    <cdf-money-input [(ngModel)]="priceCents" currency="BRL" />
+  </cdf-form-field>
+
+  <cdf-checkbox [(ngModel)]="acceptTerms" label="I accept the terms" />
+  <cdf-toggle [(ngModel)]="notifyOn" label="Email notifications" />
+</div>
+
+<h2>Pricing</h2>
+<div class="row">
+  <cdf-price-tag [amountCents]="3990" currency="BRL" period="monthly" />
+  <cdf-divider orientation="vertical" />
+  <cdf-price-tag [amountCents]="47880" currency="BRL" period="annual" [installments]="12" />
+  <cdf-divider orientation="vertical" />
+  <cdf-price-tag [amountCents]="999" currency="USD" period="monthly" />
+</div>
+
+<h2>Plan features</h2>
+<cdf-plan-feature-list [categories]="planCategories" [features]="planFeatures" />
+
+<h2>Progress bars</h2>
+<div class="form-grid">
+  <cdf-progress-bar [value]="progressValue()" variant="primary" label="Course progress" />
+  <cdf-progress-bar [value]="35" variant="xp" size="lg" label="XP toward next level" />
+  <cdf-progress-bar [value]="80" variant="success" size="sm" />
+  <cdf-progress-bar [indeterminate]="true" label="Saving…" />
+</div>
+
+<h2>Skeletons</h2>
+<div class="form-grid">
+  <cdf-skeleton shape="text" width="60%" height="14px" />
+  <cdf-skeleton shape="text" width="40%" height="14px" />
+  <cdf-skeleton shape="rect" width="100%" height="120px" />
+  <div class="row">
+    <cdf-skeleton shape="circle" width="36px" height="36px" />
+    <cdf-skeleton shape="text" width="120px" height="14px" />
+  </div>
+</div>
+
+<h2>Detail panel</h2>
+<cdf-key-value-list [rows]="courseRows" />
+
+<h2>JSON editor</h2>
+<cdf-form-field label="Badge rule" help="Validates JSON on blur.">
+  <cdf-json-editor [(ngModel)]="badgeRule" [rows]="6" />
+</cdf-form-field>
+
+<h2>Pagination</h2>
+<cdf-pagination
+  [page]="currentPage()"
+  [totalPages]="totalPages()"
+  (pageChange)="currentPage.set($event)"
+/>
+
+<h2>Icon buttons</h2>
+<div class="row">
+  <cdf-icon-button icon="plus" ariaLabel="Add" kind="primary" />
+  <cdf-icon-button icon="pencil" ariaLabel="Edit" kind="secondary" />
+  <cdf-icon-button icon="trash" ariaLabel="Delete" kind="danger" />
+  <cdf-icon-button icon="gear" ariaLabel="Settings" kind="ghost" />
+  <cdf-icon-button icon="search" ariaLabel="Search" size="sm" />
+</div>
+
+<h2>Tooltip + KBD</h2>
+<div class="row">
+  <cdf-button
+    kind="secondary"
+    cdfTooltip="Save changes"
+    cdfTooltipPlacement="top"
+  >
+    Hover me
+  </cdf-button>
+  <span>Open command bar with <cdf-kbd>⌘</cdf-kbd> + <cdf-kbd>K</cdf-kbd></span>
+  <cdf-spinner size="md" label="Loading" />
+</div>
+
+<cdf-divider label="Empty state" />
+
+<cdf-empty-state
+  icon="plus"
+  title="No courses yet"
+  description="Start by creating your first course. You can add modules and lessons after."
+>
+  <cdf-button kind="primary"><cdf-icon name="plus" size="sm" /> New course</cdf-button>
+  <cdf-button kind="ghost">Browse templates</cdf-button>
+</cdf-empty-state>

@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+.cdf-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+
+  &__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-1);
+    margin-bottom: var(--cdf-space-3);
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text);
+
+    &--excluded {
+      color: var(--cdf-color-text-subtle);
+    }
+  }
+
+  &__icon--ok { color: var(--cdf-color-success); }
+  &__icon--no { color: var(--cdf-color-text-subtle); }
+
+  &__label {
+    flex: 1;
+  }
+
+  &__hint {
+    color: var(--cdf-color-text-muted);
+  }
+}

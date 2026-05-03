@@ -11,10 +11,10 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  it('renders the brand', async () => {
+  it('renders the AppShell brand', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('Codify');
+    expect(compiled.querySelector('.cdf-shell__brand')?.textContent).toContain('Codify');
   });
 });
