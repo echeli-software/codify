@@ -13,6 +13,9 @@
       "default": "./src/index.ts"
     },
     "./scss": "./src/scss/index.scss",
+    "./scss/index": "./src/scss/index.scss",
+    "./scss/ionic-map": "./src/scss/_ionic-map.scss",
+    "./scss/bootstrap-map": "./src/scss/_bootstrap-map.scss",
     "./scss/*": "./src/scss/*",
     "./package.json": "./package.json"
   },

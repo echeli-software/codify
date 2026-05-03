@@ -1,0 +1,91 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Codify</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleTheme()" aria-label="Toggle theme">
+        @if (theme() === 'dark') {
+        <ion-icon slot="icon-only" name="sunny" />
+        } @else {
+        <ion-icon slot="icon-only" name="moon" />
+        }
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  <div class="hero">
+    <ion-chip color="warning">
+      <ion-icon name="flame" />
+      <ion-label>{{ demoStreak }} day streak</ion-label>
+    </ion-chip>
+    <ion-chip color="primary">
+      <ion-icon name="trophy" />
+      <ion-label>{{ demoTier() }} · Level {{ demoLevel() }}</ion-label>
+    </ion-chip>
+  </div>
+
+  <ion-card>
+    <ion-card-content>
+      <div class="level-row">
+        <strong>Level {{ demoLevel() }}</strong>
+        <ion-note>{{ demoLevelProgress() }}% to next</ion-note>
+      </div>
+      <ion-progress-bar [value]="progressFraction()" color="primary" />
+
+      <div class="stats">
+        <div class="stat">
+          <ion-icon name="sparkles" />
+          <span class="stat__value">{{ xpLabel() }}</span>
+          <span class="stat__label">XP</span>
+        </div>
+        <div class="stat">
+          <span class="coin">●</span>
+          <span class="stat__value">{{ coinLabel() }}</span>
+          <span class="stat__label">coins</span>
+        </div>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <h2>Continue learning</h2>
+
+  <ion-list inset="true">
+    <ion-item button="true" detail="true">
+      <ion-label>
+        <h3>Hooks intro</h3>
+        <p>React Fundamentals · Lesson 4 of 12</p>
+      </ion-label>
+      <ion-note slot="end">5 min</ion-note>
+    </ion-item>
+    <ion-item button="true" detail="true">
+      <ion-label>
+        <h3>Conditional rendering</h3>
+        <p>React Fundamentals · Lesson 5 of 12</p>
+      </ion-label>
+      <ion-note slot="end">7 min</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <h2>Daily quests</h2>
+  <ion-list inset="true">
+    <ion-item>
+      <ion-label>
+        <h3>Complete 1 React lesson</h3>
+        <p>0 / 1 · 20 coins</p>
+      </ion-label>
+    </ion-item>
+    <ion-item>
+      <ion-label>
+        <h3>Earn 100 XP today</h3>
+        <p>0 / 100 · 20 coins</p>
+      </ion-label>
+    </ion-item>
+    <ion-item>
+      <ion-label>
+        <h3>Pass an exercise</h3>
+        <p>0 / 1 · 20 coins</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>

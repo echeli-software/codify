@@ -1,0 +1,74 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cdf-space-2);
+  margin-bottom: var(--cdf-space-4);
+}
+
+.level-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--cdf-space-2);
+}
+
+.stats {
+  display: flex;
+  gap: var(--cdf-space-6);
+  margin-top: var(--cdf-space-3);
+  align-items: center;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-1);
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text-muted);
+
+  ion-icon {
+    color: var(--cdf-color-xp);
+    font-size: 1.1em;
+  }
+
+  .coin {
+    color: var(--cdf-color-coin);
+    font-size: 0.7em;
+  }
+
+  &__value {
+    color: var(--cdf-color-text);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__label {
+    color: var(--cdf-color-text-muted);
+  }
+}
+
+h2 {
+  font-size: var(--cdf-font-size-md);
+  color: var(--cdf-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: var(--cdf-space-6) 0 var(--cdf-space-2);
+  padding: 0 var(--cdf-space-2);
+}
+
+// Constrain content width on desktop while letting it fill the screen on
+// mobile per the responsive philosophy in docs/05-student-app.md §1.
+ion-content {
+  --max-width: 720px;
+
+  > * {
+    max-width: var(--max-width);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+}

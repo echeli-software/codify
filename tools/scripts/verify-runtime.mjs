@@ -80,8 +80,15 @@ const APPS = [
     origin: 'http://localhost:4201',
     routes: [
       {
-        path: '/',
-        expectSelectors: ['app-root', '.brand', '.shell'],
+        path: '/today',
+        expectSelectors: [
+          'app-root',
+          'ion-app',
+          'ion-router-outlet',
+          'ion-content',
+          'ion-card',
+          'ion-progress-bar',
+        ],
       },
     ],
     ignoreConsole: [/\[vite\]/i, /Angular is running in development mode/i],

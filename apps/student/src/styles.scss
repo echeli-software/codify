@@ -1,4 +1,20 @@
+// Tokens first so Ionic's CSS vars can reference --cdf-* in ionic-map.
 @use 'pkg:@codify/ui-tokens' as cdf;
+
+// Ionic core styles. `core` is required; `normalize`/`structure`/`typography`/
+// `display` align native-feeling defaults; `padding`/`text-alignment`/`flex-utils`
+// are the small utility set we'll use across pages.
+@use '@ionic/angular/css/core.css';
+@use '@ionic/angular/css/normalize.css';
+@use '@ionic/angular/css/structure.css';
+@use '@ionic/angular/css/typography.css';
+@use '@ionic/angular/css/display.css';
+@use '@ionic/angular/css/padding.css';
+@use '@ionic/angular/css/text-alignment.css';
+@use '@ionic/angular/css/flex-utils.css';
+
+// Map Codify tokens onto Ionic CSS vars (--ion-color-*, --ion-background-*).
+@use 'pkg:@codify/ui-tokens/scss/ionic-map';
 
 :root {
   @include cdf.theme-light;
@@ -28,19 +44,4 @@ body {
 
 * {
   box-sizing: border-box;
-}
-
-a {
-  color: var(--cdf-color-primary);
-  text-decoration: none;
-
-  &:hover {
-    color: var(--cdf-color-primary-hover);
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--cdf-shadow-focus-ring);
-    border-radius: var(--cdf-radius-sm);
-  }
 }
