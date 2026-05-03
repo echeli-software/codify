@@ -3,7 +3,9 @@
 //
 //   @use 'pkg:@codify/ui-bootstrap/scss/bootstrap';
 
-@use 'pkg:@codify/ui-tokens' as cdf;
+// Relative import (instead of `pkg:`) so this file works under both Angular's
+// modern sass resolver AND webpack's older sass-loader (which Storybook uses).
+@use '../../../ui-tokens/src/scss/index' as cdf;
 
 // Override Bootstrap defaults via the modern @use ... with API.
 @use 'bootstrap/scss/bootstrap' with (

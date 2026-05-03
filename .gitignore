@@ -58,3 +58,6 @@ test-output
 
 # Prisma
 prisma/.env
+
+
+storybook-static

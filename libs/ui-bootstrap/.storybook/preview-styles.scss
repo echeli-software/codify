@@ -1,0 +1,33 @@
+// Global styles for the Storybook preview iframe. Uses relative paths
+// (instead of `pkg:` URLs) because Storybook's webpack + sass-loader stack
+// doesn't support modern sass package resolution.
+//
+// The runtime CSS this emits is identical to what apps/admin/src/styles.scss
+// produces — they just take different paths to get there.
+
+@use '../../ui-tokens/src/scss/index' as cdf;
+@use '../src/scss/bootstrap';
+@use '../src/scss/lesson-prose';
+
+:root {
+  @include cdf.theme-light;
+}
+
+:root.theme-dark {
+  @include cdf.theme-dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--cdf-font-family-sans);
+  font-size: var(--cdf-font-size-base);
+  line-height: var(--cdf-line-height-normal);
+  background: var(--cdf-color-bg);
+  color: var(--cdf-color-text);
+}
+
+.sb-show-main {
+  padding: var(--cdf-space-6);
+}
