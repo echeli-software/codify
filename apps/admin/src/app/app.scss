@@ -25,6 +25,12 @@
   font-size: var(--cdf-font-size-lg);
 }
 
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cdf-space-3);
+}
+
 .user {
   display: inline-flex;
   align-items: center;
@@ -58,6 +64,10 @@
 
   .muted {
     color: var(--cdf-color-text-muted);
+  }
+
+  .small {
+    font-size: var(--cdf-font-size-sm);
   }
 
   code {

@@ -1,0 +1,38 @@
+import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { I18nService, type Locale } from '@codify/i18n';
+import { Select, type SelectOption } from '../../atoms/select/select.js';
+
+/**
+ * Drop-in language switcher used in app shells. Pulls the supported locales
+ * from I18nService so adding a new locale anywhere automatically lights it
+ * up here.
+ */
+@Component({
+  selector: 'cdf-language-switcher',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, Select],
+  template: `
+    <cdf-select
+      class="cdf-language-switcher"
+      size="sm"
+      [options]="options()"
+      [ngModel]="current()"
+      (ngModelChange)="onChange($event)"
+    />
+  `,
+  styleUrl: './language-switcher.scss',
+})
+export class LanguageSwitcher {
+  private readonly i18n = inject(I18nService);
+
+  protected readonly current = computed(() => this.i18n.currentLocale());
+
+  protected readonly options = computed<SelectOption<Locale>[]>(() =>
+    this.i18n.availableLocales.map((m) => ({ value: m.code, label: m.nativeName })),
+  );
+
+  protected onChange(value: Locale | null): void {
+    if (value) this.i18n.setLocale(value);
+  }
+}

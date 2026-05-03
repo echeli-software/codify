@@ -1,0 +1,40 @@
+:host {
+  display: block;
+}
+
+.cdf-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cdf-space-1);
+  font-size: var(--cdf-font-size-sm);
+  color: var(--cdf-color-text-muted);
+
+  &__item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+  }
+
+  &__link {
+    color: var(--cdf-color-text-muted);
+    text-decoration: none;
+    transition: color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
+
+    &:hover { color: var(--cdf-color-primary); }
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+      border-radius: var(--cdf-radius-sm);
+    }
+  }
+
+  &__current {
+    color: var(--cdf-color-text);
+    font-weight: var(--cdf-font-weight-medium);
+  }
+
+  &__sep {
+    color: var(--cdf-color-text-subtle);
+  }
+}

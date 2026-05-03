@@ -1,41 +1,54 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { I18nService, TranslatePipe } from '@codify/i18n';
+import { TranslatePipe } from '@codify/i18n';
 import {
   Avatar,
   Badge,
+  BreadcrumbBar,
+  type BreadcrumbCrumb,
   Button,
   Checkbox,
+  ConfirmDialogService,
   Divider,
+  EmptyState,
+  FormField,
   Icon,
   IconButton,
   Input,
   Kbd,
+  KeyValueList,
+  type KeyValueRow,
+  LanguageSwitcher,
+  Pagination,
+  PriceTag,
   ProgressBar,
   RadioGroup,
   type RadioOption,
+  SearchBar,
   Select,
   type SelectOption,
   Skeleton,
   Spinner,
   Tag,
   Textarea,
+  ThemeToggle,
+  ToastHost,
+  ToastService,
   Toggle,
   Tooltip,
 } from '@codify/ui-bootstrap';
 
-type Theme = 'light' | 'dark' | 'system';
 type Difficulty = '1' | '2' | '3' | '4' | '5';
 type CategoryId = 'frontend' | 'mobile' | 'ai' | 'soft';
-
-const THEME_STORAGE_KEY = 'codify.theme';
+type ToastVariant = 'success' | 'error' | 'info' | 'warn';
 
 @Component({
   imports: [
     RouterModule,
     FormsModule,
     TranslatePipe,
+    // atoms
     Avatar,
     Badge,
     Button,
@@ -54,20 +67,30 @@ const THEME_STORAGE_KEY = 'codify.theme';
     Textarea,
     Toggle,
     Tooltip,
+    // molecules
+    BreadcrumbBar,
+    EmptyState,
+    FormField,
+    KeyValueList,
+    LanguageSwitcher,
+    Pagination,
+    PriceTag,
+    SearchBar,
+    ThemeToggle,
+    ToastHost,
   ],
   selector: 'app-root',
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
-  private readonly i18n = inject(I18nService);
-  protected readonly theme = signal<Theme>(this.readPersistedTheme());
-  protected readonly locale = computed(() => this.i18n.currentLocale());
-  protected readonly availableLocales = this.i18n.availableLocales;
+  private readonly toasts = inject(ToastService);
+  private readonly confirmService = inject(ConfirmDialogService);
 
-  // Demo state for the atom playground.
+  // Form state
   protected readonly nameValue = signal('Maria');
   protected readonly bioValue = signal('');
+  protected readonly emailValue = signal('');
   protected readonly notifyOn = signal(true);
   protected readonly acceptTerms = signal(false);
   protected readonly tags = signal(['Frontend', 'AI', 'Soft skills']);
@@ -90,45 +113,70 @@ export class App {
   ];
 
   protected readonly progressValue = signal(72);
+  protected readonly currentPage = signal(3);
+  protected readonly totalPages = signal(12);
 
-  constructor() {
-    this.applyTheme(this.theme());
-  }
+  // Form-field demo
+  protected readonly emailError = signal<string | null>(null);
 
-  protected setTheme(value: Theme): void {
-    this.theme.set(value);
-    this.applyTheme(value);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, value);
-    } catch {
-      /* private browsing — ignore */
-    }
-  }
+  // Search demo
+  protected readonly searchQuery = signal('');
 
-  protected setLocale(value: string): void {
-    if (value === 'pt-BR' || value === 'en-US') {
-      this.i18n.setLocale(value);
-    }
-  }
+  // Detail panel demo
+  protected readonly courseRows: KeyValueRow[] = [
+    { key: 'Author', value: 'Maria Souza' },
+    { key: 'Source locale', value: 'pt-BR' },
+    { key: 'Difficulty', value: 'Intermediário' },
+    { key: 'Lessons', value: 12 },
+    { key: 'Duration', value: '~3h', hint: 'estimated' },
+    { key: 'Status', value: 'Published' },
+  ];
+
+  protected readonly crumbs: BreadcrumbCrumb[] = [
+    { label: 'Catalog', routerLink: ['/'] },
+    { label: 'Courses', routerLink: ['/'] },
+    { label: 'React Fundamentals' },
+  ];
 
   protected removeTag(tag: string): void {
     this.tags.update((list) => list.filter((t) => t !== tag));
   }
 
-  private applyTheme(theme: Theme): void {
-    const root = document.documentElement;
-    root.classList.remove('theme-light', 'theme-dark');
-    if (theme === 'light') root.classList.add('theme-light');
-    if (theme === 'dark') root.classList.add('theme-dark');
+  protected validateEmail(): void {
+    const v = this.emailValue();
+    this.emailError.set(
+      v.length === 0 ? 'Email is required' : !v.includes('@') ? 'Looks invalid' : null,
+    );
   }
 
-  private readPersistedTheme(): Theme {
-    try {
-      const v = localStorage.getItem(THEME_STORAGE_KEY);
-      if (v === 'light' || v === 'dark' || v === 'system') return v;
-    } catch {
-      /* ignore */
-    }
-    return 'system';
+  protected onSearch(query: string): void {
+    this.searchQuery.set(query);
+  }
+
+  protected showToast(variant: ToastVariant): void {
+    const messages: Record<ToastVariant, string> = {
+      success: 'Course saved.',
+      error: 'Could not connect to the server.',
+      info: 'Translation completeness updated.',
+      warn: 'You have unsynced changes.',
+    };
+    this.toasts[variant](messages[variant], {
+      title: variant.charAt(0).toUpperCase() + variant.slice(1),
+      actionLabel: variant === 'error' ? 'Retry' : undefined,
+      onAction: () => this.toasts.info('Retried'),
+    });
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const ok = await this.confirmService.open({
+      title: 'Delete this course?',
+      message: 'This action cannot be undone. All lessons and progress will be lost.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      confirmKind: 'danger',
+      icon: 'warning',
+      typeToConfirm: 'react-fundamentals',
+    });
+    if (ok) this.toasts.success('Course deleted (demo).');
   }
 }

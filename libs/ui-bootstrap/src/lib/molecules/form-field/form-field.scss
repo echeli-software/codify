@@ -1,0 +1,41 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cdf-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-1);
+
+  &__label {
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-medium);
+    color: var(--cdf-color-text);
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--cdf-space-1);
+  }
+
+  &__required {
+    color: var(--cdf-color-danger);
+    font-weight: var(--cdf-font-weight-bold);
+  }
+
+  &__control {
+    display: block;
+  }
+
+  &__help {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-danger);
+    font-weight: var(--cdf-font-weight-medium);
+  }
+}

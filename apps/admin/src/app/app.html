@@ -5,45 +5,46 @@
       <span>Codify · Admin</span>
     </div>
 
-    <div class="user">
+    <div class="actions">
+      <cdf-language-switcher />
+      <cdf-theme-toggle />
       <cdf-avatar name="Maria Souza" size="md" />
-      <span class="user__name">Maria Souza</span>
-      <cdf-badge variant="premium" [subtle]="true">Premium</cdf-badge>
     </div>
   </header>
 
   <section class="content">
-    <h1>Phase 2 atoms</h1>
-    <p class="muted">All atoms below come from <code>&#64;codify/ui-bootstrap</code>.</p>
+    <cdf-breadcrumb-bar [crumbs]="crumbs" />
+    <h1>Phase 2 atoms + molecules</h1>
+    <p class="muted">All components from <code>&#64;codify/ui-bootstrap</code>.</p>
 
-    <div class="row">
-      <label class="control">
-        {{ 'common.language' | translate }}
-        <cdf-input [ngModel]="locale()" [readonly]="true" />
-      </label>
-      <select [value]="locale()" (change)="setLocale($any($event.target).value)" aria-label="Locale">
-        @for (loc of availableLocales; track loc.code) {
-        <option [value]="loc.code">{{ loc.nativeName }}</option>
-        }
-      </select>
-    </div>
+    <h2>Search</h2>
+    <cdf-search-bar
+      placeholder="{{ 'common.search' | translate }} courses, lessons, items…"
+      (query)="onSearch($event)"
+    />
+    @if (searchQuery()) {
+    <p class="muted small">Debounced query: <code>{{ searchQuery() }}</code></p>
+    }
 
     <h2>Buttons</h2>
     <div class="row">
       <cdf-button kind="primary"><cdf-icon name="plus" size="sm" />New course</cdf-button>
       <cdf-button kind="secondary">{{ 'common.save' | translate }}</cdf-button>
       <cdf-button kind="ghost"><cdf-icon name="pencil" size="sm" />Edit</cdf-button>
-      <cdf-button kind="danger"><cdf-icon name="trash" size="sm" />Delete</cdf-button>
+      <cdf-button kind="danger" (click)="confirmDelete()">
+        <cdf-icon name="trash" size="sm" />Delete
+      </cdf-button>
       <cdf-button kind="link">Link</cdf-button>
       <cdf-button kind="primary" [loading]="true">Saving</cdf-button>
       <cdf-button kind="primary" [disabled]="true">Disabled</cdf-button>
     </div>
 
-    <h2>Sizes</h2>
+    <h2>Toasts</h2>
     <div class="row">
-      <cdf-button size="sm">Small</cdf-button>
-      <cdf-button size="md">Medium</cdf-button>
-      <cdf-button size="lg">Large</cdf-button>
+      <cdf-button kind="secondary" (click)="showToast('success')">Show success</cdf-button>
+      <cdf-button kind="secondary" (click)="showToast('info')">Show info</cdf-button>
+      <cdf-button kind="secondary" (click)="showToast('warn')">Show warning</cdf-button>
+      <cdf-button kind="secondary" (click)="showToast('error')">Show error</cdf-button>
     </div>
 
     <h2>Badges</h2>
@@ -55,8 +56,7 @@
       <cdf-badge variant="info">New</cdf-badge>
       <cdf-badge variant="coin">+25 coins</cdf-badge>
       <cdf-badge variant="xp">+10 XP</cdf-badge>
-      <cdf-badge variant="premium">Premium only</cdf-badge>
-      <cdf-badge variant="success" [subtle]="true">Subtle</cdf-badge>
+      <cdf-badge variant="premium" [subtle]="true">Premium only</cdf-badge>
     </div>
 
     <h2>Tags</h2>
@@ -66,64 +66,53 @@
       }
     </div>
 
-    <h2>Form controls</h2>
+    <h2>Form fields</h2>
     <div class="form-grid">
-      <label class="control">
-        Display name
+      <cdf-form-field label="Display name" [required]="true" help="Shown to other learners.">
         <cdf-input [(ngModel)]="nameValue" placeholder="e.g. Maria Souza" />
-      </label>
+      </cdf-form-field>
 
-      <label class="control">
-        Bio
+      <cdf-form-field
+        label="Email"
+        [required]="true"
+        [error]="emailError()"
+      >
+        <cdf-input
+          [(ngModel)]="emailValue"
+          (blur)="validateEmail()"
+          [invalid]="!!emailError()"
+          type="email"
+          placeholder="you@example.com"
+        />
+      </cdf-form-field>
+
+      <cdf-form-field label="Bio" help="Optional. Markdown supported.">
         <cdf-textarea [(ngModel)]="bioValue" placeholder="A short blurb…" [rows]="3" />
-      </label>
+      </cdf-form-field>
+
+      <cdf-form-field label="Category">
+        <cdf-select [options]="categoryOptions" [(ngModel)]="category" />
+      </cdf-form-field>
+
+      <cdf-form-field label="Difficulty">
+        <cdf-radio-group
+          [options]="difficultyOptions"
+          [(ngModel)]="difficulty"
+          ariaLabel="Difficulty"
+        />
+      </cdf-form-field>
 
       <cdf-checkbox [(ngModel)]="acceptTerms" label="I accept the terms" />
-
       <cdf-toggle [(ngModel)]="notifyOn" label="Email notifications" />
-
-      <cdf-input [ngModel]="''" [invalid]="true" placeholder="Invalid example" />
     </div>
 
-    <h2>Spinner & icons</h2>
+    <h2>Pricing</h2>
     <div class="row">
-      <cdf-spinner size="sm" label="Loading" />
-      <cdf-spinner label="Loading" />
-      <cdf-spinner size="lg" label="Loading" />
-      <cdf-icon name="check-circle" size="xl" />
-      <cdf-icon name="warning" size="xl" />
-      <cdf-icon name="x-circle" size="xl" />
-    </div>
-
-    <cdf-divider label="More atoms" />
-
-    <h2>Icon buttons</h2>
-    <div class="row">
-      <cdf-icon-button icon="plus" ariaLabel="Add" kind="primary" />
-      <cdf-icon-button icon="pencil" ariaLabel="Edit" kind="secondary" />
-      <cdf-icon-button icon="trash" ariaLabel="Delete" kind="danger" />
-      <cdf-icon-button icon="gear" ariaLabel="Settings" kind="ghost" />
-      <cdf-icon-button icon="eye" ariaLabel="Preview" size="sm" />
-      <cdf-icon-button icon="search" ariaLabel="Search" size="lg" />
-      <cdf-icon-button
-        icon="moon"
-        ariaLabel="Toggle dark mode"
-        kind="ghost"
-        [pressed]="theme() === 'dark'"
-        (click)="setTheme(theme() === 'dark' ? 'light' : 'dark')"
-      />
-    </div>
-
-    <h2>Select &amp; radio</h2>
-    <div class="form-grid">
-      <label class="control">
-        Category
-        <cdf-select [options]="categoryOptions" [(ngModel)]="category" />
-      </label>
-      <label class="control">
-        Difficulty
-        <cdf-radio-group [options]="difficultyOptions" [(ngModel)]="difficulty" ariaLabel="Difficulty" />
-      </label>
+      <cdf-price-tag [amountCents]="3990" currency="BRL" period="monthly" />
+      <cdf-divider orientation="vertical" />
+      <cdf-price-tag [amountCents]="47880" currency="BRL" period="annual" [installments]="12" />
+      <cdf-divider orientation="vertical" />
+      <cdf-price-tag [amountCents]="999" currency="USD" period="monthly" />
     </div>
 
     <h2>Progress bars</h2>
@@ -145,6 +134,25 @@
       </div>
     </div>
 
+    <h2>Detail panel</h2>
+    <cdf-key-value-list [rows]="courseRows" />
+
+    <h2>Pagination</h2>
+    <cdf-pagination
+      [page]="currentPage()"
+      [totalPages]="totalPages()"
+      (pageChange)="currentPage.set($event)"
+    />
+
+    <h2>Icon buttons</h2>
+    <div class="row">
+      <cdf-icon-button icon="plus" ariaLabel="Add" kind="primary" />
+      <cdf-icon-button icon="pencil" ariaLabel="Edit" kind="secondary" />
+      <cdf-icon-button icon="trash" ariaLabel="Delete" kind="danger" />
+      <cdf-icon-button icon="gear" ariaLabel="Settings" kind="ghost" />
+      <cdf-icon-button icon="search" ariaLabel="Search" size="sm" />
+    </div>
+
     <h2>Tooltip + KBD</h2>
     <div class="row">
       <cdf-button
@@ -155,23 +163,22 @@
         Hover me
       </cdf-button>
       <span>Open command bar with <cdf-kbd>⌘</cdf-kbd> + <cdf-kbd>K</cdf-kbd></span>
+      <cdf-spinner size="md" label="Loading" />
     </div>
 
-    <cdf-divider />
+    <cdf-divider label="Empty state" />
 
-    <h2>Theme + locale</h2>
-    <div class="row">
-      <cdf-button kind="ghost" (click)="setTheme('light')" [class.active]="theme() === 'light'">
-        <cdf-icon name="sun" size="sm" /> {{ 'common.theme.light' | translate }}
-      </cdf-button>
-      <cdf-button kind="ghost" (click)="setTheme('dark')" [class.active]="theme() === 'dark'">
-        <cdf-icon name="moon" size="sm" /> {{ 'common.theme.dark' | translate }}
-      </cdf-button>
-      <cdf-button kind="ghost" (click)="setTheme('system')" [class.active]="theme() === 'system'">
-        {{ 'common.theme.system' | translate }}
-      </cdf-button>
-    </div>
+    <cdf-empty-state
+      icon="plus"
+      title="No courses yet"
+      description="Start by creating your first course. You can add modules and lessons after."
+    >
+      <cdf-button kind="primary"><cdf-icon name="plus" size="sm" /> New course</cdf-button>
+      <cdf-button kind="ghost">Browse templates</cdf-button>
+    </cdf-empty-state>
 
     <router-outlet />
   </section>
+
+  <cdf-toast-host />
 </main>

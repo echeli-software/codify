@@ -1,0 +1,102 @@
+.cdf-toast-host {
+  position: fixed;
+  top: var(--cdf-space-4);
+  right: var(--cdf-space-4);
+  z-index: var(--cdf-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 32px));
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.cdf-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cdf-space-2);
+  padding: var(--cdf-space-3);
+  background: var(--cdf-color-surface-elev);
+  border: 1px solid var(--cdf-color-border);
+  border-left-width: 4px;
+  border-radius: var(--cdf-radius-md);
+  box-shadow: var(--cdf-shadow-3);
+  animation: cdf-toast-in var(--cdf-motion-duration-base) var(--cdf-motion-easing-emphasized);
+
+  &__icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text);
+  }
+
+  &__message {
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text-muted);
+    word-wrap: break-word;
+  }
+
+  &__action {
+    background: transparent;
+    border: none;
+    color: var(--cdf-color-primary);
+    font-family: inherit;
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-medium);
+    cursor: pointer;
+    padding: var(--cdf-space-1) var(--cdf-space-2);
+    border-radius: var(--cdf-radius-sm);
+
+    &:hover { background: var(--cdf-color-primary-subtle); }
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &--success {
+    border-left-color: var(--cdf-color-success);
+    .cdf-toast__icon { color: var(--cdf-color-success); }
+  }
+  &--error {
+    border-left-color: var(--cdf-color-danger);
+    .cdf-toast__icon { color: var(--cdf-color-danger); }
+  }
+  &--warn {
+    border-left-color: var(--cdf-color-warning);
+    .cdf-toast__icon { color: var(--cdf-color-warning); }
+  }
+  &--info {
+    border-left-color: var(--cdf-color-info);
+    .cdf-toast__icon { color: var(--cdf-color-info); }
+  }
+}
+
+@keyframes cdf-toast-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdf-toast { animation: none; }
+}
