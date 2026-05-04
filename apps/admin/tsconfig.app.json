@@ -20,6 +20,9 @@
       "path": "../../libs/ui-bootstrap/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/auth/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/i18n/tsconfig.lib.json"
     }
   ]

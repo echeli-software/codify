@@ -36,7 +36,24 @@ const APPS = [
   {
     name: 'admin',
     origin: 'http://localhost:4202',
+    /** Stub auth — admin app is staff-only so we sign in as ADMIN. */
+    seed: {
+      'codify.auth.user': JSON.stringify({
+        id: 'dev-admin',
+        email: 'admin@codify.local',
+        displayName: 'Admin',
+        role: 'ADMIN',
+        avatarUrl: null,
+        locale: 'pt-BR',
+      }),
+      'codify.auth.token': JSON.stringify({ token: 'dev-token-admin', expiresAt: null }),
+    },
     routes: [
+      {
+        path: '/login',
+        public: true,
+        expectSelectors: ['app-root', '.role-btn'],
+      },
       {
         path: '/playground',
         expectSelectors: [
