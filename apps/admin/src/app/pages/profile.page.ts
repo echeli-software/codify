@@ -105,7 +105,7 @@ import { I18nService, type Locale } from '@codify/i18n';
           [rows]="identityRows()"
         />
         <div style="margin-top: 12px; display:flex; gap:8px;">
-          <cdf-button kind="danger" (buttonClick)="signOut()">Sign out</cdf-button>
+          <cdf-button kind="danger" (click)="signOut()">Sign out</cdf-button>
         </div>
       </section>
       }

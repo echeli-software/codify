@@ -43,3 +43,47 @@
   // Font
   --ion-font-family:             var(--cdf-font-family-sans);
 }
+
+// ─── Overlays (action-sheet / alert / popover / modal) ──────────────────
+// Ionic's overlays use their own component-scoped CSS vars, not the
+// global --ion-text-color. Without these, dark-mode action sheets render
+// with low-contrast button text against a dark background.
+
+ion-action-sheet {
+  --background:                   var(--cdf-color-surface-elev);
+  --color:                        var(--cdf-color-text);
+  --button-background:            var(--cdf-color-surface-elev);
+  --button-background-activated:  var(--cdf-color-primary-subtle);
+  --button-background-hover:      var(--cdf-color-primary-subtle);
+  --button-background-selected:   var(--cdf-color-primary-subtle);
+  --button-color:                 var(--cdf-color-text);
+  --button-color-activated:       var(--cdf-color-primary);
+  --button-color-selected:        var(--cdf-color-primary);
+}
+
+ion-alert {
+  --background:                   var(--cdf-color-surface-elev);
+  --backdrop-opacity:              0.5;
+}
+ion-alert .alert-title,
+ion-alert .alert-sub-title,
+ion-alert .alert-message,
+ion-alert .alert-radio-label,
+ion-alert .alert-checkbox-label,
+ion-alert .alert-input,
+ion-alert .alert-button {
+  color: var(--cdf-color-text);
+}
+ion-alert .alert-button.sc-ion-alert-md,
+ion-alert .alert-button.sc-ion-alert-ios {
+  color: var(--cdf-color-primary);
+}
+
+ion-popover {
+  --background:                   var(--cdf-color-surface-elev);
+  --color:                        var(--cdf-color-text);
+}
+
+ion-modal {
+  --background:                   var(--cdf-color-bg);
+}

@@ -19,7 +19,7 @@ import { inject } from '@angular/core';
         description="The admin app is for staff only. Your account doesn't have the required role."
       >
         <div style="display:flex; gap:8px;">
-          <cdf-button kind="primary" (buttonClick)="signOutAndRedirect()">
+          <cdf-button kind="primary" (click)="signOutAndRedirect()">
             Sign out
           </cdf-button>
           <cdf-button kind="ghost" routerLink="/login">Back to login</cdf-button>

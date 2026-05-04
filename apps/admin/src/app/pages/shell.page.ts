@@ -44,7 +44,7 @@ const NAV: NavSection[] = [
             <span class="topbar-user__name">{{ u.displayName }}</span>
             <span class="topbar-user__role">{{ u.role }}</span>
           </span>
-          <cdf-button kind="ghost" size="sm" (buttonClick)="signOut()">
+          <cdf-button kind="ghost" size="sm" (click)="signOut()">
             Sign out
           </cdf-button>
         </span>
