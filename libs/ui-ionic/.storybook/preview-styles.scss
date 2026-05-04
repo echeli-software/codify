@@ -1,0 +1,41 @@
+// Global styles for the ui-ionic Storybook preview iframe. Mirrors what
+// apps/student/src/styles.scss emits but uses relative paths because
+// Storybook's webpack sass-loader can't resolve `pkg:` URLs.
+
+@use '../../ui-tokens/src/scss/index' as cdf;
+
+// Ionic core CSS suite.
+@use '@ionic/angular/css/core.css';
+@use '@ionic/angular/css/normalize.css';
+@use '@ionic/angular/css/structure.css';
+@use '@ionic/angular/css/typography.css';
+@use '@ionic/angular/css/display.css';
+@use '@ionic/angular/css/padding.css';
+@use '@ionic/angular/css/text-alignment.css';
+@use '@ionic/angular/css/flex-utils.css';
+
+// Map Codify tokens onto Ionic CSS vars.
+@use '../../ui-tokens/src/scss/ionic-map';
+
+:root {
+  @include cdf.theme-light;
+}
+
+:root.theme-dark {
+  @include cdf.theme-dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--cdf-font-family-sans);
+  font-size: var(--cdf-font-size-base);
+  line-height: var(--cdf-line-height-normal);
+  background: var(--cdf-color-bg);
+  color: var(--cdf-color-text);
+}
+
+.sb-show-main {
+  padding: var(--cdf-space-6);
+}
