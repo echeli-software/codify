@@ -91,6 +91,7 @@
     "@angular/platform-browser-dynamic": "~21.2.0",
     "@angular/router": "~21.2.0",
     "@capacitor/core": "^6.2.1",
+    "@codify/auth": "workspace:*",
     "@codify/gamification-engine": "workspace:*",
     "@codify/i18n": "workspace:*",
     "@codify/ui-bootstrap": "workspace:*",

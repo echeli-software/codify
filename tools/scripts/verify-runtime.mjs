@@ -78,7 +78,24 @@ const APPS = [
   {
     name: 'student',
     origin: 'http://localhost:4201',
+    /** Stub auth — seeds localStorage so the authGuard lets us through. */
+    seed: {
+      'codify.auth.user': JSON.stringify({
+        id: 'dev-student',
+        email: 'student@codify.local',
+        displayName: 'Maria Souza',
+        role: 'STUDENT',
+        avatarUrl: null,
+        locale: 'pt-BR',
+      }),
+      'codify.auth.token': JSON.stringify({ token: 'dev-token-student', expiresAt: null }),
+    },
     routes: [
+      {
+        path: '/login',
+        public: true,
+        expectSelectors: ['app-root', 'ion-content', '.role-btn'],
+      },
       {
         path: '/today',
         expectSelectors: [
@@ -147,6 +164,14 @@ for (const app of targets) {
 
     try {
       process.stdout.write(`Checking ${app.name} ${route.path} … `);
+      // Seed localStorage on the app's origin so the authGuard sees a
+      // signed-in user before the SPA bootstraps. Public routes skip this.
+      if (app.seed && !route.public) {
+        await page.goto(app.origin + '/login', { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+        await page.evaluate((seed) => {
+          for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v);
+        }, app.seed);
+      }
       await page.goto(url, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS });
       for (const sel of route.expectSelectors) {
         const found = await page.$(sel);
