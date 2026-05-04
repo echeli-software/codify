@@ -85,6 +85,17 @@ const APPS = [
           '.cdf-lesson-editor__surface .ProseMirror',
         ],
       },
+      {
+        path: '/profile',
+        expectSelectors: [
+          'app-root',
+          '.cdf-shell',
+          '.profile-page',
+          '.cdf-input',
+          '.cdf-select',
+          '.cdf-kv',
+        ],
+      },
     ],
     ignoreConsole: [
       /\[vite\]/i,
@@ -141,7 +152,14 @@ const APPS = [
       },
       {
         path: '/profile',
-        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
+        expectSelectors: [
+          'app-root',
+          'ion-tabs',
+          'ion-content',
+          '.profile-hero',
+          'cdf-app-input',
+          'cdf-app-select',
+        ],
       },
     ],
     ignoreConsole: [/\[vite\]/i, /Angular is running in development mode/i],

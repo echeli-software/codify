@@ -68,6 +68,22 @@ export class AuthService {
     this.persist(user, session);
   }
 
+  /**
+   * Patch the signed-in user with a partial update — `displayName`, `locale`,
+   * `avatarUrl`, etc. No-op when unauthenticated. Persists immediately so a
+   * page reload keeps the change.
+   *
+   * In Phase 4b/Clerk this will additionally call the API to mirror the
+   * change server-side; for stub mode it's local-only.
+   */
+  updateProfile(patch: Partial<Omit<AuthUser, 'id' | 'role'>>): void {
+    const current = this.state();
+    if (!current.user || !current.session) return;
+    const user: AuthUser = { ...current.user, ...patch };
+    this.state.set({ ...current, user });
+    this.persist(user, current.session);
+  }
+
   /** Clear local state + storage. Throws no errors when already signed out. */
   signOut(): void {
     this.state.set({ user: null, session: null, loading: false });

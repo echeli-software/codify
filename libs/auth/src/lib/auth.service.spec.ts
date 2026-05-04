@@ -32,6 +32,23 @@ describe('AuthService', () => {
     expect(localStorage.getItem('codify.auth.user')).toBeNull();
   });
 
+  it('updateProfile() merges fields into the signed-in user', () => {
+    const auth = TestBed.inject(AuthService);
+    auth.signInAs('STUDENT');
+    auth.updateProfile({ displayName: 'Renamed', locale: 'en-US' });
+    expect(auth.user()?.displayName).toBe('Renamed');
+    expect(auth.user()?.locale).toBe('en-US');
+    expect(auth.user()?.role).toBe('STUDENT');
+    const persisted = JSON.parse(localStorage.getItem('codify.auth.user')!);
+    expect(persisted.displayName).toBe('Renamed');
+  });
+
+  it('updateProfile() is a no-op when unauthenticated', () => {
+    const auth = TestBed.inject(AuthService);
+    auth.updateProfile({ displayName: 'Ghost' });
+    expect(auth.user()).toBeNull();
+  });
+
   it('hasAnyRole(): empty list = any authenticated user qualifies', () => {
     const auth = TestBed.inject(AuthService);
     expect(auth.hasAnyRole([])).toBe(false); // unauthenticated

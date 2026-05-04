@@ -20,6 +20,10 @@ const NAV: NavSection[] = [
       { label: 'Lesson editor', icon: 'pencil', routerLink: ['/lessons'] },
     ],
   },
+  {
+    label: 'Account',
+    items: [{ label: 'Profile', icon: 'user-circle', routerLink: ['/profile'] }],
+  },
 ];
 
 /**

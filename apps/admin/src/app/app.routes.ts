@@ -34,6 +34,11 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('./pages/lessons.page').then((m) => m.LessonsPage),
       },
+      {
+        path: 'profile',
+        loadComponent: () =>
+          import('./pages/profile.page').then((m) => m.ProfilePage),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'playground' },
     ],
   },
