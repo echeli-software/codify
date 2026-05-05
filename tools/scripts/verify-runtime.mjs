@@ -96,6 +96,15 @@ const APPS = [
           '.cdf-kv',
         ],
       },
+      {
+        path: '/categories',
+        expectSelectors: [
+          'app-root',
+          '.cdf-shell',
+          '.cdf-table',
+          '.cdf-form-field',
+        ],
+      },
     ],
     ignoreConsole: [
       /\[vite\]/i,

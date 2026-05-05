@@ -8,6 +8,13 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 export { MeClient } from './lib/me.client.js';
 export { UsersClient } from './lib/users.client.js';
 export { HealthClient } from './lib/health.client.js';
+export {
+  CategoriesClient,
+  type Category,
+  type CategoryListResponse,
+  type CreateCategoryBody,
+  type UpdateCategoryBody,
+} from './lib/categories.client.js';
 
 // Idempotency helpers
 export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';

@@ -60,3 +60,24 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([entity, entityId])
 }
+
+/// Catalog category — soft taxonomy for tagging courses and plans.
+/// Phase 5b: ships with a single-locale `name` + `description`. The
+/// polymorphic ContentTranslation table from /docs/02 §Translations
+/// lands when Course joins in Phase 5c (avoids needing the full
+/// polymorphic relation set when only one entity uses it).
+model Category {
+  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
+  slug        String   @unique
+  name        String
+  description String?
+  /// References ICON_NAMES in libs/ui-bootstrap/atoms/icon (e.g. "gear").
+  iconName    String?
+  /// Codify color token (e.g. "primary", "success") from libs/ui-tokens.
+  colorToken  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([slug])
+}

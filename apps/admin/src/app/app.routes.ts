@@ -35,6 +35,11 @@ export const appRoutes: Route[] = [
           import('./pages/lessons.page').then((m) => m.LessonsPage),
       },
       {
+        path: 'categories',
+        loadComponent: () =>
+          import('./pages/categories.page').then((m) => m.CategoriesPage),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),
