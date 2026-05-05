@@ -15,6 +15,19 @@ export {
   type CreateCategoryBody,
   type UpdateCategoryBody,
 } from './lib/categories.client.js';
+export {
+  CoursesClient,
+  type CourseStatus,
+  type LessonType,
+  type CourseListItem,
+  type CourseListResponse,
+  type CourseModuleSummary,
+  type CourseLessonSummary,
+  type CourseDetail,
+  type ListCoursesQuery,
+  type CreateCourseBody,
+  type UpdateCourseBody,
+} from './lib/courses.client.js';
 
 // Idempotency helpers
 export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';

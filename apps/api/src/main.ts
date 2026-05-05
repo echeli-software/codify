@@ -32,6 +32,9 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      // Query / path params arrive as strings; coerce them to the
+      // declared TS types so @IsInt / @Min / @Max validate correctly.
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 

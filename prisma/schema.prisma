@@ -38,7 +38,8 @@ model User {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  auditedActions AuditLog[]
+  auditedActions  AuditLog[]
+  authoredCourses Course[]   @relation("CourseAuthor")
 
   @@index([role])
   @@index([lastSeenAt])
@@ -64,8 +65,7 @@ model AuditLog {
 /// Catalog category — soft taxonomy for tagging courses and plans.
 /// Phase 5b: ships with a single-locale `name` + `description`. The
 /// polymorphic ContentTranslation table from /docs/02 §Translations
-/// lands when Course joins in Phase 5c (avoids needing the full
-/// polymorphic relation set when only one entity uses it).
+/// joins in Phase 5c.
 model Category {
   id          String   @id @default(dbgenerated("uuid_generate_v7()"))
   slug        String   @unique
@@ -79,5 +79,130 @@ model Category {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
+  courses CourseCategory[]
+
   @@index([slug])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Course / Module / Lesson — see /docs/02-data-model.md §"Catalog"
+// ─────────────────────────────────────────────────────────────────────
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Course {
+  id               String       @id @default(dbgenerated("uuid_generate_v7()"))
+  slug             String       @unique
+  authorId         String
+  author           User         @relation("CourseAuthor", fields: [authorId], references: [id])
+  /// Locale the title/description in ContentTranslation-with-this-locale
+  /// is the canonical source for. Other locales are translations.
+  sourceLocale     String       @default("pt-BR")
+  status           CourseStatus @default(DRAFT)
+  difficulty       Int          @default(1) /// 1-5
+  estimatedMinutes Int          @default(60)
+  coverAssetId     String?
+  publishedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  modules    Module[]
+  categories CourseCategory[]
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+}
+
+model Module {
+  id        String   @id @default(dbgenerated("uuid_generate_v7()"))
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lessons Lesson[]
+
+  @@unique([courseId, order])
+}
+
+enum LessonType {
+  READING
+  QUIZ
+  EXERCISE
+  AI_PROMPT
+  SCENARIO
+}
+
+model Lesson {
+  id               String     @id @default(dbgenerated("uuid_generate_v7()"))
+  moduleId         String
+  module           Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  order            Int
+  type             LessonType @default(READING)
+  isFree           Boolean    @default(false)
+  estimatedMinutes Int        @default(5)
+  baseXp           Int        @default(10)
+  baseCoins        Int        @default(5)
+  /// Tiptap doc — see 06-content-authoring.md
+  contentJson      Json
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([moduleId, order])
+  @@index([type])
+}
+
+model CourseCategory {
+  courseId   String
+  categoryId String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([courseId, categoryId])
+  @@index([categoryId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Translations (content-level) — see /docs/02-data-model.md §"Translations"
+// ─────────────────────────────────────────────────────────────────────
+
+enum TranslatableEntity {
+  COURSE
+  MODULE
+  LESSON
+  CATEGORY
+}
+
+/// Polymorphic translations table. Tried Prisma named relations
+/// (Course/Module/Lesson/Category) — they collapse to four real FK
+/// constraints on the same column, so every insert had to satisfy
+/// all four targets simultaneously. Dropped the relations; entityId
+/// is just a string. Cascade deletes happen at the application layer
+/// when an entity is hard-deleted (we soft-delete day-to-day, so this
+/// rarely matters).
+model ContentTranslation {
+  id         String             @id @default(dbgenerated("uuid_generate_v7()"))
+  entityType TranslatableEntity
+  entityId   String
+  locale     String
+  /// e.g. "title", "description", "contentJson"
+  field      String
+  /// JSON-encoded if `field` represents a JSON column.
+  value      String
+  /// Marked true when the source-locale changed after this translation
+  /// was last touched. Surfaces in the admin Translation workspace.
+  outdated   Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([entityType, entityId, locale, field])
+  @@index([entityType, entityId])
 }
