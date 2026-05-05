@@ -23,6 +23,7 @@ import {
 } from '@codify/ui-bootstrap';
 import { AuthService } from '@codify/auth';
 import { I18nService, type Locale } from '@codify/i18n';
+import { MeClient, ProblemDetailsError } from '@codify/api-client';
 
 /**
  * Admin Profile page — display name + locale + theme + role + email + sign
@@ -84,6 +85,14 @@ import { I18nService, type Locale } from '@codify/i18n';
         @if (savedLabel()) {
         <p class="profile-saved">
           <cdf-icon name="check-circle" size="sm" /> {{ savedLabel() }}
+        </p>
+        }
+        @if (apiSyncStatus() === 'syncing') {
+        <p class="profile-sync profile-sync--syncing">Syncing with server…</p>
+        }
+        @if (apiSyncStatus() === 'offline') {
+        <p class="profile-sync profile-sync--offline">
+          API offline — changes saved locally.
         </p>
         }
       </section>
@@ -158,6 +167,16 @@ import { I18nService, type Locale } from '@codify/i18n';
         align-items: center;
         gap: 6px;
       }
+      .profile-sync {
+        margin: var(--cdf-space-2) 0 0;
+        font-size: 13px;
+      }
+      .profile-sync--syncing {
+        color: var(--cdf-color-text-muted);
+      }
+      .profile-sync--offline {
+        color: var(--cdf-color-warning);
+      }
     `,
   ],
 })
@@ -165,10 +184,12 @@ export class ProfilePage {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
+  private readonly meClient = inject(MeClient);
   protected readonly themeService = inject(ThemeService);
 
   protected readonly user = computed(() => this.auth.user());
   protected displayNameModel = '';
+  protected readonly apiSyncStatus = signal<'idle' | 'syncing' | 'offline'>('idle');
 
   protected readonly localeOptions: SelectOption<Locale>[] =
     this.i18n.availableLocales.map((m) => ({ value: m.code, label: m.nativeName }));
@@ -202,6 +223,26 @@ export class ProfilePage {
       const u = this.user();
       if (u) this.displayNameModel = u.displayName;
     });
+    void this.syncFromApi();
+  }
+
+  /** Pull /api/me on mount; fall back silently when API offline. */
+  private async syncFromApi(): Promise<void> {
+    this.apiSyncStatus.set('syncing');
+    try {
+      const me = await this.meClient.me();
+      this.auth.updateProfile({
+        displayName: me.displayName,
+        locale: me.locale,
+      });
+      if (me.locale && me.locale !== this.i18n.currentLocale()) {
+        this.i18n.setLocale(me.locale as Locale);
+      }
+      this.apiSyncStatus.set('idle');
+    } catch (err) {
+      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
+      this.apiSyncStatus.set('offline');
+    }
   }
 
   protected onDisplayNameChange(value: string): void {
@@ -209,6 +250,21 @@ export class ProfilePage {
     if (!next) return;
     this.auth.updateProfile({ displayName: next });
     this.flashSaved('Display name saved');
+    void this.persistToApi({ displayName: next });
+  }
+
+  /** Best-effort PATCH /api/me. */
+  private async persistToApi(patch: {
+    displayName?: string;
+    locale?: string;
+  }): Promise<void> {
+    try {
+      await this.meClient.update(patch);
+      this.apiSyncStatus.set('idle');
+    } catch (err) {
+      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
+      this.apiSyncStatus.set('offline');
+    }
   }
 
   protected onLocaleChange(value: Locale | null): void {
@@ -216,6 +272,7 @@ export class ProfilePage {
     this.i18n.setLocale(value);
     this.auth.updateProfile({ locale: value });
     this.flashSaved('Language updated');
+    void this.persistToApi({ locale: value });
   }
 
   protected onThemeChange(mode: ThemeMode | null): void {

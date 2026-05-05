@@ -31,6 +31,7 @@ import {
 } from '@codify/ui-ionic';
 import { AuthService } from '@codify/auth';
 import { I18nService, type Locale } from '@codify/i18n';
+import { MeClient, ProblemDetailsError } from '@codify/api-client';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 const THEME_KEY = 'codify.theme';
@@ -106,6 +107,16 @@ const THEME_KEY = 'codify.theme';
         @if (savedLabel()) {
         <p class="profile-saved">
           <cdf-icon name="check-circle" size="sm" /> {{ savedLabel() }}
+        </p>
+        }
+        @if (apiSyncStatus() === 'syncing') {
+        <p class="profile-sync profile-sync--syncing">
+          <cdf-icon name="hourglass" size="sm" /> Syncing with server…
+        </p>
+        }
+        @if (apiSyncStatus() === 'offline') {
+        <p class="profile-sync profile-sync--offline">
+          <cdf-icon name="cloud-offline" size="sm" /> API offline — changes saved locally.
         </p>
         }
       </cdf-app-card>
@@ -186,6 +197,19 @@ const THEME_KEY = 'codify.theme';
         align-items: center;
         gap: 6px;
       }
+      .profile-sync {
+        margin: var(--cdf-space-2) 0 0;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .profile-sync--syncing {
+        color: var(--cdf-color-text-muted);
+      }
+      .profile-sync--offline {
+        color: var(--cdf-color-warning);
+      }
     `,
   ],
 })
@@ -193,10 +217,12 @@ export class ProfilePage {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
+  private readonly meClient = inject(MeClient);
 
   protected readonly user = computed(() => this.auth.user());
   protected displayNameModel = '';
   protected reduceMotionModel = false;
+  protected readonly apiSyncStatus = signal<'idle' | 'syncing' | 'offline'>('idle');
 
   protected readonly localeOptions: AppSelectOption<Locale>[] =
     this.i18n.availableLocales.map((m) => ({ value: m.code, label: m.nativeName }));
@@ -224,13 +250,46 @@ export class ProfilePage {
     });
 
     this.applyTheme(this.themeMode());
+    void this.syncFromApi();
+  }
+
+  /**
+   * Pull canonical /api/me on mount. Falls back silently when the API
+   * is offline so dev work without a running NestJS instance still
+   * loads the page (state stays from AuthService.localStorage).
+   */
+  private async syncFromApi(): Promise<void> {
+    this.apiSyncStatus.set('syncing');
+    try {
+      const me = await this.meClient.me();
+      // Mirror server canonical state into AuthService — locale + display
+      // name are the only fields the user can edit, but the response
+      // also tells us about server-side patches (admin-driven role bumps,
+      // for example) so we trust it as the source of truth.
+      this.auth.updateProfile({
+        displayName: me.displayName,
+        locale: me.locale,
+      });
+      if (me.locale && me.locale !== this.i18n.currentLocale()) {
+        this.i18n.setLocale(me.locale as Locale);
+      }
+      this.apiSyncStatus.set('idle');
+    } catch (err) {
+      if (err instanceof ProblemDetailsError && err.isUnauthorized) {
+        // Auth interceptor already cleared the session — guard will redirect.
+        return;
+      }
+      this.apiSyncStatus.set('offline');
+    }
   }
 
   protected onDisplayNameChange(value: string): void {
     const next = value.trim();
     if (!next) return;
+    // Optimistic local update so the topbar avatar reflects instantly.
     this.auth.updateProfile({ displayName: next });
     this.flashSaved('Display name saved');
+    void this.persistToApi({ displayName: next });
   }
 
   protected onLocaleChange(value: Locale | null): void {
@@ -238,6 +297,21 @@ export class ProfilePage {
     this.i18n.setLocale(value);
     this.auth.updateProfile({ locale: value });
     this.flashSaved('Language updated');
+    void this.persistToApi({ locale: value });
+  }
+
+  /** Best-effort PATCH /api/me. Errors flip the offline indicator. */
+  private async persistToApi(patch: {
+    displayName?: string;
+    locale?: string;
+  }): Promise<void> {
+    try {
+      await this.meClient.update(patch);
+      this.apiSyncStatus.set('idle');
+    } catch (err) {
+      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
+      this.apiSyncStatus.set('offline');
+    }
   }
 
   protected onThemeChange(mode: ThemeMode | null): void {

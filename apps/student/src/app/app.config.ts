@@ -7,13 +7,19 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideIonicAngular } from '@ionic/angular/standalone';
 import { provideI18n } from '@codify/i18n';
 import { authInterceptor, provideAuth } from '@codify/auth';
+import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
 import { appRoutes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor()])),
+    provideHttpClient(
+      // Order matters: auth first attaches the Bearer token, then the
+      // api-client wrapper interceptors layer locale + idempotency +
+      // problem-details remapping.
+      withInterceptors([authInterceptor(), ...apiClientInterceptors()]),
+    ),
     provideIonicAngular({
       // Use platform-aware mode (Material on Android, iOS-native on iOS,
       // iOS by default in browser — closest to "native feel" target per
@@ -21,6 +27,7 @@ export const appConfig: ApplicationConfig = {
       mode: 'md',
     }),
     provideAuth(),
+    provideApiClient({ baseUrl: 'http://localhost:3000/api' }),
     provideI18n(),
   ],
 };
