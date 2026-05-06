@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { CoursesModule } from './courses/courses.module.js';
 import { HealthModule } from './health/health.module.js';
+import { LessonsModule } from './lessons/lessons.module.js';
+import { ModulesModule } from './modules/modules.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -19,6 +21,8 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     CategoriesModule,
     CoursesModule,
+    ModulesModule,
+    LessonsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

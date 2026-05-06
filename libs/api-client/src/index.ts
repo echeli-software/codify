@@ -28,6 +28,18 @@ export {
   type CreateCourseBody,
   type UpdateCourseBody,
 } from './lib/courses.client.js';
+export {
+  ModulesClient,
+  type CourseModule,
+  type CreateModuleBody,
+  type UpdateModuleBody,
+} from './lib/modules.client.js';
+export {
+  LessonsClient,
+  type Lesson,
+  type CreateLessonBody,
+  type UpdateLessonBody,
+} from './lib/lessons.client.js';
 
 // Idempotency helpers
 export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';

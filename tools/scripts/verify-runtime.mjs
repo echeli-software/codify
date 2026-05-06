@@ -75,16 +75,9 @@ const APPS = [
           '.cdf-table th', // sortable headers rendered
         ],
       },
-      {
-        path: '/lessons',
-        expectSelectors: [
-          'app-root',
-          '.cdf-shell',
-          '.cdf-lesson-editor',
-          '.cdf-lesson-editor__toolbar',
-          '.cdf-lesson-editor__surface .ProseMirror',
-        ],
-      },
+      // Lesson editor moved to /lessons/:id (real lesson required); not
+      // covered by the static verifier — the Phase 5d behavior probe
+      // exercises it end-to-end against a created lesson instead.
       {
         path: '/profile',
         expectSelectors: [

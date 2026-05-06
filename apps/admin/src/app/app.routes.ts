@@ -30,7 +30,12 @@ export const appRoutes: Route[] = [
           import('./pages/courses.page').then((m) => m.CoursesPage),
       },
       {
-        path: 'lessons',
+        path: 'courses/:slug',
+        loadComponent: () =>
+          import('./pages/course-detail.page').then((m) => m.CourseDetailPage),
+      },
+      {
+        path: 'lessons/:id',
         loadComponent: () =>
           import('./pages/lessons.page').then((m) => m.LessonsPage),
       },
