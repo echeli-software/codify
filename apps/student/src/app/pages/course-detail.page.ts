@@ -23,6 +23,7 @@ import {
   CoursesClient,
   type CourseDetail,
   type LessonType,
+  ProgressClient,
 } from '@codify/api-client';
 import {
   AppBadge,
@@ -144,12 +145,13 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
             [title]="l.title"
             [subtitle]="lessonSubtitle(l.order, m.lessons.length)"
             [type]="lessonType(l.type)"
-            [status]="lessonStatus(l.isFree)"
+            [status]="lessonStatus(l.id, l.isFree)"
             [isFree]="l.isFree"
             [estimateMinutes]="l.estimatedMinutes || null"
             [routerLink]="lessonLink(l.id, l.isFree)"
             [attr.data-lesson-id]="l.id"
             [attr.data-lesson-free]="l.isFree"
+            [attr.data-lesson-completed]="completedIds().has(l.id)"
           />
           }
         </ion-item-group>
@@ -207,10 +209,13 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
 export class CourseDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly coursesClient = inject(CoursesClient);
+  private readonly progressClient = inject(ProgressClient);
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly course = signal<CourseDetail | null>(null);
+  /** Lessons in this course the current user has completed. */
+  protected readonly completedIds = signal<Set<string>>(new Set());
 
   protected readonly freeCount = computed(
     () =>
@@ -218,6 +223,8 @@ export class CourseDetailPage {
         ?.modules.flatMap((m) => m.lessons)
         .filter((l) => l.isFree).length ?? 0,
   );
+
+  protected readonly completedCount = computed(() => this.completedIds().size);
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
@@ -229,9 +236,17 @@ export class CourseDetailPage {
   private async load(slug: string): Promise<void> {
     this.loading.set(true);
     this.notFound.set(false);
+    this.completedIds.set(new Set());
     try {
       const detail = await this.coursesClient.detail(slug);
       this.course.set(detail);
+      // Best-effort: fetch progress so completed rows render as checkmarks.
+      try {
+        const cp = await this.progressClient.forCourse(detail.id);
+        this.completedIds.set(new Set(cp.items.map((i) => i.lessonId)));
+      } catch {
+        // Non-fatal: curriculum still renders, just without completion marks.
+      }
     } catch {
       this.notFound.set(true);
       this.course.set(null);
@@ -259,7 +274,8 @@ export class CourseDetailPage {
     return LESSON_TYPE_MAP[t];
   }
 
-  protected lessonStatus(isFree: boolean): LessonItemStatus {
+  protected lessonStatus(id: string, isFree: boolean): LessonItemStatus {
+    if (this.completedIds().has(id)) return 'completed';
     return isFree ? 'not-started' : 'locked';
   }
 

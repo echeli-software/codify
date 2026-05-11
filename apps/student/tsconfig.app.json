@@ -17,6 +17,12 @@
       "path": "../../libs/gamification-engine/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/lesson-schema/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/ui-bootstrap/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/ui-ionic/tsconfig.lib.json"
     },
     {

@@ -38,8 +38,16 @@ model User {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
+  /// Running gamification totals — single-row updates from Progress
+  /// completions inside the same transaction that writes Progress, so
+  /// these two are always in sync. Source of truth: User row; Progress
+  /// rows are the immutable journal.
+  totalXp             Int       @default(0)
+  coins               Int       @default(0)
+
   auditedActions  AuditLog[]
   authoredCourses Course[]   @relation("CourseAuthor")
+  progress        Progress[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -157,6 +165,27 @@ model Lesson {
 
   @@unique([moduleId, order])
   @@index([type])
+
+  progress Progress[]
+}
+
+/// Per-user, per-lesson completion record. Acts as the immutable journal
+/// behind User.totalXp / User.coins running totals. Server enforces
+/// uniqueness — replays of POST /lessons/:id/complete return the existing
+/// row instead of double-awarding. Phase 5b will add a queued/synced flow
+/// on top of this for offline (see /docs/16-offline.md).
+model Progress {
+  id           String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt  DateTime @default(now())
+  xpAwarded    Int
+  coinsAwarded Int
+
+  @@unique([userId, lessonId])
+  @@index([userId, completedAt])
 }
 
 model CourseCategory {

@@ -266,14 +266,17 @@ if (!target) {
   if (!page.url().endsWith(`/lessons/${freeId}`)) {
     fail(`lesson nav — url is ${page.url()}`);
   } else {
-    const renderedId = await page.$eval(
-      '[data-testid="lesson-id"]',
-      (el) => el.textContent?.trim() ?? '',
-    );
-    if (renderedId !== freeId) {
-      fail(`lesson page — rendered id "${renderedId}" !== ${freeId}`);
+    // Phase 5f replaced the placeholder with the real player, so the
+    // assertion shifted from `data-testid="lesson-id"` to the article
+    // wrapper. Either signal means routing worked.
+    await page
+      .waitForSelector('[data-testid="lesson-article"]', { timeout: 5_000 })
+      .catch(() => {});
+    const article = await page.$('[data-testid="lesson-article"]');
+    if (!article) {
+      fail('lesson page — article wrapper missing');
     } else {
-      ok(`lesson page — rendered id matches`);
+      ok('lesson page — article wrapper rendered');
     }
   }
 }

@@ -517,7 +517,7 @@ export class CourseDetailPage {
     try {
       await this.modulesClient.remove(m.id);
       this.modules.update((ms) => ms.filter((x) => x.id !== m.id));
-      const removedLessons = m.lessons?.length ?? 0;
+      const removedLessons = m.lessonCount ?? 0;
       this.course.update((cur) =>
         cur
           ? {

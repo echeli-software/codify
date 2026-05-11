@@ -40,6 +40,13 @@ export {
   type CreateLessonBody,
   type UpdateLessonBody,
 } from './lib/lessons.client.js';
+export {
+  ProgressClient,
+  type ProgressItem,
+  type UserTotals,
+  type CompleteLessonResponse,
+  type CourseProgressResponse,
+} from './lib/progress.client.js';
 
 // Idempotency helpers
 export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';

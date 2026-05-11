@@ -16,6 +16,10 @@
 // Map Codify tokens onto Ionic CSS vars (--ion-color-*, --ion-background-*).
 @use 'pkg:@codify/ui-tokens/scss/ionic-map';
 
+// Tiptap `.ProseMirror` prose styling — shared between the admin editor
+// and the student player so the rendered DOM looks identical.
+@use 'pkg:@codify/ui-bootstrap/scss/lesson-prose';
+
 :root {
   @include cdf.theme-light;
 }

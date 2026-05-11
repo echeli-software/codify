@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ProgressModule } from './progress/progress.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module.js';
     CoursesModule,
     ModulesModule,
     LessonsModule,
+    ProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService],
