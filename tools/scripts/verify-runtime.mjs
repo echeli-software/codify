@@ -142,7 +142,15 @@ const APPS = [
       },
       {
         path: '/catalog',
-        expectSelectors: ['app-root', 'ion-tabs', 'ion-content', '.cdf-empty'],
+        // Catalog renders either the course grid (data-testid="catalog-grid")
+        // when courses exist, or a .cdf-empty when none — both states
+        // require ion-tabs + the category filter chip row.
+        expectSelectors: [
+          'app-root',
+          'ion-tabs',
+          'ion-content',
+          '.catalog-filters',
+        ],
       },
       {
         path: '/avatar',

@@ -517,11 +517,13 @@ export class CourseDetailPage {
     try {
       await this.modulesClient.remove(m.id);
       this.modules.update((ms) => ms.filter((x) => x.id !== m.id));
+      const removedLessons = m.lessons?.length ?? 0;
       this.course.update((cur) =>
         cur
           ? {
               ...cur,
               moduleCount: Math.max(0, cur.moduleCount - 1),
+              lessonCount: Math.max(0, cur.lessonCount - removedLessons),
               modules: cur.modules.filter((dm) => dm.id !== m.id),
             }
           : cur,
@@ -576,6 +578,7 @@ export class CourseDetailPage {
         cur
           ? {
               ...cur,
+              lessonCount: cur.lessonCount + 1,
               modules: cur.modules.map((dm) =>
                 dm.id === moduleId
                   ? {

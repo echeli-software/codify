@@ -87,9 +87,41 @@ export class CoursesService {
         })
       : [];
 
+    // Lesson counts — lessons live under modules, not courses directly,
+    // so aggregate via a 2-query pattern (modules-with-courseId, then
+    // lessons groupBy moduleId). Keeps it O(2) regardless of page size.
+    const courseModules = courseIds.length
+      ? await this.prisma.module.findMany({
+          where: { courseId: { in: courseIds } },
+          select: { id: true, courseId: true },
+        })
+      : [];
+    const moduleIdToCourseId = new Map(courseModules.map((m) => [m.id, m.courseId]));
+    const lessonGroups = courseModules.length
+      ? await this.prisma.lesson.groupBy({
+          by: ['moduleId'],
+          where: {
+            deletedAt: null,
+            moduleId: { in: courseModules.map((m) => m.id) },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const lessonCountByCourseId = new Map<string, number>();
+    for (const g of lessonGroups) {
+      const cid = moduleIdToCourseId.get(g.moduleId);
+      if (!cid) continue;
+      lessonCountByCourseId.set(cid, (lessonCountByCourseId.get(cid) ?? 0) + g._count._all);
+    }
+
     return {
       items: rows.map((r) =>
-        toListItem(r, translations.filter((t) => t.entityId === r.id), locale),
+        toListItem(
+          r,
+          translations.filter((t) => t.entityId === r.id),
+          locale,
+          lessonCountByCourseId.get(r.id) ?? 0,
+        ),
       ),
       total,
     };
@@ -139,6 +171,7 @@ export class CoursesService {
       },
     });
 
+    const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
     const list = toListItem(
       {
         ...course,
@@ -146,6 +179,7 @@ export class CoursesService {
       } as never,
       courseTranslations,
       locale,
+      totalLessons,
     );
 
     const modules: CourseModuleSummary[] = course.modules.map((m) => ({
@@ -351,7 +385,10 @@ export class CoursesService {
         field: { in: ['title', 'description'] },
       },
     });
-    return toListItem(course as never, translations, locale);
+    const lessonCount = await this.prisma.lesson.count({
+      where: { deletedAt: null, module: { courseId: id } },
+    });
+    return toListItem(course as never, translations, locale, lessonCount);
   }
 }
 
@@ -365,6 +402,7 @@ function toListItem(
   c: CourseWithIncludes,
   translations: ContentTranslation[],
   locale: string,
+  lessonCount: number,
 ): CourseListItem {
   const resolved = pickTitleAndDescription(translations, locale, c.sourceLocale);
   return {
@@ -383,6 +421,7 @@ function toListItem(
     titleFromTranslation: resolved.fromTranslation,
     categoryIds: c.categories.map((cc) => cc.categoryId),
     moduleCount: c._count.modules,
+    lessonCount,
   };
 }
 

@@ -24,6 +24,7 @@ export interface CourseListItem {
   titleFromTranslation: boolean;
   categoryIds: string[];
   moduleCount: number;
+  lessonCount: number;
 }
 
 export interface CourseLessonSummary {
