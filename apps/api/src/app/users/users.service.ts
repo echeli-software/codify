@@ -20,6 +20,8 @@ const ME_FIELDS = {
   onboardedAt: true,
   lastSeenAt: true,
   createdAt: true,
+  totalXp: true,
+  coins: true,
 } as const;
 
 @Injectable()
@@ -106,5 +108,7 @@ function toMeResponse(
     onboardedAt: u.onboardedAt?.toISOString() ?? null,
     lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
+    totalXp: u.totalXp,
+    coins: u.coins,
   };
 }

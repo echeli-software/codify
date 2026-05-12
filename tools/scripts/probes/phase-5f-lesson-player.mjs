@@ -10,8 +10,8 @@
  *   4. STUDENT POST /api/lessons/:freeId/complete — 201, returns
  *      progress row + updated totals. Totals match baseline +
  *      baseXp/baseCoins.
- *   5. Replay same POST — 200 (idempotent). Progress row id unchanged.
- *      Totals not double-incremented.
+ *   5. Replay same POST — 409 Conflict (per /docs/16-offline §8) with
+ *      the original progress payload echoed back. Totals not bumped.
  *   6. STUDENT POST /api/lessons/:paidId/complete — 402 (paywall).
  *   7. STUDENT GET /api/courses/:id/progress — items contains free,
  *      not paid. completedLessons=1, totalLessons=2.
@@ -189,19 +189,33 @@ if (c1.status !== 201) {
   ok('first complete — 201, awarded 12 XP + 4 coins, totals bumped');
 }
 
-// ─── 5. Replay → 200, no double-award ────────────────────────────────
+// ─── 5. Replay → 409 with original Progress payload, no double-award ─
 const c2 = await api('POST', `/lessons/${freeId}/complete`, {}, STUDENT_AUTH);
-if (c2.status !== 200) {
-  fail(`replay complete — expected 200, got ${c2.status}`);
+if (c2.status !== 409) {
+  fail(`replay complete — expected 409, got ${c2.status}`);
 } else if (
-  c2.body.totals.totalXp !== c1.body.totals.totalXp ||
-  c2.body.totals.coins !== c1.body.totals.coins
+  c2.body.totals?.totalXp !== c1.body.totals.totalXp ||
+  c2.body.totals?.coins !== c1.body.totals.coins
 ) {
   fail(
-    `replay complete — totals changed: ${JSON.stringify(c2.body.totals)}`,
+    `replay complete — totals diverged: ${JSON.stringify(c2.body.totals)}`,
   );
 } else {
-  ok('replay complete — 200, totals unchanged (idempotent)');
+  ok('replay complete — 409 Conflict, totals unchanged');
+}
+
+// Verify the User's actual totals after replay — server must not have
+// double-incremented under the hood.
+const afterReplay = studentTotals();
+if (
+  afterReplay.totalXp !== c1.body.totals.totalXp ||
+  afterReplay.coins !== c1.body.totals.coins
+) {
+  fail(
+    `db totals after replay diverged: ${JSON.stringify(afterReplay)} vs ${JSON.stringify(c1.body.totals)}`,
+  );
+} else {
+  ok('db totals after replay unchanged (no double-award)');
 }
 
 // ─── 6. Paid lesson → 402 ────────────────────────────────────────────

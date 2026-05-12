@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { type HttpInterceptorFn } from '@angular/common/http';
 import { catchError, throwError } from 'rxjs';
 import { I18nService } from '@codify/i18n';
-import { IDEMPOTENCY_TOKEN, uuidV4 } from './idempotency.js';
+import { IDEMPOTENCY_KEY, IDEMPOTENCY_TOKEN, uuidV4 } from './idempotency.js';
 import { toProblemDetails } from './problem-details.js';
 
 /**
@@ -26,8 +26,9 @@ export const localeInterceptor: HttpInterceptorFn = (req, next) => {
  */
 export const idempotencyInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.context.get(IDEMPOTENCY_TOKEN)) return next(req);
+  const explicit = req.context.get(IDEMPOTENCY_KEY);
   const cloned = req.clone({
-    setHeaders: { 'Idempotency-Key': uuidV4() },
+    setHeaders: { 'Idempotency-Key': explicit ?? uuidV4() },
   });
   return next(cloned);
 };

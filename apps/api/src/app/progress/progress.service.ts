@@ -1,9 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
@@ -39,13 +41,16 @@ export class ProgressService {
    * and bumps the User's running totals **inside the same transaction**
    * so totals never diverge from the journal of Progress rows.
    *
-   * `wasNew` is true on first completion and false on idempotent replay.
-   * Controller maps that to 201 vs 200.
+   * Behavior on duplicates: per /docs/16-offline.md §8, a second
+   * completion for the same (userId, lessonId) is `409 Conflict`. The
+   * conflict body carries the original Progress payload + current
+   * totals so the offline-sync queue can drop the event and reconcile
+   * the UI without crediting twice.
    */
   async complete(
     actor: ApiUser,
     lessonId: string,
-  ): Promise<CompleteLessonResponse & { wasNew: boolean }> {
+  ): Promise<CompleteLessonResponse> {
     if (actor.role !== 'STUDENT') {
       throw new ForbiddenException('Only students can complete lessons');
     }
@@ -66,44 +71,62 @@ export class ProgressService {
     const existing = await this.prisma.progress.findUnique({
       where: { userId_lessonId: { userId: actor.userId, lessonId } },
     });
+    if (existing) throw await this.conflictFromExisting(actor.userId, existing);
 
-    if (existing) {
-      const user = await this.prisma.user.findUniqueOrThrow({
-        where: { id: actor.userId },
-        select: { totalXp: true, coins: true },
+    try {
+      const { progress, totals } = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.progress.create({
+          data: {
+            userId: actor.userId,
+            lessonId,
+            xpAwarded: lesson.baseXp,
+            coinsAwarded: lesson.baseCoins,
+          },
+        });
+        const updated = await tx.user.update({
+          where: { id: actor.userId },
+          data: {
+            totalXp: { increment: lesson.baseXp },
+            coins: { increment: lesson.baseCoins },
+          },
+          select: { totalXp: true, coins: true },
+        });
+        return { progress: created, totals: updated };
       });
-      return {
-        wasNew: false,
-        progress: toItem(existing),
-        totals: { totalXp: user.totalXp, coins: user.coins },
-      };
+      return { progress: toItem(progress), totals };
+    } catch (err) {
+      // Race window between findUnique and create — another request
+      // (different device, retried offline-queue, etc.) just landed
+      // the row. Translate the Prisma P2002 into the same 409 shape so
+      // clients have a single conflict path to handle.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const raced = await this.prisma.progress.findUnique({
+          where: { userId_lessonId: { userId: actor.userId, lessonId } },
+        });
+        if (raced) throw await this.conflictFromExisting(actor.userId, raced);
+      }
+      throw err;
     }
+  }
 
-    const { progress, totals } = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.progress.create({
-        data: {
-          userId: actor.userId,
-          lessonId,
-          xpAwarded: lesson.baseXp,
-          coinsAwarded: lesson.baseCoins,
-        },
-      });
-      const updated = await tx.user.update({
-        where: { id: actor.userId },
-        data: {
-          totalXp: { increment: lesson.baseXp },
-          coins: { increment: lesson.baseCoins },
-        },
-        select: { totalXp: true, coins: true },
-      });
-      return { progress: created, totals: updated };
+  /** Build the 409 payload referenced from both the fast and slow conflict paths. */
+  private async conflictFromExisting(
+    userId: string,
+    existing: { lessonId: string; completedAt: Date; xpAwarded: number; coinsAwarded: number },
+  ): Promise<ConflictException> {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { totalXp: true, coins: true },
     });
-
-    return {
-      wasNew: true,
-      progress: toItem(progress),
-      totals,
-    };
+    return new ConflictException({
+      message: 'Lesson already completed',
+      statusCode: 409,
+      progress: toItem(existing),
+      totals: { totalXp: user.totalXp, coins: user.coins },
+    });
   }
 
   async forCourse(

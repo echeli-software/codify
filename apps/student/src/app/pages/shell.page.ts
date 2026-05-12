@@ -2,6 +2,9 @@ import { Component, inject, OnInit } from '@angular/core';
 import { AppShell, type ShellTab } from '@codify/ui-ionic';
 import { RewardOrchestrator } from '@codify/gamification-engine';
 import { RewardOverlays } from '../reward-overlays.component.js';
+import { IdentityCacheService } from '../offline/identity-cache.service.js';
+import { OfflineIndicator } from '../offline/offline-indicator.component.js';
+import { OfflineSyncService } from '../offline/offline-sync.service.js';
 
 const TABS: ShellTab[] = [
   { path: 'today', label: 'Today', icon: 'home' },
@@ -21,20 +24,28 @@ const TABS: ShellTab[] = [
  * the orchestrator. Real seed comes from /me on app boot in Phase 5.
  */
 @Component({
-  imports: [AppShell, RewardOverlays],
+  imports: [AppShell, RewardOverlays, OfflineIndicator],
   template: `
     <cdf-app-shell brand="Codify" [tabs]="tabs" />
+    <cdf-offline-indicator />
     <cdf-reward-overlays />
   `,
 })
 export class ShellPage implements OnInit {
   protected readonly tabs = TABS;
   private readonly orchestrator = inject(RewardOrchestrator);
+  private readonly identity = inject(IdentityCacheService);
+  // Inject to instantiate so its constructor effect arms the auto-flush.
+  protected readonly sync = inject(OfflineSyncService);
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    // Cache /me into IndexedDB so the future offline-boot path
+    // (per /docs/16-offline §4) has the data ready. Fire-and-forget;
+    // failures fall back to the existing in-memory AuthService.
+    const cached = await this.identity.prime();
     this.orchestrator.reconcile({
-      totalXp: 1750,
-      coins: 320,
+      totalXp: cached?.totalXp ?? 0,
+      coins: cached?.coins ?? 0,
       streakDays: 12,
       freezesAvailable: 2,
     });

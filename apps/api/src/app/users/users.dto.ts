@@ -52,6 +52,9 @@ export interface MeResponse {
   onboardedAt: string | null;
   lastSeenAt: string | null;
   createdAt: string;
+  /** Running gamification totals; cached on the student client. */
+  totalXp: number;
+  coins: number;
 }
 
 export interface AdminUserListItem {

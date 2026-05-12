@@ -14,12 +14,26 @@ import { HttpContext, HttpContextToken } from '@angular/common/http';
 export const IDEMPOTENCY_TOKEN = new HttpContextToken<boolean>(() => false);
 
 /**
- * Returns an `HttpContext` that flips the idempotency flag on. Compose
- * with other context tokens by passing in an existing context.
+ * Pre-computed Idempotency-Key override.  Set this when the caller has
+ * already minted a key (e.g. the offline-event queue persists a
+ * `clientEventId` at event time and must replay that exact value on
+ * flush so the server dedup window matches).  If absent, the
+ * interceptor mints a fresh UUID v4.
  */
-export function withIdempotency(context?: HttpContext): HttpContext {
+export const IDEMPOTENCY_KEY = new HttpContextToken<string | null>(() => null);
+
+/**
+ * Returns an `HttpContext` that flips the idempotency flag on. Compose
+ * with other context tokens by passing in an existing context.  Pass a
+ * `key` to pin the Idempotency-Key value (offline-sync replay path).
+ */
+export function withIdempotency(
+  context?: HttpContext,
+  key?: string | null,
+): HttpContext {
   const ctx = context ?? new HttpContext();
   ctx.set(IDEMPOTENCY_TOKEN, true);
+  if (key) ctx.set(IDEMPOTENCY_KEY, key);
   return ctx;
 }
 

@@ -20,6 +20,9 @@ export interface MeResponse {
   onboardedAt: string | null;
   lastSeenAt: string | null;
   createdAt: string;
+  /** Running totals updated by Progress completions. */
+  totalXp: number;
+  coins: number;
 }
 
 export interface UpdateMeBody {

@@ -43,12 +43,21 @@ export class ProgressClient {
   private readonly http = inject(HttpClient);
   private readonly config = inject(API_CLIENT_CONFIG);
 
-  complete(lessonId: string): Promise<CompleteLessonResponse> {
+  /**
+   * Record completion.  Pass `clientEventId` to pin the
+   * `Idempotency-Key` header when replaying a queued offline event —
+   * the server uses that value (alongside the (userId, lessonId)
+   * unique constraint) to dedupe.
+   */
+  complete(
+    lessonId: string,
+    clientEventId?: string,
+  ): Promise<CompleteLessonResponse> {
     return firstValueFrom(
       this.http.post<CompleteLessonResponse>(
         `${this.config.baseUrl}/lessons/${encodeURIComponent(lessonId)}/complete`,
         {},
-        { context: withIdempotency() },
+        { context: withIdempotency(undefined, clientEventId) },
       ),
     );
   }

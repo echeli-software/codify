@@ -5,9 +5,8 @@ import {
   Param,
   Post,
   Req,
-  Res,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -40,28 +39,24 @@ export class ProgressController {
 
   @Roles('STUDENT')
   @Post('lessons/:id/complete')
+  @HttpCode(201)
   async complete(
     @CurrentUser() actor: ApiUser,
     @Param('id') lessonId: string,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<CompleteLessonResponse> {
-    const { wasNew, progress, totals } = await this.progress.complete(
-      actor,
-      lessonId,
-    );
-    res.status(wasNew ? 201 : 200);
-
-    if (wasNew) {
-      void this.audit.record(actor, {
-        action: 'lesson.complete',
-        entity: 'Lesson',
-        entityId: lessonId,
-        diff: { xpAwarded: progress.xpAwarded, coinsAwarded: progress.coinsAwarded },
-        ip: req.ip ?? null,
-        userAgent: (req.headers['user-agent'] as string) ?? null,
-      });
-    }
+    // Service throws ConflictException on duplicate so the controller
+    // path here only runs for first-time completions — keeping the
+    // 201 + audit-emission semantics clean.
+    const { progress, totals } = await this.progress.complete(actor, lessonId);
+    void this.audit.record(actor, {
+      action: 'lesson.complete',
+      entity: 'Lesson',
+      entityId: lessonId,
+      diff: { xpAwarded: progress.xpAwarded, coinsAwarded: progress.coinsAwarded },
+      ip: req.ip ?? null,
+      userAgent: (req.headers['user-agent'] as string) ?? null,
+    });
     return { progress, totals };
   }
 

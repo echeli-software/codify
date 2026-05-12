@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -22,6 +23,7 @@ import {
   ProgressClient,
   ProblemDetailsError,
 } from '@codify/api-client';
+import { OfflineSyncService } from '../offline/offline-sync.service.js';
 import { LessonBlockRenderer } from '@codify/ui-bootstrap';
 import type { LessonDoc } from '@codify/lesson-schema';
 import {
@@ -118,11 +120,18 @@ import {
       <ion-toolbar>
         <div class="lesson-cta">
           @if (completed(); as p) {
-          <div class="lesson-done" data-testid="lesson-completed">
+          <div
+            class="lesson-done"
+            data-testid="lesson-completed"
+            [attr.data-queued]="queued()"
+          >
             <cdf-icon name="check-circle" size="md" />
-            <span>Completed</span>
+            <span>{{ queued() ? 'Saved offline' : 'Completed' }}</span>
             <cdf-xp-badge [value]="p.xpAwarded" />
             <cdf-coin-badge [value]="p.coinsAwarded" />
+            @if (queued()) {
+            <small class="lesson-done__hint">Will sync when you're online.</small>
+            }
           </div>
           } @else {
           <cdf-app-button
@@ -179,9 +188,19 @@ import {
       .lesson-done {
         display: inline-flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: var(--cdf-space-2);
         font-weight: 600;
         color: var(--cdf-color-success);
+      }
+      .lesson-done[data-queued='true'] {
+        color: var(--cdf-color-warning, #c87000);
+      }
+      .lesson-done__hint {
+        width: 100%;
+        font-weight: 400;
+        font-size: var(--cdf-font-size-xs);
+        color: var(--cdf-color-text-muted);
       }
       .lesson-cta__err {
         margin: 0;
@@ -203,6 +222,7 @@ export class LessonPage {
   private readonly route = inject(ActivatedRoute);
   private readonly lessonsClient = inject(LessonsClient);
   private readonly progressClient = inject(ProgressClient);
+  private readonly sync = inject(OfflineSyncService);
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
@@ -212,6 +232,8 @@ export class LessonPage {
     xpAwarded: number;
     coinsAwarded: number;
   } | null>(null);
+  /** True while the completion is sitting in the offline queue. */
+  protected readonly queued = signal(false);
   protected readonly completing = signal(false);
   protected readonly completeError = signal<string | null>(null);
 
@@ -224,6 +246,19 @@ export class LessonPage {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
       if (id) void this.load(id);
+    });
+    // Listen for sync events from the offline service.  When a queued
+    // completion for *this* lesson syncs (or comes back 409), flip the
+    // queued badge off and reflect canonical xp/coins.
+    effect(() => {
+      const r = this.sync.reconciled();
+      const l = this.lesson();
+      if (!r || !l || r.lessonId !== l.id) return;
+      this.queued.set(false);
+      this.completed.set({
+        xpAwarded: r.response.progress.xpAwarded,
+        coinsAwarded: r.response.progress.coinsAwarded,
+      });
     });
   }
 
@@ -267,11 +302,24 @@ export class LessonPage {
     this.completing.set(true);
     this.completeError.set(null);
     try {
-      const res = await this.progressClient.complete(l.id);
-      this.completed.set({
-        xpAwarded: res.progress.xpAwarded,
-        coinsAwarded: res.progress.coinsAwarded,
-      });
+      const outcome = await this.sync.completeLesson(l.id);
+      if (outcome.status === 'synced' || outcome.status === 'conflict') {
+        // Reconciled by the service via the `reconciled` signal effect
+        // above, but set explicitly here too so the UI flips this tick.
+        this.queued.set(false);
+        this.completed.set({
+          xpAwarded: outcome.response.progress.xpAwarded,
+          coinsAwarded: outcome.response.progress.coinsAwarded,
+        });
+      } else {
+        // Queued — show optimistic "Completed" with a will-sync badge.
+        // Server award not yet known; show the lesson's nominal value.
+        this.queued.set(true);
+        this.completed.set({
+          xpAwarded: l.baseXp,
+          coinsAwarded: l.baseCoins,
+        });
+      }
     } catch (err) {
       if (err instanceof ProblemDetailsError && err.status === 402) {
         this.paywall.set(true);
