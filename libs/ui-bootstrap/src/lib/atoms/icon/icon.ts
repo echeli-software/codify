@@ -30,6 +30,8 @@ import {
   phosphorSignOut,
   phosphorSpinnerGap,
   phosphorList,
+  phosphorCreditCard,
+  phosphorArrowClockwise,
 } from '@ng-icons/phosphor-icons/regular';
 
 /**
@@ -62,6 +64,8 @@ export const ICON_NAMES = [
   'sign-out',
   'spinner',
   'menu',
+  'credit-card',
+  'arrow-clockwise',
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -90,6 +94,8 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
   'sign-out': 'phosphorSignOut',
   spinner: 'phosphorSpinnerGap',
   menu: 'phosphorList',
+  'credit-card': 'phosphorCreditCard',
+  'arrow-clockwise': 'phosphorArrowClockwise',
 };
 
 @Component({
@@ -122,6 +128,8 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
       phosphorSignOut,
       phosphorSpinnerGap,
       phosphorList,
+      phosphorCreditCard,
+      phosphorArrowClockwise,
     }),
   ],
   template: `<ng-icon [name]="phosphorName()" [size]="sizePx()" [attr.aria-label]="label() || null" [attr.role]="label() ? 'img' : null" />`,

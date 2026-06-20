@@ -18,6 +18,7 @@ const NAV: NavSection[] = [
     items: [
       { label: 'Courses', icon: 'pencil', routerLink: ['/courses'] },
       { label: 'Categories', icon: 'gear', routerLink: ['/categories'] },
+      { label: 'Plans', icon: 'credit-card', routerLink: ['/plans'] },
     ],
   },
   {

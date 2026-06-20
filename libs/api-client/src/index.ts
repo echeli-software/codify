@@ -47,6 +47,25 @@ export {
   type CompleteLessonResponse,
   type CourseProgressResponse,
 } from './lib/progress.client.js';
+export {
+  PlansClient,
+  type Plan,
+  type PlanPrice,
+  type PlanListResponse,
+  type PlanPriceInput,
+  type CreatePlanBody,
+  type UpdatePlanBody,
+  type BillingPeriod,
+} from './lib/plans.client.js';
+export {
+  BillingClient,
+  type PaymentMethod,
+  type SubscriptionStatus,
+  type SubscriptionView,
+  type MySubscriptionResponse,
+  type CheckoutSessionResponse,
+  type LessonAccess,
+} from './lib/billing.client.js';
 
 // Idempotency helpers
 export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';
