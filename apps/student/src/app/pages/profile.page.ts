@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -57,6 +57,7 @@ const THEME_KEY = 'codify.theme';
     IonList,
     IonItem,
     IonLabel,
+    RouterLink,
     AppAvatar,
     AppBadge,
     AppButton,
@@ -119,6 +120,19 @@ const THEME_KEY = 'codify.theme';
           <cdf-icon name="cloud-offline" size="sm" /> API offline — changes saved locally.
         </p>
         }
+      </cdf-app-card>
+
+      <h2>Membership</h2>
+      <cdf-app-card padding="normal">
+        <ion-list inset="false">
+          <ion-item button [routerLink]="['/subscription']" lines="none" detail="true" data-testid="subscription-link">
+            <cdf-icon name="diamond" slot="start" size="md" />
+            <ion-label>
+              <h3>Subscription</h3>
+              <p>Manage your plan, billing, and trial</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
       </cdf-app-card>
 
       <h2>Appearance</h2>

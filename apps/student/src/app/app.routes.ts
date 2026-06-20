@@ -47,6 +47,16 @@ export const appRoutes: Route[] = [
           import('./pages/shop.page').then((m) => m.ShopPage),
       },
       {
+        path: 'subscription',
+        loadComponent: () =>
+          import('./pages/subscription.page').then((m) => m.SubscriptionPage),
+      },
+      {
+        path: 'billing/success',
+        loadComponent: () =>
+          import('./pages/billing-success.page').then((m) => m.BillingSuccessPage),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),

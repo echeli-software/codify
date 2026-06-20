@@ -23,6 +23,9 @@
       "path": "../../libs/ui-bootstrap/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/billing/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/ui-ionic/tsconfig.lib.json"
     },
     {
