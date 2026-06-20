@@ -9,6 +9,20 @@ module.exports = {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
     }),
   },
+  // Bundle pure workspace libs from source. NxAppWebpackPlugin's tsc
+  // compiler doesn't apply tsconfig `paths`, and these libs ship as
+  // ESM-only — so we alias them to their TS entrypoint and let webpack
+  // pull them into the (CJS) bundle. `extensionAlias` resolves the
+  // NodeNext-style `.js` import specifiers inside those libs to `.ts`.
+  resolve: {
+    alias: {
+      '@codify/domain': join(__dirname, '../../libs/domain/src/index.ts'),
+    },
+    extensions: ['.ts', '.js'],
+    extensionAlias: {
+      '.js': ['.ts', '.js'],
+    },
+  },
   plugins: [
     new NxAppWebpackPlugin({
       target: 'node',

@@ -4,11 +4,13 @@ import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthMiddleware } from './auth/auth.middleware.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { CoursesModule } from './courses/courses.module.js';
 import { HealthModule } from './health/health.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
+import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -18,12 +20,14 @@ import { UsersModule } from './users/users.module.js';
     PrismaModule,
     AuthModule,
     AuditModule,
+    BillingModule,
     HealthModule,
     UsersModule,
     CategoriesModule,
     CoursesModule,
     ModulesModule,
     LessonsModule,
+    PlansModule,
     ProgressModule,
   ],
   controllers: [AppController],

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AccessService } from '../billing/access.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
   CompleteLessonResponse,
@@ -34,7 +35,10 @@ import type {
  */
 @Injectable()
 export class ProgressService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
   /**
    * Record a completion. Awards `lesson.baseXp` + `lesson.baseCoins`
@@ -62,10 +66,21 @@ export class ProgressService {
     if (!lesson || lesson.module.course.status !== 'PUBLISHED') {
       throw new NotFoundException('Lesson not found');
     }
-    if (!lesson.isFree) {
-      // Phase 6 will check Enrollment + subscription here; for now the
-      // free-flag is the only gate. 402 = the paywall trigger.
-      throw new HttpException('Subscription required', 402);
+
+    // Phase 6: server-authoritative access. The same @codify/domain rule the
+    // client uses for UI gating decides here, so they never drift. A paywall
+    // verdict becomes 402 carrying the plans the student could buy.
+    const { access } = await this.access.resolveLessonAccess(actor.userId, lessonId);
+    if (!access.granted) {
+      throw new HttpException(
+        {
+          statusCode: 402,
+          message: 'Subscription required',
+          reason: access.reason,
+          requiredPlans: access.requiredPlans ?? [],
+        },
+        402,
+      );
     }
 
     const existing = await this.prisma.progress.findUnique({
