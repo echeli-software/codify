@@ -48,6 +48,7 @@ model User {
   auditedActions  AuditLog[]
   authoredCourses Course[]   @relation("CourseAuthor")
   progress        Progress[]
+  subscriptions   Subscription[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -88,6 +89,7 @@ model Category {
   deletedAt   DateTime?
 
   courses CourseCategory[]
+  plans   PlanCategory[]
 
   @@index([slug])
 }
@@ -197,6 +199,117 @@ model CourseCategory {
 
   @@id([courseId, categoryId])
   @@index([categoryId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Plans & subscriptions — see /docs/09-billing.md and /docs/02-data-model.md
+// ─────────────────────────────────────────────────────────────────────
+
+enum BillingPeriod {
+  MONTHLY
+  ANNUAL
+}
+
+/// A purchasable subscription plan. `stripeProductId` is null until the
+/// admin runs "Sync to Stripe" (Phase 6 dev-mode synthesizes a deterministic
+/// fake id so the flow is exercisable without a real Stripe account).
+/// Like Category, name/description are stored as direct single-locale columns
+/// for now; ContentTranslation joins later.
+model Plan {
+  id              String   @id @default(dbgenerated("uuid_generate_v7()"))
+  slug            String   @unique
+  name            String
+  description     String?
+  /// One-line marketing tagline shown on the paywall sheet.
+  tagline         String?
+  stripeProductId String?  @unique
+  /// Bypasses the category check — grants every published course.
+  isAllAccess     Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  /// Free-trial length applied at Checkout. See /docs/09-billing.md §9.
+  trialDays       Int      @default(7)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  prices        PlanPrice[]
+  categories    PlanCategory[]
+  subscriptions Subscription[]
+
+  @@index([isActive, sortOrder])
+}
+
+model PlanPrice {
+  id              String        @id @default(dbgenerated("uuid_generate_v7()"))
+  planId          String
+  plan            Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stripePriceId   String?       @unique
+  /// ISO-4217, e.g. "BRL".
+  currency        String
+  amountCents     Int
+  period          BillingPeriod
+  /// Brazil parcelamento, up to 12. Null = no installments (monthly).
+  maxInstallments Int?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([planId, currency, period])
+  @@index([planId])
+}
+
+model PlanCategory {
+  planId     String
+  categoryId String
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([planId, categoryId])
+  @@index([categoryId])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+  PAUSED
+}
+
+/// Provenance of a subscription. Prep for App Store / Play Billing via
+/// RevenueCat (Phase 11). At launch only STRIPE_WEB / ADMIN_GRANT are used.
+enum SubscriptionSource {
+  STRIPE_WEB
+  APPLE_IAP
+  GOOGLE_PLAY
+  ADMIN_GRANT
+}
+
+model Subscription {
+  id                   String             @id @default(dbgenerated("uuid_generate_v7()"))
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id])
+  planId               String
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  source               SubscriptionSource @default(STRIPE_WEB)
+  stripeSubscriptionId String             @unique
+  stripeCustomerId     String
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  canceledAt           DateTime?
+  trialEndsAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([stripeCustomerId])
 }
 
 // ─────────────────────────────────────────────────────────────────────
