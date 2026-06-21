@@ -32,6 +32,7 @@ import {
   phosphorList,
   phosphorCreditCard,
   phosphorArrowClockwise,
+  phosphorTrophy,
 } from '@ng-icons/phosphor-icons/regular';
 
 /**
@@ -66,6 +67,7 @@ export const ICON_NAMES = [
   'menu',
   'credit-card',
   'arrow-clockwise',
+  'trophy',
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -96,6 +98,7 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
   menu: 'phosphorList',
   'credit-card': 'phosphorCreditCard',
   'arrow-clockwise': 'phosphorArrowClockwise',
+  trophy: 'phosphorTrophy',
 };
 
 @Component({
@@ -130,6 +133,7 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
       phosphorList,
       phosphorCreditCard,
       phosphorArrowClockwise,
+      phosphorTrophy,
     }),
   ],
   template: `<ng-icon [name]="phosphorName()" [size]="sizePx()" [attr.aria-label]="label() || null" [attr.role]="label() ? 'img' : null" />`,

@@ -93,6 +93,38 @@ export interface CreateBadgeBody {
   isActive?: boolean;
 }
 
+export type MultiplierKind = 'PREMIUM_DEFAULT' | 'COURSE_PROMO' | 'LESSON_PROMO' | 'STREAK_TIER' | 'CAMPAIGN';
+export type MultiplierTarget = 'XP' | 'COINS' | 'BOTH';
+
+export interface Multiplier {
+  id: string;
+  kind: MultiplierKind;
+  target: MultiplierTarget;
+  value: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  courseId: string | null;
+  lessonId: string | null;
+  streakDaysMin: number | null;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMultiplierBody {
+  kind: MultiplierKind;
+  target?: MultiplierTarget;
+  value: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  courseId?: string | null;
+  lessonId?: string | null;
+  streakDaysMin?: number | null;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 /** Typed client for /api/gamification, /api/quests*, /api/badges. */
 @Injectable({ providedIn: 'root' })
 export class GamificationClient {
@@ -156,5 +188,23 @@ export class GamificationClient {
 
   deleteBadge(id: string): Promise<void> {
     return firstValueFrom(this.http.delete<void>(`${this.base}/badges/${encodeURIComponent(id)}`));
+  }
+
+  listMultipliers(): Promise<Multiplier[]> {
+    return firstValueFrom(this.http.get<Multiplier[]>(`${this.base}/multipliers`));
+  }
+
+  createMultiplier(body: CreateMultiplierBody): Promise<Multiplier> {
+    return firstValueFrom(this.http.post<Multiplier>(`${this.base}/multipliers`, body, { context: withIdempotency() }));
+  }
+
+  updateMultiplier(id: string, body: Partial<CreateMultiplierBody>): Promise<Multiplier> {
+    return firstValueFrom(
+      this.http.patch<Multiplier>(`${this.base}/multipliers/${encodeURIComponent(id)}`, body, { context: withIdempotency() }),
+    );
+  }
+
+  deleteMultiplier(id: string): Promise<void> {
+    return firstValueFrom(this.http.delete<void>(`${this.base}/multipliers/${encodeURIComponent(id)}`));
   }
 }

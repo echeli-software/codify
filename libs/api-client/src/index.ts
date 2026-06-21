@@ -62,6 +62,10 @@ export {
   type BadgeDef,
   type CreateQuestTemplateBody,
   type CreateBadgeBody,
+  type Multiplier,
+  type MultiplierKind,
+  type MultiplierTarget,
+  type CreateMultiplierBody,
 } from './lib/gamification.client.js';
 export {
   PlansClient,
