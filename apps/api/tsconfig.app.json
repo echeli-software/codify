@@ -22,6 +22,9 @@
   ],
   "references": [
     {
+      "path": "../../libs/ui-core/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/domain/tsconfig.lib.json"
     }
   ]

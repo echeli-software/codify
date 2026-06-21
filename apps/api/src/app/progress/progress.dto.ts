@@ -5,6 +5,8 @@
  * (clientTimestamp etc).
  */
 
+import type { RewardResult } from '../gamification/gamification.types.js';
+
 export interface ProgressItem {
   lessonId: string;
   completedAt: string;
@@ -20,6 +22,12 @@ export interface UserTotals {
 export interface CompleteLessonResponse {
   progress: ProgressItem;
   totals: UserTotals;
+  /**
+   * Canonical reward the client feeds straight into RewardOrchestrator
+   * (XP/coins after multipliers, breakdown, level-up, streak). Absent on
+   * the 409 idempotent-replay path.
+   */
+  reward?: RewardResult;
 }
 
 export interface CourseProgressResponse {

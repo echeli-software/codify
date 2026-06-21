@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from '../billing/access.service.js';
+import { GamificationService } from '../gamification/gamification.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
   CompleteLessonResponse,
@@ -38,6 +39,7 @@ export class ProgressService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly gamification: GamificationService,
   ) {}
 
   /**
@@ -89,26 +91,39 @@ export class ProgressService {
     if (existing) throw await this.conflictFromExisting(actor.userId, existing);
 
     try {
-      const { progress, totals } = await this.prisma.$transaction(async (tx) => {
+      const { progress, reward } = await this.prisma.$transaction(async (tx) => {
+        // Create the Progress row first so the (userId, lessonId) unique
+        // constraint is the authoritative double-award guard — a racing
+        // duplicate fails here and the whole tx (including the grant) rolls back.
         const created = await tx.progress.create({
-          data: {
+          data: { userId: actor.userId, lessonId, xpAwarded: 0, coinsAwarded: 0 },
+        });
+        // Server-authoritative reward: XP/coins (with multipliers), streak,
+        // level-up — all in this transaction.
+        const granted = await this.gamification.grantReward(
+          {
             userId: actor.userId,
+            baseXp: lesson.baseXp,
+            baseCoins: lesson.baseCoins,
+            xpSource: 'LESSON_COMPLETE',
+            coinSource: 'LESSON_COMPLETE',
+            refType: 'lesson',
+            refId: lessonId,
+            idempotencyKey: `lesson_complete:${actor.userId}:${lessonId}`,
+            courseId: lesson.module.course.id,
             lessonId,
-            xpAwarded: lesson.baseXp,
-            coinsAwarded: lesson.baseCoins,
+            countsForStreak: true,
           },
+          tx,
+        );
+        // Persist the post-multiplier amounts onto the Progress journal row.
+        const finalized = await tx.progress.update({
+          where: { id: created.id },
+          data: { xpAwarded: granted.xp, coinsAwarded: granted.coins },
         });
-        const updated = await tx.user.update({
-          where: { id: actor.userId },
-          data: {
-            totalXp: { increment: lesson.baseXp },
-            coins: { increment: lesson.baseCoins },
-          },
-          select: { totalXp: true, coins: true },
-        });
-        return { progress: created, totals: updated };
+        return { progress: finalized, reward: granted };
       });
-      return { progress: toItem(progress), totals };
+      return { progress: toItem(progress), totals: reward.totals, reward };
     } catch (err) {
       // Race window between findUnique and create — another request
       // (different device, retried offline-queue, etc.) just landed
