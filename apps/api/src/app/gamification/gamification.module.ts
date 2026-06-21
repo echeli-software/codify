@@ -1,14 +1,20 @@
 import { Global, Module } from '@nestjs/common';
 import { GamificationService } from './gamification.service.js';
+import { QuestsService } from './quests.service.js';
+import { BadgesService } from './badges.service.js';
+import { QuestsController } from './quests.controller.js';
+import { BadgesController } from './badges.controller.js';
 
 /**
- * Global gamification module — exposes the server-authoritative reward
- * pipeline (GamificationService) to any feature that grants rewards
- * (lesson completion, quests, milestones, admin grants).
+ * Global gamification module — the server-authoritative reward pipeline
+ * (GamificationService) plus daily quests and badges, all of which grant
+ * through the same pipeline. Exported so lesson completion can advance
+ * quests + evaluate badges inside its transaction.
  */
 @Global()
 @Module({
-  providers: [GamificationService],
-  exports: [GamificationService],
+  controllers: [QuestsController, BadgesController],
+  providers: [GamificationService, QuestsService, BadgesService],
+  exports: [GamificationService, QuestsService, BadgesService],
 })
 export class GamificationModule {}

@@ -6,6 +6,8 @@
  */
 
 import type { RewardResult } from '../gamification/gamification.types.js';
+import type { CompletedQuest } from '../gamification/quests.service.js';
+import type { UnlockedBadge } from '../gamification/badges.service.js';
 
 export interface ProgressItem {
   lessonId: string;
@@ -28,6 +30,10 @@ export interface CompleteLessonResponse {
    * the 409 idempotent-replay path.
    */
   reward?: RewardResult;
+  /** Daily quests that completed as a result of this completion. */
+  questsCompleted?: CompletedQuest[];
+  /** Badges unlocked as a result of this completion. */
+  badgesUnlocked?: UnlockedBadge[];
 }
 
 export interface CourseProgressResponse {

@@ -48,7 +48,8 @@ export class ProgressController {
     // Service throws ConflictException on duplicate so the controller
     // path here only runs for first-time completions — keeping the
     // 201 + audit-emission semantics clean.
-    const { progress, totals, reward } = await this.progress.complete(actor, lessonId);
+    const { progress, totals, reward, questsCompleted, badgesUnlocked } =
+      await this.progress.complete(actor, lessonId);
     void this.audit.record(actor, {
       action: 'lesson.complete',
       entity: 'Lesson',
@@ -57,11 +58,13 @@ export class ProgressController {
         xpAwarded: progress.xpAwarded,
         coinsAwarded: progress.coinsAwarded,
         multiplier: reward?.multiplier ?? 1,
+        questsCompleted: questsCompleted?.length ?? 0,
+        badgesUnlocked: badgesUnlocked?.length ?? 0,
       },
       ip: req.ip ?? null,
       userAgent: (req.headers['user-agent'] as string) ?? null,
     });
-    return { progress, totals, reward };
+    return { progress, totals, reward, questsCompleted, badgesUnlocked };
   }
 
   @Get('courses/:id/progress')

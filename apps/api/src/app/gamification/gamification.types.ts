@@ -19,6 +19,12 @@ export interface StreakInfo {
   freezesAvailable: number;
 }
 
+export interface StreakMilestone {
+  days: number;
+  xp: number;
+  coins: number;
+}
+
 /**
  * Canonical reward returned by the grant pipeline — mirrors
  * `RewardCanonical`/`RewardPayload` in @codify/gamification-engine so the
@@ -35,6 +41,8 @@ export interface RewardResult {
   totals: { totalXp: number; coins: number; level: number };
   levelUp: LevelUpInfo | null;
   streak: StreakInfo | null;
+  /** Set when this event pushed the streak onto a milestone day (§2 bonus). */
+  streakMilestone?: StreakMilestone | null;
 }
 
 export interface GrantRewardParams {
@@ -52,6 +60,8 @@ export interface GrantRewardParams {
   lessonId?: string | null;
   /** When true, this event advances the daily streak. */
   countsForStreak?: boolean;
+  /** Flat reward — skip multiplier resolution (quests, badges, milestones). */
+  flat?: boolean;
   /** User-local TZ for streak day attribution. */
   timezone?: string;
   /** Offline attribution: the time the action actually happened. */

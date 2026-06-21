@@ -6,9 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from '../billing/access.service.js';
 import { GamificationService } from '../gamification/gamification.service.js';
+import { QuestsService } from '../gamification/quests.service.js';
+import { BadgesService } from '../gamification/badges.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
   CompleteLessonResponse,
@@ -40,6 +43,8 @@ export class ProgressService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly gamification: GamificationService,
+    private readonly quests: QuestsService,
+    private readonly badges: BadgesService,
   ) {}
 
   /**
@@ -90,8 +95,16 @@ export class ProgressService {
     });
     if (existing) throw await this.conflictFromExisting(actor.userId, existing);
 
+    // Course categories — needed for category-scoped quests.
+    const courseId = lesson.module.course.id;
+    const courseCats = await this.prisma.courseCategory.findMany({
+      where: { courseId },
+      select: { categoryId: true },
+    });
+    const categoryIds = courseCats.map((c) => c.categoryId);
+
     try {
-      const { progress, reward } = await this.prisma.$transaction(async (tx) => {
+      const out = await this.prisma.$transaction(async (tx) => {
         // Create the Progress row first so the (userId, lessonId) unique
         // constraint is the authoritative double-award guard — a racing
         // duplicate fails here and the whole tx (including the grant) rolls back.
@@ -99,7 +112,7 @@ export class ProgressService {
           data: { userId: actor.userId, lessonId, xpAwarded: 0, coinsAwarded: 0 },
         });
         // Server-authoritative reward: XP/coins (with multipliers), streak,
-        // level-up — all in this transaction.
+        // level-up, streak milestone — all in this transaction.
         const granted = await this.gamification.grantReward(
           {
             userId: actor.userId,
@@ -110,20 +123,49 @@ export class ProgressService {
             refType: 'lesson',
             refId: lessonId,
             idempotencyKey: `lesson_complete:${actor.userId}:${lessonId}`,
-            courseId: lesson.module.course.id,
+            courseId,
             lessonId,
             countsForStreak: true,
           },
           tx,
         );
-        // Persist the post-multiplier amounts onto the Progress journal row.
+
+        // Advance daily quests + evaluate badges in the same transaction so
+        // their (flat) rewards land atomically with the completion.
+        const questsCompleted = await this.quests.onEvent(tx, actor.userId, {
+          type: 'lesson_complete',
+          courseId,
+          categoryIds,
+          xpEarned: granted.xp,
+          streakAdvanced: true,
+        });
+        const badgesUnlocked = await this.badges.evaluate(tx, actor.userId);
+
+        // Re-read final totals (quest/badge bonuses may have added more).
+        const finalUser = await tx.user.findUniqueOrThrow({
+          where: { id: actor.userId },
+          select: { totalXp: true, coins: true },
+        });
+        granted.totals = {
+          totalXp: finalUser.totalXp,
+          coins: finalUser.coins,
+          level: levelFromXp(finalUser.totalXp),
+        };
+
+        // Progress journal stores the lesson's own award (not quest/badge).
         const finalized = await tx.progress.update({
           where: { id: created.id },
           data: { xpAwarded: granted.xp, coinsAwarded: granted.coins },
         });
-        return { progress: finalized, reward: granted };
+        return { progress: finalized, reward: granted, questsCompleted, badgesUnlocked };
       });
-      return { progress: toItem(progress), totals: reward.totals, reward };
+      return {
+        progress: toItem(out.progress),
+        totals: out.reward.totals,
+        reward: out.reward,
+        questsCompleted: out.questsCompleted,
+        badgesUnlocked: out.badgesUnlocked,
+      };
     } catch (err) {
       // Race window between findUnique and create — another request
       // (different device, retried offline-queue, etc.) just landed

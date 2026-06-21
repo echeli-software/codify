@@ -16,6 +16,15 @@ const DEFAULT_TZ = 'America/Sao_Paulo';
 /** Earn a freeze every 7 streak days, capped at this many banked. */
 const MAX_FREEZES = 2;
 
+/** One-time streak-day milestone payouts (docs/07 §2). */
+const STREAK_MILESTONES: Record<number, { xp: number; coins: number }> = {
+  7: { xp: 0, coins: 50 },
+  14: { xp: 0, coins: 100 },
+  30: { xp: 0, coins: 200 },
+  100: { xp: 100, coins: 500 },
+  365: { xp: 500, coins: 2000 },
+};
+
 /**
  * Server-authoritative reward pipeline (docs/07-gamification.md §11–§12).
  * Every earn flows through `grantReward`, which — atomically —
@@ -55,25 +64,37 @@ export class GamificationService {
     }
 
     // 1. Streak (before multiplier resolution so today's day counts).
-    const streak = params.countsForStreak
-      ? await this.advanceStreak(tx, params.userId, params.timezone ?? user.timezone, params.clientTimestamp)
-      : await this.readStreak(tx, params.userId);
+    let streak: StreakInfo | null;
+    let reachedMilestone: number | null = null;
+    if (params.countsForStreak) {
+      const adv = await this.advanceStreak(
+        tx,
+        params.userId,
+        params.timezone ?? user.timezone,
+        params.clientTimestamp,
+      );
+      streak = { currentDays: adv.currentDays, longestDays: adv.longestDays, freezesAvailable: adv.freezesAvailable };
+      reachedMilestone = adv.reachedMilestone;
+    } else {
+      streak = await this.readStreak(tx, params.userId);
+    }
 
-    // 2. Multipliers.
-    const isPremium = await this.isPremium(tx, params.userId);
-    const rules = await this.loadMultiplierRules(tx);
-    const cap = await this.readCap(tx);
-    const resolved = resolveMultiplier({
-      multipliers: rules,
-      isPremium,
-      courseId: params.courseId ?? null,
-      lessonId: params.lessonId ?? null,
-      streakDays: streak?.currentDays ?? 0,
-      cap,
-    });
+    // 2. Multipliers (skipped for flat rewards — quests/badges/milestones).
+    const resolved = params.flat
+      ? null
+      : resolveMultiplier({
+          multipliers: await this.loadMultiplierRules(tx),
+          isPremium: await this.isPremium(tx, params.userId),
+          courseId: params.courseId ?? null,
+          lessonId: params.lessonId ?? null,
+          streakDays: streak?.currentDays ?? 0,
+          cap: await this.readCap(tx),
+        });
+    const xpMult = resolved ? resolved.xp.effective : 1;
+    const coinMult = resolved ? resolved.coins.effective : 1;
 
-    const xp = applyMultiplier(params.baseXp, resolved.xp.effective);
-    const coins = applyMultiplier(params.baseCoins, resolved.coins.effective);
+    const xp = applyMultiplier(params.baseXp, xpMult);
+    const coins = applyMultiplier(params.baseCoins, coinMult);
 
     // 3. Journals (idempotent on key).
     // Chain balanceAfter from the ledger (not User.coins) so the ledger stays
@@ -107,7 +128,7 @@ export class GamificationService {
           userId: params.userId,
           source: params.xpSource,
           amount: xp,
-          multiplier: new Prisma.Decimal(resolved.xp.effective),
+          multiplier: new Prisma.Decimal(xpMult),
           refType: params.refType ?? null,
           refId: params.refId ?? null,
           idempotencyKey: params.idempotencyKey ?? null,
@@ -120,7 +141,7 @@ export class GamificationService {
           userId: params.userId,
           delta: coins,
           source: params.coinSource,
-          multiplier: new Prisma.Decimal(resolved.coins.effective),
+          multiplier: new Prisma.Decimal(coinMult),
           balanceAfter,
           refType: params.refType ?? null,
           refId: params.refId ?? null,
@@ -139,23 +160,49 @@ export class GamificationService {
 
     // 5. Level-up.
     const levelBefore = levelFromXp(user.totalXp);
-    const levelAfter = levelFromXp(updated.totalXp);
-    const levelUp =
+    let levelAfter = levelFromXp(updated.totalXp);
+    let levelUp =
       levelAfter > levelBefore
         ? { newLevel: levelAfter, xpForNextLevel: xpForLevel(levelAfter + 1) }
         : null;
 
-    return {
+    const result: RewardResult = {
       xp,
       coins,
-      multiplier: resolved.xp.effective,
-      xpMultiplier: resolved.xp.effective,
-      coinMultiplier: resolved.coins.effective,
+      multiplier: xpMult,
+      xpMultiplier: xpMult,
+      coinMultiplier: coinMult,
       breakdown: buildBreakdown(params.baseXp, params.baseCoins, resolved),
       totals: { totalXp: updated.totalXp, coins: updated.coins, level: levelAfter },
       levelUp,
       streak,
+      streakMilestone: null,
     };
+
+    // 6. Streak-day milestone (one-time flat bonus). Granted as its own
+    //    journaled, flat (un-multiplied) reward in the same transaction.
+    if (reachedMilestone && STREAK_MILESTONES[reachedMilestone]) {
+      const m = STREAK_MILESTONES[reachedMilestone];
+      const bonus = await this.grantReward(
+        {
+          userId: params.userId,
+          baseXp: m.xp,
+          baseCoins: m.coins,
+          xpSource: 'STREAK_MILESTONE',
+          coinSource: 'STREAK_MILESTONE',
+          refType: 'streak',
+          refId: String(reachedMilestone),
+          idempotencyKey: `streak_milestone:${params.userId}:${reachedMilestone}`,
+          flat: true,
+        },
+        tx,
+      );
+      result.streakMilestone = { days: reachedMilestone, xp: bonus.xp, coins: bonus.coins };
+      result.totals = bonus.totals;
+      if (bonus.levelUp) result.levelUp = bonus.levelUp;
+    }
+
+    return result;
   }
 
   // ─── Streak ───────────────────────────────────────────────────────────
@@ -178,7 +225,7 @@ export class GamificationService {
     userId: string,
     timezone: string,
     clientTimestamp?: string | null,
-  ): Promise<StreakInfo> {
+  ): Promise<StreakInfo & { reachedMilestone: number | null }> {
     const tz = timezone || DEFAULT_TZ;
     const at = clientTimestamp ? new Date(clientTimestamp) : new Date();
     const todayKey = localDateKey(at, tz);
@@ -189,7 +236,7 @@ export class GamificationService {
       const created = await tx.streak.create({
         data: { userId, currentDays: 1, longestDays: 1, freezesAvailable: 0, lastActivityDate: todayDate },
       });
-      return toStreakInfo(created);
+      return { ...toStreakInfo(created), reachedMilestone: milestoneFor(1) };
     }
 
     const lastKey = localDateKey(existing.lastActivityDate, 'UTC');
@@ -199,8 +246,8 @@ export class GamificationService {
     let freezesAvailable = existing.freezesAvailable;
 
     if (diff <= 0) {
-      // Same day (or clock skew) — already counted today.
-      return toStreakInfo(existing);
+      // Same day (or clock skew) — already counted today; no new milestone.
+      return { ...toStreakInfo(existing), reachedMilestone: null };
     } else if (diff === 1) {
       currentDays += 1;
     } else {
@@ -223,7 +270,7 @@ export class GamificationService {
       where: { userId },
       data: { currentDays, longestDays, freezesAvailable, lastActivityDate: todayDate },
     });
-    return toStreakInfo(updated);
+    return { ...toStreakInfo(updated), reachedMilestone: milestoneFor(currentDays) };
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────
@@ -289,16 +336,23 @@ function toStreakInfo(s: {
   return { currentDays: s.currentDays, longestDays: s.longestDays, freezesAvailable: s.freezesAvailable };
 }
 
+/** The milestone day (7/14/30/100/365) iff `days` is exactly one, else null. */
+function milestoneFor(days: number): number | null {
+  return days in STREAK_MILESTONES ? days : null;
+}
+
 function buildBreakdown(
   baseXp: number,
   baseCoins: number,
-  resolved: ReturnType<typeof resolveMultiplier>,
+  resolved: ReturnType<typeof resolveMultiplier> | null,
 ): RewardResult['breakdown'] {
   const entries: RewardResult['breakdown'] = [
     { source: 'base', xp: baseXp, coins: baseCoins },
   ];
-  for (const c of resolved.xp.components) {
-    entries.push({ source: c.kind, multiplier: c.value });
+  if (resolved) {
+    for (const c of resolved.xp.components) {
+      entries.push({ source: c.kind, multiplier: c.value });
+    }
   }
   return entries;
 }
