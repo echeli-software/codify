@@ -49,6 +49,11 @@ model User {
   authoredCourses Course[]   @relation("CourseAuthor")
   progress        Progress[]
   subscriptions   Subscription[]
+  xpEvents         XpEvent[]
+  coinTransactions CoinTransaction[]
+  streak           Streak?
+  userBadges       UserBadge[]
+  questAssignments QuestAssignment[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -121,8 +126,9 @@ model Course {
   updatedAt        DateTime     @updatedAt
   deletedAt        DateTime?
 
-  modules    Module[]
-  categories CourseCategory[]
+  modules     Module[]
+  categories  CourseCategory[]
+  multipliers Multiplier[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -168,7 +174,8 @@ model Lesson {
   @@unique([moduleId, order])
   @@index([type])
 
-  progress Progress[]
+  progress    Progress[]
+  multipliers Multiplier[]
 }
 
 /// Per-user, per-lesson completion record. Acts as the immutable journal
@@ -310,6 +317,196 @@ model Subscription {
 
   @@index([userId, status])
   @@index([stripeCustomerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Gamification — XP / coins / streaks / multipliers / badges / quests
+// See /docs/07-gamification.md and /docs/02-data-model.md.
+// ─────────────────────────────────────────────────────────────────────
+
+enum XpSource {
+  LESSON_COMPLETE
+  QUIZ_PERFECT
+  EXERCISE_PASS
+  STREAK_MILESTONE
+  DAILY_QUEST
+  BADGE_UNLOCK
+  LEAGUE_PROMOTION
+  ADMIN_GRANT
+}
+
+/// Immutable XP journal. The user's current XP is SUM(amount); we also keep
+/// User.totalXp as a running total updated in the same transaction.
+model XpEvent {
+  id             String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source         XpSource
+  amount         Int
+  multiplier     Decimal  @db.Decimal(5, 2)
+  refType        String?
+  refId          String?
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum CoinSource {
+  LESSON_COMPLETE
+  QUIZ_PERFECT
+  EXERCISE_PASS
+  STREAK_MILESTONE
+  DAILY_QUEST
+  WEEKLY_LEAGUE
+  BADGE_UNLOCK
+  CHEST_OPEN
+  PURCHASE_REFUND
+  PROMO_CODE
+  ADMIN_GRANT
+  ITEM_PURCHASE
+  CHEST_PURCHASE
+}
+
+/// Coin ledger — source of truth for the balance. `balanceAfter` is a
+/// write-side denormalization so reads are O(1); the nightly drift check
+/// verifies latest balanceAfter == SUM(delta) per user.
+model CoinTransaction {
+  id             String     @id @default(dbgenerated("uuid_generate_v7()"))
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta          Int
+  source         CoinSource
+  multiplier     Decimal?   @db.Decimal(5, 2)
+  balanceAfter   Int
+  refType        String?
+  refId          String?
+  idempotencyKey String?    @unique
+  createdAt      DateTime   @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// One row per user. `lastActivityDate` is the user-local date (midnight) of
+/// their last streak-satisfying action. Freezes auto-apply on a missed day.
+model Streak {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentDays      Int      @default(0)
+  longestDays      Int      @default(0)
+  freezesAvailable Int      @default(0)
+  lastActivityDate DateTime
+  updatedAt        DateTime @updatedAt
+}
+
+enum MultiplierKind {
+  PREMIUM_DEFAULT
+  COURSE_PROMO
+  LESSON_PROMO
+  STREAK_TIER
+  CAMPAIGN
+}
+
+enum MultiplierTarget {
+  XP
+  COINS
+  BOTH
+}
+
+model Multiplier {
+  id            String           @id @default(dbgenerated("uuid_generate_v7()"))
+  kind          MultiplierKind
+  target        MultiplierTarget @default(BOTH)
+  value         Decimal          @db.Decimal(5, 2)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  courseId      String?
+  course        Course?          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId      String?
+  lesson        Lesson?          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  streakDaysMin Int?
+  description   String?
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([kind, startsAt, endsAt])
+}
+
+model Badge {
+  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
+  slug        String   @unique
+  name        String
+  description String?
+  iconName    String?
+  /// BadgeRule DSL — see /docs/07-gamification.md §7.
+  rule        Json
+  xpReward    Int      @default(0)
+  coinReward  Int      @default(0)
+  isHidden    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  userId    String
+  badgeId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now())
+
+  @@id([userId, badgeId])
+  @@index([userId])
+}
+
+enum QuestKind {
+  LESSON_COUNT
+  CATEGORY_LESSON_COUNT
+  XP_AMOUNT
+  STREAK_MAINTAIN
+  EXERCISE_PASS
+}
+
+model QuestTemplate {
+  id         String    @id @default(dbgenerated("uuid_generate_v7()"))
+  slug       String    @unique
+  kind       QuestKind
+  title      String
+  /// Difficulty band for the weighted daily picker (one of each per day).
+  difficulty Int       @default(1) /// 1=easy, 2=medium, 3=hard
+  target     Int
+  paramsJson Json?
+  coinReward Int       @default(0)
+  xpReward   Int       @default(0)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  assignments QuestAssignment[]
+}
+
+model QuestAssignment {
+  id          String        @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    QuestTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  assignedFor DateTime
+  progress    Int           @default(0)
+  completedAt DateTime?
+
+  @@unique([userId, templateId, assignedFor])
+  @@index([userId, assignedFor])
+}
+
+/// Admin-editable config knobs (earning rates, caps, multiplier cap, etc.).
+model GamificationConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.
