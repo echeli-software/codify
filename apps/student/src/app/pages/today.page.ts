@@ -48,6 +48,15 @@ import {
   XpService,
   StreakService,
 } from '@codify/gamification-engine';
+import { GamificationClient, type QuestView } from '@codify/api-client';
+
+const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
+  LESSON_COUNT: 'lesson-count',
+  CATEGORY_LESSON_COUNT: 'category-lesson-count',
+  XP_AMOUNT: 'xp-amount',
+  STREAK_MAINTAIN: 'streak-maintain',
+  EXERCISE_PASS: 'exercise-pass',
+};
 
 interface ContinueLessonRow {
   title: string;
@@ -111,6 +120,7 @@ const THEME_STORAGE_KEY = 'codify.theme';
 export class TodayPage {
   private readonly i18n = inject(I18nService);
   private readonly orchestrator = inject(RewardOrchestrator);
+  private readonly gamificationClient = inject(GamificationClient);
   protected readonly xpSvc = inject(XpService);
   protected readonly coinSvc = inject(CoinService);
   protected readonly streakSvc = inject(StreakService);
@@ -131,36 +141,8 @@ export class TodayPage {
     { date: '2026-05-02', completed: true },
   ];
 
-  protected readonly dailyQuests: DailyQuest[] = [
-    {
-      id: 'q1',
-      title: 'Complete 1 React lesson',
-      progress: 0,
-      target: 1,
-      xpReward: 25,
-      coinReward: 10,
-      kind: 'lesson-count',
-    },
-    {
-      id: 'q2',
-      title: 'Earn 100 XP today',
-      progress: 20,
-      target: 100,
-      xpReward: 50,
-      coinReward: 15,
-      kind: 'xp-amount',
-    },
-    {
-      id: 'q3',
-      title: 'Pass an exercise',
-      progress: 1,
-      target: 1,
-      xpReward: 30,
-      coinReward: 12,
-      kind: 'exercise-pass',
-      completed: true,
-    },
-  ];
+  /** Today's quests from the server (lazy-assigned on read). */
+  protected readonly dailyQuests = signal<DailyQuest[]>([]);
 
   // Form-controls demo state.
   protected readonly notifyDaily = signal(true);
@@ -290,6 +272,29 @@ export class TodayPage {
   constructor() {
     this.applyTheme(this.theme());
     setTimeout(() => this.catalogLoading.set(false), 1500);
+    void this.loadGamification();
+  }
+
+  /**
+   * Reconcile the canonical XP/coins/streak into the engine state services
+   * and load today's quests. Best-effort — the page still renders offline.
+   */
+  private async loadGamification(): Promise<void> {
+    try {
+      const [summary, quests] = await Promise.all([
+        this.gamificationClient.summary(),
+        this.gamificationClient.questsToday(),
+      ]);
+      this.orchestrator.reconcile({
+        totalXp: summary.totalXp,
+        coins: summary.coins,
+        streakDays: summary.streak.currentDays,
+        freezesAvailable: summary.streak.freezesAvailable,
+      });
+      this.dailyQuests.set(quests.map(toDailyQuest));
+    } catch {
+      /* offline / signed out — leave defaults */
+    }
   }
 
   protected toggleTheme(): void {
@@ -404,4 +409,18 @@ export class TodayPage {
     }
     return 'system';
   }
+}
+
+/** Map a server QuestView to the ui-ionic DailyQuest shape. */
+function toDailyQuest(q: QuestView): DailyQuest {
+  return {
+    id: q.id,
+    title: q.title,
+    progress: q.progress,
+    target: q.target,
+    xpReward: q.xpReward,
+    coinReward: q.coinReward,
+    kind: KIND_MAP[q.kind],
+    completed: q.completed,
+  };
 }

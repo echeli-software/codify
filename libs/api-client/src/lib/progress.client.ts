@@ -16,9 +16,54 @@ export interface UserTotals {
   coins: number;
 }
 
+export interface RewardBreakdownEntry {
+  source: string;
+  xp?: number;
+  coins?: number;
+  multiplier?: number;
+}
+
+export interface StreakInfo {
+  currentDays: number;
+  longestDays: number;
+  freezesAvailable: number;
+}
+
+/** Canonical reward — fed straight into RewardOrchestrator.grant(). */
+export interface RewardResult {
+  xp: number;
+  coins: number;
+  multiplier: number;
+  xpMultiplier: number;
+  coinMultiplier: number;
+  breakdown: RewardBreakdownEntry[];
+  totals: { totalXp: number; coins: number; level: number };
+  levelUp: { newLevel: number; xpForNextLevel: number } | null;
+  streak: StreakInfo | null;
+  streakMilestone?: { days: number; xp: number; coins: number } | null;
+}
+
+export interface CompletedQuest {
+  id: string;
+  title: string;
+  xpReward: number;
+  coinReward: number;
+}
+
+export interface UnlockedBadge {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string;
+  description?: string;
+}
+
 export interface CompleteLessonResponse {
   progress: ProgressItem;
   totals: UserTotals;
+  reward?: RewardResult;
+  questsCompleted?: CompletedQuest[];
+  badgesUnlocked?: UnlockedBadge[];
 }
 
 export interface CourseProgressResponse {

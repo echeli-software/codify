@@ -4,6 +4,7 @@ import { QuestsService } from './quests.service.js';
 import { BadgesService } from './badges.service.js';
 import { QuestsController } from './quests.controller.js';
 import { BadgesController } from './badges.controller.js';
+import { GamificationController } from './gamification.controller.js';
 
 /**
  * Global gamification module — the server-authoritative reward pipeline
@@ -13,7 +14,7 @@ import { BadgesController } from './badges.controller.js';
  */
 @Global()
 @Module({
-  controllers: [QuestsController, BadgesController],
+  controllers: [QuestsController, BadgesController, GamificationController],
   providers: [GamificationService, QuestsService, BadgesService],
   exports: [GamificationService, QuestsService, BadgesService],
 })

@@ -22,10 +22,12 @@ import {
   type Lesson,
   ProgressClient,
   ProblemDetailsError,
+  type CompleteLessonResponse,
 } from '@codify/api-client';
 import { OfflineSyncService } from '../offline/offline-sync.service.js';
 import { LessonBlockRenderer } from '@codify/ui-bootstrap';
 import type { LessonDoc } from '@codify/lesson-schema';
+import { RewardOrchestrator } from '@codify/gamification-engine';
 import {
   AppButton,
   AppCard,
@@ -139,7 +141,7 @@ import {
             size="md"
             [disabled]="completing()"
             data-testid="lesson-complete-btn"
-            (buttonClick)="completeLesson()"
+            (buttonClick)="completeLesson($event)"
           >
             @if (completing()) { Saving… } @else { Mark as complete }
           </cdf-app-button>
@@ -223,6 +225,7 @@ export class LessonPage {
   private readonly lessonsClient = inject(LessonsClient);
   private readonly progressClient = inject(ProgressClient);
   private readonly sync = inject(OfflineSyncService);
+  private readonly orchestrator = inject(RewardOrchestrator);
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
@@ -296,11 +299,12 @@ export class LessonPage {
     }
   }
 
-  protected async completeLesson(): Promise<void> {
+  protected async completeLesson(ev?: MouseEvent): Promise<void> {
     const l = this.lesson();
     if (!l || this.completing()) return;
     this.completing.set(true);
     this.completeError.set(null);
+    const sourceEl = (ev?.currentTarget as HTMLElement) ?? null;
     try {
       const outcome = await this.sync.completeLesson(l.id);
       if (outcome.status === 'synced' || outcome.status === 'conflict') {
@@ -311,6 +315,11 @@ export class LessonPage {
           xpAwarded: outcome.response.progress.xpAwarded,
           coinsAwarded: outcome.response.progress.coinsAwarded,
         });
+        // Server-authoritative reward → play the celebration through the
+        // single RewardOrchestrator entry point, then reconcile exact totals.
+        if (outcome.status === 'synced' && outcome.response.reward) {
+          this.playReward(outcome.response, sourceEl);
+        }
       } else {
         // Queued — show optimistic "Completed" with a will-sync badge.
         // Server award not yet known; show the lesson's nominal value.
@@ -331,5 +340,44 @@ export class LessonPage {
     } finally {
       this.completing.set(false);
     }
+  }
+
+  /**
+   * Drive the reward celebration from the canonical server payload, then
+   * reconcile the exact totals/streak (quest + badge bonuses may have added
+   * more than the lesson's own award). Fire-and-forget — the animation must
+   * not block the UI.
+   */
+  private playReward(res: CompleteLessonResponse, sourceEl: HTMLElement | null): void {
+    const reward = res.reward;
+    if (!reward) return;
+    void this.orchestrator
+      .grant({
+        kind: 'lessonComplete',
+        canonical: {
+          xp: reward.xp,
+          coins: reward.coins,
+          multiplier: reward.multiplier,
+          breakdown: reward.breakdown,
+        },
+        levelUp: reward.levelUp
+          ? { newLevel: reward.levelUp.newLevel, xpForNextLevel: reward.levelUp.xpForNextLevel }
+          : null,
+        badgesUnlocked: (res.badgesUnlocked ?? []).map((b) => ({
+          id: b.id,
+          name: b.name,
+          icon: b.icon,
+          description: b.description,
+        })),
+        sourceEl,
+      })
+      .then(() =>
+        this.orchestrator.reconcile({
+          totalXp: reward.totals.totalXp,
+          coins: reward.totals.coins,
+          streakDays: reward.streak?.currentDays,
+          freezesAvailable: reward.streak?.freezesAvailable,
+        }),
+      );
   }
 }

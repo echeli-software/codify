@@ -41,6 +41,27 @@ export class GamificationService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Read a user's gamification snapshot for the app header / reconcile. */
+  async getSummary(userId: string): Promise<{
+    totalXp: number;
+    level: number;
+    coins: number;
+    streak: StreakInfo;
+  }> {
+    const [user, streak] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { totalXp: true, coins: true } }),
+      this.prisma.streak.findUnique({ where: { userId } }),
+    ]);
+    return {
+      totalXp: user.totalXp,
+      level: levelFromXp(user.totalXp),
+      coins: user.coins,
+      streak: streak
+        ? { currentDays: streak.currentDays, longestDays: streak.longestDays, freezesAvailable: streak.freezesAvailable }
+        : { currentDays: 0, longestDays: 0, freezesAvailable: 0 },
+    };
+  }
+
   /** Grant a reward. Runs in `tx` if given, else opens its own transaction. */
   async grantReward(params: GrantRewardParams, tx?: Tx): Promise<RewardResult> {
     if (tx) return this.grantInTx(tx, params);

@@ -46,7 +46,23 @@ export {
   type UserTotals,
   type CompleteLessonResponse,
   type CourseProgressResponse,
+  type RewardResult,
+  type RewardBreakdownEntry,
+  type StreakInfo,
+  type CompletedQuest,
+  type UnlockedBadge,
 } from './lib/progress.client.js';
+export {
+  GamificationClient,
+  type GamificationSummary,
+  type QuestView,
+  type QuestKind,
+  type QuestTemplate,
+  type BadgeView,
+  type BadgeDef,
+  type CreateQuestTemplateBody,
+  type CreateBadgeBody,
+} from './lib/gamification.client.js';
 export {
   PlansClient,
   type Plan,
