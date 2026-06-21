@@ -312,6 +312,21 @@ model Subscription {
   @@index([stripeCustomerId])
 }
 
+/// Long-term idempotency ledger for critical billing/gamification paths.
+/// Redis is the hot-path cache (later); Postgres is authoritative — the
+/// unique `key` guarantees no double-execution. Used by the Stripe webhook
+/// handler to drop duplicate event deliveries. See /docs/02 §IdempotencyRecord.
+model IdempotencyRecord {
+  key          String   @id
+  /// e.g. "stripe_webhook", "lesson_complete".
+  scope        String
+  userId       String?
+  responseHash String?
+  createdAt    DateTime @default(now())
+
+  @@index([scope, createdAt])
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Translations (content-level) — see /docs/02-data-model.md §"Translations"
 // ─────────────────────────────────────────────────────────────────────

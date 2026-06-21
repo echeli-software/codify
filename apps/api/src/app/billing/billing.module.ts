@@ -2,6 +2,8 @@ import { Global, Logger, Module } from '@nestjs/common';
 import { AccessService } from './access.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingService } from './billing.service.js';
+import { WebhookController } from './webhook.controller.js';
+import { WebhookService } from './webhook.service.js';
 import {
   BILLING_PROVIDER,
   DevBillingProvider,
@@ -19,10 +21,11 @@ import {
  */
 @Global()
 @Module({
-  controllers: [BillingController],
+  controllers: [BillingController, WebhookController],
   providers: [
     AccessService,
     BillingService,
+    WebhookService,
     {
       provide: BILLING_PROVIDER,
       useFactory: (): BillingProvider => {

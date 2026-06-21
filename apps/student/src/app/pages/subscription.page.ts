@@ -198,7 +198,13 @@ export class SubscriptionPage {
   protected async subscribe(priceId: string): Promise<void> {
     this.checkoutId.set(priceId);
     try {
-      const res = await this.billing.createCheckout({ planPriceId: priceId, paymentMethod: 'card' });
+      const origin = window.location.origin;
+      const res = await this.billing.createCheckout({
+        planPriceId: priceId,
+        paymentMethod: 'card',
+        successUrl: `${origin}/billing/success`,
+        cancelUrl: `${origin}/subscription`,
+      });
       // Redirect to the provider checkout. In dev this is our own success
       // page, which completes the stubbed checkout.
       window.location.href = res.url;

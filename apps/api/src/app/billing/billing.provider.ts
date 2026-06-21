@@ -81,11 +81,25 @@ export interface DevCheckoutPayload {
   period: BillingPeriod;
 }
 
+/** Minimal shape of the Stripe events we act on. */
+export interface StripeWebhookEvent {
+  id: string;
+  type: string;
+  data: { object: Record<string, unknown> };
+}
+
 export interface BillingProvider {
   readonly mode: 'dev' | 'stripe';
   syncPlan(input: SyncPlanInput): Promise<SyncPlanResult>;
   createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult>;
   createPortalSession(input: PortalSessionInput): Promise<PortalSessionResult>;
+  /**
+   * Verify + parse an incoming webhook. In Stripe mode this is
+   * `Stripe.webhooks.constructEvent(rawBody, signature, secret)` and throws on
+   * a bad signature. The dev provider trusts the parsed JSON (no signature).
+   * Returns null when the payload can't be parsed.
+   */
+  constructWebhookEvent(rawBody: string, signature: string | undefined): StripeWebhookEvent | null;
 }
 
 const DEV_SESSION_PREFIX = 'cs_dev_';
@@ -144,6 +158,19 @@ export class DevBillingProvider implements BillingProvider {
   async createPortalSession(input: PortalSessionInput): Promise<PortalSessionResult> {
     const sep = input.returnUrl.includes('?') ? '&' : '?';
     return { url: `${input.returnUrl}${sep}portal=dev` };
+  }
+
+  constructWebhookEvent(rawBody: string): StripeWebhookEvent | null {
+    // No signature to verify in dev — trust the parsed JSON.
+    try {
+      const parsed = JSON.parse(rawBody);
+      if (parsed && typeof parsed.id === 'string' && typeof parsed.type === 'string') {
+        return parsed as StripeWebhookEvent;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }
 

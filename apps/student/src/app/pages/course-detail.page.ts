@@ -193,6 +193,7 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
             [attr.data-lesson-id]="l.id"
             [attr.data-lesson-free]="l.isFree"
             [attr.data-lesson-completed]="completedIds().has(l.id)"
+            [attr.data-lesson-locked]="lessonStatus(l.id, l.isFree) === 'locked'"
           />
           }
         </ion-item-group>
@@ -430,7 +431,13 @@ export class CourseDetailPage {
   protected async subscribe(planPriceId: string): Promise<void> {
     this.paywallOpen.set(false);
     try {
-      const res = await this.billing.createCheckout({ planPriceId, paymentMethod: 'card' });
+      const origin = window.location.origin;
+      const res = await this.billing.createCheckout({
+        planPriceId,
+        paymentMethod: 'card',
+        successUrl: `${origin}/billing/success`,
+        cancelUrl: `${origin}${window.location.pathname}`,
+      });
       window.location.href = res.url;
     } catch {
       // Surfaced by the global toast/problem-details interceptor.
