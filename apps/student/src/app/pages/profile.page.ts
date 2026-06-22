@@ -135,6 +135,19 @@ const THEME_KEY = 'codify.theme';
         </ion-list>
       </cdf-app-card>
 
+      <h2>Social</h2>
+      <cdf-app-card padding="normal">
+        <ion-list inset="false">
+          <ion-item button [routerLink]="['/friends']" lines="none" detail="true" data-testid="friends-link">
+            <cdf-icon name="person" slot="start" size="md" />
+            <ion-label>
+              <h3>Friends</h3>
+              <p>Add friends, accept requests, and nudge</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </cdf-app-card>
+
       <h2>Storage</h2>
       <cdf-app-card padding="normal">
         <ion-list inset="false">

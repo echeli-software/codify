@@ -57,6 +57,19 @@ export const appRoutes: Route[] = [
           import('./pages/downloads.page').then((m) => m.DownloadsPage),
       },
       {
+        path: 'league',
+        loadComponent: () => import('./pages/league.page').then((m) => m.LeaguePage),
+      },
+      {
+        path: 'friends',
+        loadComponent: () => import('./pages/friends.page').then((m) => m.FriendsPage),
+      },
+      {
+        path: 'u/:id',
+        loadComponent: () =>
+          import('./pages/user-profile.page').then((m) => m.UserProfilePage),
+      },
+      {
         path: 'billing/success',
         loadComponent: () =>
           import('./pages/billing-success.page').then((m) => m.BillingSuccessPage),

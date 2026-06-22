@@ -81,6 +81,14 @@ export {
   type CreateItemBody,
 } from './lib/items.client.js';
 export {
+  LeaguesClient,
+  type CurrentLeague,
+  type LeagueMember,
+  type Friend,
+  type FriendRequest,
+  type PublicProfile,
+} from './lib/leagues.client.js';
+export {
   PlansClient,
   type Plan,
   type PlanPrice,

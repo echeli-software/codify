@@ -9,6 +9,7 @@ import { OfflineSyncService } from '../offline/offline-sync.service.js';
 const TABS: ShellTab[] = [
   { path: 'today', label: 'Today', icon: 'home' },
   { path: 'catalog', label: 'Catalog', icon: 'school' },
+  { path: 'league', label: 'League', icon: 'podium' },
   { path: 'avatar', label: 'Avatar', icon: 'person-circle' },
   { path: 'shop', label: 'Shop', icon: 'cart' },
   { path: 'profile', label: 'Profile', icon: 'person' },
