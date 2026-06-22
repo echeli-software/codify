@@ -27,7 +27,7 @@ interface SyncResult {
  * Turns RevenueCat entitlement events into our `Subscription` mirror.
  * Idempotent on the RevenueCat event id, and identity-stable on the store's
  * `original_transaction_id` (which survives renewals) so renewals update the
- * same row rather than creating duplicates. See /docs/11-mobile.md.
+ * same row rather than creating duplicates. See /docs/17-mobile.md.
  *
  * Access is resolved purely from `Subscription` rows (AccessService is
  * source-agnostic), so a synced store purchase grants access with no extra

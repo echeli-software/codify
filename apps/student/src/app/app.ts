@@ -9,7 +9,7 @@ import { NativePlatformService } from './native/native-platform.service.js';
  * so per-route layout choices stay local.
  *
  * On the native shell we register for push once the user is authenticated
- * (no-op on web). See /docs/11-mobile.md §Push.
+ * (no-op on web). See /docs/17-mobile.md §Push.
  */
 @Component({
   imports: [IonApp, IonRouterOutlet],

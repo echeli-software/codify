@@ -249,7 +249,7 @@ model Plan {
   tagline         String?
   stripeProductId String?  @unique
   /// RevenueCat entitlement identifier (e.g. "all_access") this plan grants.
-  /// Store webhooks map an entitlement back to the plan via this. See /docs/11-mobile.md.
+  /// Store webhooks map an entitlement back to the plan via this. See /docs/17-mobile.md.
   revenueCatEntitlementId String? @unique
   /// Bypasses the category check — grants every published course.
   isAllAccess     Boolean  @default(false)
@@ -330,7 +330,7 @@ model Subscription {
   stripeCustomerId     String?
   // Store (RevenueCat) subscriptions: the app-user id RevenueCat reports, and
   // the store's original transaction id — the stable identity across renewals
-  // and the idempotent upsert key for IAP. See /docs/11-mobile.md §RevenueCat.
+  // and the idempotent upsert key for IAP. See /docs/17-mobile.md §RevenueCat.
   revenueCatUserId     String?
   storeTransactionId   String?            @unique
   storeProductId       String?
@@ -424,7 +424,7 @@ enum DevicePlatform {
 
 /// A registered push target (FCM/APNs token) for one user device. The student
 /// app registers its token on login; streak reminders + reward pushes are
-/// delivered here. See /docs/11-mobile.md §Push.
+/// delivered here. See /docs/17-mobile.md §Push.
 model DeviceToken {
   id         String         @id @default(dbgenerated("uuid_generate_v7()"))
   userId     String

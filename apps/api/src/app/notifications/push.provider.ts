@@ -8,7 +8,7 @@ import { Logger } from '@nestjs/common';
  * Mirrors the BillingProvider / CodeExecutionProvider dev-stub pattern.
  *
  * Real native delivery (signed FCM/APNs, physical devices) is store-side and
- * deferred — see /docs/11-mobile.md §Push.
+ * deferred — see /docs/17-mobile.md §Push.
  */
 
 export const PUSH_PROVIDER = Symbol('PUSH_PROVIDER');

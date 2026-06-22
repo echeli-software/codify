@@ -5,7 +5,7 @@ import { Logger } from '@nestjs/common';
  * + Play): products mirror our Stripe plans, and its entitlement webhook is
  * the source of truth that syncs store purchases into our `Subscription`
  * mirror — the same table Stripe writes to, so access resolution is identical
- * regardless of where the user paid. See /docs/11-mobile.md.
+ * regardless of where the user paid. See /docs/17-mobile.md.
  *
  * Mirrors the BillingProvider pattern: in prod we verify the shared
  * Authorization secret RevenueCat is configured to send; in dev (no secret) a

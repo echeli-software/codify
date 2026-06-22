@@ -12,7 +12,7 @@ export interface StreakReminderResult {
  * Sends "keep your streak alive" pushes to users who have an active streak but
  * haven't done a streak-satisfying action *today* (in their own timezone).
  * In production a daily cron (per-timezone evening slot) calls run(); here an
- * admin endpoint triggers it on demand for verification. See /docs/11-mobile.md.
+ * admin endpoint triggers it on demand for verification. See /docs/17-mobile.md.
  */
 @Injectable()
 export class StreakReminderService {

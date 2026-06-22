@@ -10,7 +10,7 @@ import { DevicesClient, type DevicePlatform } from '@codify/api-client';
  *
  * The pieces that need real native infra — signed FCM/APNs delivery and the
  * RevenueCat purchase sheet — only run on-device; here they're wired but inert
- * on web. See /docs/11-mobile.md.
+ * on web. See /docs/17-mobile.md.
  */
 @Injectable({ providedIn: 'root' })
 export class NativePlatformService {
