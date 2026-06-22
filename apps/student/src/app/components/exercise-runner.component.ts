@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   AppBadge,
@@ -89,7 +89,7 @@ import {
     `,
   ],
 })
-export class ExerciseRunnerComponent {
+export class ExerciseRunnerComponent implements OnInit {
   readonly lessonId = input.required<string>();
   /** Emits the SubmitResult when the exercise is first passed. */
   readonly completed = output<SubmitResult>();
@@ -108,8 +108,8 @@ export class ExerciseRunnerComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly passed = signal(false);
 
-  constructor() {
-    // Reload whenever the bound lesson changes.
+  ngOnInit(): void {
+    // Inputs are bound by now (don't read a required input in the constructor).
     void this.load();
   }
 
