@@ -45,6 +45,9 @@ model User {
   totalXp             Int       @default(0)
   coins               Int       @default(0)
 
+  /// AvatarConfig JSON (base body, skin tone, hair). See 08-avatar-and-shop.md.
+  avatarConfig        Json?
+
   auditedActions  AuditLog[]
   authoredCourses Course[]   @relation("CourseAuthor")
   progress        Progress[]
@@ -54,6 +57,8 @@ model User {
   streak           Streak?
   userBadges       UserBadge[]
   questAssignments QuestAssignment[]
+  items            UserItem[]
+  equipped         EquippedItem[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -507,6 +512,107 @@ model GamificationConfig {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Avatar & shop — see /docs/08-avatar-and-shop.md
+// ─────────────────────────────────────────────────────────────────────
+
+enum ItemSlot {
+  PET
+  BACKGROUND
+  TOP
+  BOTTOM
+  SHOES
+  HAT
+  HAIR
+  GLASSES
+  ACCESSORY
+  FRAME
+  EMOTE
+}
+
+enum ItemRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+/// How an item entered an inventory (distinct from CoinSource).
+enum ItemAcquisitionSource {
+  PURCHASE
+  CHEST
+  ADMIN_GRANT
+  PROMO
+  ONBOARDING
+  REFUND_RESTORE
+}
+
+model ItemCategory {
+  slug      String   @id
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+}
+
+model Item {
+  id               String       @id @default(dbgenerated("uuid_generate_v7()"))
+  slug             String       @unique
+  name             String
+  description      String?
+  slot             ItemSlot
+  categorySlug     String
+  category         ItemCategory @relation(fields: [categorySlug], references: [slug])
+  rarity           ItemRarity   @default(COMMON)
+  costCoins        Int          @default(0)
+  requiredLevel    Int          @default(1)
+  isPremiumOnly    Boolean      @default(false)
+  isLimitedDrop    Boolean      @default(false)
+  dropStartsAt     DateTime?
+  dropEndsAt       DateTime?
+  /// Placeholder sprite token until the SVG/R2 pipeline lands — e.g.
+  /// "emoji:🎩" or "color:#88ccff". See 08-avatar-and-shop.md §3.
+  spriteAssetId    String
+  thumbnailAssetId String?
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  userItems     UserItem[]
+  equippedItems EquippedItem[]
+
+  @@index([slot, rarity])
+  @@index([dropStartsAt, dropEndsAt])
+}
+
+model UserItem {
+  id         String                @id @default(dbgenerated("uuid_generate_v7()"))
+  userId     String
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       Item                  @relation(fields: [itemId], references: [id])
+  source     ItemAcquisitionSource
+  acquiredAt DateTime              @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId, acquiredAt])
+}
+
+model EquippedItem {
+  userId String
+  slot   ItemSlot
+  itemId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item   Item     @relation(fields: [itemId], references: [id])
+
+  @@id([userId, slot])
+  @@index([userId])
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.
