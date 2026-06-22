@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import {
   IonHeader,
   IonToolbar,
@@ -44,12 +45,13 @@ const REASON_LABEL: Record<string, string> = {
 
 /**
  * Shop — browse cosmetics, try them on against the live avatar, and buy with
- * coins. Eligibility comes from the server (the same @codify/domain rule the
- * API enforces), so the Buy button never lies.
+ * coins. Limited drops are pinned to the top with a live countdown; premium-
+ * only items carry a star badge. Eligibility comes from the server (the same
+ * @codify/domain rule the API enforces), so the Buy button never lies.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonHeader, IonToolbar, IonTitle, IonContent, AppBadge, AppButton, AppCard, AppSkeleton, AvatarRenderer, EmptyState, Icon],
+  imports: [NgTemplateOutlet, IonHeader, IonToolbar, IonTitle, IonContent, AppBadge, AppButton, AppCard, AppSkeleton, AvatarRenderer, EmptyState, Icon],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -82,12 +84,37 @@ const REASON_LABEL: Record<string, string> = {
       } @else if (items().length === 0) {
       <cdf-empty-state icon="cart" title="Nothing here yet" description="Check back as new items drop." />
       } @else {
-      <div class="grid" data-testid="shop-grid">
-        @for (it of items(); track it.id) {
-        <cdf-app-card padding="normal" class="item" [attr.data-item-id]="it.id" (click)="setTryOn(it)">
+        @if (limitedItems().length > 0) {
+        <section class="limited" data-testid="limited-section">
+          <h3 class="limited__title">
+            <cdf-icon name="flame" size="sm" /> Limited drop
+            <span class="limited__count" data-testid="limited-countdown">· ends in {{ countdownLabel() }}</span>
+          </h3>
+          <div class="grid" data-testid="limited-grid">
+            @for (it of limitedItems(); track it.id) {
+            <ng-container *ngTemplateOutlet="card; context: { $implicit: it }" />
+            }
+          </div>
+        </section>
+        }
+
+        <div class="grid" data-testid="shop-grid">
+          @for (it of regularItems(); track it.id) {
+          <ng-container *ngTemplateOutlet="card; context: { $implicit: it }" />
+          }
+        </div>
+      }
+
+      <ng-template #card let-it>
+        <cdf-app-card padding="normal" class="item" [class.item--limited]="it.isLimitedDrop" [attr.data-item-id]="it.id" (click)="setTryOn(it)">
           <div class="item__sprite" [style.background]="swatch(it)">{{ glyph(it) }}</div>
           <h3>{{ it.name }}</h3>
-          <cdf-app-badge [variant]="rarityVariant(it.rarity)" [subtle]="true">{{ it.rarity }}</cdf-app-badge>
+          <div class="item__badges">
+            <cdf-app-badge [variant]="rarityVariant(it.rarity)" [subtle]="true">{{ it.rarity }}</cdf-app-badge>
+            @if (it.isPremiumOnly) {
+            <cdf-app-badge variant="warning" [subtle]="true" data-testid="premium-badge">★ Premium</cdf-app-badge>
+            }
+          </div>
           <div class="item__cost"><cdf-icon name="diamond" size="xs" /> {{ it.costCoins }}</div>
           @if (it.owned) {
           <cdf-app-badge variant="success" [subtle]="true">Owned</cdf-app-badge>
@@ -99,9 +126,7 @@ const REASON_LABEL: Record<string, string> = {
           <span class="item__locked">{{ reasonLabel(it.reason) }}</span>
           }
         </cdf-app-card>
-        }
-      </div>
-      }
+      </ng-template>
     </ion-content>
   `,
   styles: [
@@ -112,9 +137,14 @@ const REASON_LABEL: Record<string, string> = {
       .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--cdf-space-2); margin-bottom: var(--cdf-space-2); }
       .chip { flex: 0 0 auto; border: 1px solid var(--cdf-color-border, #ccc); background: transparent; border-radius: 16px; padding: 4px 12px; font-size: 13px; }
       .chip--active { background: var(--cdf-color-primary, #5b8def); color: #fff; border-color: transparent; }
+      .limited { border: 1px solid var(--cdf-color-warning, #e0a800); border-radius: 14px; padding: var(--cdf-space-3); margin-bottom: var(--cdf-space-3); background: rgba(224, 168, 0, 0.06); }
+      .limited__title { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--cdf-space-2); font-size: 15px; }
+      .limited__count { color: var(--cdf-color-text-muted); font-weight: 500; font-size: 13px; }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--cdf-space-2); }
       .item { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      .item--limited { outline: 1px solid var(--cdf-color-warning, #e0a800); }
       .item h3 { margin: 2px 0 0; font-size: 14px; }
+      .item__badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
       .item__sprite { width: 56px; height: 56px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; background: var(--cdf-color-surface-2, #eef1f6); }
       .item__cost { display: flex; align-items: center; gap: 4px; font-weight: 600; }
       .item__locked { font-size: 12px; color: var(--cdf-color-text-muted); }
@@ -134,6 +164,21 @@ export class ShopPage {
   protected readonly affordableOnly = signal(false);
   protected readonly buyingId = signal<string | null>(null);
   protected readonly tryOn = signal<ShopItem | null>(null);
+  /** Ticks each second to drive the limited-drop countdown. */
+  protected readonly now = signal(Date.now());
+
+  protected readonly limitedItems = computed(() => this.items().filter((i) => i.isLimitedDrop));
+  protected readonly regularItems = computed(() => this.items().filter((i) => !i.isLimitedDrop));
+
+  /** Soonest limited-drop end, formatted as a coarse countdown. */
+  protected readonly countdownLabel = computed(() => {
+    const ends = this.limitedItems()
+      .map((i) => (i.dropEndsAt ? new Date(i.dropEndsAt).getTime() : null))
+      .filter((t): t is number => t != null);
+    if (ends.length === 0) return '—';
+    const remaining = Math.max(0, Math.min(...ends) - this.now());
+    return formatRemaining(remaining);
+  });
 
   /** Equipped map with the try-on item overlaid into its slot. */
   protected readonly previewEquipped = computed<Partial<Record<AvatarSlot, AvatarSprite>>>(() => {
@@ -149,6 +194,8 @@ export class ShopPage {
 
   constructor() {
     void this.load();
+    const timer = setInterval(() => this.now.set(Date.now()), 1000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }
 
   private async load(): Promise<void> {
@@ -196,7 +243,6 @@ export class ShopPage {
     try {
       const res = await this.items_.purchase(it.id);
       this.coins.set(res.coins);
-      // Refresh shop (owned flags) + avatar; keep try-on showing the bought item.
       const [shop, av] = await Promise.all([this.items_.shop(this.queryArgs()), this.items_.avatar()]);
       this.items.set(shop);
       this.avatar.set(av);
@@ -222,4 +268,16 @@ export class ShopPage {
     if (r === 'UNCOMMON') return 'success';
     return 'neutral';
   }
+}
+
+/** Coarse "2d 4h" / "3h 12m" / "45s" countdown formatting. */
+function formatRemaining(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
 }

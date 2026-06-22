@@ -54,6 +54,13 @@ try {
   await page.waitForSelector('[data-testid="shop-grid"]', { timeout: 12_000 }).catch(() => {});
   must(!!(await page.$('[data-testid="shop-grid"]')), 'shop grid renders', '');
 
+  // Limited-drop section + countdown + premium badge (seeded founding/premium items).
+  const limitedOk = await page.$('[data-testid="limited-section"]');
+  must(!!limitedOk, 'limited-drop section pinned at top', '');
+  const countdown = await page.$eval('[data-testid="limited-countdown"]', (el) => el.textContent || '').catch(() => '');
+  must(/ends in/.test(countdown), 'limited-drop countdown shows', JSON.stringify(countdown.trim()));
+  must(!!(await page.$('[data-testid="premium-badge"]')), 'premium-only items show a Premium star badge', '');
+
   // Filter to Hats so the dressing room's default HAT slot has the bought item.
   await page.evaluate(() => {
     const chip = [...document.querySelectorAll('[data-testid="slot-filters"] .chip')].find((c) => c.textContent?.trim() === 'Hats');
@@ -75,7 +82,13 @@ try {
       .then(() => true)
       .catch(() => false);
     must(dropped, 'coin balance drops after buying', `before=${coinsBefore}`);
-    const ownedShown = await page.waitForFunction(() => (document.querySelector('[data-testid="shop-grid"]')?.textContent || '').includes('Owned'), { timeout: 8_000 }).then(() => true).catch(() => false);
+    const ownedShown = await page
+      .waitForFunction(() => {
+        const grids = document.querySelectorAll('[data-testid="shop-grid"], [data-testid="limited-grid"]');
+        return [...grids].some((g) => (g.textContent || '').includes('Owned'));
+      }, { timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
     must(ownedShown, 'bought item shows "Owned"', '');
   }
 
@@ -101,6 +114,22 @@ try {
     .then(() => true)
     .catch(() => false);
   must(wearing, 'avatar renders the equipped hat (card "On" + aria "wearing")', '');
+
+  // 3b. Skin-tone config picker (free customization, persists).
+  await page.waitForSelector('[data-testid="skin-tones"]', { timeout: 8_000 }).catch(() => {});
+  await page.click('[data-tone="deep"]').catch(() => {});
+  const toneActive = await page
+    .waitForFunction(() => document.querySelector('[data-tone="deep"]')?.classList.contains('tone--active'), { timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  must(toneActive, 'picking a skin tone activates it', '');
+  // Persisted: reload and the tone is still selected.
+  await page.reload({ waitUntil: 'networkidle2' });
+  const tonePersisted = await page
+    .waitForFunction(() => document.querySelector('[data-tone="deep"]')?.classList.contains('tone--active'), { timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  must(tonePersisted, 'skin tone persists across reload', '');
 
   // 4. Admin Items page
   await page.goto(`${ADM}/login`, { waitUntil: 'domcontentloaded' });

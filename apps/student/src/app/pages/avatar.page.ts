@@ -24,6 +24,14 @@ import {
   type ItemSlot,
 } from '@codify/api-client';
 
+const SKIN_TONES: { value: string; emoji: string }[] = [
+  { value: 'porcelain', emoji: '🧑🏻' },
+  { value: 'light', emoji: '🧑🏼' },
+  { value: 'tan', emoji: '🧑🏽' },
+  { value: 'brown', emoji: '🧑🏾' },
+  { value: 'deep', emoji: '🧑🏿' },
+];
+
 const SLOTS: { value: ItemSlot; label: string }[] = [
   { value: 'HAT', label: 'Hat' },
   { value: 'GLASSES', label: 'Glasses' },
@@ -64,6 +72,19 @@ const SLOTS: { value: ItemSlot; label: string }[] = [
         </div>
       </div>
 
+      <!-- Free customization: skin tone -->
+      <h3 class="muted">Skin tone</h3>
+      <div class="tones" data-testid="skin-tones">
+        @for (t of skinTones; track t.value) {
+        <button
+          class="tone"
+          [class.tone--active]="currentTone() === t.value"
+          [attr.data-tone]="t.value"
+          (click)="setSkinTone(t.value)"
+        >{{ t.emoji }}</button>
+        }
+      </div>
+
       <!-- Slot picker -->
       <div class="filters" data-testid="slot-picker">
         @for (s of slots; track s.value) {
@@ -96,6 +117,9 @@ const SLOTS: { value: ItemSlot; label: string }[] = [
       .stage { display: flex; flex-direction: column; align-items: center; gap: var(--cdf-space-2); margin-bottom: var(--cdf-space-3); }
       .stage__actions { display: flex; gap: var(--cdf-space-2); }
       .muted { color: var(--cdf-color-text-muted); }
+      .tones { display: flex; gap: 6px; margin-bottom: var(--cdf-space-2); }
+      .tone { font-size: 26px; line-height: 1; border: 2px solid transparent; border-radius: 50%; background: var(--cdf-color-surface-2, #eef1f6); width: 44px; height: 44px; }
+      .tone--active { border-color: var(--cdf-color-primary, #5b8def); }
       .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--cdf-space-2); }
       .chip { flex: 0 0 auto; border: 1px solid var(--cdf-color-border, #ccc); background: transparent; border-radius: 16px; padding: 4px 12px; font-size: 13px; }
       .chip--active { background: var(--cdf-color-primary, #5b8def); color: #fff; border-color: transparent; }
@@ -110,10 +134,13 @@ export class AvatarPage {
   private readonly items = inject(ItemsClient);
 
   protected readonly slots = SLOTS;
+  protected readonly skinTones = SKIN_TONES;
   protected readonly loading = signal(true);
   protected readonly avatar = signal<AvatarResponse | null>(null);
   protected readonly inventory = signal<InventoryItem[]>([]);
   protected readonly slot = signal<ItemSlot>('HAT');
+
+  protected readonly currentTone = computed(() => (this.avatar()?.config?.['skinTone'] as string | undefined) ?? null);
 
   protected readonly equippedSprites = computed<Partial<Record<AvatarSlot, AvatarSprite>>>(() => {
     const out: Partial<Record<AvatarSlot, AvatarSprite>> = {};
@@ -141,6 +168,19 @@ export class AvatarPage {
       /* offline — leave empty */
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Free customization — persists AvatarConfig and live-updates the renderer. */
+  protected async setSkinTone(tone: string): Promise<void> {
+    const config = { ...(this.avatar()?.config ?? {}), skinTone: tone };
+    // Optimistic local update so the avatar changes instantly.
+    this.avatar.update((a) => (a ? { ...a, config } : a));
+    try {
+      const av = await this.items.saveConfig(config);
+      this.avatar.set(av);
+    } catch {
+      /* surfaced by interceptor; optimistic value stays */
     }
   }
 
