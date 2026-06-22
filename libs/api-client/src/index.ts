@@ -68,6 +68,19 @@ export {
   type CreateMultiplierBody,
 } from './lib/gamification.client.js';
 export {
+  ItemsClient,
+  type Item,
+  type ItemSlot,
+  type ItemRarity,
+  type ShopItem,
+  type ShopQuery,
+  type InventoryItem,
+  type EquippedRef,
+  type AvatarResponse,
+  type ItemCategory,
+  type CreateItemBody,
+} from './lib/items.client.js';
+export {
   PlansClient,
   type Plan,
   type PlanPrice,

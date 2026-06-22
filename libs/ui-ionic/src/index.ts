@@ -65,6 +65,12 @@ export {
 export { EmptyState } from './lib/molecules/empty-state/empty-state.js';
 export { RewardToast } from './lib/molecules/reward-toast/reward-toast.js';
 export { AvatarWithFrame } from './lib/molecules/avatar-with-frame/avatar-with-frame.js';
+export {
+  AvatarRenderer,
+  type AvatarSlot,
+  type AvatarSprite,
+  type AvatarConfigLike,
+} from './lib/molecules/avatar-renderer/avatar-renderer.js';
 
 // ─── Organisms ───────────────────────────────────────────────────────────
 export { AppShell, type ShellTab } from './lib/organisms/app-shell/app-shell.js';
