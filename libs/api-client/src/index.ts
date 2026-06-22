@@ -7,6 +7,7 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 // Typed clients
 export { MeClient } from './lib/me.client.js';
 export { UsersClient } from './lib/users.client.js';
+export { DevicesClient, type DevicePlatform } from './lib/devices.client.js';
 export { HealthClient } from './lib/health.client.js';
 export {
   CategoriesClient,

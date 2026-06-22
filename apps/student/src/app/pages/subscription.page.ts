@@ -27,6 +27,7 @@ import {
   EmptyState,
   Icon,
 } from '@codify/ui-ionic';
+import { NativePlatformService } from '../native/native-platform.service.js';
 
 /**
  * Student Subscription screen. Shows the current subscription state (status,
@@ -128,6 +129,14 @@ import {
         }
       </div>
       }
+
+      <!-- App Store / Play rule: restoring purchases must be offered (native only). -->
+      @if (isNative) {
+      <cdf-app-button kind="ghost" [loading]="restoreLoading()" (buttonClick)="restore()" data-testid="restore-btn">
+        <cdf-icon name="refresh" size="sm" /> Restore purchases
+      </cdf-app-button>
+      @if (restoreMsg(); as rm) { <p class="muted" data-testid="restore-msg">{{ rm }}</p> }
+      }
       }
     </ion-content>
   `,
@@ -148,12 +157,20 @@ import {
 export class SubscriptionPage {
   private readonly billing = inject(BillingClient);
   private readonly plansClient = inject(PlansClient);
+  private readonly native = inject(NativePlatformService);
 
   protected readonly loading = signal(true);
   protected readonly plans = signal<readonly Plan[]>([]);
   protected readonly mine = signal<MySubscriptionResponse | null>(null);
   protected readonly checkoutId = signal<string | null>(null);
   protected readonly portalLoading = signal(false);
+  protected readonly restoreLoading = signal(false);
+  protected readonly restoreMsg = signal<string | null>(null);
+
+  /** Inside the Capacitor shell → use store IAP + show "Restore purchases". */
+  protected get isNative(): boolean {
+    return this.native.isNative;
+  }
 
   /** The first access-granting subscription, if any. */
   protected readonly activeSub = computed(
@@ -197,6 +214,22 @@ export class SubscriptionPage {
 
   protected async subscribe(priceId: string): Promise<void> {
     this.checkoutId.set(priceId);
+
+    // Native: digital subscriptions MUST go through store IAP (App Store /
+    // Play rules forbid linking out to web payment). The RevenueCat
+    // entitlement then syncs to our Subscription via webhook.
+    if (this.isNative) {
+      try {
+        const ok = await this.native.purchasePackage(priceId);
+        if (ok) await this.load();
+      } catch {
+        /* purchase cancelled / unavailable */
+      } finally {
+        this.checkoutId.set(null);
+      }
+      return;
+    }
+
     try {
       const origin = window.location.origin;
       const res = await this.billing.createCheckout({
@@ -210,6 +243,24 @@ export class SubscriptionPage {
       window.location.href = res.url;
     } catch {
       this.checkoutId.set(null);
+    }
+  }
+
+  protected async restore(): Promise<void> {
+    this.restoreLoading.set(true);
+    this.restoreMsg.set(null);
+    try {
+      const restored = await this.native.restorePurchases();
+      if (restored) {
+        await this.load();
+        this.restoreMsg.set('Purchases restored.');
+      } else {
+        this.restoreMsg.set('No previous purchases found.');
+      }
+    } catch {
+      this.restoreMsg.set('Could not restore purchases.');
+    } finally {
+      this.restoreLoading.set(false);
     }
   }
 

@@ -1,13 +1,14 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Capacitor config for the student app. Native iOS/Android platforms are
- * not added until Phase 11 (per docs/15-roadmap.md); for now this file
- * documents the eventual app id + name and the web build location.
+ * Capacitor config for the student app (Phase 11). The web build is wrapped
+ * by the native shells; NativePlatformService bridges haptics, push, and
+ * RevenueCat IAP, degrading to no-ops on web.
  *
- *   To add platforms when Phase 11 lands:
+ *   Add platforms (needs Xcode / Android SDK — deferred, store-side):
  *     npx cap add ios
  *     npx cap add android
+ *     npx cap sync
  */
 const config: CapacitorConfig = {
   appId: 'app.codify.student',
@@ -15,6 +16,11 @@ const config: CapacitorConfig = {
   webDir: '../../dist/apps/student/browser',
   server: {
     androidScheme: 'https',
+  },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
 };
 
