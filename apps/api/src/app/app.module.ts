@@ -14,6 +14,7 @@ import { ItemsModule } from './items/items.module.js';
 import { LeaguesModule } from './leagues/leagues.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
@@ -35,6 +36,7 @@ import { UsersModule } from './users/users.module.js';
     ExercisesModule,
     ModulesModule,
     LessonsModule,
+    NotificationsModule,
     PlansModule,
     ProgressModule,
   ],

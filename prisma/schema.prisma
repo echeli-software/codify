@@ -55,6 +55,7 @@ model User {
   xpEvents         XpEvent[]
   coinTransactions CoinTransaction[]
   streak           Streak?
+  deviceTokens     DeviceToken[]
   userBadges       UserBadge[]
   questAssignments QuestAssignment[]
   items            UserItem[]
@@ -413,6 +414,27 @@ model CoinTransaction {
   createdAt      DateTime   @default(now())
 
   @@index([userId, createdAt])
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+/// A registered push target (FCM/APNs token) for one user device. The student
+/// app registers its token on login; streak reminders + reward pushes are
+/// delivered here. See /docs/11-mobile.md §Push.
+model DeviceToken {
+  id         String         @id @default(dbgenerated("uuid_generate_v7()"))
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String         @unique
+  platform   DevicePlatform
+  createdAt  DateTime       @default(now())
+  lastSeenAt DateTime       @default(now())
+
+  @@index([userId])
 }
 
 /// One row per user. `lastActivityDate` is the user-local date (midnight) of
