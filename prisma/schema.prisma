@@ -59,6 +59,13 @@ model User {
   questAssignments QuestAssignment[]
   items            UserItem[]
   equipped         EquippedItem[]
+  leagueMemberships     LeagueMembership[]
+  sentFriendRequests    FriendRequest[]    @relation("Sender")
+  recvFriendRequests    FriendRequest[]    @relation("Receiver")
+  friendshipsA          Friendship[]       @relation("FriendA")
+  friendshipsB          Friendship[]       @relation("FriendB")
+  sentNudges            FriendNudge[]      @relation("NudgeSender")
+  recvNudges            FriendNudge[]      @relation("NudgeReceiver")
 
   @@index([role])
   @@index([lastSeenAt])
@@ -613,6 +620,100 @@ model EquippedItem {
 
   @@id([userId, slot])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Leagues — see /docs/07-gamification.md §9
+// ─────────────────────────────────────────────────────────────────────
+
+enum LeagueTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+model League {
+  id        String     @id @default(dbgenerated("uuid_generate_v7()"))
+  tier      LeagueTier
+  /// UTC Monday 00:00.
+  weekStart DateTime
+  /// Shard key — scatters users into ~30-person cohorts.
+  cohortKey String
+  createdAt DateTime   @default(now())
+
+  members LeagueMembership[]
+
+  @@unique([tier, weekStart, cohortKey])
+  @@index([weekStart])
+  @@index([tier, weekStart])
+}
+
+model LeagueMembership {
+  leagueId   String
+  userId     String
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyXp   Int      @default(0)
+  finalRank  Int?
+  promoted   Boolean?
+  demoted    Boolean?
+  /// Set by the rollover job in the same tx that grants rewards — the
+  /// idempotency token (retries skip rows where rewardedAt IS NOT NULL).
+  rewardedAt DateTime?
+
+  @@id([leagueId, userId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Social — friends + nudges (see /docs/15-roadmap Phase 9)
+// ─────────────────────────────────────────────────────────────────────
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+model FriendRequest {
+  id         String              @id @default(dbgenerated("uuid_generate_v7()"))
+  senderId   String
+  receiverId String
+  sender     User                @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User                @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  resolvedAt DateTime?
+
+  @@index([receiverId, status])
+  @@index([senderId, status])
+}
+
+/// Friendship is symmetric; convention userAId < userBId lexicographically.
+model Friendship {
+  userAId String
+  userBId String
+  userA   User     @relation("FriendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB   User     @relation("FriendB", fields: [userBId], references: [id], onDelete: Cascade)
+  since   DateTime @default(now())
+
+  @@id([userAId, userBId])
+  @@index([userBId])
+}
+
+/// Records each nudge for rate limiting (1 per friend per 24h).
+model FriendNudge {
+  id         String   @id @default(dbgenerated("uuid_generate_v7()"))
+  senderId   String
+  receiverId String
+  sender     User     @relation("NudgeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("NudgeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId, receiverId, createdAt])
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.
