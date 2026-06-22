@@ -54,6 +54,10 @@ export const appRoutes: Route[] = [
           import('./pages/gamification.page').then((m) => m.GamificationPage),
       },
       {
+        path: 'items',
+        loadComponent: () => import('./pages/items.page').then((m) => m.ItemsPage),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),
