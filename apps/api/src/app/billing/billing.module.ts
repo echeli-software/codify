@@ -4,11 +4,18 @@ import { BillingController } from './billing.controller.js';
 import { BillingService } from './billing.service.js';
 import { WebhookController } from './webhook.controller.js';
 import { WebhookService } from './webhook.service.js';
+import { RevenueCatWebhookService } from './revenuecat-webhook.service.js';
 import {
   BILLING_PROVIDER,
   DevBillingProvider,
   type BillingProvider,
 } from './billing.provider.js';
+import {
+  REVENUECAT_PROVIDER,
+  DevRevenueCatProvider,
+  RevenueCatHttpProvider,
+  type RevenueCatProvider,
+} from './revenuecat.provider.js';
 
 /**
  * Global billing module. Provides the BILLING_PROVIDER seam, the reusable
@@ -26,6 +33,7 @@ import {
     AccessService,
     BillingService,
     WebhookService,
+    RevenueCatWebhookService,
     {
       provide: BILLING_PROVIDER,
       useFactory: (): BillingProvider => {
@@ -38,6 +46,16 @@ import {
           );
         }
         return new DevBillingProvider();
+      },
+    },
+    {
+      provide: REVENUECAT_PROVIDER,
+      useFactory: (): RevenueCatProvider => {
+        // Verify the shared Authorization secret when configured; otherwise
+        // use the dev provider so the store-purchase → access flow works
+        // offline (Phase 11). Real native delivery is store-side.
+        const secret = process.env['REVENUECAT_WEBHOOK_AUTH'];
+        return secret ? new RevenueCatHttpProvider(secret) : new DevRevenueCatProvider();
       },
     },
   ],

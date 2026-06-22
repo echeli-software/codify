@@ -107,6 +107,7 @@ export class PlansService {
           description: input.description ?? null,
           tagline: input.tagline ?? null,
           isAllAccess: input.isAllAccess ?? false,
+          revenueCatEntitlementId: input.revenueCatEntitlementId || null,
           trialDays: input.trialDays ?? 7,
           sortOrder: input.sortOrder ?? 0,
         },
@@ -147,6 +148,7 @@ export class PlansService {
       if (patch.description !== undefined) data.description = patch.description;
       if (patch.tagline !== undefined) data.tagline = patch.tagline;
       if (patch.isAllAccess !== undefined) data.isAllAccess = patch.isAllAccess;
+      if (patch.revenueCatEntitlementId !== undefined) data.revenueCatEntitlementId = patch.revenueCatEntitlementId || null;
       if (patch.isActive !== undefined) data.isActive = patch.isActive;
       if (patch.trialDays !== undefined) data.trialDays = patch.trialDays;
       if (patch.sortOrder !== undefined) data.sortOrder = patch.sortOrder;
@@ -286,6 +288,7 @@ function toResponse(p: PlanWithRelations): PlanResponse {
     description: p.description,
     tagline: p.tagline,
     isAllAccess: p.isAllAccess,
+    revenueCatEntitlementId: p.revenueCatEntitlementId,
     isActive: p.isActive,
     trialDays: p.trialDays,
     sortOrder: p.sortOrder,

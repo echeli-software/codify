@@ -62,6 +62,12 @@ export class CreatePlanDto {
   @IsBoolean()
   isAllAccess?: boolean;
 
+  /** RevenueCat entitlement id this plan grants (maps store purchases → plan). */
+  @IsOptional()
+  @IsString()
+  @Length(0, 80)
+  revenueCatEntitlementId?: string;
+
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -115,6 +121,11 @@ export class UpdatePlanDto {
   isAllAccess?: boolean;
 
   @IsOptional()
+  @IsString()
+  @Length(0, 80)
+  revenueCatEntitlementId?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
@@ -166,6 +177,7 @@ export interface PlanResponse {
   description: string | null;
   tagline: string | null;
   isAllAccess: boolean;
+  revenueCatEntitlementId: string | null;
   isActive: boolean;
   trialDays: number;
   sortOrder: number;

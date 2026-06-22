@@ -247,6 +247,9 @@ model Plan {
   /// One-line marketing tagline shown on the paywall sheet.
   tagline         String?
   stripeProductId String?  @unique
+  /// RevenueCat entitlement identifier (e.g. "all_access") this plan grants.
+  /// Store webhooks map an entitlement back to the plan via this. See /docs/11-mobile.md.
+  revenueCatEntitlementId String? @unique
   /// Bypasses the category check — grants every published course.
   isAllAccess     Boolean  @default(false)
   isActive        Boolean  @default(true)
@@ -321,8 +324,15 @@ model Subscription {
   planId               String
   plan                 Plan               @relation(fields: [planId], references: [id])
   source               SubscriptionSource @default(STRIPE_WEB)
-  stripeSubscriptionId String             @unique
-  stripeCustomerId     String
+  // Stripe-web subscriptions only — null for store (RevenueCat) subscriptions.
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?
+  // Store (RevenueCat) subscriptions: the app-user id RevenueCat reports, and
+  // the store's original transaction id — the stable identity across renewals
+  // and the idempotent upsert key for IAP. See /docs/11-mobile.md §RevenueCat.
+  revenueCatUserId     String?
+  storeTransactionId   String?            @unique
+  storeProductId       String?
   status               SubscriptionStatus
   currentPeriodStart   DateTime
   currentPeriodEnd     DateTime
@@ -334,6 +344,7 @@ model Subscription {
 
   @@index([userId, status])
   @@index([stripeCustomerId])
+  @@index([revenueCatUserId])
 }
 
 // ─────────────────────────────────────────────────────────────────────
