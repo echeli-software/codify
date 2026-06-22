@@ -135,6 +135,19 @@ const THEME_KEY = 'codify.theme';
         </ion-list>
       </cdf-app-card>
 
+      <h2>Storage</h2>
+      <cdf-app-card padding="normal">
+        <ion-list inset="false">
+          <ion-item button [routerLink]="['/downloads']" lines="none" detail="true" data-testid="downloads-link">
+            <cdf-icon name="download" slot="start" size="md" />
+            <ion-label>
+              <h3>Downloads</h3>
+              <p>Manage offline courses, storage, and sync</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </cdf-app-card>
+
       <h2>Appearance</h2>
       <cdf-app-card padding="normal">
         <cdf-form-field label="Theme" hint="System follows your OS preference.">

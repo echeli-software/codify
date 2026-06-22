@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CoursesClient, LessonsClient, type Lesson } from '@codify/api-client';
 import { idbStores, tx } from './db.js';
 
-const { STORE_DOWNLOADS, STORE_DL_LESSONS } = idbStores;
+const { STORE_DOWNLOADS, STORE_DL_LESSONS, STORE_ASSETS } = idbStores;
 const PREFS_KEY = 'codify.downloads.prefs';
 const DEFAULT_BUDGET = 1024 * 1024 * 1024; // 1 GB
 
@@ -168,6 +168,25 @@ export class DownloadService {
   async getDownloadedLesson(lessonId: string): Promise<DownloadedLesson | null> {
     const l = await tx<DownloadedLesson | undefined>(STORE_DL_LESSONS, 'readonly', (s) => s.get(lessonId));
     return l ?? null;
+  }
+
+  // ─── Asset prefetch (offline dressing room) ──────────────────────────────
+
+  /**
+   * Cache the avatar + inventory bundle so the dressing room renders offline
+   * (docs/16 §6: a signed-in user's avatar must always render offline).
+   */
+  async prefetchAssets(bundle: { avatar: unknown; inventory: unknown }): Promise<void> {
+    await tx(STORE_ASSETS, 'readwrite', (s) => s.put({ ...bundle, cachedAt: Date.now() }, 'current'));
+  }
+
+  async getCachedAssets(): Promise<{ avatar: unknown; inventory: unknown } | null> {
+    const v = await tx<{ avatar: unknown; inventory: unknown } | undefined>(
+      STORE_ASSETS,
+      'readonly',
+      (s) => s.get('current'),
+    );
+    return v ?? null;
   }
 
   /** Touch a course's lastReadAt so it survives LRU eviction. */

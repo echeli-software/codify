@@ -23,6 +23,8 @@ import {
   type InventoryItem,
   type ItemSlot,
 } from '@codify/api-client';
+import { DownloadService } from '../offline/download.service.js';
+import { NetworkStatusService } from '../offline/network-status.service.js';
 
 const SKIN_TONES: { value: string; emoji: string }[] = [
   { value: 'porcelain', emoji: '🧑🏻' },
@@ -132,6 +134,8 @@ const SLOTS: { value: ItemSlot; label: string }[] = [
 })
 export class AvatarPage {
   private readonly items = inject(ItemsClient);
+  private readonly downloads = inject(DownloadService);
+  private readonly network = inject(NetworkStatusService);
 
   protected readonly slots = SLOTS;
   protected readonly skinTones = SKIN_TONES;
@@ -160,14 +164,30 @@ export class AvatarPage {
 
   private async load(): Promise<void> {
     this.loading.set(true);
+    // Offline: render avatar + inventory from the prefetched cache.
+    if (!this.network.online()) {
+      await this.loadFromCache();
+      this.loading.set(false);
+      return;
+    }
     try {
       const [av, inv] = await Promise.all([this.items.avatar(), this.items.inventory()]);
       this.avatar.set(av);
       this.inventory.set(inv);
+      // Cache so the dressing room renders offline next time.
+      void this.downloads.prefetchAssets({ avatar: av, inventory: inv });
     } catch {
-      /* offline — leave empty */
+      await this.loadFromCache();
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async loadFromCache(): Promise<void> {
+    const cached = await this.downloads.getCachedAssets();
+    if (cached) {
+      this.avatar.set(cached.avatar as AvatarResponse);
+      this.inventory.set((cached.inventory as InventoryItem[]) ?? []);
     }
   }
 
