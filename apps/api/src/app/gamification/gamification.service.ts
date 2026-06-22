@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Prisma, type CoinSource } from '@prisma/client';
 import {
   applyMultiplier,
   resolveMultiplier,
@@ -68,6 +68,68 @@ export class GamificationService {
     return this.prisma.$transaction((t) => this.grantInTx(t, params));
   }
 
+  /**
+   * Spend coins (a negative ledger entry) — e.g. an item purchase. Atomic,
+   * idempotent on `idempotencyKey`, and ledger-consistent (so the drift check
+   * keeps holding). Throws 400 if the balance is insufficient.
+   */
+  async spendCoins(
+    params: { userId: string; amount: number; source: CoinSource; refType?: string | null; refId?: string | null; idempotencyKey?: string | null },
+    tx?: Tx,
+  ): Promise<{ coins: number; spent: number }> {
+    const run = async (t: Tx) => {
+      const user = await t.user.findUniqueOrThrow({ where: { id: params.userId }, select: { coins: true } });
+      if (params.idempotencyKey) {
+        const seen = await t.coinTransaction.findUnique({
+          where: { idempotencyKey: params.idempotencyKey },
+          select: { id: true },
+        });
+        if (seen) return { coins: user.coins, spent: 0 };
+      }
+      if (user.coins < params.amount) throw new BadRequestException('Insufficient coins');
+      const balanceAfter = (await this.prevLedgerBalance(t, params.userId, user.coins)) - params.amount;
+      await t.coinTransaction.create({
+        data: {
+          userId: params.userId,
+          delta: -params.amount,
+          source: params.source,
+          balanceAfter,
+          refType: params.refType ?? null,
+          refId: params.refId ?? null,
+          idempotencyKey: params.idempotencyKey ?? null,
+        },
+      });
+      const updated = await t.user.update({
+        where: { id: params.userId },
+        data: { coins: { decrement: params.amount } },
+        select: { coins: true },
+      });
+      return { coins: updated.coins, spent: params.amount };
+    };
+    return tx ? run(tx) : this.prisma.$transaction(run);
+  }
+
+  /**
+   * The user's current ledger balance to chain the next balanceAfter from.
+   * Writes a one-time opening-balance row for coins earned before the ledger
+   * existed (pre-Phase-7), so SUM(delta) == latest balanceAfter.
+   */
+  private async prevLedgerBalance(tx: Tx, userId: string, userCoins: number): Promise<number> {
+    const last = await tx.coinTransaction.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { balanceAfter: true },
+    });
+    if (last) return last.balanceAfter;
+    if (userCoins > 0) {
+      await tx.coinTransaction.create({
+        data: { userId, delta: userCoins, source: 'ADMIN_GRANT', balanceAfter: userCoins, refType: 'opening_balance' },
+      });
+      return userCoins;
+    }
+    return 0;
+  }
+
   private async grantInTx(tx: Tx, params: GrantRewardParams): Promise<RewardResult> {
     const user = await tx.user.findUniqueOrThrow({
       where: { id: params.userId },
@@ -117,32 +179,8 @@ export class GamificationService {
     const xp = applyMultiplier(params.baseXp, xpMult);
     const coins = applyMultiplier(params.baseCoins, coinMult);
 
-    // 3. Journals (idempotent on key).
-    // Chain balanceAfter from the ledger (not User.coins) so the ledger stays
-    // self-consistent — SUM(delta) == latest balanceAfter. If the user earned
-    // coins before the ledger existed (pre-Phase-7), write a one-time opening
-    // balance so those coins are represented in the ledger too.
-    const last = await tx.coinTransaction.findFirst({
-      where: { userId: params.userId },
-      orderBy: { createdAt: 'desc' },
-      select: { balanceAfter: true },
-    });
-    let prevBalance = last?.balanceAfter ?? null;
-    if (prevBalance === null && user.coins > 0) {
-      await tx.coinTransaction.create({
-        data: {
-          userId: params.userId,
-          delta: user.coins,
-          source: 'ADMIN_GRANT',
-          balanceAfter: user.coins,
-          refType: 'opening_balance',
-        },
-      });
-      prevBalance = user.coins;
-    } else if (prevBalance === null) {
-      prevBalance = 0;
-    }
-    const balanceAfter = prevBalance + coins;
+    // 3. Journals (idempotent on key). balanceAfter chains from the ledger.
+    const balanceAfter = (await this.prevLedgerBalance(tx, params.userId, user.coins)) + coins;
     if (xp > 0) {
       await tx.xpEvent.create({
         data: {
