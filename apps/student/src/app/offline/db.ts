@@ -11,9 +11,15 @@
  */
 
 const DB_NAME = 'codify-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_IDENTITY = 'identity';
 const STORE_QUEUE = 'queue';
+/** Per-course download records (keyPath 'courseId'). Phase 8b. */
+const STORE_DOWNLOADS = 'downloads';
+/** Downloaded lesson content (keyPath 'lessonId', index 'byCourse'). Phase 8b. */
+const STORE_DL_LESSONS = 'dl_lessons';
+/** Cached avatar + inventory bundle for the offline dressing room (key 'current'). */
+const STORE_ASSETS = 'assets';
 
 let openP: Promise<IDBDatabase> | null = null;
 
@@ -31,6 +37,17 @@ function openDb(): Promise<IDBDatabase> {
           keyPath: 'clientEventId',
         });
         store.createIndex('byTimestamp', 'clientTimestamp', { unique: false });
+      }
+      // v2: download cache (Phase 8b).
+      if (!db.objectStoreNames.contains(STORE_DOWNLOADS)) {
+        db.createObjectStore(STORE_DOWNLOADS, { keyPath: 'courseId' });
+      }
+      if (!db.objectStoreNames.contains(STORE_DL_LESSONS)) {
+        const ls = db.createObjectStore(STORE_DL_LESSONS, { keyPath: 'lessonId' });
+        ls.createIndex('byCourse', 'courseId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_ASSETS)) {
+        db.createObjectStore(STORE_ASSETS);
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -68,6 +85,9 @@ async function tx<T>(
 export const idbStores = {
   STORE_IDENTITY,
   STORE_QUEUE,
+  STORE_DOWNLOADS,
+  STORE_DL_LESSONS,
+  STORE_ASSETS,
 };
 
 export { openDb, tx };

@@ -25,6 +25,8 @@ import {
   type CompleteLessonResponse,
 } from '@codify/api-client';
 import { OfflineSyncService } from '../offline/offline-sync.service.js';
+import { DownloadService, type DownloadedLesson } from '../offline/download.service.js';
+import { NetworkStatusService } from '../offline/network-status.service.js';
 import { LessonBlockRenderer } from '@codify/ui-bootstrap';
 import type { LessonDoc } from '@codify/lesson-schema';
 import { RewardOrchestrator } from '@codify/gamification-engine';
@@ -105,6 +107,11 @@ import {
       />
       } @else if (lesson(); as l) {
       <article class="lesson-article" data-testid="lesson-article">
+        @if (fromCache()) {
+        <p class="lesson-offline" data-testid="offline-read">
+          <cdf-icon name="cloud-offline" size="xs" /> Reading offline
+        </p>
+        }
         <header class="lesson-article__head">
           <h1 class="lesson-article__title">{{ l.title }}</h1>
           <p class="lesson-article__meta">
@@ -167,6 +174,14 @@ import {
       .lesson-article__head {
         margin-bottom: var(--cdf-space-4);
       }
+      .lesson-offline {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: var(--cdf-font-size-xs);
+        color: var(--cdf-color-text-muted);
+        margin: 0 0 var(--cdf-space-2);
+      }
       .lesson-article__title {
         margin: 0 0 var(--cdf-space-1);
         font-size: var(--cdf-font-size-2xl);
@@ -226,6 +241,11 @@ export class LessonPage {
   private readonly progressClient = inject(ProgressClient);
   private readonly sync = inject(OfflineSyncService);
   private readonly orchestrator = inject(RewardOrchestrator);
+  private readonly downloads = inject(DownloadService);
+  private readonly network = inject(NetworkStatusService);
+
+  /** True when the lesson is being read from the offline download cache. */
+  protected readonly fromCache = signal(false);
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
@@ -271,9 +291,20 @@ export class LessonPage {
     this.paywall.set(false);
     this.completed.set(null);
     this.completeError.set(null);
+    this.fromCache.set(false);
+
+    // Offline: read straight from the download cache (docs/16 §3 capability).
+    if (!this.network.online()) {
+      if (await this.loadFromCache(id)) {
+        this.loading.set(false);
+        return;
+      }
+    }
+
     try {
       const lesson = await this.lessonsClient.detail(id);
       this.lesson.set(lesson);
+      void this.downloads.markRead(lesson.courseId);
       // Best-effort: see whether this lesson is already done.
       try {
         const cp = await this.progressClient.forCourse(lesson.courseId);
@@ -288,15 +319,27 @@ export class LessonPage {
         // Non-fatal — page still renders.
       }
     } catch (err) {
-      if (err instanceof ProblemDetailsError && err.isNotFound) {
-        this.notFound.set(true);
-      } else {
-        this.notFound.set(true);
+      // Network failed — fall back to the offline download cache if present.
+      if (await this.loadFromCache(id)) {
+        this.loading.set(false);
+        return;
       }
+      this.notFound.set(true);
       this.lesson.set(null);
+      void err;
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Render the lesson from IndexedDB if it was downloaded. */
+  private async loadFromCache(id: string): Promise<boolean> {
+    const cached = await this.downloads.getDownloadedLesson(id);
+    if (!cached) return false;
+    this.lesson.set(fromCached(cached));
+    this.fromCache.set(true);
+    void this.downloads.markRead(cached.courseId);
+    return true;
   }
 
   protected async completeLesson(ev?: MouseEvent): Promise<void> {
@@ -380,4 +423,23 @@ export class LessonPage {
         }),
       );
   }
+}
+
+/** Build a Lesson view-model from a downloaded cache record (offline read). */
+function fromCached(c: DownloadedLesson): Lesson {
+  return {
+    id: c.lessonId,
+    moduleId: '',
+    courseId: c.courseId,
+    order: 0,
+    type: c.type as Lesson['type'],
+    isFree: c.isFree,
+    estimatedMinutes: 0,
+    baseXp: c.baseXp,
+    baseCoins: c.baseCoins,
+    title: c.title,
+    contentJson: c.contentJson,
+    createdAt: '',
+    updatedAt: '',
+  };
 }

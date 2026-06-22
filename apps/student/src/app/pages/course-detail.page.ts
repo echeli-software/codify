@@ -29,6 +29,7 @@ import {
   ProgressClient,
 } from '@codify/api-client';
 import { formatPrice } from '@codify/billing';
+import { DownloadService } from '../offline/download.service.js';
 import {
   AppBadge,
   AppButton,
@@ -134,6 +135,29 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
           {{ freeCount() }} free
         </cdf-app-badge>
         }
+
+        <!-- Offline download -->
+        <div class="course-hero__download" data-testid="download-control">
+          @if (downloadProgress(); as p) {
+          <cdf-app-button kind="ghost" size="sm" (buttonClick)="cancelDownload()" data-testid="download-cancel">
+            <cdf-icon name="download" size="sm" /> Downloading {{ downloadPct(p) }}%
+          </cdf-app-button>
+          } @else if (isDownloaded()) {
+          <cdf-app-badge variant="success" [subtle]="true" data-testid="downloaded-badge">
+            <cdf-icon name="download" size="xs" /> Downloaded
+          </cdf-app-badge>
+          @if (updateAvailable()) {
+          <cdf-app-button kind="secondary" size="sm" (buttonClick)="download()" data-testid="download-update">
+            Update available
+          </cdf-app-button>
+          }
+          <cdf-app-button kind="ghost" size="sm" (buttonClick)="removeDownload()" data-testid="download-remove">Remove</cdf-app-button>
+          } @else {
+          <cdf-app-button kind="secondary" size="sm" (buttonClick)="download()" data-testid="download-btn">
+            <cdf-icon name="download" size="sm" /> Download for offline
+          </cdf-app-button>
+          }
+        </div>
       </cdf-app-card>
 
       <!-- Paywall: shown when this course has paid lessons the user can't
@@ -297,6 +321,22 @@ export class CourseDetailPage {
   private readonly progressClient = inject(ProgressClient);
   private readonly plansClient = inject(PlansClient);
   private readonly billing = inject(BillingClient);
+  private readonly downloads = inject(DownloadService);
+
+  protected readonly isDownloaded = computed(() => {
+    const c = this.course();
+    this.downloads.downloads(); // track
+    return c ? this.downloads.isDownloaded(c.id) : false;
+  });
+  protected readonly downloadProgress = computed(() => {
+    const c = this.course();
+    return c ? this.downloads.progress()[c.id] ?? null : null;
+  });
+  protected readonly updateAvailable = computed(() => {
+    const c = this.course();
+    this.downloads.downloads(); // track
+    return c ? this.downloads.updateAvailable(c.id, c.updatedAt) : false;
+  });
 
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
@@ -378,10 +418,30 @@ export class CourseDetailPage {
   protected readonly completedCount = computed(() => this.completedIds().size);
 
   constructor() {
+    void this.downloads.hydrate();
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const slug = pm.get('slug');
       if (slug) void this.load(slug);
     });
+  }
+
+  protected downloadPct(p: { current: number; total: number }): number {
+    return Math.round((p.current / Math.max(1, p.total)) * 100);
+  }
+
+  protected async download(): Promise<void> {
+    const c = this.course();
+    if (c) await this.downloads.downloadCourse(c.id);
+  }
+
+  protected cancelDownload(): void {
+    const c = this.course();
+    if (c) this.downloads.cancel(c.id);
+  }
+
+  protected async removeDownload(): Promise<void> {
+    const c = this.course();
+    if (c) await this.downloads.removeCourse(c.id);
   }
 
   private async load(slug: string): Promise<void> {
