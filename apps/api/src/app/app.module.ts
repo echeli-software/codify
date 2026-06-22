@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { CoursesModule } from './courses/courses.module.js';
+import { ExercisesModule } from './exercises/exercises.module.js';
 import { GamificationModule } from './gamification/gamification.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ItemsModule } from './items/items.module.js';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     CategoriesModule,
     CoursesModule,
+    ExercisesModule,
     ModulesModule,
     LessonsModule,
     PlansModule,
