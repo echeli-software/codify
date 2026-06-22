@@ -40,6 +40,11 @@ export const appRoutes: Route[] = [
           import('./pages/lessons.page').then((m) => m.LessonsPage),
       },
       {
+        path: 'lessons/:lessonId/exercise',
+        loadComponent: () =>
+          import('./pages/exercise-editor.page').then((m) => m.ExerciseEditorPage),
+      },
+      {
         path: 'categories',
         loadComponent: () =>
           import('./pages/categories.page').then((m) => m.CategoriesPage),

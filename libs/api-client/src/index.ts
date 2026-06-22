@@ -89,6 +89,16 @@ export {
   type PublicProfile,
 } from './lib/leagues.client.js';
 export {
+  ExercisesClient,
+  type StudentExercise,
+  type ExerciseTestCase,
+  type ExerciseTestResult,
+  type RunResult,
+  type SubmitResult,
+  type AdminExercise,
+  type CreateExerciseBody,
+} from './lib/exercises.client.js';
+export {
   PlansClient,
   type Plan,
   type PlanPrice,

@@ -51,6 +51,12 @@ export class ExercisesController {
   }
 
   @Roles('ADMIN', 'TEACHER')
+  @Get('lessons/:lessonId/exercise/admin')
+  getAdminByLesson(@Param('lessonId') lessonId: string) {
+    return this.exercises.getAdminByLesson(lessonId);
+  }
+
+  @Roles('ADMIN', 'TEACHER')
   @Post('exercises/:id/verify')
   verify(@Param('id') id: string) {
     return this.exercises.verifyReference(id);

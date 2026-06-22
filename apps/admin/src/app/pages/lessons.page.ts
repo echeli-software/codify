@@ -125,6 +125,11 @@ const TYPE_OPTIONS: SelectOption<LessonType>[] = [
             (ngModelChange)="onTypeChange($event)"
           />
         </cdf-form-field>
+        @if (typeModel === 'EXERCISE') {
+        <cdf-button kind="secondary" size="sm" [routerLink]="['/lessons', lessonId(), 'exercise']" data-testid="edit-exercise-link">
+          <cdf-icon name="check-circle" size="sm" /> Edit exercise
+        </cdf-button>
+        }
         <cdf-form-field label="Estimated minutes">
           <cdf-input
             type="number"
@@ -235,6 +240,7 @@ export class LessonsPage {
   private readonly confirm = inject(ConfirmDialogService);
 
   protected readonly typeOptions = TYPE_OPTIONS;
+  protected readonly lessonId = signal<string>('');
   protected readonly lesson = signal<Lesson | null>(null);
   protected readonly notFound = signal<boolean>(false);
   protected readonly saving = signal<boolean>(false);
@@ -268,7 +274,10 @@ export class LessonsPage {
     effect(() => {
       this.route.paramMap.subscribe((map) => {
         const id = map.get('id');
-        if (id) void this.load(id);
+        if (id) {
+          this.lessonId.set(id);
+          void this.load(id);
+        }
       });
     });
   }

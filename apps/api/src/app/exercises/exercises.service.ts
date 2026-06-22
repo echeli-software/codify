@@ -90,6 +90,12 @@ export class ExercisesService {
     return this.prisma.exercise.findUniqueOrThrow({ where: { id } });
   }
 
+  /** The exercise attached to a lesson (admin), or null if none yet. */
+  async getAdminByLesson(lessonId: string): Promise<Exercise | null> {
+    const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId }, include: { exercise: true } });
+    return lesson?.exercise ?? null;
+  }
+
   /** Run the reference solution against every test — it must all pass. */
   async verifyReference(id: string): Promise<RunResult & { ok: boolean }> {
     const ex = await this.prisma.exercise.findUniqueOrThrow({ where: { id } });

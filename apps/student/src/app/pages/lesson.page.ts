@@ -30,6 +30,8 @@ import { NetworkStatusService } from '../offline/network-status.service.js';
 import { LessonBlockRenderer } from '@codify/ui-bootstrap';
 import type { LessonDoc } from '@codify/lesson-schema';
 import { RewardOrchestrator } from '@codify/gamification-engine';
+import { ExerciseRunnerComponent } from '../components/exercise-runner.component.js';
+import type { SubmitResult } from '@codify/api-client';
 import {
   AppButton,
   AppCard,
@@ -73,6 +75,7 @@ import {
     Icon,
     XpBadge,
     LessonBlockRenderer,
+    ExerciseRunnerComponent,
   ],
   template: `
     <ion-header>
@@ -120,7 +123,11 @@ import {
             {{ l.baseCoins }} coins
           </p>
         </header>
+        @if (l.type === 'EXERCISE') {
+        <cdf-exercise-runner [lessonId]="l.id" (completed)="onExerciseCompleted($event)" />
+        } @else {
         <cdf-lesson-block-renderer [doc]="docModel()" />
+        }
       </article>
       }
     </ion-content>
@@ -142,7 +149,7 @@ import {
             <small class="lesson-done__hint">Will sync when you're online.</small>
             }
           </div>
-          } @else {
+          } @else if (lesson()?.type !== 'EXERCISE') {
           <cdf-app-button
             kind="primary"
             size="md"
@@ -330,6 +337,14 @@ export class LessonPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * The ExerciseRunner already played the reward + recorded completion
+   * server-side; just reflect the completed state in the footer.
+   */
+  protected onExerciseCompleted(res: SubmitResult): void {
+    this.completed.set({ xpAwarded: res.reward?.xp ?? 0, coinsAwarded: res.reward?.coins ?? 0 });
   }
 
   /** Render the lesson from IndexedDB if it was downloaded. */
