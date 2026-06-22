@@ -87,6 +87,18 @@ function parseStubToken(token: string): {
       role: rest,
     };
   }
+  // Numbered students (dev-token-student2, …) — dev-only affordance for
+  // multi-user testing (friends, league cohorts at scale). All STUDENT.
+  const numbered = /^STUDENT(\d+)$/.exec(rest);
+  if (numbered) {
+    const n = numbered[1];
+    return {
+      clerkId: `dev-student${n}`,
+      email: `student${n}@codify.local`,
+      displayName: `Student ${n}`,
+      role: 'STUDENT',
+    };
+  }
   return null;
 }
 

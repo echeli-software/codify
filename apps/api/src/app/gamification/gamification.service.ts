@@ -8,6 +8,7 @@ import {
 } from '@codify/domain';
 import { levelFromXp, xpForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { LeagueAccumulatorService } from '../leagues/league-accumulator.service.js';
 import type { GrantRewardParams, RewardResult, StreakInfo } from './gamification.types.js';
 
 type Tx = Prisma.TransactionClient;
@@ -39,7 +40,10 @@ const STREAK_MILESTONES: Record<number, { xp: number; coins: number }> = {
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly leagues: LeagueAccumulatorService,
+  ) {}
 
   /** Read a user's gamification snapshot for the app header / reconcile. */
   async getSummary(userId: string): Promise<{
@@ -216,6 +220,9 @@ export class GamificationService {
       data: { totalXp: { increment: xp }, coins: { increment: coins } },
       select: { totalXp: true, coins: true },
     });
+
+    // 4b. Weekly league standing — all XP counts toward the current cohort.
+    if (xp > 0) await this.leagues.accumulateXp(tx, params.userId, xp);
 
     // 5. Level-up.
     const levelBefore = levelFromXp(user.totalXp);

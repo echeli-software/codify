@@ -10,6 +10,7 @@ import { CoursesModule } from './courses/courses.module.js';
 import { GamificationModule } from './gamification/gamification.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ItemsModule } from './items/items.module.js';
+import { LeaguesModule } from './leagues/leagues.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
 import { PlansModule } from './plans/plans.module.js';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module.js';
     GamificationModule,
     HealthModule,
     ItemsModule,
+    LeaguesModule,
     UsersModule,
     CategoriesModule,
     CoursesModule,
