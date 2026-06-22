@@ -66,6 +66,7 @@ model User {
   friendshipsB          Friendship[]       @relation("FriendB")
   sentNudges            FriendNudge[]      @relation("NudgeSender")
   recvNudges            FriendNudge[]      @relation("NudgeReceiver")
+  submissions           Submission[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -182,6 +183,10 @@ model Lesson {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   deletedAt        DateTime?
+
+  /// For EXERCISE lessons — the auto-graded coding exercise (1:1).
+  exerciseId  String?    @unique
+  exercise    Exercise?  @relation(fields: [exerciseId], references: [id])
 
   @@unique([moduleId, order])
   @@index([type])
@@ -714,6 +719,74 @@ model FriendNudge {
   createdAt  DateTime @default(now())
 
   @@index([senderId, receiverId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Exercises — auto-graded code (see /docs/12-code-execution.md)
+// ─────────────────────────────────────────────────────────────────────
+
+model Exercise {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  language      String   /// "javascript" (dev executor) | "python" | …
+  /// Function the tests call (data-driven harness: entryFunction(...args)).
+  entryFunction String   @default("solution")
+  starterCode   String
+  /// Reference solution — never sent to the client.
+  solutionCode  String
+  /// Optional custom harness; when empty the data-driven runner is used.
+  testHarness   String   @default("")
+  timeLimitMs   Int      @default(2000)
+  memoryLimitKb Int      @default(128000)
+  /// [{ id, name, args, expected }] — visible in the UI.
+  visibleTestsJson Json
+  /// Same shape — hidden until the student passes.
+  hiddenTestsJson  Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lesson      Lesson?
+  submissions Submission[]
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  WORKER_LOST
+}
+
+enum SubmissionVerdict {
+  PASS
+  FAIL
+  ERROR
+  TIMEOUT
+  MEMORY
+  RUNTIME
+}
+
+model Submission {
+  id             String             @id @default(dbgenerated("uuid_generate_v7()"))
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId     String
+  exercise       Exercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  code           String
+  status         SubmissionStatus   @default(PENDING)
+  verdict        SubmissionVerdict?
+  runtimeMs      Int?
+  memoryKb       Int?
+  output         String?
+  scorePct       Int?
+  /// Whether this was a "submit" (scored, visible+hidden) vs a "run".
+  scored         Boolean            @default(true)
+  idempotencyKey String?            @unique
+  createdAt      DateTime           @default(now())
+  completedAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([userId, exerciseId])
+  @@index([exerciseId])
+  @@index([status])
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.
