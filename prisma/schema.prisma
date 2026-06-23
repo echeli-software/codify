@@ -32,6 +32,10 @@ model User {
   quietHoursStart     Int?
   quietHoursEnd       Int?
   marketingEmailOptIn Boolean   @default(false)
+  /// Public referral code (share link). Generated lazily. See /docs/18-growth.md.
+  referralCode        String?   @unique
+  /// The user who referred this account, if any.
+  referredById        String?
   onboardedAt         DateTime?
   lastSeenAt          DateTime?
   createdAt           DateTime  @default(now())
@@ -70,9 +74,13 @@ model User {
   submissions           Submission[]
   aiSubmissions         AiSubmission[]
   scenarioRuns          ScenarioRun[]
+  certificates          Certificate[]
+  referredBy            User?              @relation("Referrals", fields: [referredById], references: [id])
+  referrals             User[]             @relation("Referrals")
 
   @@index([role])
   @@index([lastSeenAt])
+  @@index([referredById])
 }
 
 model AuditLog {
@@ -137,14 +145,18 @@ model Course {
   difficulty       Int          @default(1) /// 1-5
   estimatedMinutes Int          @default(60)
   coverAssetId     String?
+  /// A capstone course: a curated, multi-lesson project that issues a
+  /// shareable certificate on completion. See /docs/18-growth.md.
+  isCapstone       Boolean      @default(false)
   publishedAt      DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   deletedAt        DateTime?
 
-  modules     Module[]
-  categories  CourseCategory[]
-  multipliers Multiplier[]
+  modules      Module[]
+  categories   CourseCategory[]
+  multipliers  Multiplier[]
+  certificates Certificate[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -917,6 +929,29 @@ model ScenarioRun {
 
   @@index([userId, scenarioId])
   @@index([scenarioId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Certificates — issued on course completion (Phase 13) — docs/18-growth
+// ─────────────────────────────────────────────────────────────────────
+
+model Certificate {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId      String
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  /// Public, verifiable code (e.g. "CDFY-AB12-CD34") — the verify URL key.
+  serial        String   @unique
+  /// Snapshots taken at issue time so the certificate is stable if the
+  /// display name / course title later change.
+  recipientName String
+  courseTitle   String
+  isCapstone    Boolean  @default(false)
+  issuedAt      DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([userId])
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.

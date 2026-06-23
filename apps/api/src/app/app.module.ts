@@ -7,6 +7,7 @@ import { AuthMiddleware } from './auth/auth.middleware.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
+import { CertificatesModule } from './certificates/certificates.module.js';
 import { CoursesModule } from './courses/courses.module.js';
 import { ExercisesModule } from './exercises/exercises.module.js';
 import { GamificationModule } from './gamification/gamification.module.js';
@@ -35,6 +36,7 @@ import { UsersModule } from './users/users.module.js';
     LeaguesModule,
     UsersModule,
     CategoriesModule,
+    CertificatesModule,
     CoursesModule,
     ExercisesModule,
     ModulesModule,
