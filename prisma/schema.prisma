@@ -68,6 +68,8 @@ model User {
   sentNudges            FriendNudge[]      @relation("NudgeSender")
   recvNudges            FriendNudge[]      @relation("NudgeReceiver")
   submissions           Submission[]
+  aiSubmissions         AiSubmission[]
+  scenarioRuns          ScenarioRun[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -188,6 +190,14 @@ model Lesson {
   /// For EXERCISE lessons — the auto-graded coding exercise (1:1).
   exerciseId  String?    @unique
   exercise    Exercise?  @relation(fields: [exerciseId], references: [id])
+
+  /// For AI_PROMPT lessons — the rubric-graded prompt (1:1).
+  aiPromptId  String?    @unique
+  aiPrompt    AiPrompt?  @relation(fields: [aiPromptId], references: [id])
+
+  /// For SCENARIO lessons — the branching dialogue (1:1).
+  scenarioId  String?    @unique
+  scenario    Scenario?  @relation(fields: [scenarioId], references: [id])
 
   @@unique([moduleId, order])
   @@index([type])
@@ -357,6 +367,8 @@ enum XpSource {
   LESSON_COMPLETE
   QUIZ_PERFECT
   EXERCISE_PASS
+  AI_PROMPT_PASS
+  SCENARIO_COMPLETE
   STREAK_MILESTONE
   DAILY_QUEST
   BADGE_UNLOCK
@@ -385,6 +397,8 @@ enum CoinSource {
   LESSON_COMPLETE
   QUIZ_PERFECT
   EXERCISE_PASS
+  AI_PROMPT_PASS
+  SCENARIO_COMPLETE
   STREAK_MILESTONE
   DAILY_QUEST
   WEEKLY_LEAGUE
@@ -820,6 +834,89 @@ model Submission {
   @@index([userId, exerciseId])
   @@index([exerciseId])
   @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// AI-prompt lessons — rubric-graded free-text (Phase 12) — docs/17-ai-grading
+// ─────────────────────────────────────────────────────────────────────
+
+enum GradedBy {
+  HEURISTIC
+  LLM
+}
+
+model AiPrompt {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  /// The task shown to the student.
+  promptText    String
+  /// Optional reference material shown alongside the prompt.
+  contextText   String?
+  /// Rubric criteria JSON: [{ id, label, weight, kind, config }] — see
+  /// libs/domain ai-grading. `llm` criteria are graded by the provider.
+  rubricJson    Json
+  /// Passing score (weighted percent).
+  passThreshold Int      @default(70)
+  /// 0 = unlimited.
+  maxAttempts   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lesson      Lesson?
+  submissions AiSubmission[]
+}
+
+model AiSubmission {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiPromptId    String
+  aiPrompt      AiPrompt @relation(fields: [aiPromptId], references: [id], onDelete: Cascade)
+  response      String
+  scorePct      Int
+  passed        Boolean
+  /// Per-criterion results JSON ([{ id, label, weight, passed, detail }]).
+  breakdownJson Json
+  gradedBy      GradedBy @default(HEURISTIC)
+  /// True when served from the identical-response cache (no re-grade).
+  cached        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([userId, aiPromptId])
+  @@index([aiPromptId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Scenario lessons — branching dialogue (Phase 12) — docs/17-ai-grading
+// ─────────────────────────────────────────────────────────────────────
+
+model Scenario {
+  id        String   @id @default(dbgenerated("uuid_generate_v7()"))
+  /// Graph JSON: { startId, nodes: { [id]: { id, speaker, text,
+  /// choices: [{ id, label, to, ending?, outcome? }] } } }.
+  graphJson Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lesson Lesson?
+  runs   ScenarioRun[]
+}
+
+model ScenarioRun {
+  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenarioId  String
+  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// Ordered choice ids the student took.
+  pathJson    Json
+  /// Number of choices made (branch depth reached).
+  maxDepth    Int      @default(0)
+  completed   Boolean  @default(false)
+  outcome     String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, scenarioId])
+  @@index([scenarioId])
 }
 
 /// Long-term idempotency ledger for critical billing/gamification paths.
