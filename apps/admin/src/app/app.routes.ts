@@ -45,6 +45,16 @@ export const appRoutes: Route[] = [
           import('./pages/exercise-editor.page').then((m) => m.ExerciseEditorPage),
       },
       {
+        path: 'lessons/:lessonId/ai-prompt',
+        loadComponent: () =>
+          import('./pages/ai-prompt-editor.page').then((m) => m.AiPromptEditorPage),
+      },
+      {
+        path: 'lessons/:lessonId/scenario',
+        loadComponent: () =>
+          import('./pages/scenario-editor.page').then((m) => m.ScenarioEditorPage),
+      },
+      {
         path: 'categories',
         loadComponent: () =>
           import('./pages/categories.page').then((m) => m.CategoriesPage),

@@ -100,6 +100,24 @@ export {
   type CreateExerciseBody,
 } from './lib/exercises.client.js';
 export {
+  AiPromptsClient,
+  type RubricCriterion,
+  type CriterionResult,
+  type StudentAiPrompt,
+  type GradeResult,
+  type AdminAiPrompt,
+  type AiPromptBody,
+} from './lib/ai-prompts.client.js';
+export {
+  ScenariosClient,
+  type ScenarioChoice,
+  type ScenarioNode,
+  type ScenarioGraph,
+  type StudentScenario,
+  type CompleteResult,
+  type AdminScenario,
+} from './lib/scenarios.client.js';
+export {
   PlansClient,
   type Plan,
   type PlanPrice,

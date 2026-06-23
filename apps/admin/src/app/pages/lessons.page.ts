@@ -130,6 +130,16 @@ const TYPE_OPTIONS: SelectOption<LessonType>[] = [
           <cdf-icon name="check-circle" size="sm" /> Edit exercise
         </cdf-button>
         }
+        @if (typeModel === 'AI_PROMPT') {
+        <cdf-button kind="secondary" size="sm" [routerLink]="['/lessons', lessonId(), 'ai-prompt']" data-testid="edit-ai-prompt-link">
+          <cdf-icon name="check-circle" size="sm" /> Edit AI prompt
+        </cdf-button>
+        }
+        @if (typeModel === 'SCENARIO') {
+        <cdf-button kind="secondary" size="sm" [routerLink]="['/lessons', lessonId(), 'scenario']" data-testid="edit-scenario-link">
+          <cdf-icon name="check-circle" size="sm" /> Edit scenario
+        </cdf-button>
+        }
         <cdf-form-field label="Estimated minutes">
           <cdf-input
             type="number"

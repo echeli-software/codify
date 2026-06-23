@@ -31,7 +31,9 @@ import { LessonBlockRenderer } from '@codify/ui-bootstrap';
 import type { LessonDoc } from '@codify/lesson-schema';
 import { RewardOrchestrator } from '@codify/gamification-engine';
 import { ExerciseRunnerComponent } from '../components/exercise-runner.component.js';
-import type { SubmitResult } from '@codify/api-client';
+import { AiPromptPlaygroundComponent } from '../components/ai-prompt-playground.component.js';
+import { ScenarioRunnerComponent } from '../components/scenario-runner.component.js';
+import type { SubmitResult, GradeResult, CompleteResult } from '@codify/api-client';
 import {
   AppButton,
   AppCard,
@@ -76,6 +78,8 @@ import {
     XpBadge,
     LessonBlockRenderer,
     ExerciseRunnerComponent,
+    AiPromptPlaygroundComponent,
+    ScenarioRunnerComponent,
   ],
   template: `
     <ion-header>
@@ -125,6 +129,10 @@ import {
         </header>
         @if (l.type === 'EXERCISE') {
         <cdf-exercise-runner [lessonId]="l.id" (completed)="onExerciseCompleted($event)" />
+        } @else if (l.type === 'AI_PROMPT') {
+        <cdf-ai-prompt-playground [lessonId]="l.id" (completed)="onGradedCompleted($event)" />
+        } @else if (l.type === 'SCENARIO') {
+        <cdf-scenario-runner [lessonId]="l.id" (completed)="onScenarioCompleted($event)" />
         } @else {
         <cdf-lesson-block-renderer [doc]="docModel()" />
         }
@@ -149,7 +157,7 @@ import {
             <small class="lesson-done__hint">Will sync when you're online.</small>
             }
           </div>
-          } @else if (lesson()?.type !== 'EXERCISE') {
+          } @else if (!isInteractive()) {
           <cdf-app-button
             kind="primary"
             size="md"
@@ -345,6 +353,20 @@ export class LessonPage {
    */
   protected onExerciseCompleted(res: SubmitResult): void {
     this.completed.set({ xpAwarded: res.reward?.xp ?? 0, coinsAwarded: res.reward?.coins ?? 0 });
+  }
+
+  protected onGradedCompleted(res: GradeResult): void {
+    this.completed.set({ xpAwarded: res.reward?.xp ?? 0, coinsAwarded: res.reward?.coins ?? 0 });
+  }
+
+  protected onScenarioCompleted(res: CompleteResult): void {
+    this.completed.set({ xpAwarded: res.reward?.xp ?? 0, coinsAwarded: res.reward?.coins ?? 0 });
+  }
+
+  /** Interactive lessons complete by passing/finishing, not a manual button. */
+  protected isInteractive(): boolean {
+    const t = this.lesson()?.type;
+    return t === 'EXERCISE' || t === 'AI_PROMPT' || t === 'SCENARIO';
   }
 
   /** Render the lesson from IndexedDB if it was downloaded. */
