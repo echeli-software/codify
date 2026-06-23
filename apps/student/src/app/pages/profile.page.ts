@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
 import {
   IonHeader,
   IonToolbar,
@@ -67,6 +68,7 @@ const THEME_KEY = 'codify.theme';
     AppToggle,
     FormField,
     Icon,
+    ProfileCertificatesComponent,
   ],
   template: `
     <ion-header>
@@ -87,6 +89,8 @@ const THEME_KEY = 'codify.theme';
           </div>
         </header>
       </cdf-app-card>
+
+      <cdf-profile-certificates />
 
       <h2>Account</h2>
       <cdf-app-card padding="normal">

@@ -8,6 +8,12 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 export { MeClient } from './lib/me.client.js';
 export { UsersClient } from './lib/users.client.js';
 export { DevicesClient, type DevicePlatform } from './lib/devices.client.js';
+export {
+  CertificatesClient,
+  type CertificateView,
+  type ReferralView,
+  type VerifyResult,
+} from './lib/certificates.client.js';
 export { HealthClient } from './lib/health.client.js';
 export {
   CategoriesClient,

@@ -95,6 +95,10 @@ export class UpdateCourseDto {
   estimatedMinutes?: number;
 
   @IsOptional()
+  @IsBoolean()
+  isCapstone?: boolean;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
   @IsString({ each: true })
@@ -132,6 +136,7 @@ export interface CourseListItem {
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   difficulty: number;
   estimatedMinutes: number;
+  isCapstone: boolean;
   sourceLocale: string;
   publishedAt: string | null;
   createdAt: string;

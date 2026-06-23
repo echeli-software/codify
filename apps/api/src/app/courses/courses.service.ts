@@ -273,6 +273,7 @@ export class CoursesService {
       if (typeof patch.difficulty === 'number') data.difficulty = patch.difficulty;
       if (typeof patch.estimatedMinutes === 'number')
         data.estimatedMinutes = patch.estimatedMinutes;
+      if (typeof patch.isCapstone === 'boolean') data.isCapstone = patch.isCapstone;
 
       if (Object.keys(data).length > 0) {
         await tx.course.update({ where: { id }, data });
@@ -411,6 +412,7 @@ function toListItem(
     status: c.status as CourseStatus,
     difficulty: c.difficulty,
     estimatedMinutes: c.estimatedMinutes,
+    isCapstone: c.isCapstone,
     sourceLocale: c.sourceLocale,
     publishedAt: c.publishedAt?.toISOString() ?? null,
     createdAt: c.createdAt.toISOString(),

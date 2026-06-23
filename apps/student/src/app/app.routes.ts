@@ -6,6 +6,19 @@ export const appRoutes: Route[] = [
     path: 'login',
     loadComponent: () => import('./pages/login.page').then((m) => m.LoginPage),
   },
+  // Public marketing + certificate verification — outside the auth shell.
+  {
+    path: 'welcome',
+    loadComponent: () => import('./pages/marketing.page').then((m) => m.MarketingPage),
+  },
+  {
+    path: 'verify',
+    loadComponent: () => import('./pages/certificate-verify.page').then((m) => m.CertificateVerifyPage),
+  },
+  {
+    path: 'verify/:serial',
+    loadComponent: () => import('./pages/certificate-verify.page').then((m) => m.CertificateVerifyPage),
+  },
   {
     path: 'forbidden',
     loadComponent: () =>

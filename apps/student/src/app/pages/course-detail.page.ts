@@ -21,6 +21,7 @@ import {
 } from '@ionic/angular/standalone';
 import {
   BillingClient,
+  CertificatesClient,
   CoursesClient,
   PlansClient,
   type CourseDetail,
@@ -159,6 +160,19 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
           }
         </div>
       </cdf-app-card>
+
+      <!-- Certificate: shown once every lesson is complete. -->
+      @if (allComplete()) {
+      <cdf-app-card padding="normal" class="cert-banner" data-testid="course-certificate">
+        @if (certificate(); as cert) {
+        <p class="cert-banner__done"><cdf-icon name="trophy-outline" size="sm" /> Certificate earned!</p>
+        <cdf-app-button kind="primary" size="sm" [routerLink]="['/verify', cert.serial]" data-testid="view-certificate">View certificate</cdf-app-button>
+        } @else {
+        <p><cdf-icon name="trophy-outline" size="sm" /> You finished this course.</p>
+        <cdf-app-button kind="primary" size="sm" [loading]="claiming()" (buttonClick)="claimCertificate()" data-testid="claim-certificate">Get your certificate</cdf-app-button>
+        }
+      </cdf-app-card>
+      }
 
       <!-- Paywall: shown when this course has paid lessons the user can't
            yet open. Lists the plans that include this course. -->
@@ -319,6 +333,7 @@ export class CourseDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly coursesClient = inject(CoursesClient);
   private readonly progressClient = inject(ProgressClient);
+  private readonly certs = inject(CertificatesClient);
   private readonly plansClient = inject(PlansClient);
   private readonly billing = inject(BillingClient);
   private readonly downloads = inject(DownloadService);
@@ -416,6 +431,27 @@ export class CourseDetailPage {
   });
 
   protected readonly completedCount = computed(() => this.completedIds().size);
+
+  /** Total lessons across the course's modules. */
+  protected readonly totalLessons = computed(() => (this.course()?.modules ?? []).reduce((n, m) => n + m.lessons.length, 0));
+  /** Every lesson finished → the course can issue a certificate. */
+  protected readonly allComplete = computed(() => this.totalLessons() > 0 && this.completedCount() >= this.totalLessons());
+  protected readonly certificate = signal<{ serial: string } | null>(null);
+  protected readonly claiming = signal(false);
+
+  protected async claimCertificate(): Promise<void> {
+    const c = this.course();
+    if (!c) return;
+    this.claiming.set(true);
+    try {
+      const cert = await this.certs.claim(c.id);
+      this.certificate.set({ serial: cert.serial });
+    } catch {
+      /* not complete / error — button stays */
+    } finally {
+      this.claiming.set(false);
+    }
+  }
 
   constructor() {
     void this.downloads.hydrate();
