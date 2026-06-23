@@ -19,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
+import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -41,6 +42,7 @@ import { UsersModule } from './users/users.module.js';
     NotificationsModule,
     PlansModule,
     ProgressModule,
+    ScenariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
