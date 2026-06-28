@@ -47,19 +47,21 @@ import { CertificatesClient, type VerifyResult } from '@codify/api-client';
   styles: [
     `
       .vf { --background: #0f172a; color: #e2e8f0; }
+      /* Ionic typography.css colours h1 directly — set it explicitly. */
+      .vf h1 { color: #f8fafc; }
       .vf__nav { padding: 20px 24px; }
-      .vf__brand { font-family: Georgia, serif; letter-spacing: 4px; font-weight: 700; color: #7c5cff; text-decoration: none; }
-      .vf__box { max-width: 720px; margin: 24px auto; padding: 0 24px; }
+      .vf__brand { font-family: Georgia, serif; letter-spacing: 4px; font-weight: 700; color: #a78bfa; text-decoration: none; }
+      .vf__box { max-width: 720px; margin: 24px auto; padding: 0 24px; color: #e2e8f0; }
       .vf__form { display: flex; gap: 8px; margin: 16px 0 24px; }
       .vf__form input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-family: monospace; text-transform: uppercase; }
       .btn { padding: 12px 22px; border-radius: 10px; background: #7c5cff; color: #fff; border: none; font-weight: 700; cursor: pointer; }
       .badge { color: #34d399; font-weight: 800; }
       .vf__img { width: 100%; border-radius: 12px; border: 1px solid #334155; }
       dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin-top: 16px; }
-      dt { color: #94a3b8; } dd { margin: 0; }
+      dt { color: #94a3b8; } dd { margin: 0; color: #e2e8f0; }
       .mono { font-family: monospace; }
       .vf__bad { color: #f87171; font-weight: 600; }
-      .muted { color: #94a3b8; }
+      .muted { color: #cbd5e1; }
     `,
   ],
 })
