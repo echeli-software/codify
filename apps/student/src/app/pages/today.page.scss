@@ -101,6 +101,8 @@ h2 {
 // mobile per the responsive philosophy in docs/05-student-app.md §1.
 ion-content {
   --max-width: 720px;
+  // Keep in sync with the app shell's fixed sidebar (app-shell.scss).
+  --shell-sidebar: 240px;
 
   > * {
     max-width: var(--max-width);
@@ -111,5 +113,15 @@ ion-content {
 
   > .rec-grid {
     max-width: var(--max-width);
+  }
+}
+
+// The shell's fixed 240px sidebar offsets ion-content's left edge, so plain
+// auto-centering drifts the readable column right-of-centre on screen (lots of
+// empty space on the left). Re-centre the column on the *full* viewport on
+// desktop, clamped so it keeps a comfortable gap on narrower windows.
+@media (min-width: 768px) {
+  ion-content > * {
+    margin-left: max(16px, calc(50vw - (var(--max-width) / 2) - var(--shell-sidebar)));
   }
 }
