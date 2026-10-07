@@ -68,6 +68,13 @@ export interface RewardPayload {
   sourceEl?: HTMLElement | null;
   /** ISO timestamp the server stamped on this reward — useful for queue dedup. */
   serverTimestamp?: string;
+  /**
+   * Canonical running totals the server returned with this reward
+   * (`RewardResult.totals` + streak). When present the orchestrator tweens
+   * to these exact values instead of `actual + canonical.xp` — so quest /
+   * badge bonuses and concurrent devices never drift the counters.
+   */
+  totals?: RewardServerState | null;
 }
 
 /** Snapshot pushed by reward grants; mirrored by the state services. */
@@ -77,4 +84,46 @@ export interface RewardServerState {
   coins?: number;
   streakDays?: number;
   freezesAvailable?: number;
+  bestDays?: number;
+}
+
+/** One multiplier factor shown in the reward toast ("×2 premium"). */
+export interface RewardMultiplierPart {
+  /** Breakdown `source`, e.g. `PREMIUM_DEFAULT`, `STREAK_TIER`. */
+  source: string;
+  value: number;
+  /** Short English label used in `text` ("premium", "streak"). */
+  label: string;
+  /** i18n key for the label (`gamification.multiplier.*`). */
+  labelKey: string;
+}
+
+/**
+ * Emitted once per orchestration run on `RewardOrchestrator.toast` — the
+ * caller renders it (RewardToast / ion-toast). Under reduced motion it
+ * also carries the level-up / badges that would otherwise be overlays.
+ */
+export interface RewardToastEvent {
+  /** Monotonic id so identical consecutive toasts still re-render. */
+  id: number;
+  kinds: RewardKind[];
+  xp: number;
+  coins: number;
+  multiplier: number | null;
+  parts: RewardMultiplierPart[];
+  /** Ready-made English line, e.g. "+240 XP (×2 premium × 1.2 streak)". */
+  text: string;
+  levelUp: LevelUpInfo | null;
+  badges: BadgeRef[];
+  /** True when overlays were replaced by this toast (reduced motion). */
+  replacesOverlays: boolean;
+}
+
+/** What `grant()` resolves with once the counters reached the totals. */
+export interface RewardGrantResult {
+  /** Final canonical totals applied to the state services. */
+  totals: { totalXp: number; coins: number };
+  toast: RewardToastEvent;
+  /** Resolves when every overlay of this run was dismissed (or none). */
+  overlays: Promise<void>;
 }
