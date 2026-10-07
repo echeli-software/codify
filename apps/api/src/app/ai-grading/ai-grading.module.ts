@@ -1,28 +1,20 @@
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { ProgressModule } from '../progress/progress.module.js';
 import { AiGradingController } from './ai-grading.controller.js';
 import { AiGradingService } from './ai-grading.service.js';
-import { AI_GRADER, DevHeuristicGrader, type AiGrader } from './ai-grading.provider.js';
+import { AI_GRADER, createAiGrader } from './ai-grading.provider.js';
 
 /**
- * AI-prompt grading module. The AI_GRADER seam selects a real LLM judge in
- * production (once ANTHROPIC_API_KEY is wired) and the deterministic
- * DevHeuristicGrader locally.
+ * AI-prompt grading module (docs/17). AI_GRADER selects the Anthropic judge
+ * when ANTHROPIC_API_KEY is set (required in production) and the
+ * deterministic DevHeuristicGrader otherwise.
  */
 @Module({
+  imports: [ProgressModule],
   controllers: [AiGradingController],
   providers: [
     AiGradingService,
-    {
-      provide: AI_GRADER,
-      useFactory: (): AiGrader => {
-        if (process.env['ANTHROPIC_API_KEY']) {
-          new Logger('AiGradingModule').warn(
-            'ANTHROPIC_API_KEY is set but the LLM grader is not implemented yet — using DevHeuristicGrader.',
-          );
-        }
-        return new DevHeuristicGrader();
-      },
-    },
+    { provide: AI_GRADER, useFactory: () => createAiGrader(process.env) },
   ],
   exports: [AiGradingService],
 })

@@ -1,6 +1,12 @@
 import {
   allPassed,
   deepEqual,
+  ENTRY_FUNCTION_PATTERN,
+  EXERCISE_LANGUAGES,
+  HIDDEN_TEST_FAILED_MESSAGE,
+  isExerciseLanguage,
+  redactHiddenResults,
+  type StoredTestResult,
   scoreFromResults,
   verdictFromResults,
   type TestResult,
@@ -54,5 +60,85 @@ describe('verdictFromResults', () => {
     expect(verdictFromResults([r(true)], 'runtime')).toBe('RUNTIME');
     expect(verdictFromResults([], 'error')).toBe('ERROR');
     expect(verdictFromResults([r(true)], 'memory')).toBe('MEMORY');
+  });
+});
+
+describe('languages + entry function', () => {
+  it('whitelists javascript, typescript and python only', () => {
+    expect(EXERCISE_LANGUAGES).toEqual(['javascript', 'typescript', 'python']);
+    expect(isExerciseLanguage('python')).toBe(true);
+    expect(isExerciseLanguage('ruby')).toBe(false);
+  });
+  it('entry function must be a plain identifier', () => {
+    expect(ENTRY_FUNCTION_PATTERN.test('two_sum')).toBe(true);
+    expect(ENTRY_FUNCTION_PATTERN.test('a); process.exit(')).toBe(false);
+    expect(ENTRY_FUNCTION_PATTERN.test('1abc')).toBe(false);
+  });
+});
+
+describe('redactHiddenResults', () => {
+  const results: StoredTestResult[] = [
+    {
+      id: 'v1',
+      name: 'visible',
+      passed: false,
+      actual: 1,
+      expected: 2,
+      hidden: false,
+    },
+    {
+      id: 'h-negatives',
+      name: 'negative numbers',
+      passed: false,
+      actual: -1,
+      expected: 3,
+      error: 'boom: secret arg 42',
+      hidden: true,
+    },
+    { id: 'h-empty', name: 'empty list', passed: true, hidden: true },
+  ];
+
+  it('keeps visible diffs but strips everything but pass/fail from hidden tests', () => {
+    const out = redactHiddenResults(results, false);
+    expect(out[0]).toEqual({
+      id: 'v1',
+      name: 'visible',
+      passed: false,
+      actual: 1,
+      expected: 2,
+    });
+    expect(out[1]).toEqual({
+      id: 'hidden-1',
+      name: 'Hidden test 1',
+      passed: false,
+      hidden: true,
+      error: HIDDEN_TEST_FAILED_MESSAGE,
+    });
+    expect(out[2]).toEqual({
+      id: 'hidden-2',
+      name: 'Hidden test 2',
+      passed: true,
+      hidden: true,
+    });
+    const json = JSON.stringify(out);
+    expect(json).not.toContain('secret');
+    expect(json).not.toContain('negative numbers');
+    expect(out[1]).not.toHaveProperty('actual');
+    expect(out[1]).not.toHaveProperty('expected');
+  });
+
+  it('reveals hidden names (only) on a full pass', () => {
+    const passing = results.map((x) => ({
+      id: x.id,
+      name: x.name,
+      hidden: x.hidden,
+      passed: true,
+    }));
+    expect(redactHiddenResults(passing, true)[1]).toEqual({
+      id: 'h-negatives',
+      name: 'negative numbers',
+      passed: true,
+      hidden: true,
+    });
   });
 });

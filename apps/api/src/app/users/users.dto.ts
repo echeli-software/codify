@@ -1,4 +1,39 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  registerDecorator,
+  type ValidationOptions,
+} from 'class-validator';
+
+/** True for any IANA zone (or alias such as "UTC") the runtime's Intl knows. */
+export function isValidTimeZone(value: unknown): boolean {
+  if (typeof value !== 'string' || !value || value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function IsTimeZone(options?: ValidationOptions) {
+  return (object: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isTimeZone',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be a valid IANA time zone (e.g. "America/Sao_Paulo")`,
+        ...options,
+      },
+      validator: { validate: isValidTimeZone },
+    });
+}
 
 /**
  * Allowed mutation surface for `PATCH /api/me`. Role/email/clerkId are
@@ -19,18 +54,19 @@ export class UpdateMeDto {
   @IsOptional()
   @IsString()
   @Length(2, 64)
+  @IsTimeZone()
   timezone?: string;
 
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(1440)
+  @Max(1439)
   quietHoursStart?: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(1440)
+  @Max(1439)
   quietHoursEnd?: number;
 
   @IsOptional()

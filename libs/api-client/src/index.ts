@@ -58,6 +58,9 @@ export {
   type StreakInfo,
   type CompletedQuest,
   type UnlockedBadge,
+  type CompleteLessonBody,
+  type CompleteLessonOptions,
+  type CompleteLessonConflictCode,
 } from './lib/progress.client.js';
 export {
   GamificationClient,
@@ -104,6 +107,11 @@ export {
   type SubmitResult,
   type AdminExercise,
   type CreateExerciseBody,
+  type ExerciseLanguage,
+  type ExerciseVerdict,
+  type SubmissionStatus,
+  type SubmissionView,
+  isSubmissionFinal,
 } from './lib/exercises.client.js';
 export {
   AiPromptsClient,
@@ -113,6 +121,8 @@ export {
   type GradeResult,
   type AdminAiPrompt,
   type AiPromptBody,
+  type AiPromptPreview,
+  type AiPromptRateLimitCode,
 } from './lib/ai-prompts.client.js';
 export {
   ScenariosClient,
