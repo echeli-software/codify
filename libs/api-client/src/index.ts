@@ -143,8 +143,48 @@ export {
   type LessonAccess,
 } from './lib/billing.client.js';
 
+// Engagement area additions (gamification config, leagues, shop, referrals, translations)
+export type {
+  ListMultipliersQuery,
+  RewardAmount,
+  GamificationConfigValues,
+  GamificationConfigKey,
+  GamificationConfigEntry,
+  GamificationConfigPatch,
+} from './lib/gamification.client.js';
+export type { PurchaseResponse } from './lib/items.client.js';
+export type {
+  LeagueTier,
+  LastWeekResult,
+  RolloverSummary,
+  FriendInvite,
+  AcceptInviteResult,
+} from './lib/leagues.client.js';
+export {
+  ReferralsClient,
+  type ReferralSummary,
+  type ClaimReferralResult,
+} from './lib/referrals.client.js';
+export {
+  TranslationsClient,
+  type ContentLocale,
+  type TranslatableEntityType,
+  type TranslationStatus,
+  type TranslationRow,
+  type ListTranslationsQuery,
+  type TranslationUpsert,
+  type CompletenessCounts,
+  type TranslationCompleteness,
+  type ResolvedField,
+  type ResolvedTranslations,
+} from './lib/translations.client.js';
+
 // Idempotency helpers
-export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';
+export {
+  withIdempotency,
+  IDEMPOTENCY_TOKEN,
+  uuidV4,
+} from './lib/idempotency.js';
 
 // Error mapping
 export {

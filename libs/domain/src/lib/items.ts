@@ -57,7 +57,10 @@ function ms(d: Date | string | null | undefined): number | null {
 }
 
 /** Whether a limited-drop item is inside its sale window (non-limited = always). */
-export function isItemAvailable(item: ItemEligibilityLike, now: Date = new Date()): boolean {
+export function isItemAvailable(
+  item: ItemEligibilityLike,
+  now: Date = new Date(),
+): boolean {
   if (!item.isLimitedDrop) return true;
   const t = now.getTime();
   const s = ms(item.dropStartsAt);
@@ -68,17 +71,48 @@ export function isItemAvailable(item: ItemEligibilityLike, now: Date = new Date(
 }
 
 /**
+ * Validate an item's limited-drop window as it will be stored. Returns
+ * problems; empty = valid. A limited drop needs a start (so it can be
+ * scheduled and announced); the end, when set, must be after the start.
+ */
+export function validateDropWindow(
+  item: Pick<
+    ItemEligibilityLike,
+    'isLimitedDrop' | 'dropStartsAt' | 'dropEndsAt'
+  >,
+): string[] {
+  const errors: string[] = [];
+  const s = ms(item.dropStartsAt);
+  const e = ms(item.dropEndsAt);
+  if (item.dropStartsAt != null && s == null)
+    errors.push('dropStartsAt is not a valid date');
+  if (item.dropEndsAt != null && e == null)
+    errors.push('dropEndsAt is not a valid date');
+  if (s != null && e != null && e <= s)
+    errors.push('dropEndsAt must be after dropStartsAt');
+  if (item.isLimitedDrop && item.dropStartsAt == null)
+    errors.push('a limited drop needs dropStartsAt');
+  return errors;
+}
+
+/**
  * Can the user buy this item right now? Evaluated in priority order so the
  * surfaced reason is the most actionable one:
  *   owned → not_available (drop window) → level_locked → premium_required →
  *   insufficient_coins → ok.
  */
-export function evaluatePurchase(input: EvaluatePurchaseInput): PurchaseEligibility {
+export function evaluatePurchase(
+  input: EvaluatePurchaseInput,
+): PurchaseEligibility {
   const now = input.now ?? new Date();
   if (input.owned) return { canBuy: false, reason: 'owned' };
-  if (!isItemAvailable(input.item, now)) return { canBuy: false, reason: 'not_available' };
-  if (input.userLevel < input.item.requiredLevel) return { canBuy: false, reason: 'level_locked' };
-  if (input.item.isPremiumOnly && !input.isPremium) return { canBuy: false, reason: 'premium_required' };
-  if (input.userCoins < input.item.costCoins) return { canBuy: false, reason: 'insufficient_coins' };
+  if (!isItemAvailable(input.item, now))
+    return { canBuy: false, reason: 'not_available' };
+  if (input.userLevel < input.item.requiredLevel)
+    return { canBuy: false, reason: 'level_locked' };
+  if (input.item.isPremiumOnly && !input.isPremium)
+    return { canBuy: false, reason: 'premium_required' };
+  if (input.userCoins < input.item.costCoins)
+    return { canBuy: false, reason: 'insufficient_coins' };
   return { canBuy: true, reason: 'ok' };
 }

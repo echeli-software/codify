@@ -5,8 +5,17 @@ import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
 
 export type ItemSlot =
-  | 'PET' | 'BACKGROUND' | 'TOP' | 'BOTTOM' | 'SHOES'
-  | 'HAT' | 'HAIR' | 'GLASSES' | 'ACCESSORY' | 'FRAME' | 'EMOTE';
+  | 'PET'
+  | 'BACKGROUND'
+  | 'TOP'
+  | 'BOTTOM'
+  | 'SHOES'
+  | 'HAT'
+  | 'HAIR'
+  | 'GLASSES'
+  | 'ACCESSORY'
+  | 'FRAME'
+  | 'EMOTE';
 export type ItemRarity = 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
 
 export interface Item {
@@ -69,6 +78,14 @@ export interface ShopQuery {
   premiumOnly?: boolean;
 }
 
+export interface PurchaseResponse {
+  item: Item;
+  /** Coin balance after the purchase. */
+  coins: number;
+  /** True when the purchase also equipped the item. */
+  equipped: boolean;
+}
+
 export interface CreateItemBody {
   slug: string;
   name: string;
@@ -99,21 +116,34 @@ export class ItemsClient {
   shop(query: ShopQuery = {}): Promise<ShopItem[]> {
     let params = new HttpParams();
     if (query.slot) params = params.set('slot', query.slot);
-    if (query.categorySlug) params = params.set('categorySlug', query.categorySlug);
+    if (query.categorySlug)
+      params = params.set('categorySlug', query.categorySlug);
     if (query.rarity) params = params.set('rarity', query.rarity);
     if (query.affordableOnly) params = params.set('affordableOnly', 'true');
     if (query.premiumOnly) params = params.set('premiumOnly', 'true');
-    return firstValueFrom(this.http.get<ShopItem[]>(`${this.base}/shop`, { params }));
+    return firstValueFrom(
+      this.http.get<ShopItem[]>(`${this.base}/shop`, { params }),
+    );
   }
 
-  purchase(itemId: string): Promise<{ item: Item; coins: number }> {
+  /** Buy an item; `{ equip: true }` also wears it, atomically. */
+  purchase(
+    itemId: string,
+    opts: { equip?: boolean } = {},
+  ): Promise<PurchaseResponse> {
     return firstValueFrom(
-      this.http.post<{ item: Item; coins: number }>(`${this.base}/shop/${encodeURIComponent(itemId)}/purchase`, {}, { context: withIdempotency() }),
+      this.http.post<PurchaseResponse>(
+        `${this.base}/shop/${encodeURIComponent(itemId)}/purchase`,
+        opts.equip ? { equip: true } : {},
+        { context: withIdempotency() },
+      ),
     );
   }
 
   inventory(): Promise<InventoryItem[]> {
-    return firstValueFrom(this.http.get<InventoryItem[]>(`${this.base}/inventory`));
+    return firstValueFrom(
+      this.http.get<InventoryItem[]>(`${this.base}/inventory`),
+    );
   }
 
   avatar(): Promise<AvatarResponse> {
@@ -121,11 +151,23 @@ export class ItemsClient {
   }
 
   saveConfig(config: Record<string, unknown>): Promise<AvatarResponse> {
-    return firstValueFrom(this.http.put<AvatarResponse>(`${this.base}/avatar/config`, { config }, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.put<AvatarResponse>(
+        `${this.base}/avatar/config`,
+        { config },
+        { context: withIdempotency() },
+      ),
+    );
   }
 
   equip(slot: ItemSlot, itemId: string | null): Promise<AvatarResponse> {
-    return firstValueFrom(this.http.put<AvatarResponse>(`${this.base}/avatar/equip`, { slot, itemId }, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.put<AvatarResponse>(
+        `${this.base}/avatar/equip`,
+        { slot, itemId },
+        { context: withIdempotency() },
+      ),
+    );
   }
 
   // ─── Admin ───────────────────────────────────────────────────────────
@@ -135,22 +177,55 @@ export class ItemsClient {
   }
 
   createItem(body: CreateItemBody): Promise<Item> {
-    return firstValueFrom(this.http.post<Item>(`${this.base}/items`, body, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.post<Item>(`${this.base}/items`, body, {
+        context: withIdempotency(),
+      }),
+    );
   }
 
   updateItem(id: string, body: Partial<CreateItemBody>): Promise<Item> {
-    return firstValueFrom(this.http.patch<Item>(`${this.base}/items/${encodeURIComponent(id)}`, body, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.patch<Item>(
+        `${this.base}/items/${encodeURIComponent(id)}`,
+        body,
+        { context: withIdempotency() },
+      ),
+    );
   }
 
   deleteItem(id: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${this.base}/items/${encodeURIComponent(id)}`));
+    return firstValueFrom(
+      this.http.delete<void>(`${this.base}/items/${encodeURIComponent(id)}`),
+    );
   }
 
   listCategories(): Promise<ItemCategory[]> {
-    return firstValueFrom(this.http.get<ItemCategory[]>(`${this.base}/item-categories`));
+    return firstValueFrom(
+      this.http.get<ItemCategory[]>(`${this.base}/item-categories`),
+    );
   }
 
-  createCategory(body: { slug: string; name: string; sortOrder?: number }): Promise<ItemCategory> {
-    return firstValueFrom(this.http.post<ItemCategory>(`${this.base}/item-categories`, body, { context: withIdempotency() }));
+  createCategory(body: {
+    slug: string;
+    name: string;
+    sortOrder?: number;
+  }): Promise<ItemCategory> {
+    return firstValueFrom(
+      this.http.post<ItemCategory>(`${this.base}/item-categories`, body, {
+        context: withIdempotency(),
+      }),
+    );
+  }
+
+  /** ADMIN: announce limited drops that just went live (the job does this every 15 min). */
+  announceDrops(): Promise<{ drops: number; pushed: number }> {
+    return firstValueFrom(
+      this.http.post<{ drops: number; pushed: number }>(
+        `${this.base}/admin/items/drops/announce`,
+        {},
+        { context: withIdempotency() },
+      ),
+    );
   }
 }

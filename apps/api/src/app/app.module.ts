@@ -1,4 +1,8 @@
-import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiGradingModule } from './ai-grading/ai-grading.module.js';
@@ -22,6 +26,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
 import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { UsersModule } from './users/users.module.js';
+import { ReferralsModule } from './referrals/referrals.module.js';
+import { TranslationsModule } from './translations/translations.module.js';
 
 @Module({
   imports: [
@@ -45,6 +51,8 @@ import { UsersModule } from './users/users.module.js';
     PlansModule,
     ProgressModule,
     ScenariosModule,
+    ReferralsModule,
+    TranslationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

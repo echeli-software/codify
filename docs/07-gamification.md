@@ -4,38 +4,38 @@ The single most important system in the product. Server is authoritative for all
 
 ## 1. Core systems at a glance
 
-| System | Purpose |
-|---|---|
-| XP | Long-arc progress. Drives level. Visible everywhere. |
-| Levels | Unlock items, gate cosmetics, signal mastery. |
-| Coins | Spendable currency for cosmetics. |
-| Multipliers | Configurable boosters (premium, course/lesson promo, streak, campaign). |
-| Streaks | Daily-loop driver. Freezes prevent loss. |
-| Daily quests | Variety + sub-daily goals. |
-| Badges | Recognition for milestones. |
-| Leagues | Weekly cohort competition. |
-| Mystery chests | Variable-reward dopamine, with **published drop tables**. |
+| System         | Purpose                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| XP             | Long-arc progress. Drives level. Visible everywhere.                    |
+| Levels         | Unlock items, gate cosmetics, signal mastery.                           |
+| Coins          | Spendable currency for cosmetics.                                       |
+| Multipliers    | Configurable boosters (premium, course/lesson promo, streak, campaign). |
+| Streaks        | Daily-loop driver. Freezes prevent loss.                                |
+| Daily quests   | Variety + sub-daily goals.                                              |
+| Badges         | Recognition for milestones.                                             |
+| Leagues        | Weekly cohort competition.                                              |
+| Mystery chests | Variable-reward dopamine, with **published drop tables**.               |
 
 ## 2. Earning rules (defaults; configurable in admin)
 
-| Action | XP | Coins | Notes |
-|---|---|---|---|
-| Reading lesson complete | 10 | 5 | Once per `(user, lesson)`; idempotent |
-| Quiz lesson complete | 15 | 8 | Plus per-question bonus |
-| Quiz: perfect score | +10 | +5 | Bonus on top |
-| Exercise pass (first time) | 25 | 12 | Subsequent attempts: 0 (no farming) |
-| Exercise pass (retake) | 5 | 2 | Cap once per day |
-| AI prompt pass | 20 | 10 | Same first-time vs retake rule |
-| Scenario complete (per branch) | 10 | 5 | Cap 3 branches per scenario per day |
-| Daily quest complete | 0 | 20 | Quest defines XP separately |
-| Streak day milestone (7) | 0 | 50 | One-time per milestone hit |
-| Streak day milestone (14) | 0 | 100 | |
-| Streak day milestone (30) | 0 | 200 | |
-| Streak day milestone (100) | 100 | 500 | |
-| Streak day milestone (365) | 500 | 2000 | |
-| Badge unlock | varies | varies | Per badge config |
-| League promotion | 50 | 100 | At week roll |
-| League rank #1 in cohort | +25 | +50 | At week roll, on top of promotion |
+| Action                         | XP     | Coins  | Notes                                 |
+| ------------------------------ | ------ | ------ | ------------------------------------- |
+| Reading lesson complete        | 10     | 5      | Once per `(user, lesson)`; idempotent |
+| Quiz lesson complete           | 15     | 8      | Plus per-question bonus               |
+| Quiz: perfect score            | +10    | +5     | Bonus on top                          |
+| Exercise pass (first time)     | 25     | 12     | Subsequent attempts: 0 (no farming)   |
+| Exercise pass (retake)         | 5      | 2      | Cap once per day                      |
+| AI prompt pass                 | 20     | 10     | Same first-time vs retake rule        |
+| Scenario complete (per branch) | 10     | 5      | Cap 3 branches per scenario per day   |
+| Daily quest complete           | 0      | 20     | Quest defines XP separately           |
+| Streak day milestone (7)       | 0      | 50     | One-time per milestone hit            |
+| Streak day milestone (14)      | 0      | 100    |                                       |
+| Streak day milestone (30)      | 0      | 200    |                                       |
+| Streak day milestone (100)     | 100    | 500    |                                       |
+| Streak day milestone (365)     | 500    | 2000   |                                       |
+| Badge unlock                   | varies | varies | Per badge config                      |
+| League promotion               | 50     | 100    | At week roll                          |
+| League rank #1 in cohort       | +25    | +50    | At week roll, on top of promotion     |
 
 All values are admin-editable via `Settings → Gamification defaults`. Changes are versioned in `AuditLog`.
 
@@ -45,16 +45,17 @@ This is the user's stated requirement: premium has a configurable rate, specific
 
 ### Multiplier types (the `MultiplierKind` enum)
 
-| Kind | Bind to | Use case |
-|---|---|---|
-| `PREMIUM_DEFAULT` | None (global) | Paid-user default. Default value 2.00; admin can set to 1.5 or 3.0 etc. |
-| `COURSE_PROMO` | `Course` | "Boost engagement on the new React course: 4x coins for two weeks" |
-| `LESSON_PROMO` | `Lesson` | "This capstone lesson awards 5x XP" |
-| `STREAK_TIER` | `streakDaysMin` (e.g. 7, 30) | "Once you hit a 30-day streak, every reward is 1.5x" |
-| `LEAGUE_PROMOTION` | None | Single-event boost on rank-up |
-| `CAMPAIGN` | None (time-bounded) | "Double-XP weekend" platform-wide |
+| Kind               | Bind to                      | Use case                                                                |
+| ------------------ | ---------------------------- | ----------------------------------------------------------------------- |
+| `PREMIUM_DEFAULT`  | None (global)                | Paid-user default. Default value 2.00; admin can set to 1.5 or 3.0 etc. |
+| `COURSE_PROMO`     | `Course`                     | "Boost engagement on the new React course: 4x coins for two weeks"      |
+| `LESSON_PROMO`     | `Lesson`                     | "This capstone lesson awards 5x XP"                                     |
+| `STREAK_TIER`      | `streakDaysMin` (e.g. 7, 30) | "Once you hit a 30-day streak, every reward is 1.5x"                    |
+| `LEAGUE_PROMOTION` | None                         | Single-event boost on rank-up                                           |
+| `CAMPAIGN`         | None (time-bounded)          | "Double-XP weekend" platform-wide                                       |
 
 Each multiplier has:
+
 - `target`: `XP`, `COINS`, or `BOTH`.
 - `value`: decimal (typical 1.5 – 5.0).
 - `startsAt` / `endsAt`: optional time window.
@@ -73,6 +74,7 @@ For any reward event, `libs/domain/multipliers.resolveMultiplier({ user, lesson,
 5. `LEAGUE_PROMOTION` (only on the league-promotion event itself)
 
 Example for a 30-day-streak premium user doing a 4x-promo lesson during a 2x campaign:
+
 ```
 Effective XP/COINS multiplier
   = 2.0 (premium)
@@ -87,6 +89,7 @@ We **cap the effective multiplier at 30x** to prevent surprise mega-payouts in s
 ### Breakdown for UI
 
 The resolver returns:
+
 ```ts
 {
   xp:    { effective: 24.0, components: [{kind:'PREMIUM_DEFAULT',value:2}, ...] },
@@ -152,15 +155,15 @@ Level 50 should take a determined daily learner ~6 months at default rates. Abov
 
 ### Streak tier multipliers (default)
 
-These are *ongoing* multipliers (apply to every reward while qualifying), distinct from the one-shot milestone payouts in §2.
+These are _ongoing_ multipliers (apply to every reward while qualifying), distinct from the one-shot milestone payouts in §2.
 
 | Streak ≥ | Multiplier (XP+Coins) |
-|---|---|
-| 7 | 1.10x |
-| 14 | 1.25x |
-| 30 | 1.50x |
-| 100 | 1.75x |
-| 365 | 2.00x |
+| -------- | --------------------- |
+| 7        | 1.10x                 |
+| 14       | 1.25x                 |
+| 30       | 1.50x                 |
+| 100      | 1.75x                 |
+| 365      | 2.00x                 |
 
 The highest qualifying tier applies; not stacked among themselves. Seeded as `Multiplier(kind=STREAK_TIER, streakDaysMin=N, value=...)` rows so admins can edit values or thresholds without code changes.
 
@@ -197,6 +200,7 @@ The highest qualifying tier applies; not stacked among themselves. Seeded as `Mu
 Predicates: `gte`, `lte`, `gt`, `lt`, `eq`. Combinators: `all`, `any`. `event` filters on event types. `metric` reads precomputed user metrics.
 
 A badge config also includes:
+
 - `xpReward`, `coinReward` granted on unlock.
 - `isHidden` — hidden until earned (drives surprise / discovery).
 - Translatable name + description.
@@ -210,6 +214,7 @@ A badge config also includes:
 - Completed quest: standalone XP/coin reward; also counts toward badges/league XP and satisfies the day's streak (see §6).
 
 ### Quest kinds (initial)
+
 - `LESSON_COUNT`: complete N lessons.
 - `CATEGORY_LESSON_COUNT`: complete N lessons in a category (drives diversification).
 - `XP_AMOUNT`: earn N XP today.
@@ -231,8 +236,23 @@ The single most powerful retention lever after streak.
   - Promotion: 50 XP + 100 coins + a freeze.
   - Top of cohort: +25 XP + +50 coins + a special weekly badge (rotates monthly).
 - League membership becomes inactive 4 weeks after the week ends (history preserved).
+- **Small cohorts** (early weeks, quiet tiers) scale the zones instead of
+  applying 7/5 literally — which would promote everyone in a 6-person
+  cohort: promote `round(n × 7/30)` (min 1, max 7, never all n), demote
+  `round(n × 5/30)` (min 1, max 5) only when `n ≥ 5`, zones never overlap.
+  A full 30-person cohort gets exactly 7 / 5. Members with 0 weekly XP never
+  promote or take the #1 bonus. (`promoteZoneSize` / `demoteZoneSize` in
+  `@codify/domain`.)
+- Rewards (promotion, rank-1) and the freeze cap are admin-editable
+  (`GamificationConfig`: `league.promotionReward`, `league.rank1Reward`,
+  `streak.freezeCap`). The rank-1 badge is `league-champion-YYYY-MM`, created
+  hidden on first use each month. `GET /api/league/last-week` returns the
+  caller's result; each member gets a `LEAGUE_RESULT` push after rollover.
+- Cohort placement takes a per-(tier, week) advisory lock so concurrent joins
+  can't overfill a cohort past 30.
 
 ### Honest competition
+
 - Cohorts of 30 (not 100) keep mid-pack movement frequent.
 - Tier system prevents new users from ever facing veterans.
 - Promotion is achievable for a casual learner who hits their daily quests.
@@ -290,7 +310,7 @@ QUEUE
 
 ### Anti-abuse on the client
 
-- Optimistic UI is *display-only*: balances rendered are always the canonical server values from the latest reward response. We never let the client invent a reward.
+- Optimistic UI is _display-only_: balances rendered are always the canonical server values from the latest reward response. We never let the client invent a reward.
 
 ## 12. Anti-abuse on the server
 
@@ -306,9 +326,11 @@ QUEUE
 ## 13. Telemetry & tuning
 
 Every reward event logs:
+
 - `userId`, `source`, `xpAwarded`, `coinsAwarded`, `multiplierEffective`, `multiplierBreakdown`, `lessonId?`, `courseId?`.
 
 Dashboards:
+
 - Distribution of effective multipliers (catch runaway stacking).
 - Coin earn vs spend ratio (calibrate shop pricing).
 - Time-to-level-up by cohort.
@@ -317,10 +339,11 @@ Dashboards:
 - League promotion rate per tier.
 
 Weekly tuning rituals:
+
 - If shop spend > 0.6× shop earn for a week → ship more premium-ish items or raise prices.
 - If P50 streak < 3 → daily quest design too hard or notifications wrong.
 - If multiplier P95 > 12x → check for accidental campaign × promo overlap.
 
 ## 14. Anti-patterns
 
-Two gamification-specific commitments: paid premium gives multipliers (never levels or unlocks of advancement), and we monetize *no* form of streak-loss. The full review checklist for any feature touching engagement lives in [10-engagement.md §8](./10-engagement.md).
+Two gamification-specific commitments: paid premium gives multipliers (never levels or unlocks of advancement), and we monetize _no_ form of streak-loss. The full review checklist for any feature touching engagement lives in [10-engagement.md §8](./10-engagement.md).

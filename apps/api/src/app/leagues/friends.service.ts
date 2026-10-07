@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UserPushService } from '../gamification/user-push.service.js';
+import { ReferralsService } from '../referrals/referrals.service.js';
 
 const NUDGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +24,14 @@ export interface FriendRequestView {
   senderName: string;
   createdAt: string;
 }
+export interface FriendInviteView {
+  code: string;
+  url: string;
+}
+export interface AcceptInviteResult {
+  status: 'accepted' | 'already_friends';
+  friend: { userId: string; displayName: string };
+}
 
 /** Ordered friendship key (userAId < userBId). */
 function pair(a: string, b: string): { userAId: string; userBId: string } {
@@ -30,16 +40,40 @@ function pair(a: string, b: string): { userAId: string; userBId: string } {
 
 @Injectable()
 export class FriendsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: UserPushService,
+    private readonly referrals: ReferralsService,
+  ) {}
 
-  async sendRequest(senderId: string, email: string): Promise<{ status: string; requestId?: string }> {
-    const receiver = await this.prisma.user.findUnique({ where: { email: email.toLowerCase().trim() }, select: { id: true } });
-    if (!receiver) throw new NotFoundException('No user with that email');
-    if (receiver.id === senderId) throw new BadRequestException('You cannot friend yourself');
+  /**
+   * Send a friend request by email. The response is identical whether or not
+   * the email belongs to an account (and whether a request/friendship already
+   * exists), so the endpoint can't be used to enumerate registered emails.
+   */
+  async sendRequest(
+    senderId: string,
+    email: string,
+  ): Promise<{ status: 'sent' }> {
+    const normalized = email.toLowerCase().trim();
+    const sender = await this.prisma.user.findUniqueOrThrow({
+      where: { id: senderId },
+      select: { email: true },
+    });
+    if (sender.email.toLowerCase() === normalized)
+      throw new BadRequestException('You cannot friend yourself');
+
+    const receiver = await this.prisma.user.findFirst({
+      where: { email: normalized, deletedAt: null },
+      select: { id: true },
+    });
+    if (!receiver) return { status: 'sent' };
 
     const key = pair(senderId, receiver.id);
-    const friendship = await this.prisma.friendship.findUnique({ where: { userAId_userBId: key } });
-    if (friendship) throw new ConflictException('Already friends');
+    const friendship = await this.prisma.friendship.findUnique({
+      where: { userAId_userBId: key },
+    });
+    if (friendship) return { status: 'sent' };
 
     // Reuse a pending request in either direction.
     const existing = await this.prisma.friendRequest.findFirst({
@@ -50,13 +84,14 @@ export class FriendsService {
           { senderId: receiver.id, receiverId: senderId },
         ],
       },
+      select: { id: true },
     });
-    if (existing) return { status: 'pending', requestId: existing.id };
-
-    const created = await this.prisma.friendRequest.create({
-      data: { senderId, receiverId: receiver.id, status: 'PENDING' },
-    });
-    return { status: 'sent', requestId: created.id };
+    if (!existing) {
+      await this.prisma.friendRequest.create({
+        data: { senderId, receiverId: receiver.id, status: 'PENDING' },
+      });
+    }
+    return { status: 'sent' };
   }
 
   async incomingRequests(userId: string): Promise<FriendRequestView[]> {
@@ -65,22 +100,45 @@ export class FriendsService {
       include: { sender: { select: { displayName: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map((r) => ({ id: r.id, senderId: r.senderId, senderName: r.sender.displayName, createdAt: r.createdAt.toISOString() }));
+    return rows.map((r) => ({
+      id: r.id,
+      senderId: r.senderId,
+      senderName: r.sender.displayName,
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
-  async respond(userId: string, requestId: string, accept: boolean): Promise<{ status: string }> {
-    const req = await this.prisma.friendRequest.findUnique({ where: { id: requestId } });
-    if (!req || req.receiverId !== userId) throw new NotFoundException('Request not found');
-    if (req.status !== 'PENDING') throw new ConflictException('Request already resolved');
+  async respond(
+    userId: string,
+    requestId: string,
+    accept: boolean,
+  ): Promise<{ status: string }> {
+    const req = await this.prisma.friendRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!req || req.receiverId !== userId)
+      throw new NotFoundException('Request not found');
+    if (req.status !== 'PENDING')
+      throw new ConflictException('Request already resolved');
 
     if (!accept) {
-      await this.prisma.friendRequest.update({ where: { id: requestId }, data: { status: 'REJECTED', resolvedAt: new Date() } });
+      await this.prisma.friendRequest.update({
+        where: { id: requestId },
+        data: { status: 'REJECTED', resolvedAt: new Date() },
+      });
       return { status: 'rejected' };
     }
     const key = pair(req.senderId, req.receiverId);
     await this.prisma.$transaction([
-      this.prisma.friendRequest.update({ where: { id: requestId }, data: { status: 'ACCEPTED', resolvedAt: new Date() } }),
-      this.prisma.friendship.upsert({ where: { userAId_userBId: key }, create: key, update: {} }),
+      this.prisma.friendRequest.update({
+        where: { id: requestId },
+        data: { status: 'ACCEPTED', resolvedAt: new Date() },
+      }),
+      this.prisma.friendship.upsert({
+        where: { userAId_userBId: key },
+        create: key,
+        update: {},
+      }),
     ]);
     return { status: 'accepted' };
   }
@@ -96,23 +154,118 @@ export class FriendsService {
     });
     return rows.map((r) => {
       const friend = r.userAId === userId ? r.userB : r.userA;
-      return { userId: friend.id, displayName: friend.displayName, level: levelFromXp(friend.totalXp), since: r.since.toISOString() };
+      return {
+        userId: friend.id,
+        displayName: friend.displayName,
+        level: levelFromXp(friend.totalXp),
+        since: r.since.toISOString(),
+      };
     });
   }
 
-  /** Nudge a friend — rate-limited to one per friend per 24h. */
-  async nudge(senderId: string, friendId: string): Promise<{ status: string }> {
+  /**
+   * Nudge a friend — rate-limited to one per friend per 24h — and push a
+   * FRIEND_NUDGE to them (quiet hours respected by the push helper).
+   */
+  async nudge(
+    senderId: string,
+    friendId: string,
+  ): Promise<{ status: string; pushed: boolean }> {
     const key = pair(senderId, friendId);
-    const friendship = await this.prisma.friendship.findUnique({ where: { userAId_userBId: key } });
+    const friendship = await this.prisma.friendship.findUnique({
+      where: { userAId_userBId: key },
+    });
     if (!friendship) throw new ForbiddenException('You can only nudge friends');
 
-    const recent = await this.prisma.friendNudge.findFirst({
-      where: { senderId, receiverId: friendId, createdAt: { gt: new Date(Date.now() - NUDGE_WINDOW_MS) } },
+    const sender = await this.prisma.$transaction(async (tx) => {
+      // Serialize nudges for this (sender, receiver) pair so two concurrent
+      // taps can't both pass the 24h check.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`nudge:${senderId}:${friendId}`}))`;
+      const recent = await tx.friendNudge.findFirst({
+        where: {
+          senderId,
+          receiverId: friendId,
+          createdAt: { gt: new Date(Date.now() - NUDGE_WINDOW_MS) },
+        },
+        select: { id: true },
+      });
+      if (recent)
+        throw new ConflictException('You already nudged this friend recently');
+      await tx.friendNudge.create({ data: { senderId, receiverId: friendId } });
+      return tx.user.findUniqueOrThrow({
+        where: { id: senderId },
+        select: { displayName: true },
+      });
     });
-    if (recent) throw new ConflictException('You already nudged this friend recently');
 
-    await this.prisma.friendNudge.create({ data: { senderId, receiverId: friendId } });
-    // A real push notification would be enqueued here (FRIEND_NUDGE).
-    return { status: 'nudged' };
+    const res = await this.push.sendToUser(friendId, ({ locale }) =>
+      nudgeCopy(locale, sender.displayName, senderId),
+    );
+    return { status: 'nudged', pushed: res.sent > 0 };
   }
+
+  // ─── Invite links ─────────────────────────────────────────────────────
+
+  /**
+   * The caller's friend-invite link. Reuses their referral code, so one
+   * shared link both attributes a signup (referral) and connects friends.
+   */
+  async invite(userId: string): Promise<FriendInviteView> {
+    const code = await this.referrals.getOrCreateCode(userId);
+    return { code, url: this.referrals.shareUrl(code) };
+  }
+
+  /**
+   * Accept an invite: befriend the code's owner. Idempotent (a second accept
+   * reports `already_friends`); any pending request between the two is
+   * resolved as accepted. You can't accept your own invite.
+   */
+  async acceptInvite(
+    userId: string,
+    code: string,
+  ): Promise<AcceptInviteResult> {
+    const owner = await this.prisma.user.findFirst({
+      where: { referralCode: code.trim().toUpperCase(), deletedAt: null },
+      select: { id: true, displayName: true },
+    });
+    if (!owner) throw new NotFoundException('Invite not found');
+    if (owner.id === userId)
+      throw new BadRequestException('You cannot friend yourself');
+
+    const key = pair(userId, owner.id);
+    const existing = await this.prisma.friendship.findUnique({
+      where: { userAId_userBId: key },
+    });
+    const friend = { userId: owner.id, displayName: owner.displayName };
+    if (existing) return { status: 'already_friends', friend };
+
+    await this.prisma.$transaction([
+      this.prisma.friendship.upsert({
+        where: { userAId_userBId: key },
+        create: key,
+        update: {},
+      }),
+      this.prisma.friendRequest.updateMany({
+        where: {
+          status: 'PENDING',
+          OR: [
+            { senderId: userId, receiverId: owner.id },
+            { senderId: owner.id, receiverId: userId },
+          ],
+        },
+        data: { status: 'ACCEPTED', resolvedAt: new Date() },
+      }),
+    ]);
+    return { status: 'accepted', friend };
+  }
+}
+
+function nudgeCopy(locale: string, senderName: string, senderId: string) {
+  const pt = locale.startsWith('pt');
+  return {
+    kind: 'FRIEND_NUDGE' as const,
+    title: pt ? `👋 ${senderName} te cutucou!` : `👋 ${senderName} nudged you!`,
+    body: pt ? 'Bora fazer uma lição hoje?' : 'Fancy a quick lesson today?',
+    data: { senderId, route: '/friends' },
+  };
 }
