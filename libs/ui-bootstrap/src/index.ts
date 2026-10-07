@@ -124,7 +124,6 @@ export {
   type BlockMenuItem,
 } from './lib/organisms/block-menu/block-menu.js';
 
-
 // ─── Roadmap completion additions ─────────────────────────────────────────
 export { Chip, type ChipVariant } from './lib/atoms/chip/chip.js';
 export { Popover } from './lib/atoms/popover/popover.js';
