@@ -26,12 +26,12 @@ let uid = 0;
   template: `
     <div class="cdf-form-field" [class.cdf-form-field--invalid]="!!error()">
       @if (label(); as l) {
-      <label class="cdf-form-field__label" [attr.for]="controlId()">
-        {{ l }}
-        @if (required()) {
-        <span class="cdf-form-field__required" aria-hidden="true">*</span>
-        }
-      </label>
+        <label class="cdf-form-field__label" [attr.for]="fieldId()">
+          {{ l }}
+          @if (required()) {
+            <span class="cdf-form-field__required" aria-hidden="true">*</span>
+          }
+        </label>
       }
 
       <div class="cdf-form-field__control">
@@ -39,9 +39,11 @@ let uid = 0;
       </div>
 
       @if (error(); as e) {
-      <p class="cdf-form-field__error" [id]="errorId()" role="alert">{{ e }}</p>
+        <p class="cdf-form-field__error" [id]="errorId()" role="alert">
+          {{ e }}
+        </p>
       } @else if (help(); as h) {
-      <p class="cdf-form-field__help" [id]="helpId()">{{ h }}</p>
+        <p class="cdf-form-field__help" [id]="helpId()">{{ h }}</p>
       }
     </div>
   `,
@@ -53,16 +55,16 @@ export class FormField {
   readonly error = input<string | null>(null);
   readonly required = input(false);
   /** Optional explicit id; otherwise a stable generated one. */
-  readonly controlIdInput = input<string | null>(null, { alias: 'controlId' });
+  readonly controlId = input<string | null>(null);
 
   private readonly _autoId = `cdf-field-${++uid}`;
-  protected readonly controlId = computed(() => this.controlIdInput() ?? this._autoId);
-  protected readonly helpId = computed(() => `${this.controlId()}-help`);
-  protected readonly errorId = computed(() => `${this.controlId()}-error`);
+  protected readonly fieldId = computed(() => this.controlId() ?? this._autoId);
+  protected readonly helpId = computed(() => `${this.fieldId()}-help`);
+  protected readonly errorId = computed(() => `${this.fieldId()}-error`);
 
   /**
    * IDs callers pass through to the projected control:
-   *   <cdf-input [id]="field.controlId()" [describedBy]="field.describedBy()" />
+   *   <cdf-input [id]="field.fieldId()" [describedBy]="field.describedBy()" />
    * This keeps the FormField/control coupling explicit without wiring through
    * complex content-child projection.
    */

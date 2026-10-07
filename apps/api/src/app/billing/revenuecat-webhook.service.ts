@@ -1,7 +1,21 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
-import { Prisma, type SubscriptionSource, type SubscriptionStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import {
+  Prisma,
+  type SubscriptionSource,
+  type SubscriptionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { REVENUECAT_PROVIDER, type RcEvent, type RevenueCatProvider } from './revenuecat.provider.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
+import {
+  REVENUECAT_PROVIDER,
+  type RcEvent,
+  type RevenueCatProvider,
+} from './revenuecat.provider.js';
 
 /** RevenueCat store → our SubscriptionSource. */
 function sourceFromStore(store: string | undefined): SubscriptionSource {
@@ -42,17 +56,25 @@ export class RevenueCatWebhookService {
     @Inject(REVENUECAT_PROVIDER) private readonly rc: RevenueCatProvider,
   ) {}
 
-  async handle(rawBody: string, authHeader: string | undefined): Promise<SyncResult> {
+  async handle(
+    rawBody: string,
+    authHeader: string | undefined,
+  ): Promise<SyncResult> {
     const event = this.rc.constructEvent(rawBody, authHeader);
-    if (!event) throw new BadRequestException('Invalid or unauthenticated RevenueCat webhook');
+    if (!event)
+      throw new BadRequestException(
+        'Invalid or unauthenticated RevenueCat webhook',
+      );
 
     // Idempotency: insert-first so concurrent duplicate deliveries collide on
     // the PK rather than double-processing.
     const key = `revenuecat:${event.id}`;
     try {
-      await this.prisma.idempotencyRecord.create({ data: { key, scope: 'revenuecat_webhook' } });
+      await this.prisma.idempotencyRecord.create({
+        data: { key, scope: 'revenuecat_webhook' },
+      });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      if (isUniqueViolation(err)) {
         return { received: true, duplicate: true, handled: false };
       }
       throw err;
@@ -79,7 +101,9 @@ export class RevenueCatWebhookService {
       case 'BILLING_ISSUE':
         return this.setStatus(event, 'PAST_DUE');
       default:
-        this.logger.debug(`Ignoring unhandled RevenueCat event type ${event.type}`);
+        this.logger.debug(
+          `Ignoring unhandled RevenueCat event type ${event.type}`,
+        );
         return false;
     }
   }
@@ -89,7 +113,11 @@ export class RevenueCatWebhookService {
     const entitlements = event.entitlement_ids ?? [];
     if (entitlements.length === 0) return null;
     const plan = await this.prisma.plan.findFirst({
-      where: { revenueCatEntitlementId: { in: entitlements }, isActive: true, deletedAt: null },
+      where: {
+        revenueCatEntitlementId: { in: entitlements },
+        isActive: true,
+        deletedAt: null,
+      },
       select: { id: true },
     });
     return plan?.id ?? null;
@@ -104,20 +132,32 @@ export class RevenueCatWebhookService {
     const transactionId = this.txId(event);
     const userId = event.app_user_id;
     if (!transactionId || !userId) {
-      this.logger.warn(`RevenueCat ${event.type} ${event.id} missing transaction id / app_user_id — skipping`);
+      this.logger.warn(
+        `RevenueCat ${event.type} ${event.id} missing transaction id / app_user_id — skipping`,
+      );
       return false;
     }
 
     const planId = await this.resolvePlanId(event);
-    const existing = await this.prisma.subscription.findUnique({ where: { storeTransactionId: transactionId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { storeTransactionId: transactionId },
+    });
 
     if (!planId && !existing) {
-      this.logger.warn(`RevenueCat ${event.type} ${event.id}: no plan matches entitlements ${JSON.stringify(event.entitlement_ids)} — skipping`);
+      this.logger.warn(
+        `RevenueCat ${event.type} ${event.id}: no plan matches entitlements ${JSON.stringify(event.entitlement_ids)} — skipping`,
+      );
       return false;
     }
 
-    const periodStart = msToDate(event.purchased_at_ms) ?? existing?.currentPeriodStart ?? new Date();
-    const periodEnd = msToDate(event.expiration_at_ms) ?? existing?.currentPeriodEnd ?? addDays(new Date(), 30);
+    const periodStart =
+      msToDate(event.purchased_at_ms) ??
+      existing?.currentPeriodStart ??
+      new Date();
+    const periodEnd =
+      msToDate(event.expiration_at_ms) ??
+      existing?.currentPeriodEnd ??
+      addDays(new Date(), 30);
     const isTrial = event.period_type === 'TRIAL';
     const status: SubscriptionStatus = isTrial ? 'TRIALING' : 'ACTIVE';
 
@@ -159,7 +199,9 @@ export class RevenueCatWebhookService {
   private async markCancelAtPeriodEnd(event: RcEvent): Promise<boolean> {
     const transactionId = this.txId(event);
     if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({ where: { storeTransactionId: transactionId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { storeTransactionId: transactionId },
+    });
     if (!existing) return false;
     await this.prisma.subscription.update({
       where: { storeTransactionId: transactionId },
@@ -171,23 +213,37 @@ export class RevenueCatWebhookService {
   private async expire(event: RcEvent): Promise<boolean> {
     const transactionId = this.txId(event);
     if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({ where: { storeTransactionId: transactionId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { storeTransactionId: transactionId },
+    });
     if (!existing) return false;
     const now = new Date();
     const periodEnd = msToDate(event.expiration_at_ms) ?? now;
     await this.prisma.subscription.update({
       where: { storeTransactionId: transactionId },
-      data: { status: 'CANCELED', canceledAt: existing.canceledAt ?? now, currentPeriodEnd: periodEnd },
+      data: {
+        status: 'CANCELED',
+        canceledAt: existing.canceledAt ?? now,
+        currentPeriodEnd: periodEnd,
+      },
     });
     return true;
   }
 
-  private async setStatus(event: RcEvent, status: SubscriptionStatus): Promise<boolean> {
+  private async setStatus(
+    event: RcEvent,
+    status: SubscriptionStatus,
+  ): Promise<boolean> {
     const transactionId = this.txId(event);
     if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({ where: { storeTransactionId: transactionId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { storeTransactionId: transactionId },
+    });
     if (!existing) return false;
-    await this.prisma.subscription.update({ where: { storeTransactionId: transactionId }, data: { status } });
+    await this.prisma.subscription.update({
+      where: { storeTransactionId: transactionId },
+      data: { status },
+    });
     return true;
   }
 }

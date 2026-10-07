@@ -5,9 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { AccessService } from '../billing/access.service.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { QuestsService } from '../gamification/quests.service.js';
@@ -77,7 +77,10 @@ export class ProgressService {
     // Phase 6: server-authoritative access. The same @codify/domain rule the
     // client uses for UI gating decides here, so they never drift. A paywall
     // verdict becomes 402 carrying the plans the student could buy.
-    const { access } = await this.access.resolveLessonAccess(actor.userId, lessonId);
+    const { access } = await this.access.resolveLessonAccess(
+      actor.userId,
+      lessonId,
+    );
     if (!access.granted) {
       throw new HttpException(
         {
@@ -109,7 +112,12 @@ export class ProgressService {
         // constraint is the authoritative double-award guard — a racing
         // duplicate fails here and the whole tx (including the grant) rolls back.
         const created = await tx.progress.create({
-          data: { userId: actor.userId, lessonId, xpAwarded: 0, coinsAwarded: 0 },
+          data: {
+            userId: actor.userId,
+            lessonId,
+            xpAwarded: 0,
+            coinsAwarded: 0,
+          },
         });
         // Server-authoritative reward: XP/coins (with multipliers), streak,
         // level-up, streak milestone — all in this transaction.
@@ -157,7 +165,12 @@ export class ProgressService {
           where: { id: created.id },
           data: { xpAwarded: granted.xp, coinsAwarded: granted.coins },
         });
-        return { progress: finalized, reward: granted, questsCompleted, badgesUnlocked };
+        return {
+          progress: finalized,
+          reward: granted,
+          questsCompleted,
+          badgesUnlocked,
+        };
       });
       return {
         progress: toItem(out.progress),
@@ -171,10 +184,7 @@ export class ProgressService {
       // (different device, retried offline-queue, etc.) just landed
       // the row. Translate the Prisma P2002 into the same 409 shape so
       // clients have a single conflict path to handle.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isUniqueViolation(err)) {
         const raced = await this.prisma.progress.findUnique({
           where: { userId_lessonId: { userId: actor.userId, lessonId } },
         });
@@ -187,7 +197,12 @@ export class ProgressService {
   /** Build the 409 payload referenced from both the fast and slow conflict paths. */
   private async conflictFromExisting(
     userId: string,
-    existing: { lessonId: string; completedAt: Date; xpAwarded: number; coinsAwarded: number },
+    existing: {
+      lessonId: string;
+      completedAt: Date;
+      xpAwarded: number;
+      coinsAwarded: number;
+    },
   ): Promise<ConflictException> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },

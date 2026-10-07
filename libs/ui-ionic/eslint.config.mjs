@@ -12,7 +12,7 @@ export default [
         'error',
         {
           type: 'attribute',
-          prefix: 'lib',
+          prefix: ['cdf'],
           style: 'camelCase',
         },
       ],
@@ -20,7 +20,22 @@ export default [
         'error',
         {
           type: 'element',
-          prefix: 'lib',
+          prefix: ['cdf'],
+          style: 'kebab-case',
+        },
+      ],
+    },
+  },
+  {
+    // Storybook-only demo components use an `sb-` prefix so they can't be
+    // mistaken for library components.
+    files: ['**/*.stories.ts'],
+    rules: {
+      '@angular-eslint/component-selector': [
+        'error',
+        {
+          type: 'element',
+          prefix: ['cdf', 'sb'],
           style: 'kebab-case',
         },
       ],

@@ -20,8 +20,13 @@ const MIGRATIONS: Record<number, MigrationFn> = {
  * Run any registered migrations needed to bring `doc.version` up to
  * LESSON_DOC_VERSION. Pure — does not mutate the input.
  */
-export function migrateLessonDoc(doc: { version?: number; [k: string]: unknown }): LessonDoc {
-  let current = JSON.parse(JSON.stringify(doc)) as { version?: number; [k: string]: unknown };
+export function migrateLessonDoc(
+  doc: LessonDoc | { version?: number; [k: string]: unknown },
+): LessonDoc {
+  let current = JSON.parse(JSON.stringify(doc)) as {
+    version?: number;
+    [k: string]: unknown;
+  };
   let version = current.version ?? 1;
 
   if (version > LESSON_DOC_VERSION) {
@@ -53,5 +58,7 @@ export function migrateLessonDoc(doc: { version?: number; [k: string]: unknown }
  * Test helper: return the list of registered target versions.
  */
 export function registeredMigrationTargets(): number[] {
-  return Object.keys(MIGRATIONS).map(Number).sort((a, b) => a - b);
+  return Object.keys(MIGRATIONS)
+    .map(Number)
+    .sort((a, b) => a - b);
 }

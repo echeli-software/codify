@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { type CriterionResult, type RubricCriterion } from '@codify/domain';
 
 /**
@@ -23,14 +22,20 @@ export interface GradeContext {
 export interface AiGrader {
   readonly mode: 'dev' | 'llm';
   /** Judge the `llm`-kind criteria; deterministic ones are handled upstream. */
-  judge(response: string, criteria: RubricCriterion[], ctx: GradeContext): Promise<CriterionResult[]>;
+  judge(
+    response: string,
+    criteria: RubricCriterion[],
+    ctx: GradeContext,
+  ): Promise<CriterionResult[]>;
 }
 
 export class DevHeuristicGrader implements AiGrader {
   readonly mode = 'dev' as const;
-  private readonly logger = new Logger(DevHeuristicGrader.name);
 
-  async judge(response: string, criteria: RubricCriterion[]): Promise<CriterionResult[]> {
+  async judge(
+    response: string,
+    criteria: RubricCriterion[],
+  ): Promise<CriterionResult[]> {
     const text = response.normalize('NFKD').toLowerCase();
     const words = (text.match(/\S+/g) ?? []).length;
     return criteria.map((c) => {
@@ -38,9 +43,17 @@ export class DevHeuristicGrader implements AiGrader {
       if (concepts.length === 0) {
         // No concept list → reward a non-trivial, on-task answer.
         const passed = words >= 20;
-        return { id: c.id, label: c.label, weight: c.weight, passed, detail: passed ? 'substantive answer' : 'answer too short' };
+        return {
+          id: c.id,
+          label: c.label,
+          weight: c.weight,
+          passed,
+          detail: passed ? 'substantive answer' : 'answer too short',
+        };
       }
-      const hit = concepts.filter((k) => text.includes(k.normalize('NFKD').toLowerCase()));
+      const hit = concepts.filter((k) =>
+        text.includes(k.normalize('NFKD').toLowerCase()),
+      );
       // Cover at least half the concepts to satisfy the criterion.
       const passed = hit.length * 2 >= concepts.length;
       return {
@@ -48,7 +61,9 @@ export class DevHeuristicGrader implements AiGrader {
         label: c.label,
         weight: c.weight,
         passed,
-        detail: passed ? `covers ${hit.length}/${concepts.length} concepts` : `covers only ${hit.length}/${concepts.length} concepts`,
+        detail: passed
+          ? `covers ${hit.length}/${concepts.length} concepts`
+          : `covers only ${hit.length}/${concepts.length} concepts`,
       };
     });
   }

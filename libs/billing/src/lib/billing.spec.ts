@@ -2,7 +2,7 @@ import { annualSavings, formatMoney, formatPrice } from './billing.js';
 
 // Intl currency formatting inserts a non-breaking space (U+00A0) between
 // the symbol and the number for pt-BR; normalize so assertions read cleanly.
-const norm = (s: string) => s.replace(/ /g, ' ');
+const norm = (s: string) => s.replace(/\u00a0/g, ' ');
 
 describe('formatMoney', () => {
   it('formats BRL with pt-BR separators', () => {
@@ -17,15 +17,25 @@ describe('formatMoney', () => {
 
 describe('formatPrice', () => {
   it('monthly pt-BR', () => {
-    expect(norm(formatPrice({ currency: 'BRL', amountCents: 3990, period: 'MONTHLY' }, 'pt-BR'))).toBe(
-      'R$ 39,90/mês',
-    );
+    expect(
+      norm(
+        formatPrice(
+          { currency: 'BRL', amountCents: 3990, period: 'MONTHLY' },
+          'pt-BR',
+        ),
+      ),
+    ).toBe('R$ 39,90/mês');
   });
 
   it('monthly en-US', () => {
-    expect(norm(formatPrice({ currency: 'USD', amountCents: 999, period: 'MONTHLY' }, 'en-US'))).toBe(
-      '$9.99/mo',
-    );
+    expect(
+      norm(
+        formatPrice(
+          { currency: 'USD', amountCents: 999, period: 'MONTHLY' },
+          'en-US',
+        ),
+      ),
+    ).toBe('$9.99/mo');
   });
 
   it('annual pt-BR with savings shows equivalent + economize', () => {
@@ -36,13 +46,20 @@ describe('formatPrice', () => {
         { annualSavingsFraction: 0.2 },
       ),
     );
-    expect(out).toBe('R$ 478,80/ano · R$ 39,90/mês equivalente · economize 20%');
+    expect(out).toBe(
+      'R$ 478,80/ano · R$ 39,90/mês equivalente · economize 20%',
+    );
   });
 
   it('annual pt-BR with installments (no savings clause)', () => {
     const out = norm(
       formatPrice(
-        { currency: 'BRL', amountCents: 47880, period: 'ANNUAL', maxInstallments: 12 },
+        {
+          currency: 'BRL',
+          amountCents: 47880,
+          period: 'ANNUAL',
+          maxInstallments: 12,
+        },
         'pt-BR',
       ),
     );
@@ -61,9 +78,14 @@ describe('formatPrice', () => {
   });
 
   it('falls back to en strings for an unknown locale', () => {
-    expect(norm(formatPrice({ currency: 'USD', amountCents: 500, period: 'MONTHLY' }, 'fr-FR'))).toContain(
-      '/mo',
-    );
+    expect(
+      norm(
+        formatPrice(
+          { currency: 'USD', amountCents: 500, period: 'MONTHLY' },
+          'fr-FR',
+        ),
+      ),
+    ).toContain('/mo');
   });
 });
 

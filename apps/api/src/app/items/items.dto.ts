@@ -3,7 +3,6 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
-  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -14,30 +13,57 @@ import {
 } from 'class-validator';
 
 export const ITEM_SLOTS = [
-  'PET', 'BACKGROUND', 'TOP', 'BOTTOM', 'SHOES', 'HAT', 'HAIR', 'GLASSES', 'ACCESSORY', 'FRAME', 'EMOTE',
+  'PET',
+  'BACKGROUND',
+  'TOP',
+  'BOTTOM',
+  'SHOES',
+  'HAT',
+  'HAIR',
+  'GLASSES',
+  'ACCESSORY',
+  'FRAME',
+  'EMOTE',
 ] as const;
-export const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'] as const;
+export const RARITIES = [
+  'COMMON',
+  'UNCOMMON',
+  'RARE',
+  'EPIC',
+  'LEGENDARY',
+] as const;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
 
 export class CreateItemCategoryDto {
-  @IsString() @Length(2, 60) @Matches(SLUG)
+  @IsString()
+  @Length(2, 60)
+  @Matches(SLUG)
   slug!: string;
 
-  @IsString() @Length(1, 80)
+  @IsString()
+  @Length(1, 80)
   name!: string;
 
-  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
   sortOrder?: number;
 }
 
 export class CreateItemDto {
-  @IsString() @Length(2, 60) @Matches(SLUG)
+  @IsString()
+  @Length(2, 60)
+  @Matches(SLUG)
   slug!: string;
 
-  @IsString() @Length(1, 80)
+  @IsString()
+  @Length(1, 80)
   name!: string;
 
-  @IsOptional() @IsString() @Length(0, 500)
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
   description?: string;
 
   @IsIn(ITEM_SLOTS)
@@ -46,34 +72,49 @@ export class CreateItemDto {
   @IsString()
   categorySlug!: string;
 
-  @IsOptional() @IsIn(RARITIES)
+  @IsOptional()
+  @IsIn(RARITIES)
   rarity?: (typeof RARITIES)[number];
 
-  @IsOptional() @IsInt() @Min(0) @Max(1000000)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000000)
   costCoins?: number;
 
-  @IsOptional() @IsInt() @Min(1) @Max(1000)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
   requiredLevel?: number;
 
-  @IsOptional() @IsBoolean()
+  @IsOptional()
+  @IsBoolean()
   isPremiumOnly?: boolean;
 
-  @IsOptional() @IsBoolean()
+  @IsOptional()
+  @IsBoolean()
   isLimitedDrop?: boolean;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   dropStartsAt?: string | null;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   dropEndsAt?: string | null;
 
-  @IsString() @Length(1, 200)
+  @IsString()
+  @Length(1, 200)
   spriteAssetId!: string;
 
-  @IsOptional() @IsString() @Length(0, 200)
+  @IsOptional()
+  @IsString()
+  @Length(0, 200)
   thumbnailAssetId?: string;
 
-  @IsOptional() @IsBoolean()
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }
 
@@ -107,7 +148,8 @@ export class EquipDto {
   slot!: (typeof ITEM_SLOTS)[number];
 
   /** Item to equip in the slot; null/omitted unequips. */
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   itemId?: string | null;
 }
 

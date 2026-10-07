@@ -13,7 +13,9 @@ export default [
       '@nx/enforce-module-boundaries': [
         'error',
         {
-          enforceBuildableLibDependency: true,
+          // Every lib resolves to source through tsconfig paths and nothing is
+          // published, so the buildable/non-buildable split is not meaningful here.
+          enforceBuildableLibDependency: false,
           allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
           depConstraints: [
             {
