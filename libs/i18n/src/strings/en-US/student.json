@@ -1,1 +1,674 @@
-{ "student": {} }
+{
+  "student": {
+    "public": {
+      "skipToContent": "Skip to content",
+      "navLabel": "Main",
+      "nav": {
+        "features": "Features",
+        "pricing": "Pricing",
+        "verify": "Verify a certificate",
+        "login": "Log in",
+        "signup": "Sign up free",
+        "openApp": "Open the app"
+      },
+      "footer": {
+        "tagline": "Codify — learn, build, ship.",
+        "label": "Footer"
+      }
+    },
+    "welcome": {
+      "metaTitle": "Codify — learn to code and actually finish",
+      "metaDescription": "Bite-size lessons, real coding exercises, AI-graded practice and streaks that keep you coming back — in Portuguese and English.",
+      "heroTitle": "Learn to code.",
+      "heroAccent": "Actually finish.",
+      "heroBody": "Bite-size lessons, real coding exercises, AI-graded practice, and a streak that keeps you coming back — in Portuguese and English.",
+      "ctaStart": "Start free",
+      "ctaPricing": "See pricing",
+      "ctaFeatures": "Explore features",
+      "ctaVerify": "Verify a certificate",
+      "featuresTitle": "Why Codify",
+      "highlights": {
+        "exercises": {
+          "title": "Real exercises",
+          "body": "Write code in the browser and get graded against hidden tests — instantly."
+        },
+        "ai": {
+          "title": "AI-graded practice",
+          "body": "Free-text answers scored against a rubric, with feedback on what to improve."
+        },
+        "scenarios": {
+          "title": "Branching scenarios",
+          "body": "Practice soft skills through interactive, replayable dialogue."
+        },
+        "streaks": {
+          "title": "Streaks & leagues",
+          "body": "XP, coins, streaks and weekly leagues keep momentum going."
+        }
+      },
+      "proofTitle": "Certificates you can prove",
+      "proofBody": "Finish a course and get a certificate with a public verification link anyone can check."
+    },
+    "features": {
+      "metaTitle": "Features — Codify",
+      "metaDescription": "Lessons, coding exercises, AI-graded prompts, scenarios, streaks, leagues, offline learning and verifiable certificates.",
+      "title": "Everything you need to keep learning",
+      "subtitle": "Short lessons, real practice, and rewards that make the habit stick.",
+      "sections": {
+        "lessons": {
+          "title": "Bite-size lessons",
+          "body": "Readings and quizzes designed for a few minutes a day.",
+          "points": [
+            "Instant feedback on every quiz",
+            "Free preview lessons in every course",
+            "Content in Portuguese and English"
+          ]
+        },
+        "practice": {
+          "title": "Hands-on practice",
+          "body": "Learn by doing, not just reading.",
+          "points": [
+            "Code exercises graded by visible and hidden tests",
+            "AI-graded prompts with a rubric that lights up",
+            "Branching scenarios for soft skills"
+          ]
+        },
+        "motivation": {
+          "title": "Built-in motivation",
+          "body": "Small wins every day add up.",
+          "points": [
+            "XP, coins, levels and daily quests",
+            "Streaks with freezes for busy days",
+            "Weekly leagues with friends"
+          ]
+        },
+        "offline": {
+          "title": "Learn offline",
+          "body": "Download a course and keep going on the bus or a plane.",
+          "points": [
+            "Readings, quizzes and scenarios work offline",
+            "Progress syncs as soon as you are back online"
+          ]
+        },
+        "certificates": {
+          "title": "Verifiable certificates",
+          "body": "Show what you finished.",
+          "points": [
+            "A certificate for every completed course",
+            "A public link anyone can verify"
+          ]
+        }
+      }
+    },
+    "pricing": {
+      "metaTitle": "Pricing — Codify",
+      "metaDescription": "Start free. Upgrade to a plan to unlock every lesson in its courses — pay by card, PIX or Boleto.",
+      "title": "Simple pricing",
+      "subtitle": "Start free. Upgrade when you are ready — cancel anytime.",
+      "free": {
+        "name": "Free",
+        "price": "R$ 0",
+        "perk1": "Free preview lessons in every course",
+        "perk2": "Daily streak, quests and leagues",
+        "perk3": "Certificates for free courses"
+      },
+      "choose": "Choose plan",
+      "signInForPrices": "Create a free account to see current plan prices.",
+      "loadError": "We couldn't load the plans right now. Please try again later.",
+      "empty": "No paid plans are available right now.",
+      "fineprint": "Prices in your currency. Card payments can be split into installments; PIX and Boleto are available for annual plans in Brazil."
+    },
+    "plans": {
+      "allCourses": "Every course in the catalog",
+      "someCourses": "{count, plural, one {Courses in # category} other {Courses in # categories}}",
+      "xpBoost": "XP boost on every lesson",
+      "trialDays": "{count, plural, one {# day free} other {# days free}}",
+      "save": "Save {pct}%"
+    },
+    "growth": {
+      "title": "Invite",
+      "working": "Applying your invite…",
+      "heading": "Welcome to Codify!",
+      "continue": "Start learning",
+      "seeFriends": "See friends",
+      "nothing": "This link was already used.",
+      "referral": {
+        "claimed": "Your friend's referral is applied — they'll be rewarded when you finish your first lesson.",
+        "invalid": "This invite code doesn't exist.",
+        "ineligible": "Referral codes only count for new accounts (within 14 days of signing up), and not for your own code.",
+        "conflict": "Your account already used a different referral link.",
+        "error": "We couldn't apply the referral right now — we'll try again next time you open the app."
+      },
+      "invite": {
+        "accepted": "You and {name} are now friends.",
+        "already": "You and {name} were already friends.",
+        "self": "That's your own invite link — share it with a friend!",
+        "invalid": "This friend invite link is not valid.",
+        "error": "We couldn't accept the friend invite right now — we'll try again later."
+      }
+    },
+    "catalog": {
+      "title": "Catalog",
+      "searchPlaceholder": "Search courses",
+      "searchLabel": "Search courses",
+      "categoriesLabel": "Categories",
+      "all": "All",
+      "loadError": "Couldn't load courses",
+      "empty": "No courses published yet",
+      "emptyFiltered": "No courses match this filter",
+      "emptyHint": "Check back soon, or pick a different category.",
+      "count": "{count, plural, one {# course} other {# courses}}",
+      "level": "Level {level}"
+    },
+    "myCourses": {
+      "title": "My courses",
+      "subtitle": "Courses you enrolled in, with your progress.",
+      "empty": "You haven't enrolled in a course yet",
+      "emptyHint": "Browse the catalog and tap \"Enroll\" on a course to keep it here.",
+      "browse": "Browse catalog",
+      "loadError": "Couldn't load your courses",
+      "progress": "{done} of {total} lessons",
+      "progressLabel": "Progress in {title}",
+      "complete": "Completed",
+      "capstone": "Capstone",
+      "accessUntil": "Access until {date}",
+      "continue": "Continue",
+      "source": {
+        "SELF": "Enrolled",
+        "PROMO": "Promo access",
+        "ADMIN_GRANT": "Granted access"
+      }
+    },
+    "time": {
+      "daysHours": "{d}d {h}h",
+      "hoursMinutes": "{h}h {m}m",
+      "minutesSeconds": "{m}m {s}s",
+      "minutes": "{m}m",
+      "seconds": "{s}s"
+    },
+    "league": {
+      "title": "League",
+      "loadError": "Couldn't load your league",
+      "tierLeague": "{tier} League",
+      "resetsIn": "Resets in {time}",
+      "rank": "#{rank}",
+      "promoteLegend": "{count, plural, one {Top # promotes} other {Top # promote}}",
+      "demoteLegend": "{count, plural, one {Bottom # moves down} other {Bottom # move down}}",
+      "standings": "This week's standings",
+      "viewProfile": "View {name}'s profile",
+      "lastWeekButton": "Last week's result",
+      "emptyTitle": "No league yet",
+      "emptyBody": "Earn some XP this week to join a league with learners like you.",
+      "emptyCta": "Find a lesson",
+      "lastWeek": {
+        "title": "Last week's result",
+        "promoted": "Promoted to {tier}!",
+        "demoted": "Moved down to {tier}",
+        "held": "You stayed in {tier}",
+        "finished": "You finished #{rank} of {size} in the {tier} league.",
+        "week": "Week of {date}",
+        "freeze": "+1 streak freeze",
+        "cta": "Let's go"
+      }
+    },
+    "friends": {
+      "title": "Friends",
+      "inviteTitle": "Invite friends",
+      "inviteBody": "Share your link — when a friend signs up with it you become friends, and you earn a reward after their first lesson.",
+      "share": "Share link",
+      "shareTitle": "Learn with me on Codify",
+      "shareText": "Join me on Codify — bite-size coding lessons, streaks and leagues.",
+      "copied": "Link copied to the clipboard.",
+      "shareFailed": "Couldn't share the link — copy it from the box instead.",
+      "addTitle": "Add by email",
+      "emailLabel": "Friend's email",
+      "emailPlaceholder": "friend@email.com",
+      "send": "Send request",
+      "invalidEmail": "Enter a valid email address.",
+      "requestSent": "If {email} has a Codify account, they'll get your friend request.",
+      "cannotAddSelf": "You can't add yourself.",
+      "requests": "Friend requests",
+      "accept": "Accept",
+      "acceptNamed": "Accept {name}'s request",
+      "decline": "Decline",
+      "declineNamed": "Decline {name}'s request",
+      "accepted": "You and {name} are now friends.",
+      "yourFriends": "{count, plural, =0 {Your friends} one {Your friends (#)} other {Your friends (#)}}",
+      "emptyTitle": "No friends yet",
+      "emptyBody": "Share your invite link or add someone by email to compete and cheer each other on.",
+      "nudge": "Nudge",
+      "nudged": "Nudged",
+      "nudgeNamed": "Nudge {name}",
+      "nudgeSent": "Nudge sent to {name}!",
+      "nudgeQueued": "Nudge saved — {name} will see it next time they open Codify.",
+      "nudgeTooSoon": "You already nudged {name} today. Try again tomorrow."
+    },
+    "reward": {
+      "multipliers": "Boosted: {parts}",
+      "levelUp": "Level {level}!",
+      "badge": "Badge unlocked: {name}"
+    },
+    "today": {
+      "title": "Today",
+      "greeting": "Hi, {name}!",
+      "greetingAnon": "Welcome back!",
+      "editAvatar": "Edit your avatar",
+      "openShop": "Open shop",
+      "continueTitle": "Continue learning",
+      "resume": "Resume lesson",
+      "openCourse": "Open course",
+      "allCaughtUp": "All lessons done — claim your certificate!",
+      "noCourseTitle": "Pick your first course",
+      "noCourseBody": "Enroll in a course and it shows up here so you can pick up where you left off.",
+      "questsTitle": "Daily quests",
+      "questsEmpty": "No quests today — check back tomorrow.",
+      "questsError": "Couldn't load today's quests.",
+      "leagueLine": "#{rank} of {size} · resets in {time}",
+      "recommendedTitle": "Recommended for you",
+      "seeCatalog": "See catalog",
+      "noRecommendations": "You're enrolled in everything we have — new courses are on the way."
+    },
+    "onboarding": {
+      "label": "Get started with Codify",
+      "slides": {
+        "learn": {
+          "title": "Learn by doing",
+          "body": "Bite-sized lessons, quizzes and code exercises — designed for daily practice."
+        },
+        "streak": {
+          "title": "Build a streak",
+          "body": "Finish at least one lesson a day to grow your streak and climb the weekly league."
+        },
+        "rewards": {
+          "title": "Earn rewards",
+          "body": "XP, coins and levels reward your progress — spend coins on your avatar."
+        }
+      },
+      "goalTitle": "Why are you here?",
+      "goals": {
+        "career": "Change careers",
+        "newTech": "Learn a new technology",
+        "ai": "Use AI tools better",
+        "softSkills": "Grow my soft skills"
+      },
+      "trackTitle": "Pick a course to start",
+      "trackBody": "We picked these for your goal. You can change any time.",
+      "noCourses": "No courses are published yet — explore the catalog later.",
+      "lessons": "{count, plural, one {# lesson} other {# lessons}}"
+    },
+    "lesson": {
+      "title": "Lesson",
+      "position": "Lesson {index} of {total}",
+      "readingOffline": "Reading offline",
+      "markComplete": "Mark as complete",
+      "completed": "Completed",
+      "savedOffline": "Saved offline",
+      "willSync": "It will sync when you're back online.",
+      "next": "Next lesson",
+      "backToCourse": "Back to course",
+      "finishRunner": "Finish the activity above to complete this lesson.",
+      "runnerLabel": {
+        "exercise": "Coding exercise",
+        "aiPrompt": "Prompt practice",
+        "scenario": "Scenario"
+      },
+      "quiz": {
+        "submit": "Check answers",
+        "answerAll": "Answer every question to check.",
+        "passed": "You scored {score}% — passed!",
+        "failed": "You scored {score}%. Review the feedback and try again.",
+        "retry": "Try again",
+        "queued": "Answers saved offline — they'll be graded when you're back online."
+      },
+      "paywall": {
+        "title": "This lesson is part of a plan",
+        "body": "Subscribe to one of these plans to unlock it — and every other lesson in the course.",
+        "cta": "See plans",
+        "sheetTitle": "Unlock this lesson",
+        "sheetSubtitle": "Any of these plans includes it.",
+        "perk1": "Every lesson in the courses your plan includes",
+        "perk2": "XP boost on every lesson",
+        "perk3": "Offline downloads and certificates",
+        "footnote": "Cancel anytime from your subscription settings."
+      },
+      "notFound": {
+        "title": "Lesson not available",
+        "body": "It may have been unpublished or moved."
+      },
+      "offline": {
+        "title": "This lesson isn't downloaded",
+        "body": "Connect to the internet to open it, or download the course next time you're online."
+      },
+      "error": {
+        "title": "Couldn't open this lesson"
+      }
+    },
+    "exercise": {
+      "hiddenTest": "Hidden test {n}",
+      "hiddenFailed": "Failed — details stay hidden until you pass.",
+      "grading": "Your submission is in the queue — grading…",
+      "gradingTimeout": "Grading is taking longer than usual. Try submitting again in a moment.",
+      "workerLost": "The grader stopped unexpectedly. Please submit again.",
+      "diagnostics": "{message}"
+    },
+    "capstone": {
+      "intro": "Capstone project — your answer is graded against the rubric below."
+    },
+    "runner": {
+      "errors": {
+        "cooldown": "{seconds, plural, =0 {Slow down — wait a moment and try again.} one {Slow down — try again in # second.} other {Slow down — try again in # seconds.}}",
+        "minuteLimit": "{seconds, plural, =0 {You've hit the per-minute limit. Try again shortly.} other {You've hit the per-minute limit. Try again in # seconds.}}",
+        "dailyLimit": "You've reached today's limit. Come back tomorrow.",
+        "noAttempts": "You've used all your attempts for this activity.",
+        "runnerUnavailable": "The code runner is unavailable right now. Try again later.",
+        "invalidPath": "That play-through couldn't be recorded. Replay the scenario.",
+        "duplicate": "That was already submitted."
+      }
+    },
+    "course": {
+      "title": "Course",
+      "notFound": "Course not found",
+      "notFoundBody": "It might have been unpublished. Head back to the catalog.",
+      "loadError": "Couldn't load this course",
+      "cached": "You're offline — showing the last saved copy of this course.",
+      "freeLessons": "{count, plural, one {# free lesson} other {# free lessons}}",
+      "continue": "Continue",
+      "start": "Start course",
+      "startPreview": "Start free preview",
+      "seePlans": "See plans",
+      "enroll": "Enroll",
+      "unenroll": "Leave course",
+      "enrolled": "Added to My courses.",
+      "unenrolled": "Removed from My courses.",
+      "plansTitle": "Plans that include this course",
+      "included": "Included in your plan",
+      "certEarned": "Certificate earned!",
+      "viewCert": "View certificate",
+      "finished": "You finished this course.",
+      "claimCert": "Get your certificate",
+      "certClaimed": "Your certificate is ready.",
+      "noModules": "Curriculum coming soon",
+      "noModulesBody": "The instructor hasn't published modules yet.",
+      "curriculum": "Curriculum",
+      "module": "Module {n} · {title}",
+      "premiumLesson": "Premium",
+      "paywall": {
+        "title": "Unlock the full course",
+        "subtitle": "{count, plural, one {# lesson is premium} other {# lessons are premium}} — any of these plans unlocks them."
+      },
+      "download": {
+        "title": "Offline access",
+        "none": "Download lessons to read them without a connection.",
+        "downloading": "Downloading {current} of {total} lessons…",
+        "paused": "Paused at {current} of {total} lessons.",
+        "waitingWifi": "Waiting for Wi-Fi to continue.",
+        "needsSpace": "Not enough space — free up room in Downloads.",
+        "error": "The download failed. Try again.",
+        "partial": "{count} of {total} lessons saved for offline.",
+        "done": "{count, plural, one {# lesson saved for offline} other {# lessons saved for offline}}",
+        "updateAvailable": "A newer version of this course is available.",
+        "progressLabel": "Download progress",
+        "all": "Download course",
+        "complete": "Download the rest",
+        "pause": "Pause",
+        "resume": "Resume",
+        "manage": "Manage downloads",
+        "update": "{count, plural, =0 {Update} one {Update # lesson} other {Update # lessons}}",
+        "updated": "Downloaded lessons are up to date.",
+        "module": "Download",
+        "moduleNamed": "Download module {title}",
+        "saved": "Saved",
+        "lessonNamed": "Download lesson {title}",
+        "lessonSaved": "Saved for offline"
+      }
+    },
+    "billing": {
+      "title": "Subscription",
+      "currentPlan": "Current plan",
+      "status": {
+        "TRIALING": "Trial",
+        "ACTIVE": "Active",
+        "PAST_DUE": "Payment failed",
+        "CANCELED": "Canceled",
+        "INCOMPLETE": "Incomplete",
+        "INCOMPLETE_EXPIRED": "Expired",
+        "UNPAID": "Unpaid",
+        "PAUSED": "Paused"
+      },
+      "source": {
+        "STRIPE_WEB": "Web (card, PIX or Boleto)",
+        "APPLE_IAP": "App Store",
+        "GOOGLE_PLAY": "Google Play",
+        "ADMIN_GRANT": "Granted by Codify"
+      },
+      "fact": {
+        "access": "Premium access",
+        "source": "Bought via",
+        "renews": "Renews on",
+        "ends": "Access until"
+      },
+      "accessYes": "Active",
+      "accessNo": "Not active",
+      "pastDue": {
+        "title": "Your last payment didn't go through",
+        "body": "Update your payment method to keep your access. We'll retry the charge automatically."
+      },
+      "updatePayment": "Update payment method",
+      "managePayment": "Manage payment & invoices",
+      "cancelPending": "Your subscription is canceled and won't renew. You keep access until {date}.",
+      "prepaidNote": "One-time payment — access runs until {date}. Buy the plan again to extend it.",
+      "grantNote": "This access was granted by Codify — there's nothing to manage or pay.",
+      "manageApple": "Bought in the App Store — manage or cancel it in your Apple ID subscription settings.",
+      "manageGoogle": "Bought on Google Play — manage or cancel it in the Play Store subscriptions.",
+      "resume": "Resume subscription",
+      "resumed": "Your subscription will renew as usual.",
+      "cancel": "Cancel subscription",
+      "canceled": "Subscription canceled. You keep access until {date}.",
+      "freeTitle": "You're on the free plan",
+      "freeBody": "Free preview lessons are always open. Pick a plan to unlock every lesson in its courses.",
+      "choosePlan": "Choose a plan",
+      "otherPlans": "Plans",
+      "periodLabel": "Billing period",
+      "noPlans": "No plans available",
+      "noPlansBody": "Check back soon.",
+      "select": "Select",
+      "checkoutTitle": "Subscribe to {plan}",
+      "methodLabel": "Payment method",
+      "method": {
+        "card": {
+          "title": "Credit card",
+          "body": "Renews automatically. Annual plans can be split into installments."
+        },
+        "pix": {
+          "title": "PIX",
+          "body": "One-time payment for a year — pay the QR code, access unlocks when it confirms."
+        },
+        "boleto": {
+          "title": "Boleto",
+          "body": "One-time payment for a year — confirmation can take up to 3 business days."
+        },
+        "annualOnly": "Available for the annual plan in reais."
+      },
+      "storeCheckout": "You'll confirm the purchase with your app store account.",
+      "continueCheckout": "Continue to payment",
+      "checkoutCanceled": "Checkout canceled — you weren't charged.",
+      "purchased": "Purchase complete — enjoy!",
+      "storeMissing": "This plan isn't available in the app store yet.",
+      "restore": "Restore purchases",
+      "restored": "Purchases restored.",
+      "nothingToRestore": "No previous purchases found.",
+      "confirm": {
+        "title": "Cancel your subscription?",
+        "keepAccess": "You keep full access until {date}.",
+        "noCharge": "You won't be charged again.",
+        "resumeAnytime": "You can resume any time before that date.",
+        "reasonLabel": "Tell us why (optional)",
+        "reasonSkip": "Prefer not to say",
+        "reasons": {
+          "tooExpensive": "It's too expensive",
+          "notUsing": "I'm not using it enough",
+          "missingContent": "Missing the content I need",
+          "technical": "Technical problems",
+          "other": "Something else"
+        },
+        "keep": "Keep subscription",
+        "cancel": "Cancel subscription"
+      },
+      "success": {
+        "confirming": "Confirming your subscription…",
+        "checking": "Checking for your payment…",
+        "checkAgain": "Check again",
+        "keepLearning": "Keep learning meanwhile",
+        "pendingTitle": "Payment pending",
+        "pending": {
+          "card": "Your card payment is being confirmed. This usually takes a few seconds.",
+          "pix": "Pay the PIX QR code from checkout. Your plan unlocks as soon as the payment confirms — usually within a minute.",
+          "boleto": "Pay the boleto at your bank or app. Confirmation can take up to 3 business days; we'll unlock your plan automatically."
+        },
+        "doneTitle": "You're in!",
+        "active": "{plan} is active until {date}.",
+        "trialActive": "Your {plan} trial is active until {date}.",
+        "start": "Start learning",
+        "view": "View subscription",
+        "errorTitle": "That didn't complete",
+        "errorBody": "We couldn't confirm a subscription from this link.",
+        "back": "Back to plans"
+      }
+    },
+    "shop": {
+      "title": "Shop",
+      "balance": "Your coins",
+      "dressingRoom": "Dressing room",
+      "filterSlot": "Filter by slot",
+      "canAfford": "I can afford",
+      "emptyTitle": "Nothing here yet",
+      "emptyBody": "Check back as new items drop.",
+      "limitedTitle": "Limited drop",
+      "endsIn": "ends in {time}",
+      "allItems": "All items",
+      "tryingOn": "Preview on your avatar",
+      "tryInRoom": "Try on in dressing room",
+      "buy": "Buy for {cost}",
+      "buyAndWear": "Buy & wear now",
+      "wear": "Wear it",
+      "bought": "You bought {name}!",
+      "boughtAndWearing": "You bought {name} and you're wearing it!",
+      "wearing": "You're now wearing {name}.",
+      "alreadyOwned": "You already own {name}.",
+      "reason": {
+        "coins": "Not enough coins yet — finish a few lessons.",
+        "level": "Unlocks at level {level}.",
+        "unavailable": "Not available right now."
+      }
+    },
+    "avatar": {
+      "title": "Dressing room",
+      "offline": "You're offline — your avatar is shown from this device. Connect to change it.",
+      "tryingOn": "Trying on {name}",
+      "tryOnHint": "This is a preview — buy it in the shop to keep it.",
+      "backToShop": "Back to shop",
+      "stopTryOn": "Stop preview",
+      "builderTitle": "Customize your avatar",
+      "skinTone": "Skin tone",
+      "tones": {
+        "porcelain": "Porcelain",
+        "light": "Light",
+        "tan": "Tan",
+        "brown": "Brown",
+        "deep": "Deep"
+      },
+      "inventory": "Inventory",
+      "browseShop": "Browse shop",
+      "saved": "Look saved."
+    },
+    "profile": {
+      "title": "Profile",
+      "viewPublic": "See your public profile",
+      "navLabel": "Account",
+      "links": {
+        "myCourses": {
+          "title": "My courses",
+          "body": "Courses you're enrolled in"
+        },
+        "subscription": {
+          "title": "Subscription",
+          "body": "Your plan, billing and cancellation"
+        },
+        "friends": {
+          "title": "Friends",
+          "body": "Invite, add and nudge friends"
+        },
+        "league": {
+          "title": "League",
+          "body": "This week's standings"
+        },
+        "downloads": {
+          "title": "Downloads",
+          "body": "Offline courses and storage"
+        }
+      },
+      "account": "Account",
+      "displayName": "Display name",
+      "nameSaved": "Display name saved.",
+      "manageAccount": "Manage sign-in & security",
+      "preferences": "Preferences",
+      "sound": "Sound effects",
+      "reduceMotion": "Reduce motion",
+      "reduceMotionHint": "Skips confetti and flying coins; rewards still show as a short message.",
+      "session": "Session",
+      "signedInAs": "Signed in as {email}",
+      "certificates": {
+        "title": "Certificates",
+        "empty": "Finish a course to earn a shareable certificate.",
+        "issued": "Issued {date}",
+        "shareNamed": "Share the certificate for {title}",
+        "shareTitle": "My Codify certificate",
+        "shareText": "I completed {title} on Codify — verify it here:"
+      },
+      "referral": {
+        "title": "Invite friends, earn rewards",
+        "body": "When someone joins with your link and finishes their first lesson, you earn XP and coins.",
+        "invited": "Joined",
+        "converted": "Finished a lesson",
+        "rewards": "You earned"
+      }
+    },
+    "publicProfile": {
+      "tierLevel": "{tier} · Level {level}",
+      "lessons": "Lessons",
+      "streak": "Streak",
+      "best": "Best streak",
+      "friends": "Friends",
+      "badges": "{count, plural, =0 {Badges} other {Badges (#)}}",
+      "noBadges": "No badges yet.",
+      "loadError": "Couldn't load this profile",
+      "notFound": "Profile not found",
+      "notFoundBody": "This learner may not exist anymore."
+    },
+    "forbidden": {
+      "title": "No access",
+      "heading": "You can't access this page",
+      "body": "Your account doesn't have the role required to see this section.",
+      "back": "Back to Today"
+    },
+    "verify": {
+      "metaTitle": "Verify a certificate — Codify",
+      "metaDescription": "Check that a Codify certificate of completion is genuine using its serial number.",
+      "title": "Verify a certificate",
+      "subtitle": "Enter the serial printed on the certificate to confirm it's genuine.",
+      "serialLabel": "Certificate serial",
+      "placeholder": "CDFY-XXXX-XXXX-XXXX-XXXX",
+      "submit": "Verify",
+      "checking": "Checking…",
+      "error": "We couldn't check this certificate right now. Try again in a moment.",
+      "valid": "✓ Verified certificate",
+      "imageAlt": "Certificate awarded to {name} for {course}",
+      "recipient": "Recipient",
+      "course": "Course",
+      "type": "Type",
+      "capstone": "Capstone certificate",
+      "issued": "Issued",
+      "serial": "Serial",
+      "invalid": "No certificate matches that serial."
+    }
+  }
+}

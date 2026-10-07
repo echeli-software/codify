@@ -1,1 +1,674 @@
-{ "student": {} }
+{
+  "student": {
+    "public": {
+      "skipToContent": "Pular para o conteúdo",
+      "navLabel": "Principal",
+      "nav": {
+        "features": "Recursos",
+        "pricing": "Preços",
+        "verify": "Verificar certificado",
+        "login": "Entrar",
+        "signup": "Criar conta grátis",
+        "openApp": "Abrir o app"
+      },
+      "footer": {
+        "tagline": "Codify — aprenda, construa, publique.",
+        "label": "Rodapé"
+      }
+    },
+    "welcome": {
+      "metaTitle": "Codify — aprenda a programar e termine de verdade",
+      "metaDescription": "Lições curtas, exercícios de código reais, prática corrigida por IA e ofensivas que fazem você voltar — em português e inglês.",
+      "heroTitle": "Aprenda a programar.",
+      "heroAccent": "E termine de verdade.",
+      "heroBody": "Lições curtas, exercícios de código reais, prática corrigida por IA e uma ofensiva que faz você voltar — em português e inglês.",
+      "ctaStart": "Comece grátis",
+      "ctaPricing": "Ver preços",
+      "ctaFeatures": "Conheça os recursos",
+      "ctaVerify": "Verificar certificado",
+      "featuresTitle": "Por que o Codify",
+      "highlights": {
+        "exercises": {
+          "title": "Exercícios reais",
+          "body": "Escreva código no navegador e seja avaliado por testes ocultos — na hora."
+        },
+        "ai": {
+          "title": "Prática corrigida por IA",
+          "body": "Respostas abertas avaliadas por uma rubrica, com dicas do que melhorar."
+        },
+        "scenarios": {
+          "title": "Cenários ramificados",
+          "body": "Pratique habilidades interpessoais em diálogos interativos e repetíveis."
+        },
+        "streaks": {
+          "title": "Ofensivas e ligas",
+          "body": "XP, moedas, ofensivas e ligas semanais mantêm o ritmo."
+        }
+      },
+      "proofTitle": "Certificados comprováveis",
+      "proofBody": "Conclua um curso e receba um certificado com um link público de verificação."
+    },
+    "features": {
+      "metaTitle": "Recursos — Codify",
+      "metaDescription": "Lições, exercícios de código, prompts corrigidos por IA, cenários, ofensivas, ligas, estudo offline e certificados verificáveis.",
+      "title": "Tudo para você continuar aprendendo",
+      "subtitle": "Lições curtas, prática de verdade e recompensas que criam o hábito.",
+      "sections": {
+        "lessons": {
+          "title": "Lições curtas",
+          "body": "Leituras e quizzes pensados para poucos minutos por dia.",
+          "points": [
+            "Feedback imediato em cada quiz",
+            "Lições gratuitas de prévia em todo curso",
+            "Conteúdo em português e inglês"
+          ]
+        },
+        "practice": {
+          "title": "Prática na mão",
+          "body": "Aprenda fazendo, não só lendo.",
+          "points": [
+            "Exercícios de código avaliados por testes visíveis e ocultos",
+            "Prompts corrigidos por IA com rubrica que acende",
+            "Cenários ramificados para habilidades interpessoais"
+          ]
+        },
+        "motivation": {
+          "title": "Motivação embutida",
+          "body": "Pequenas vitórias diárias somam.",
+          "points": [
+            "XP, moedas, níveis e missões diárias",
+            "Ofensivas com congelamentos para dias corridos",
+            "Ligas semanais com amigos"
+          ]
+        },
+        "offline": {
+          "title": "Estude offline",
+          "body": "Baixe um curso e continue no ônibus ou no avião.",
+          "points": [
+            "Leituras, quizzes e cenários funcionam offline",
+            "O progresso sincroniza assim que você voltar a ficar online"
+          ]
+        },
+        "certificates": {
+          "title": "Certificados verificáveis",
+          "body": "Mostre o que você concluiu.",
+          "points": [
+            "Um certificado para cada curso concluído",
+            "Um link público que qualquer pessoa pode verificar"
+          ]
+        }
+      }
+    },
+    "pricing": {
+      "metaTitle": "Preços — Codify",
+      "metaDescription": "Comece grátis. Assine um plano para liberar todas as lições dos cursos incluídos — pague com cartão, PIX ou Boleto.",
+      "title": "Preços simples",
+      "subtitle": "Comece grátis. Assine quando quiser — cancele quando quiser.",
+      "free": {
+        "name": "Grátis",
+        "price": "R$ 0",
+        "perk1": "Lições de prévia gratuitas em todo curso",
+        "perk2": "Ofensiva diária, missões e ligas",
+        "perk3": "Certificados dos cursos gratuitos"
+      },
+      "choose": "Escolher plano",
+      "signInForPrices": "Crie uma conta grátis para ver os preços atuais dos planos.",
+      "loadError": "Não foi possível carregar os planos agora. Tente novamente mais tarde.",
+      "empty": "Nenhum plano pago disponível no momento.",
+      "fineprint": "Preços na sua moeda. No cartão é possível parcelar; PIX e Boleto estão disponíveis para planos anuais no Brasil."
+    },
+    "plans": {
+      "allCourses": "Todos os cursos do catálogo",
+      "someCourses": "{count, plural, one {Cursos de # categoria} other {Cursos de # categorias}}",
+      "xpBoost": "Bônus de XP em todas as lições",
+      "trialDays": "{count, plural, one {# dia grátis} other {# dias grátis}}",
+      "save": "Economize {pct}%"
+    },
+    "growth": {
+      "title": "Convite",
+      "working": "Aplicando seu convite…",
+      "heading": "Boas-vindas ao Codify!",
+      "continue": "Começar a estudar",
+      "seeFriends": "Ver amigos",
+      "nothing": "Este link já foi usado.",
+      "referral": {
+        "claimed": "A indicação do seu amigo foi aplicada — ele ganha uma recompensa quando você concluir sua primeira lição.",
+        "invalid": "Este código de convite não existe.",
+        "ineligible": "Códigos de indicação valem só para contas novas (até 14 dias após o cadastro) e não para o seu próprio código.",
+        "conflict": "Sua conta já usou outro link de indicação.",
+        "error": "Não foi possível aplicar a indicação agora — tentaremos de novo na próxima vez que você abrir o app."
+      },
+      "invite": {
+        "accepted": "Você e {name} agora são amigos.",
+        "already": "Você e {name} já eram amigos.",
+        "self": "Este é o seu próprio link de convite — compartilhe com um amigo!",
+        "invalid": "Este link de convite de amizade não é válido.",
+        "error": "Não foi possível aceitar o convite agora — tentaremos de novo mais tarde."
+      }
+    },
+    "catalog": {
+      "title": "Catálogo",
+      "searchPlaceholder": "Buscar cursos",
+      "searchLabel": "Buscar cursos",
+      "categoriesLabel": "Categorias",
+      "all": "Todos",
+      "loadError": "Não foi possível carregar os cursos",
+      "empty": "Nenhum curso publicado ainda",
+      "emptyFiltered": "Nenhum curso corresponde a este filtro",
+      "emptyHint": "Volte em breve ou escolha outra categoria.",
+      "count": "{count, plural, one {# curso} other {# cursos}}",
+      "level": "Nível {level}"
+    },
+    "myCourses": {
+      "title": "Meus cursos",
+      "subtitle": "Cursos em que você se inscreveu, com seu progresso.",
+      "empty": "Você ainda não se inscreveu em nenhum curso",
+      "emptyHint": "Explore o catálogo e toque em \"Inscrever-se\" em um curso para mantê-lo aqui.",
+      "browse": "Explorar catálogo",
+      "loadError": "Não foi possível carregar seus cursos",
+      "progress": "{done} de {total} lições",
+      "progressLabel": "Progresso em {title}",
+      "complete": "Concluído",
+      "capstone": "Projeto final",
+      "accessUntil": "Acesso até {date}",
+      "continue": "Continuar",
+      "source": {
+        "SELF": "Inscrito",
+        "PROMO": "Acesso promocional",
+        "ADMIN_GRANT": "Acesso concedido"
+      }
+    },
+    "time": {
+      "daysHours": "{d}d {h}h",
+      "hoursMinutes": "{h}h {m}min",
+      "minutesSeconds": "{m}min {s}s",
+      "minutes": "{m}min",
+      "seconds": "{s}s"
+    },
+    "league": {
+      "title": "Liga",
+      "loadError": "Não foi possível carregar sua liga",
+      "tierLeague": "Liga {tier}",
+      "resetsIn": "Reinicia em {time}",
+      "rank": "#{rank}",
+      "promoteLegend": "{count, plural, one {O 1º sobe} other {Os # primeiros sobem}}",
+      "demoteLegend": "{count, plural, one {O último desce} other {Os # últimos descem}}",
+      "standings": "Classificação da semana",
+      "viewProfile": "Ver o perfil de {name}",
+      "lastWeekButton": "Resultado da semana passada",
+      "emptyTitle": "Você ainda não está em uma liga",
+      "emptyBody": "Ganhe XP nesta semana para entrar em uma liga com pessoas como você.",
+      "emptyCta": "Encontrar uma lição",
+      "lastWeek": {
+        "title": "Resultado da semana passada",
+        "promoted": "Você subiu para a liga {tier}!",
+        "demoted": "Você desceu para a liga {tier}",
+        "held": "Você continua na liga {tier}",
+        "finished": "Você terminou em #{rank} de {size} na liga {tier}.",
+        "week": "Semana de {date}",
+        "freeze": "+1 congelamento de ofensiva",
+        "cta": "Bora"
+      }
+    },
+    "friends": {
+      "title": "Amigos",
+      "inviteTitle": "Convide amigos",
+      "inviteBody": "Compartilhe seu link — quando um amigo se cadastrar por ele vocês viram amigos, e você ganha uma recompensa após a primeira lição dele.",
+      "share": "Compartilhar link",
+      "shareTitle": "Estude comigo no Codify",
+      "shareText": "Venha estudar comigo no Codify — lições curtas de programação, ofensivas e ligas.",
+      "copied": "Link copiado para a área de transferência.",
+      "shareFailed": "Não foi possível compartilhar — copie o link da caixa.",
+      "addTitle": "Adicionar por e-mail",
+      "emailLabel": "E-mail do amigo",
+      "emailPlaceholder": "amigo@email.com",
+      "send": "Enviar pedido",
+      "invalidEmail": "Digite um e-mail válido.",
+      "requestSent": "Se {email} tiver uma conta no Codify, receberá seu pedido de amizade.",
+      "cannotAddSelf": "Você não pode adicionar a si mesmo.",
+      "requests": "Pedidos de amizade",
+      "accept": "Aceitar",
+      "acceptNamed": "Aceitar o pedido de {name}",
+      "decline": "Recusar",
+      "declineNamed": "Recusar o pedido de {name}",
+      "accepted": "Você e {name} agora são amigos.",
+      "yourFriends": "{count, plural, =0 {Seus amigos} one {Seus amigos (#)} other {Seus amigos (#)}}",
+      "emptyTitle": "Nenhum amigo ainda",
+      "emptyBody": "Compartilhe seu link de convite ou adicione alguém por e-mail para competir e se incentivar.",
+      "nudge": "Cutucar",
+      "nudged": "Cutucado",
+      "nudgeNamed": "Cutucar {name}",
+      "nudgeSent": "Cutucada enviada para {name}!",
+      "nudgeQueued": "Cutucada salva — {name} vai ver na próxima vez que abrir o Codify.",
+      "nudgeTooSoon": "Você já cutucou {name} hoje. Tente de novo amanhã."
+    },
+    "reward": {
+      "multipliers": "Bônus: {parts}",
+      "levelUp": "Nível {level}!",
+      "badge": "Conquista desbloqueada: {name}"
+    },
+    "today": {
+      "title": "Hoje",
+      "greeting": "Oi, {name}!",
+      "greetingAnon": "Que bom te ver!",
+      "editAvatar": "Editar seu avatar",
+      "openShop": "Abrir loja",
+      "continueTitle": "Continue estudando",
+      "resume": "Retomar lição",
+      "openCourse": "Abrir curso",
+      "allCaughtUp": "Todas as lições concluídas — pegue seu certificado!",
+      "noCourseTitle": "Escolha seu primeiro curso",
+      "noCourseBody": "Inscreva-se em um curso e ele aparece aqui para você continuar de onde parou.",
+      "questsTitle": "Missões diárias",
+      "questsEmpty": "Nenhuma missão hoje — volte amanhã.",
+      "questsError": "Não foi possível carregar as missões de hoje.",
+      "leagueLine": "#{rank} de {size} · reinicia em {time}",
+      "recommendedTitle": "Recomendados para você",
+      "seeCatalog": "Ver catálogo",
+      "noRecommendations": "Você já está inscrito em todos os cursos — novos cursos estão a caminho."
+    },
+    "onboarding": {
+      "label": "Comece no Codify",
+      "slides": {
+        "learn": {
+          "title": "Aprenda fazendo",
+          "body": "Lições curtas, quizzes e exercícios de código — feitos para praticar todo dia."
+        },
+        "streak": {
+          "title": "Crie uma ofensiva",
+          "body": "Conclua pelo menos uma lição por dia para aumentar sua ofensiva e subir na liga semanal."
+        },
+        "rewards": {
+          "title": "Ganhe recompensas",
+          "body": "XP, moedas e níveis recompensam seu progresso — use as moedas no seu avatar."
+        }
+      },
+      "goalTitle": "O que te trouxe aqui?",
+      "goals": {
+        "career": "Mudar de carreira",
+        "newTech": "Aprender uma tecnologia nova",
+        "ai": "Usar melhor ferramentas de IA",
+        "softSkills": "Desenvolver habilidades interpessoais"
+      },
+      "trackTitle": "Escolha um curso para começar",
+      "trackBody": "Separamos estes para o seu objetivo. Você pode mudar quando quiser.",
+      "noCourses": "Nenhum curso publicado ainda — explore o catálogo mais tarde.",
+      "lessons": "{count, plural, one {# lição} other {# lições}}"
+    },
+    "lesson": {
+      "title": "Lição",
+      "position": "Lição {index} de {total}",
+      "readingOffline": "Lendo offline",
+      "markComplete": "Marcar como concluída",
+      "completed": "Concluída",
+      "savedOffline": "Salvo offline",
+      "willSync": "Vai sincronizar quando você voltar a ficar online.",
+      "next": "Próxima lição",
+      "backToCourse": "Voltar ao curso",
+      "finishRunner": "Conclua a atividade acima para finalizar esta lição.",
+      "runnerLabel": {
+        "exercise": "Exercício de código",
+        "aiPrompt": "Prática de prompt",
+        "scenario": "Cenário"
+      },
+      "quiz": {
+        "submit": "Verificar respostas",
+        "answerAll": "Responda todas as perguntas para verificar.",
+        "passed": "Você acertou {score}% — aprovado!",
+        "failed": "Você acertou {score}%. Veja o feedback e tente de novo.",
+        "retry": "Tentar de novo",
+        "queued": "Respostas salvas offline — serão corrigidas quando você voltar a ficar online."
+      },
+      "paywall": {
+        "title": "Esta lição faz parte de um plano",
+        "body": "Assine um destes planos para liberá-la — e todas as outras lições do curso.",
+        "cta": "Ver planos",
+        "sheetTitle": "Libere esta lição",
+        "sheetSubtitle": "Qualquer um destes planos inclui esta lição.",
+        "perk1": "Todas as lições dos cursos incluídos no plano",
+        "perk2": "Bônus de XP em todas as lições",
+        "perk3": "Downloads offline e certificados",
+        "footnote": "Cancele quando quiser nas configurações da assinatura."
+      },
+      "notFound": {
+        "title": "Lição indisponível",
+        "body": "Ela pode ter sido despublicada ou movida."
+      },
+      "offline": {
+        "title": "Esta lição não foi baixada",
+        "body": "Conecte-se à internet para abri-la ou baixe o curso na próxima vez que estiver online."
+      },
+      "error": {
+        "title": "Não foi possível abrir esta lição"
+      }
+    },
+    "exercise": {
+      "hiddenTest": "Teste oculto {n}",
+      "hiddenFailed": "Falhou — os detalhes ficam ocultos até você passar.",
+      "grading": "Sua submissão está na fila — corrigindo…",
+      "gradingTimeout": "A correção está demorando mais que o normal. Tente enviar de novo em instantes.",
+      "workerLost": "O corretor parou inesperadamente. Envie de novo.",
+      "diagnostics": "{message}"
+    },
+    "capstone": {
+      "intro": "Projeto final — sua resposta é avaliada pela rubrica abaixo."
+    },
+    "runner": {
+      "errors": {
+        "cooldown": "{seconds, plural, =0 {Calma — espere um instante e tente de novo.} one {Calma — tente de novo em # segundo.} other {Calma — tente de novo em # segundos.}}",
+        "minuteLimit": "{seconds, plural, =0 {Você atingiu o limite por minuto. Tente de novo em instantes.} other {Você atingiu o limite por minuto. Tente de novo em # segundos.}}",
+        "dailyLimit": "Você atingiu o limite de hoje. Volte amanhã.",
+        "noAttempts": "Você usou todas as tentativas desta atividade.",
+        "runnerUnavailable": "O executor de código está indisponível agora. Tente mais tarde.",
+        "invalidPath": "Não foi possível registrar essa jogada. Jogue o cenário de novo.",
+        "duplicate": "Isso já foi enviado."
+      }
+    },
+    "course": {
+      "title": "Curso",
+      "notFound": "Curso não encontrado",
+      "notFoundBody": "Ele pode ter sido despublicado. Volte ao catálogo.",
+      "loadError": "Não foi possível carregar este curso",
+      "cached": "Você está offline — mostrando a última cópia salva deste curso.",
+      "freeLessons": "{count, plural, one {# lição grátis} other {# lições grátis}}",
+      "continue": "Continuar",
+      "start": "Começar curso",
+      "startPreview": "Começar prévia grátis",
+      "seePlans": "Ver planos",
+      "enroll": "Inscrever-se",
+      "unenroll": "Sair do curso",
+      "enrolled": "Adicionado a Meus cursos.",
+      "unenrolled": "Removido de Meus cursos.",
+      "plansTitle": "Planos que incluem este curso",
+      "included": "Incluído no seu plano",
+      "certEarned": "Certificado conquistado!",
+      "viewCert": "Ver certificado",
+      "finished": "Você concluiu este curso.",
+      "claimCert": "Pegar seu certificado",
+      "certClaimed": "Seu certificado está pronto.",
+      "noModules": "Conteúdo em breve",
+      "noModulesBody": "O instrutor ainda não publicou módulos.",
+      "curriculum": "Conteúdo",
+      "module": "Módulo {n} · {title}",
+      "premiumLesson": "Premium",
+      "paywall": {
+        "title": "Libere o curso completo",
+        "subtitle": "{count, plural, one {# lição é premium} other {# lições são premium}} — qualquer um destes planos libera."
+      },
+      "download": {
+        "title": "Acesso offline",
+        "none": "Baixe as lições para ler sem conexão.",
+        "downloading": "Baixando {current} de {total} lições…",
+        "paused": "Pausado em {current} de {total} lições.",
+        "waitingWifi": "Aguardando Wi-Fi para continuar.",
+        "needsSpace": "Sem espaço suficiente — libere espaço em Downloads.",
+        "error": "O download falhou. Tente de novo.",
+        "partial": "{count} de {total} lições salvas para offline.",
+        "done": "{count, plural, one {# lição salva para offline} other {# lições salvas para offline}}",
+        "updateAvailable": "Há uma versão mais nova deste curso.",
+        "progressLabel": "Progresso do download",
+        "all": "Baixar curso",
+        "complete": "Baixar o restante",
+        "pause": "Pausar",
+        "resume": "Retomar",
+        "manage": "Gerenciar downloads",
+        "update": "{count, plural, =0 {Atualizar} one {Atualizar # lição} other {Atualizar # lições}}",
+        "updated": "As lições baixadas estão atualizadas.",
+        "module": "Baixar",
+        "moduleNamed": "Baixar o módulo {title}",
+        "saved": "Salvo",
+        "lessonNamed": "Baixar a lição {title}",
+        "lessonSaved": "Salva para offline"
+      }
+    },
+    "billing": {
+      "title": "Assinatura",
+      "currentPlan": "Plano atual",
+      "status": {
+        "TRIALING": "Teste",
+        "ACTIVE": "Ativa",
+        "PAST_DUE": "Pagamento falhou",
+        "CANCELED": "Cancelada",
+        "INCOMPLETE": "Incompleta",
+        "INCOMPLETE_EXPIRED": "Expirada",
+        "UNPAID": "Não paga",
+        "PAUSED": "Pausada"
+      },
+      "source": {
+        "STRIPE_WEB": "Web (cartão, PIX ou Boleto)",
+        "APPLE_IAP": "App Store",
+        "GOOGLE_PLAY": "Google Play",
+        "ADMIN_GRANT": "Concedida pelo Codify"
+      },
+      "fact": {
+        "access": "Acesso premium",
+        "source": "Comprada via",
+        "renews": "Renova em",
+        "ends": "Acesso até"
+      },
+      "accessYes": "Ativo",
+      "accessNo": "Inativo",
+      "pastDue": {
+        "title": "Seu último pagamento não foi aprovado",
+        "body": "Atualize sua forma de pagamento para manter o acesso. Vamos tentar a cobrança de novo automaticamente."
+      },
+      "updatePayment": "Atualizar forma de pagamento",
+      "managePayment": "Gerenciar pagamento e faturas",
+      "cancelPending": "Sua assinatura foi cancelada e não será renovada. Você mantém o acesso até {date}.",
+      "prepaidNote": "Pagamento único — o acesso vai até {date}. Compre o plano de novo para estender.",
+      "grantNote": "Este acesso foi concedido pelo Codify — não há nada para gerenciar ou pagar.",
+      "manageApple": "Comprada na App Store — gerencie ou cancele nas assinaturas do seu ID Apple.",
+      "manageGoogle": "Comprada no Google Play — gerencie ou cancele nas assinaturas da Play Store.",
+      "resume": "Retomar assinatura",
+      "resumed": "Sua assinatura será renovada normalmente.",
+      "cancel": "Cancelar assinatura",
+      "canceled": "Assinatura cancelada. Você mantém o acesso até {date}.",
+      "freeTitle": "Você está no plano gratuito",
+      "freeBody": "As lições de prévia gratuitas estão sempre abertas. Escolha um plano para liberar todas as lições dos cursos incluídos.",
+      "choosePlan": "Escolha um plano",
+      "otherPlans": "Planos",
+      "periodLabel": "Período de cobrança",
+      "noPlans": "Nenhum plano disponível",
+      "noPlansBody": "Volte em breve.",
+      "select": "Escolher",
+      "checkoutTitle": "Assinar {plan}",
+      "methodLabel": "Forma de pagamento",
+      "method": {
+        "card": {
+          "title": "Cartão de crédito",
+          "body": "Renova automaticamente. Planos anuais podem ser parcelados."
+        },
+        "pix": {
+          "title": "PIX",
+          "body": "Pagamento único por um ano — pague o QR code e o acesso é liberado quando confirmar."
+        },
+        "boleto": {
+          "title": "Boleto",
+          "body": "Pagamento único por um ano — a confirmação pode levar até 3 dias úteis."
+        },
+        "annualOnly": "Disponível para o plano anual em reais."
+      },
+      "storeCheckout": "Você vai confirmar a compra com sua conta da loja de apps.",
+      "continueCheckout": "Continuar para o pagamento",
+      "checkoutCanceled": "Pagamento cancelado — nada foi cobrado.",
+      "purchased": "Compra concluída — aproveite!",
+      "storeMissing": "Este plano ainda não está disponível na loja de apps.",
+      "restore": "Restaurar compras",
+      "restored": "Compras restauradas.",
+      "nothingToRestore": "Nenhuma compra anterior encontrada.",
+      "confirm": {
+        "title": "Cancelar sua assinatura?",
+        "keepAccess": "Você mantém acesso completo até {date}.",
+        "noCharge": "Você não será cobrado de novo.",
+        "resumeAnytime": "Você pode retomar a qualquer momento antes dessa data.",
+        "reasonLabel": "Conte o motivo (opcional)",
+        "reasonSkip": "Prefiro não dizer",
+        "reasons": {
+          "tooExpensive": "Está caro demais",
+          "notUsing": "Não estou usando o suficiente",
+          "missingContent": "Falta o conteúdo de que preciso",
+          "technical": "Problemas técnicos",
+          "other": "Outro motivo"
+        },
+        "keep": "Manter assinatura",
+        "cancel": "Cancelar assinatura"
+      },
+      "success": {
+        "confirming": "Confirmando sua assinatura…",
+        "checking": "Verificando seu pagamento…",
+        "checkAgain": "Verificar de novo",
+        "keepLearning": "Continue estudando enquanto isso",
+        "pendingTitle": "Pagamento pendente",
+        "pending": {
+          "card": "Seu pagamento no cartão está sendo confirmado. Isso costuma levar alguns segundos.",
+          "pix": "Pague o QR code PIX do checkout. Seu plano é liberado assim que o pagamento confirmar — geralmente em até um minuto.",
+          "boleto": "Pague o boleto no banco ou no app. A confirmação pode levar até 3 dias úteis; liberamos seu plano automaticamente."
+        },
+        "doneTitle": "Tudo certo!",
+        "active": "{plan} está ativo até {date}.",
+        "trialActive": "Seu teste do {plan} está ativo até {date}.",
+        "start": "Começar a estudar",
+        "view": "Ver assinatura",
+        "errorTitle": "Não deu certo",
+        "errorBody": "Não conseguimos confirmar uma assinatura a partir deste link.",
+        "back": "Voltar aos planos"
+      }
+    },
+    "shop": {
+      "title": "Loja",
+      "balance": "Suas moedas",
+      "dressingRoom": "Provador",
+      "filterSlot": "Filtrar por espaço",
+      "canAfford": "Posso comprar",
+      "emptyTitle": "Nada aqui ainda",
+      "emptyBody": "Volte quando chegarem itens novos.",
+      "limitedTitle": "Edição limitada",
+      "endsIn": "termina em {time}",
+      "allItems": "Todos os itens",
+      "tryingOn": "Prévia no seu avatar",
+      "tryInRoom": "Provar no provador",
+      "buy": "Comprar por {cost}",
+      "buyAndWear": "Comprar e usar agora",
+      "wear": "Usar",
+      "bought": "Você comprou {name}!",
+      "boughtAndWearing": "Você comprou {name} e já está usando!",
+      "wearing": "Agora você está usando {name}.",
+      "alreadyOwned": "Você já tem {name}.",
+      "reason": {
+        "coins": "Moedas insuficientes — conclua mais algumas lições.",
+        "level": "Libera no nível {level}.",
+        "unavailable": "Indisponível no momento."
+      }
+    },
+    "avatar": {
+      "title": "Provador",
+      "offline": "Você está offline — seu avatar é exibido a partir deste aparelho. Conecte-se para alterá-lo.",
+      "tryingOn": "Provando {name}",
+      "tryOnHint": "Isto é uma prévia — compre na loja para ficar com o item.",
+      "backToShop": "Voltar à loja",
+      "stopTryOn": "Parar prévia",
+      "builderTitle": "Personalize seu avatar",
+      "skinTone": "Tom de pele",
+      "tones": {
+        "porcelain": "Porcelana",
+        "light": "Claro",
+        "tan": "Moreno claro",
+        "brown": "Moreno",
+        "deep": "Escuro"
+      },
+      "inventory": "Inventário",
+      "browseShop": "Ver loja",
+      "saved": "Visual salvo."
+    },
+    "profile": {
+      "title": "Perfil",
+      "viewPublic": "Ver seu perfil público",
+      "navLabel": "Conta",
+      "links": {
+        "myCourses": {
+          "title": "Meus cursos",
+          "body": "Cursos em que você está inscrito"
+        },
+        "subscription": {
+          "title": "Assinatura",
+          "body": "Seu plano, cobrança e cancelamento"
+        },
+        "friends": {
+          "title": "Amigos",
+          "body": "Convide, adicione e cutuque amigos"
+        },
+        "league": {
+          "title": "Liga",
+          "body": "Classificação da semana"
+        },
+        "downloads": {
+          "title": "Downloads",
+          "body": "Cursos offline e armazenamento"
+        }
+      },
+      "account": "Conta",
+      "displayName": "Nome de exibição",
+      "nameSaved": "Nome de exibição salvo.",
+      "manageAccount": "Gerenciar login e segurança",
+      "preferences": "Preferências",
+      "sound": "Efeitos sonoros",
+      "reduceMotion": "Reduzir animações",
+      "reduceMotionHint": "Dispensa confetes e moedas voando; as recompensas aparecem como uma mensagem curta.",
+      "session": "Sessão",
+      "signedInAs": "Conectado como {email}",
+      "certificates": {
+        "title": "Certificados",
+        "empty": "Conclua um curso para ganhar um certificado compartilhável.",
+        "issued": "Emitido em {date}",
+        "shareNamed": "Compartilhar o certificado de {title}",
+        "shareTitle": "Meu certificado Codify",
+        "shareText": "Concluí {title} no Codify — verifique aqui:"
+      },
+      "referral": {
+        "title": "Convide amigos e ganhe recompensas",
+        "body": "Quando alguém entra pelo seu link e conclui a primeira lição, você ganha XP e moedas.",
+        "invited": "Entraram",
+        "converted": "Concluíram uma lição",
+        "rewards": "Você ganhou"
+      }
+    },
+    "publicProfile": {
+      "tierLevel": "{tier} · Nível {level}",
+      "lessons": "Lições",
+      "streak": "Ofensiva",
+      "best": "Melhor ofensiva",
+      "friends": "Amigos",
+      "badges": "{count, plural, =0 {Conquistas} other {Conquistas (#)}}",
+      "noBadges": "Nenhuma conquista ainda.",
+      "loadError": "Não foi possível carregar este perfil",
+      "notFound": "Perfil não encontrado",
+      "notFoundBody": "Esta pessoa pode não existir mais."
+    },
+    "forbidden": {
+      "title": "Sem acesso",
+      "heading": "Você não pode acessar esta página",
+      "body": "Sua conta não tem a função necessária para ver esta seção.",
+      "back": "Voltar para Hoje"
+    },
+    "verify": {
+      "metaTitle": "Verificar certificado — Codify",
+      "metaDescription": "Confira se um certificado de conclusão do Codify é autêntico pelo número de série.",
+      "title": "Verificar certificado",
+      "subtitle": "Digite o número de série impresso no certificado para confirmar que é autêntico.",
+      "serialLabel": "Número de série do certificado",
+      "placeholder": "CDFY-XXXX-XXXX-XXXX-XXXX",
+      "submit": "Verificar",
+      "checking": "Verificando…",
+      "error": "Não foi possível verificar este certificado agora. Tente de novo em instantes.",
+      "valid": "✓ Certificado verificado",
+      "imageAlt": "Certificado concedido a {name} por {course}",
+      "recipient": "Destinatário",
+      "course": "Curso",
+      "type": "Tipo",
+      "capstone": "Certificado de projeto final",
+      "issued": "Emitido em",
+      "serial": "Número de série",
+      "invalid": "Nenhum certificado corresponde a esse número de série."
+    }
+  }
+}
