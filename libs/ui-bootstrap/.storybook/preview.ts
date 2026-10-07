@@ -11,9 +11,9 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     a11y: {
-      // Surface axe violations in the addon panel; do not block stories yet —
-      // fix as we iterate per docs/03 §"Done when".
-      test: 'todo',
+      // docs/03 "A11y checks pass": violations fail `nx test-storybook`
+      // (test-runner + axe, light and dark — see .storybook/test-runner.ts).
+      test: 'error',
     },
     controls: {
       matchers: {
@@ -23,7 +23,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ['Atoms', 'Molecules', 'Organisms'],
+        order: ['Foundations', 'Atoms', 'Molecules', 'Organisms'],
       },
     },
   },

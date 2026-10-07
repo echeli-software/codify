@@ -16,6 +16,7 @@
     "../src/**/*.stories.tsx",
     "../src/**/*.stories.mdx",
     "*.js",
-    "*.ts"
+    "*.ts",
+    "../../../tools/storybook/tokens-page.ts"
   ]
 }
