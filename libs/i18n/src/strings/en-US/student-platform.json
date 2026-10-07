@@ -1,1 +1,208 @@
-{ "studentPlatform": {} }
+{
+  "studentPlatform": {
+    "nav": {
+      "today": "Today",
+      "catalog": "Catalog",
+      "myCourses": "My courses",
+      "league": "League",
+      "friends": "Friends",
+      "shop": "Shop",
+      "avatar": "Avatar",
+      "profile": "Profile",
+      "downloads": "Downloads",
+      "subscription": "Subscription"
+    },
+    "shell": {
+      "brand": "Codify",
+      "openAccount": "Account of {name}",
+      "statsLabel": "Your progress",
+      "level": "Level {level}",
+      "streak": "{count, plural, one {# day streak} other {# day streak}}",
+      "coins": "{count, plural, one {# coin} other {# coins}}",
+      "xp": "{count} XP",
+      "more": "More",
+      "moreNav": "More sections"
+    },
+    "offline": {
+      "openSheet": "Open sync status",
+      "chipOffline": "Offline",
+      "chipSignIn": "Sign in to sync",
+      "chipPending": "{count, plural, one {# to sync} other {# to sync}}",
+      "sheetTitle": "Sync",
+      "online": "Online",
+      "offline": "Offline",
+      "offlineBanner": "You're offline. Your progress will sync when you're back online.",
+      "nothingPending": "Everything is synced.",
+      "attempts": "{count, plural, one {# try} other {# tries}}",
+      "stuck": "Couldn't sync after several tries. Retry with “Sync now”, or discard it.",
+      "discard": "Discard",
+      "confirmDiscard": "Discard for good",
+      "manageDownloads": "Manage downloads",
+      "syncNow": "Sync now",
+      "event": {
+        "lesson": "Lesson completed — waiting to sync",
+        "lessonTitled": "Lesson “{title}” completed — waiting to sync",
+        "quiz": "Quiz answers — waiting to be graded",
+        "quizTitled": "Quiz “{title}” — waiting to be graded"
+      }
+    },
+    "sync": {
+      "discardedOtherUser": "{count, plural, one {# offline change from the previous account on this device was discarded — it was not credited to you.} other {# offline changes from the previous account on this device were discarded — they were not credited to you.}}",
+      "quizPassed": "Quiz synced: {score}% — passed!",
+      "quizFailed": "Quiz synced: {score}%. Try again to pass.",
+      "signInAgain": "Please sign in again to sync your progress.",
+      "paywall": "A lesson you completed offline now needs a subscription, so it wasn't credited.",
+      "dropped": "An offline change couldn't be synced: {reason}",
+      "allSynced": "All progress is synced.",
+      "someRemaining": "{count, plural, one {# change is still waiting to sync.} other {# changes are still waiting to sync.}}"
+    },
+    "session": {
+      "signOutTitle": "Sign out?",
+      "signOutUnsynced": "{count, plural, one {You have # unsynced change. Signing out discards it and removes your downloads from this device. Sign out anyway?} other {You have # unsynced changes. Signing out discards them and removes your downloads from this device. Sign out anyway?}}",
+      "signOutAnyway": "Sign out anyway"
+    },
+    "storage": {
+      "promptTitle": "Make room for this download?",
+      "promptBodyCourse": "Downloading “{title}” goes {size} over your storage budget.",
+      "promptBodyBudget": "Your downloads are {size} over the new storage budget.",
+      "promptEvictList": "These least-recently-read courses would be removed:",
+      "promptInsufficient": "Removing other downloads still isn't enough. Raise the storage budget or download less.",
+      "promptConfirm": "Remove and continue",
+      "raiseBudget": "Storage settings"
+    },
+    "update": {
+      "available": "A new version of Codify is available.",
+      "reload": "Reload",
+      "broken": "Codify needs to reload to keep working offline."
+    },
+    "downloads": {
+      "title": "Downloads",
+      "storage": "Storage",
+      "usedOfBudget": "{used} of {budget} used",
+      "usedPct": "{pct}% of the storage budget used",
+      "deviceEstimate": "This device: {usage} used by Codify of {quota} available to the browser.",
+      "lowSpace": "You're running low — remove a course or raise the budget to free up space.",
+      "evictionPolicy": "When a new download doesn't fit, we'll ask before removing the courses you read least recently. Your avatar and progress are never removed.",
+      "preferences": "Preferences",
+      "wifiOnly": "Download on Wi-Fi only",
+      "autoUpdate": "Update downloads automatically on Wi-Fi",
+      "autoDownloadEnrolled": "Auto-download courses I enroll in",
+      "budget": "Storage budget",
+      "waitingForWifiHint": "Downloads are paused on mobile data and resume on Wi-Fi.",
+      "sync": "Sync",
+      "pending": "{count, plural, =0 {No changes waiting to sync.} one {# change waiting to sync.} other {# changes waiting to sync.}}",
+      "checkUpdates": "Check for updates",
+      "courses": "Downloaded courses ({count})",
+      "removeAll": "Remove all",
+      "emptyTitle": "No downloads yet",
+      "emptyBody": "Download a course from its page to read it offline.",
+      "lessonsCount": "{count} of {total} lessons",
+      "updatedAgo": "updated {when}",
+      "state": {
+        "complete": "Offline",
+        "partial": "Partly downloaded",
+        "downloading": "Downloading {pct}%",
+        "waitingForWifi": "Waiting for Wi-Fi",
+        "needsSpace": "Needs space",
+        "error": "Download failed",
+        "paused": "Paused"
+      },
+      "updateAvailable": "Update available",
+      "progressLabel": "Caching lesson {current} of {total}",
+      "update": "Update",
+      "pause": "Pause",
+      "resume": "Resume",
+      "removeTitle": "Remove download?",
+      "removeBody": "Remove “{title}” ({size}) from this device? Your progress is kept.",
+      "removeAllBody": "Remove all downloads ({size}) from this device? Your progress is kept.",
+      "removed": "Download removed.",
+      "updated": "“{title}” is up to date.",
+      "updatesFound": "{count, plural, one {# course has updates.} other {# courses have updates.}}",
+      "upToDate": "All downloads are up to date."
+    },
+    "login": {
+      "offline": "You need to be online to sign in. Once signed in, you can use Codify offline.",
+      "welcome": "Welcome to Codify",
+      "clerkBody": "Sign in or create your account to keep learning.",
+      "devTitle": "Codify dev login",
+      "devBody": "Clerk is not configured — pick an account to continue.",
+      "displayName": "Display name (optional)",
+      "displayNamePlaceholder": "Your name",
+      "unavailable": "Sign-in is unavailable right now. Check your connection and try again.",
+      "account": {
+        "student": {
+          "name": "Student",
+          "description": "Default — access learning surfaces."
+        },
+        "student2": {
+          "name": "Second student",
+          "description": "Another learner — test account switching."
+        },
+        "teacher": {
+          "name": "Teacher",
+          "description": "Author and edit own courses."
+        },
+        "support": {
+          "name": "Support",
+          "description": "Read-only across the catalog."
+        },
+        "admin": {
+          "name": "Admin",
+          "description": "Full administrative access."
+        }
+      }
+    },
+    "capability": {
+      "exercise": {
+        "title": "Connect to run code",
+        "reason": "Code exercises run on our servers, so they need an internet connection. Your downloaded lessons still work offline."
+      },
+      "aiPrompt": {
+        "title": "Connect to grade",
+        "reason": "AI prompt lessons are graded online. Reconnect to submit your prompt."
+      },
+      "shop": {
+        "title": "Connect to purchase",
+        "reason": "Coin purchases are confirmed by the server, so the shop needs a connection. You can still re-equip items you own."
+      },
+      "social": {
+        "title": "Connect to see friends",
+        "reason": "Friends, requests and nudges need an internet connection."
+      },
+      "payments": {
+        "title": "Connect to manage your plan",
+        "reason": "Payments and subscription changes can only happen online."
+      },
+      "leaderboard": {
+        "title": "Connect to see the league",
+        "reason": "League rankings update live, so they need an internet connection."
+      }
+    },
+    "errors": {
+      "network": "You appear to be offline. Check your connection and try again.",
+      "validation": "Some information wasn't accepted. Check it and try again.",
+      "unauthorized": "Your session ended. Please sign in again.",
+      "paywall": "This content needs a subscription.",
+      "forbidden": "You don't have access to this.",
+      "notFound": "We couldn't find that — it may have been removed.",
+      "conflict": "This was already done.",
+      "tooLarge": "That file is too large.",
+      "rateLimited": "Too many tries — wait a moment and try again.",
+      "unavailable": "Codify is temporarily unavailable. Try again shortly.",
+      "server": "Something went wrong on our side. Try again.",
+      "unknown": "Something went wrong. Please try again.",
+      "alreadyCompleted": "You already completed this lesson.",
+      "completesViaOwnFlow": "This lesson is completed by finishing its activity.",
+      "quizRequiresGrading": "Answer the quiz to complete this lesson.",
+      "quizCooldown": "Wait a moment before trying the quiz again.",
+      "noAttemptsLeft": "No attempts left for now.",
+      "aiCooldown": "Wait a moment before submitting again.",
+      "aiRateLimit": "You're submitting too fast — try again in a minute.",
+      "aiRateLimitDay": "You've reached today's AI grading limit. Come back tomorrow.",
+      "runnerUnavailable": "The code runner is busy right now. Try again shortly.",
+      "clientTimestamp": "Your device clock looks off — check the date and time.",
+      "enrollmentGranted": "This course was granted to you and can't be removed here.",
+      "deviceRebind": "This device was linked to another account. Try again to link it to yours."
+    }
+  }
+}

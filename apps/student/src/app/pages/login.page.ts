@@ -4,7 +4,6 @@ import {
   type ElementRef,
   type OnDestroy,
   afterNextRender,
-  computed,
   effect,
   inject,
   signal,
@@ -13,40 +12,40 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
+  IonHeader,
+  IonTitle,
+  IonToolbar,
 } from '@ionic/angular/standalone';
+import { TranslatePipe } from '@codify/i18n';
 import { AppCard, AppInput, FormField, Icon } from '@codify/ui-ionic';
 import { AuthService, safeRedirect, type UserRole } from '@codify/auth';
+import { NetworkStatusService } from '../offline/network-status.service.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 
-const ROLES: { role: UserRole; label: string; description: string }[] = [
-  {
-    role: 'STUDENT',
-    label: 'Student',
-    description: 'Default — access learning surfaces.',
-  },
-  {
-    role: 'TEACHER',
-    label: 'Teacher',
-    description: 'Author + edit own courses.',
-  },
-  {
-    role: 'SUPPORT',
-    label: 'Support',
-    description: 'Read-only across the catalog.',
-  },
-  { role: 'ADMIN', label: 'Admin', description: 'Full administrative access.' },
+interface DevAccount {
+  role: UserRole;
+  /** Dev-token suffix (`dev-token-<id>`); omitted → the role's default user. */
+  id?: string;
+  key: string;
+}
+
+/** Dev role picker — only shown when Clerk isn't configured. */
+const DEV_ACCOUNTS: DevAccount[] = [
+  { role: 'STUDENT', key: 'student' },
+  { role: 'STUDENT', id: 'student2', key: 'student2' },
+  { role: 'TEACHER', key: 'teacher' },
+  { role: 'SUPPORT', key: 'support' },
+  { role: 'ADMIN', key: 'admin' },
 ];
 
 const DEFAULT_TARGET = '/today';
 
 /**
- * Student login. With Clerk configured (`provideAuth({ clerkPublishableKey })`)
- * it mounts Clerk's sign-in (magic link / Google / Apple per docs/14 §1);
- * otherwise it shows the dev role picker. Either way it returns to
- * `?redirect=` (in-app paths only) once signed in.
+ * Student login. With Clerk configured it mounts Clerk's sign-in (magic
+ * link / Google / Apple per docs/14 §1); otherwise it shows the dev account
+ * picker. Either way it returns to `?redirect=` (in-app paths only). Sign-in
+ * needs connectivity (docs/16 §4) — offline we say so instead of failing.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,81 +59,131 @@ const DEFAULT_TARGET = '/today';
     AppInput,
     FormField,
     Icon,
+    TranslatePipe,
   ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Sign in</ion-title>
+        <ion-title>{{ 'common.signIn' | translate }}</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <cdf-app-card padding="spacious">
-        <header
-          style="display:flex; align-items:center; gap:12px; margin-bottom:16px;"
-        >
-          <cdf-icon name="rocket" size="lg" />
-          <div>
-            @if (clerkMode) {
-              <h2 style="margin:0;">Welcome to Codify</h2>
-              <p
-                style="margin:0; color:var(--cdf-color-text-muted); font-size:13px;"
-              >
-                Sign in or create your account to keep learning.
-              </p>
-            } @else {
-              <h2 style="margin:0;">Codify dev login</h2>
-              <p
-                style="margin:0; color:var(--cdf-color-text-muted); font-size:13px;"
-              >
-                Clerk is not configured — pick a role to continue.
-              </p>
-            }
-          </div>
-        </header>
-
-        @if (clerkMode) {
-          <div
-            #clerkSignIn
-            class="clerk-sign-in"
-            data-testid="clerk-sign-in"
-          ></div>
-        } @else {
-          <cdf-form-field label="Display name (optional)">
-            <cdf-app-input
-              [(ngModel)]="displayNameModel"
-              placeholder="Maria Souza"
-            />
-          </cdf-form-field>
-
-          <ul
-            style="list-style:none; padding:0; margin: 16px 0 0; display:flex; flex-direction:column; gap:8px;"
-          >
-            @for (r of roles; track r.role) {
-              <li>
-                <button type="button" class="role-btn" (click)="signIn(r.role)">
-                  <span class="role-btn__name">{{ r.label }}</span>
-                  <span class="role-btn__desc">{{ r.description }}</span>
-                </button>
-              </li>
-            }
-          </ul>
+      <div class="wrap">
+        @if (!online()) {
+          <p class="offline" role="status" data-testid="login-offline">
+            <cdf-icon name="cloud-offline" size="sm" />
+            {{ 'studentPlatform.login.offline' | translate }}
+          </p>
         }
+        <cdf-app-card padding="spacious">
+          <header class="head">
+            <cdf-icon name="rocket" size="lg" />
+            <div>
+              @if (clerkMode) {
+                <h1>{{ 'studentPlatform.login.welcome' | translate }}</h1>
+                <p class="muted">
+                  {{ 'studentPlatform.login.clerkBody' | translate }}
+                </p>
+              } @else {
+                <h1>{{ 'studentPlatform.login.devTitle' | translate }}</h1>
+                <p class="muted">
+                  {{ 'studentPlatform.login.devBody' | translate }}
+                </p>
+              }
+            </div>
+          </header>
 
-        @if (errorMessage(); as msg) {
-          <p class="error" role="alert">{{ msg }}</p>
-        }
-      </cdf-app-card>
+          @if (clerkMode) {
+            <div
+              #clerkSignIn
+              class="clerk-sign-in"
+              data-testid="clerk-sign-in"
+            ></div>
+          } @else {
+            <cdf-form-field
+              [label]="'studentPlatform.login.displayName' | translate"
+            >
+              <cdf-app-input
+                [(ngModel)]="displayNameModel"
+                [placeholder]="
+                  'studentPlatform.login.displayNamePlaceholder' | translate
+                "
+              />
+            </cdf-form-field>
+
+            <ul class="roles">
+              @for (a of accounts; track a.key) {
+                <li>
+                  <button
+                    type="button"
+                    class="role-btn"
+                    [attr.data-account]="a.key"
+                    [disabled]="!online()"
+                    (click)="signIn(a)"
+                  >
+                    <span class="role-btn__name">{{
+                      'studentPlatform.login.account.' + a.key + '.name'
+                        | translate
+                    }}</span>
+                    <span class="role-btn__desc">{{
+                      'studentPlatform.login.account.' + a.key + '.description'
+                        | translate
+                    }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          @if (errorKey(); as key) {
+            <p class="error" role="alert">{{ key | translate }}</p>
+          }
+        </cdf-app-card>
+      </div>
     </ion-content>
   `,
   styles: [
     `
-      :host {
-        display: block;
+      .wrap {
         max-width: 540px;
         margin: 0 auto;
       }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .head h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .muted {
+        margin: 0;
+        color: var(--cdf-color-text-muted);
+        font-size: 13px;
+      }
+      .offline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--cdf-color-warning-subtle, #fff4d6);
+        color: var(--cdf-color-warning-strong, #8a5a00);
+        font-size: 14px;
+      }
+      .roles {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .role-btn {
         all: unset;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         gap: 2px;
@@ -151,6 +200,10 @@ const DEFAULT_TARGET = '/today';
       .role-btn:focus-visible {
         outline: 2px solid var(--cdf-color-primary);
         outline-offset: 2px;
+      }
+      .role-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
       .role-btn__name {
         font-weight: 600;
@@ -176,32 +229,30 @@ export class LoginPage implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  protected readonly roles = ROLES;
+  private readonly network = inject(NetworkStatusService);
+  private readonly telemetry = inject(TelemetryService);
+  protected readonly accounts = DEV_ACCOUNTS;
   protected readonly clerkMode = this.auth.mode === 'clerk';
+  protected readonly online = this.network.online;
   protected displayNameModel = '';
-  protected readonly errorMessage = signal<string | null>(null);
-  protected readonly currentRole = computed(() => this.auth.role());
+  protected readonly errorKey = signal<string | null>(null);
   private readonly clerkHost =
     viewChild<ElementRef<HTMLDivElement>>('clerkSignIn');
   private mountedNode: HTMLDivElement | null = null;
 
   constructor() {
-    if (!this.clerkMode) return;
-    // Clerk sign-in completes asynchronously; leave once the session (and
-    // the API role) resolves — also covers arriving here already signed in.
+    this.telemetry.track('login_viewed', { mode: this.auth.mode });
+    // Already signed in (or Clerk finished asynchronously) → go back.
     effect(() => {
       if (this.auth.isAuthenticated())
         void this.router.navigateByUrl(this.target());
     });
-    afterNextRender(() => {
-      const node = this.clerkHost()?.nativeElement;
-      if (!node) return;
-      this.mountedNode = node;
-      this.auth.mountSignIn(node, { redirectUrl: this.target() }).catch(() => {
-        this.errorMessage.set(
-          'Sign-in is unavailable right now. Check your connection and try again.',
-        );
-      });
+    if (!this.clerkMode) return;
+    afterNextRender(() => void this.mountClerk());
+    // Came back online → mount the sign-in widget if it failed earlier.
+    effect(() => {
+      if (this.online() && this.errorKey() && !this.mountedNode)
+        void this.mountClerk();
     });
   }
 
@@ -209,11 +260,38 @@ export class LoginPage implements OnDestroy {
     if (this.mountedNode) this.auth.unmountSignIn(this.mountedNode);
   }
 
-  protected signIn(role: UserRole): void {
-    this.errorMessage.set(null);
+  protected signIn(account: DevAccount): void {
+    this.errorKey.set(null);
+    if (!this.online()) {
+      this.errorKey.set('studentPlatform.login.offline');
+      return;
+    }
     const name = this.displayNameModel.trim();
-    this.auth.signInAs(role, name ? { displayName: name } : {});
+    this.auth.signInAs(account.role, {
+      ...(account.id ? { id: account.id } : {}),
+      ...(name ? { displayName: name } : {}),
+    });
+    this.telemetry.track('sign_in_completed', {
+      mode: 'dev',
+      role: account.role,
+    });
     void this.router.navigateByUrl(this.target());
+  }
+
+  private async mountClerk(): Promise<void> {
+    const node = this.clerkHost()?.nativeElement;
+    if (!node || this.mountedNode) return;
+    try {
+      await this.auth.mountSignIn(node, { redirectUrl: this.target() });
+      this.mountedNode = node;
+      this.errorKey.set(null);
+    } catch {
+      this.errorKey.set(
+        this.online()
+          ? 'studentPlatform.login.unavailable'
+          : 'studentPlatform.login.offline',
+      );
+    }
   }
 
   /** `/login?redirect=/today` — in-app paths only (no open redirects). */

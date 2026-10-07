@@ -11,7 +11,7 @@
  */
 
 const DB_NAME = 'codify-offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_IDENTITY = 'identity';
 const STORE_QUEUE = 'queue';
 /** Per-course download records (keyPath 'courseId'). Phase 8b. */
@@ -20,6 +20,13 @@ const STORE_DOWNLOADS = 'downloads';
 const STORE_DL_LESSONS = 'dl_lessons';
 /** Cached avatar + inventory bundle for the offline dressing room (key 'current'). */
 const STORE_ASSETS = 'assets';
+/** Telemetry events buffered while offline (key 'buffer' → event array). v3. */
+const STORE_TELEMETRY = 'telemetry';
+/**
+ * Downloaded ContentTranslation values (keyPath 'key' = locale|type|id,
+ * index 'byCourse'). v3 — read by the offline translation source.
+ */
+const STORE_DL_TRANSLATIONS = 'dl_translations';
 
 let openP: Promise<IDBDatabase> | null = null;
 
@@ -43,15 +50,31 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_DOWNLOADS, { keyPath: 'courseId' });
       }
       if (!db.objectStoreNames.contains(STORE_DL_LESSONS)) {
-        const ls = db.createObjectStore(STORE_DL_LESSONS, { keyPath: 'lessonId' });
+        const ls = db.createObjectStore(STORE_DL_LESSONS, {
+          keyPath: 'lessonId',
+        });
         ls.createIndex('byCourse', 'courseId', { unique: false });
       }
       if (!db.objectStoreNames.contains(STORE_ASSETS)) {
         db.createObjectStore(STORE_ASSETS);
       }
+      // v3: offline telemetry buffer.
+      if (!db.objectStoreNames.contains(STORE_TELEMETRY)) {
+        db.createObjectStore(STORE_TELEMETRY);
+      }
+      if (!db.objectStoreNames.contains(STORE_DL_TRANSLATIONS)) {
+        const ts = db.createObjectStore(STORE_DL_TRANSLATIONS, {
+          keyPath: 'key',
+        });
+        ts.createIndex('byCourse', 'courseId', { unique: false });
+      }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      // Let a later call retry (e.g. storage was blocked transiently).
+      openP = null;
+      reject(req.error);
+    };
   });
   return openP;
 }
@@ -78,7 +101,8 @@ async function tx<T>(
       result.then(resolve, reject);
     }
     transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error ?? new Error('aborted'));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error('aborted'));
   });
 }
 
@@ -88,6 +112,13 @@ export const idbStores = {
   STORE_DOWNLOADS,
   STORE_DL_LESSONS,
   STORE_ASSETS,
+  STORE_TELEMETRY,
+  STORE_DL_TRANSLATIONS,
 };
+
+/** True when IndexedDB exists in this runtime (false in jsdom/SSR). */
+export function idbAvailable(): boolean {
+  return typeof indexedDB !== 'undefined';
+}
 
 export { openDb, tx };

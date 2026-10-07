@@ -1,1 +1,208 @@
-{ "studentPlatform": {} }
+{
+  "studentPlatform": {
+    "nav": {
+      "today": "Hoje",
+      "catalog": "Catálogo",
+      "myCourses": "Meus cursos",
+      "league": "Liga",
+      "friends": "Amigos",
+      "shop": "Loja",
+      "avatar": "Avatar",
+      "profile": "Perfil",
+      "downloads": "Downloads",
+      "subscription": "Assinatura"
+    },
+    "shell": {
+      "brand": "Codify",
+      "openAccount": "Conta de {name}",
+      "statsLabel": "Seu progresso",
+      "level": "Nível {level}",
+      "streak": "{count, plural, one {Sequência de # dia} other {Sequência de # dias}}",
+      "coins": "{count, plural, one {# moeda} other {# moedas}}",
+      "xp": "{count} XP",
+      "more": "Mais",
+      "moreNav": "Mais seções"
+    },
+    "offline": {
+      "openSheet": "Abrir status de sincronização",
+      "chipOffline": "Offline",
+      "chipSignIn": "Entre para sincronizar",
+      "chipPending": "{count, plural, one {# a sincronizar} other {# a sincronizar}}",
+      "sheetTitle": "Sincronização",
+      "online": "Online",
+      "offline": "Offline",
+      "offlineBanner": "Você está offline. Seu progresso será sincronizado quando você voltar a ficar online.",
+      "nothingPending": "Tudo sincronizado.",
+      "attempts": "{count, plural, one {# tentativa} other {# tentativas}}",
+      "stuck": "Não foi possível sincronizar após várias tentativas. Tente “Sincronizar agora” ou descarte.",
+      "discard": "Descartar",
+      "confirmDiscard": "Descartar de vez",
+      "manageDownloads": "Gerenciar downloads",
+      "syncNow": "Sincronizar agora",
+      "event": {
+        "lesson": "Lição concluída — aguardando sincronização",
+        "lessonTitled": "Lição “{title}” concluída — aguardando sincronização",
+        "quiz": "Respostas do quiz — aguardando correção",
+        "quizTitled": "Quiz “{title}” — aguardando correção"
+      }
+    },
+    "sync": {
+      "discardedOtherUser": "{count, plural, one {# alteração offline da conta anterior neste aparelho foi descartada — ela não foi creditada a você.} other {# alterações offline da conta anterior neste aparelho foram descartadas — elas não foram creditadas a você.}}",
+      "quizPassed": "Quiz sincronizado: {score}% — aprovado!",
+      "quizFailed": "Quiz sincronizado: {score}%. Tente de novo para passar.",
+      "signInAgain": "Entre novamente para sincronizar seu progresso.",
+      "paywall": "Uma lição concluída offline agora exige assinatura e não foi creditada.",
+      "dropped": "Uma alteração offline não pôde ser sincronizada: {reason}",
+      "allSynced": "Todo o progresso está sincronizado.",
+      "someRemaining": "{count, plural, one {# alteração ainda aguarda sincronização.} other {# alterações ainda aguardam sincronização.}}"
+    },
+    "session": {
+      "signOutTitle": "Sair?",
+      "signOutUnsynced": "{count, plural, one {Você tem # alteração não sincronizada. Ao sair ela será descartada e seus downloads serão removidos deste aparelho. Sair mesmo assim?} other {Você tem # alterações não sincronizadas. Ao sair elas serão descartadas e seus downloads serão removidos deste aparelho. Sair mesmo assim?}}",
+      "signOutAnyway": "Sair mesmo assim"
+    },
+    "storage": {
+      "promptTitle": "Liberar espaço para este download?",
+      "promptBodyCourse": "Baixar “{title}” passa {size} do seu limite de armazenamento.",
+      "promptBodyBudget": "Seus downloads passam {size} do novo limite de armazenamento.",
+      "promptEvictList": "Estes cursos, lidos há mais tempo, seriam removidos:",
+      "promptInsufficient": "Remover outros downloads ainda não é suficiente. Aumente o limite de armazenamento ou baixe menos.",
+      "promptConfirm": "Remover e continuar",
+      "raiseBudget": "Configurações de armazenamento"
+    },
+    "update": {
+      "available": "Uma nova versão do Codify está disponível.",
+      "reload": "Recarregar",
+      "broken": "O Codify precisa recarregar para continuar funcionando offline."
+    },
+    "downloads": {
+      "title": "Downloads",
+      "storage": "Armazenamento",
+      "usedOfBudget": "{used} de {budget} usados",
+      "usedPct": "{pct}% do limite de armazenamento usado",
+      "deviceEstimate": "Neste aparelho: {usage} usados pelo Codify de {quota} disponíveis para o navegador.",
+      "lowSpace": "O espaço está acabando — remova um curso ou aumente o limite.",
+      "evictionPolicy": "Quando um novo download não couber, perguntaremos antes de remover os cursos lidos há mais tempo. Seu avatar e seu progresso nunca são removidos.",
+      "preferences": "Preferências",
+      "wifiOnly": "Baixar só no Wi-Fi",
+      "autoUpdate": "Atualizar downloads automaticamente no Wi-Fi",
+      "autoDownloadEnrolled": "Baixar automaticamente cursos em que me inscrevo",
+      "budget": "Limite de armazenamento",
+      "waitingForWifiHint": "Os downloads ficam pausados nos dados móveis e continuam no Wi-Fi.",
+      "sync": "Sincronização",
+      "pending": "{count, plural, =0 {Nenhuma alteração aguardando sincronização.} one {# alteração aguardando sincronização.} other {# alterações aguardando sincronização.}}",
+      "checkUpdates": "Procurar atualizações",
+      "courses": "Cursos baixados ({count})",
+      "removeAll": "Remover todos",
+      "emptyTitle": "Nenhum download ainda",
+      "emptyBody": "Baixe um curso na página dele para ler offline.",
+      "lessonsCount": "{count} de {total} lições",
+      "updatedAgo": "atualizado {when}",
+      "state": {
+        "complete": "Offline",
+        "partial": "Parcialmente baixado",
+        "downloading": "Baixando {pct}%",
+        "waitingForWifi": "Aguardando Wi-Fi",
+        "needsSpace": "Precisa de espaço",
+        "error": "Falha no download",
+        "paused": "Pausado"
+      },
+      "updateAvailable": "Atualização disponível",
+      "progressLabel": "Salvando lição {current} de {total}",
+      "update": "Atualizar",
+      "pause": "Pausar",
+      "resume": "Continuar",
+      "removeTitle": "Remover download?",
+      "removeBody": "Remover “{title}” ({size}) deste aparelho? Seu progresso é mantido.",
+      "removeAllBody": "Remover todos os downloads ({size}) deste aparelho? Seu progresso é mantido.",
+      "removed": "Download removido.",
+      "updated": "“{title}” está atualizado.",
+      "updatesFound": "{count, plural, one {# curso tem atualizações.} other {# cursos têm atualizações.}}",
+      "upToDate": "Todos os downloads estão atualizados."
+    },
+    "login": {
+      "offline": "Você precisa estar online para entrar. Depois de entrar, dá para usar o Codify offline.",
+      "welcome": "Boas-vindas ao Codify",
+      "clerkBody": "Entre ou crie sua conta para continuar aprendendo.",
+      "devTitle": "Login de desenvolvimento do Codify",
+      "devBody": "O Clerk não está configurado — escolha uma conta para continuar.",
+      "displayName": "Nome de exibição (opcional)",
+      "displayNamePlaceholder": "Seu nome",
+      "unavailable": "O login está indisponível agora. Verifique sua conexão e tente de novo.",
+      "account": {
+        "student": {
+          "name": "Aluno",
+          "description": "Padrão — acessa as áreas de aprendizado."
+        },
+        "student2": {
+          "name": "Segundo aluno",
+          "description": "Outro aluno — para testar troca de conta."
+        },
+        "teacher": {
+          "name": "Professor",
+          "description": "Cria e edita os próprios cursos."
+        },
+        "support": {
+          "name": "Suporte",
+          "description": "Somente leitura em todo o catálogo."
+        },
+        "admin": {
+          "name": "Admin",
+          "description": "Acesso administrativo completo."
+        }
+      }
+    },
+    "capability": {
+      "exercise": {
+        "title": "Conecte-se para executar o código",
+        "reason": "Os exercícios de código rodam nos nossos servidores e precisam de internet. Suas lições baixadas continuam funcionando offline."
+      },
+      "aiPrompt": {
+        "title": "Conecte-se para corrigir",
+        "reason": "As lições de prompt com IA são corrigidas online. Conecte-se para enviar seu prompt."
+      },
+      "shop": {
+        "title": "Conecte-se para comprar",
+        "reason": "As compras com moedas são confirmadas pelo servidor, então a loja precisa de conexão. Você ainda pode equipar itens que já tem."
+      },
+      "social": {
+        "title": "Conecte-se para ver amigos",
+        "reason": "Amigos, pedidos e cutucadas precisam de internet."
+      },
+      "payments": {
+        "title": "Conecte-se para gerenciar seu plano",
+        "reason": "Pagamentos e mudanças de assinatura só acontecem online."
+      },
+      "leaderboard": {
+        "title": "Conecte-se para ver a liga",
+        "reason": "O ranking da liga é atualizado ao vivo e precisa de internet."
+      }
+    },
+    "errors": {
+      "network": "Parece que você está offline. Verifique sua conexão e tente de novo.",
+      "validation": "Algumas informações não foram aceitas. Revise e tente de novo.",
+      "unauthorized": "Sua sessão terminou. Entre novamente.",
+      "paywall": "Este conteúdo exige assinatura.",
+      "forbidden": "Você não tem acesso a isto.",
+      "notFound": "Não encontramos isso — pode ter sido removido.",
+      "conflict": "Isso já foi feito.",
+      "tooLarge": "Esse arquivo é grande demais.",
+      "rateLimited": "Muitas tentativas — aguarde um pouco e tente de novo.",
+      "unavailable": "O Codify está temporariamente indisponível. Tente novamente em instantes.",
+      "server": "Algo deu errado do nosso lado. Tente de novo.",
+      "unknown": "Algo deu errado. Tente de novo.",
+      "alreadyCompleted": "Você já concluiu esta lição.",
+      "completesViaOwnFlow": "Esta lição é concluída ao terminar a atividade dela.",
+      "quizRequiresGrading": "Responda o quiz para concluir esta lição.",
+      "quizCooldown": "Aguarde um pouco antes de tentar o quiz de novo.",
+      "noAttemptsLeft": "Sem tentativas restantes por enquanto.",
+      "aiCooldown": "Aguarde um pouco antes de enviar de novo.",
+      "aiRateLimit": "Você está enviando rápido demais — tente em um minuto.",
+      "aiRateLimitDay": "Você atingiu o limite diário de correções por IA. Volte amanhã.",
+      "runnerUnavailable": "O executor de código está ocupado agora. Tente em instantes.",
+      "clientTimestamp": "O relógio do seu aparelho parece errado — confira data e hora.",
+      "enrollmentGranted": "Este curso foi concedido a você e não pode ser removido aqui.",
+      "deviceRebind": "Este aparelho estava vinculado a outra conta. Tente de novo para vinculá-lo à sua."
+    }
+  }
+}

@@ -27,3 +27,44 @@ export const CLERK_PUBLISHABLE_KEY: string | undefined =
   CODIFY_CLERK_PUBLISHABLE_KEY
     ? CODIFY_CLERK_PUBLISHABLE_KEY
     : undefined;
+
+/** Reads a string build define, treating unset/empty as undefined. */
+function defined(value: string | undefined): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+/**
+ * Sentry DSN for the student app (`--define=CODIFY_SENTRY_DSN="'https://…'"`).
+ * Unset means Sentry is not initialised at all.
+ */
+declare const CODIFY_SENTRY_DSN: string | undefined;
+export const SENTRY_DSN: string | undefined = defined(
+  typeof CODIFY_SENTRY_DSN === 'string' ? CODIFY_SENTRY_DSN : undefined,
+);
+
+/**
+ * RevenueCat public SDK keys (`appl_…` / `goog_…`), one per store, injected
+ * the same way. Unset means native IAP is unavailable in that build.
+ */
+declare const CODIFY_REVENUECAT_IOS_KEY: string | undefined;
+declare const CODIFY_REVENUECAT_ANDROID_KEY: string | undefined;
+export const REVENUECAT_IOS_KEY: string | undefined = defined(
+  typeof CODIFY_REVENUECAT_IOS_KEY === 'string'
+    ? CODIFY_REVENUECAT_IOS_KEY
+    : undefined,
+);
+export const REVENUECAT_ANDROID_KEY: string | undefined = defined(
+  typeof CODIFY_REVENUECAT_ANDROID_KEY === 'string'
+    ? CODIFY_REVENUECAT_ANDROID_KEY
+    : undefined,
+);
+
+/**
+ * Release identifier reported to analytics + Sentry
+ * (`--define=CODIFY_APP_VERSION="'1.4.0+212'"`). Falls back to `dev`.
+ */
+declare const CODIFY_APP_VERSION: string | undefined;
+export const APP_VERSION: string =
+  defined(
+    typeof CODIFY_APP_VERSION === 'string' ? CODIFY_APP_VERSION : undefined,
+  ) ?? 'dev';
