@@ -10,14 +10,25 @@
     padding: var(--cdf-space-1) var(--cdf-space-2);
     font-size: var(--cdf-font-size-sm);
 
-    ion-icon {
-      cursor: pointer;
-      color: var(--cdf-color-text-muted);
+    .cdf-app-tag__remove {
+      display: inline-flex;
+      align-items: center;
       margin-inline-start: var(--cdf-space-1);
+      padding: 2px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--cdf-color-text-muted);
       font-size: 14px;
+      cursor: pointer;
 
       &:hover {
         color: var(--cdf-color-text);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 1px;
       }
     }
   }

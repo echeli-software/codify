@@ -5,7 +5,11 @@ import {
   input,
   output,
   signal,
+  ElementRef,
+  viewChild,
 } from '@angular/core';
+import { teardownOverlayOnDestroy } from '../../internal/overlay-teardown.js';
+import { TranslatePipe } from '@codify/i18n';
 import {
   IonModal,
   IonHeader,
@@ -21,7 +25,12 @@ import { Icon } from '../../atoms/icon/icon.js';
 import { AppButton } from '../../atoms/app-button/app-button.js';
 import { AppBadge } from '../../atoms/app-badge/app-badge.js';
 
-export type PaywallReason = 'lesson-locked' | 'course-locked' | 'limit-reached' | 'feature-locked' | 'soft';
+export type PaywallReason =
+  | 'lesson-locked'
+  | 'course-locked'
+  | 'limit-reached'
+  | 'feature-locked'
+  | 'soft';
 
 export interface PaywallPlan {
   id: string;
@@ -44,12 +53,13 @@ export interface PaywallContent {
   footnote?: string;
 }
 
-const DEFAULT_REASON_TITLE: Record<PaywallReason, string> = {
-  'lesson-locked': 'This lesson is in Premium',
-  'course-locked': 'Unlock the full course',
-  'limit-reached': 'You hit today’s free limit',
-  'feature-locked': 'Premium feature',
-  soft: 'Go further with Premium',
+/** Default headline per reason — `ui.paywall.reason.<reason>` keys. */
+const DEFAULT_REASON_KEY: Record<PaywallReason, string> = {
+  'lesson-locked': 'ui.paywall.reason.lessonLocked',
+  'course-locked': 'ui.paywall.reason.courseLocked',
+  'limit-reached': 'ui.paywall.reason.limitReached',
+  'feature-locked': 'ui.paywall.reason.featureLocked',
+  soft: 'ui.paywall.reason.soft',
 };
 
 /**
@@ -77,10 +87,13 @@ const DEFAULT_REASON_TITLE: Record<PaywallReason, string> = {
     Icon,
     AppButton,
     AppBadge,
+    TranslatePipe,
   ],
   template: `
     <ion-modal
+      #modal
       [isOpen]="open()"
+      [attr.aria-label]="title() ?? (titleKey() | translate)"
       [breakpoints]="[0, 0.85, 1]"
       [initialBreakpoint]="0.85"
       handleBehavior="cycle"
@@ -89,12 +102,12 @@ const DEFAULT_REASON_TITLE: Record<PaywallReason, string> = {
       <ng-template>
         <ion-header>
           <ion-toolbar>
-            <ion-title>{{ resolvedTitle() }}</ion-title>
+            <ion-title>{{ title() ?? (titleKey() | translate) }}</ion-title>
             <ion-buttons slot="end">
               <cdf-app-button
                 kind="ghost"
                 size="sm"
-                aria-label="Close paywall"
+                [ariaLabel]="'ui.paywall.close' | translate"
                 (buttonClick)="dismissed.emit()"
               >
                 <cdf-icon name="close" size="md" />
@@ -108,54 +121,64 @@ const DEFAULT_REASON_TITLE: Record<PaywallReason, string> = {
 
           <ul class="cdf-paywall__perks">
             @for (perk of content().perks; track perk) {
-            <li>
-              <cdf-icon name="check-circle" size="sm" />
-              <span>{{ perk }}</span>
-            </li>
+              <li>
+                <cdf-icon name="check-circle" size="sm" />
+                <span>{{ perk }}</span>
+              </li>
             }
           </ul>
 
           @if (cadenceOptions().length > 1) {
-          <ion-segment
-            [value]="activeCadence()"
-            (ionChange)="onCadenceChange($any($event.detail.value))"
-            class="cdf-paywall__cadence"
-          >
-            @for (cad of cadenceOptions(); track cad) {
-            <ion-segment-button [value]="cad">
-              <ion-label>{{ cad === 'yearly' ? 'Yearly' : 'Monthly' }}</ion-label>
-            </ion-segment-button>
-            }
-          </ion-segment>
+            <ion-segment
+              [value]="activeCadence()"
+              (ionChange)="onCadenceChange($any($event.detail.value))"
+              class="cdf-paywall__cadence"
+            >
+              @for (cad of cadenceOptions(); track cad) {
+                <ion-segment-button [value]="cad">
+                  <ion-label>{{
+                    'ui.paywall.cadence.' + cad | translate
+                  }}</ion-label>
+                </ion-segment-button>
+              }
+            </ion-segment>
           }
 
-          <div class="cdf-paywall__plans" role="radiogroup" aria-label="Plans">
+          <div
+            class="cdf-paywall__plans"
+            role="radiogroup"
+            [attr.aria-label]="'ui.paywall.plans' | translate"
+          >
             @for (plan of plansForCadence(); track plan.id) {
-            <button
-              type="button"
-              class="cdf-paywall__plan"
-              [class.cdf-paywall__plan--active]="plan.id === selectedPlanId()"
-              [attr.aria-checked]="plan.id === selectedPlanId()"
-              role="radio"
-              (click)="selectPlan(plan.id)"
-            >
-              <span class="cdf-paywall__plan-name">{{ plan.name }}</span>
-              <span class="cdf-paywall__plan-price">{{ plan.priceLabel }}</span>
-              @if (plan.badge) {
-              <cdf-app-badge variant="success" [subtle]="true">{{ plan.badge }}</cdf-app-badge>
-              }
-            </button>
+              <button
+                type="button"
+                class="cdf-paywall__plan"
+                [class.cdf-paywall__plan--active]="plan.id === selectedPlanId()"
+                [attr.aria-checked]="plan.id === selectedPlanId()"
+                role="radio"
+                (click)="selectPlan(plan.id)"
+              >
+                <span class="cdf-paywall__plan-name">{{ plan.name }}</span>
+                <span class="cdf-paywall__plan-price">{{
+                  plan.priceLabel
+                }}</span>
+                @if (plan.badge) {
+                  <cdf-app-badge variant="success" [subtle]="true">{{
+                    plan.badge
+                  }}</cdf-app-badge>
+                }
+              </button>
             }
           </div>
 
           <div class="cdf-paywall__cta">
             <cdf-app-button kind="primary" (buttonClick)="confirm()">
-              Continue
+              {{ 'common.continue' | translate }}
             </cdf-app-button>
           </div>
 
           @if (content().footnote) {
-          <p class="cdf-paywall__footnote">{{ content().footnote }}</p>
+            <p class="cdf-paywall__footnote">{{ content().footnote }}</p>
           }
         </ion-content>
       </ng-template>
@@ -164,6 +187,12 @@ const DEFAULT_REASON_TITLE: Record<PaywallReason, string> = {
   styleUrl: './paywall-sheet.scss',
 })
 export class PaywallSheet {
+  private readonly modalRef = viewChild('modal', { read: ElementRef });
+
+  constructor() {
+    teardownOverlayOnDestroy(this.modalRef);
+  }
+
   readonly open = input.required<boolean>();
   readonly reason = input<PaywallReason>('soft');
   readonly content = input.required<PaywallContent>();
@@ -208,8 +237,8 @@ export class PaywallSheet {
     return this.plansForCadence()[0]?.id ?? '';
   });
 
-  protected readonly resolvedTitle = computed(
-    () => this.title() ?? DEFAULT_REASON_TITLE[this.reason()],
+  protected readonly titleKey = computed(
+    () => DEFAULT_REASON_KEY[this.reason()],
   );
 
   protected onCadenceChange(value: 'monthly' | 'yearly' | string): void {

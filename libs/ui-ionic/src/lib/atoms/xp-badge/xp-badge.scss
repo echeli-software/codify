@@ -2,18 +2,24 @@
   display: inline-flex;
   align-items: center;
   gap: var(--cdf-space-1);
-  color: var(--cdf-color-xp);
+  color: var(--cdf-color-xp-text);
   font-weight: var(--cdf-font-weight-semibold);
   font-feature-settings: 'tnum';
 
   cdf-icon {
-    color: var(--cdf-color-xp);
+    color: var(--cdf-color-xp-text);
   }
 }
 
-:host([data-size='sm']) { font-size: var(--cdf-font-size-sm); }
-:host([data-size='md']) { font-size: var(--cdf-font-size-base); }
-:host([data-size='lg']) { font-size: var(--cdf-font-size-lg); }
+:host([data-size='sm']) {
+  font-size: var(--cdf-font-size-sm);
+}
+:host([data-size='md']) {
+  font-size: var(--cdf-font-size-base);
+}
+:host([data-size='lg']) {
+  font-size: var(--cdf-font-size-lg);
+}
 
 .cdf-xp-badge__value {
   color: inherit;
@@ -26,9 +32,11 @@
 }
 
 :host([data-tone='gain']) {
-  color: var(--cdf-color-success);
+  color: var(--cdf-color-success-text);
 
-  cdf-icon { color: var(--cdf-color-success); }
+  cdf-icon {
+    color: var(--cdf-color-success);
+  }
 }
 
 :host([data-tone='large']) {

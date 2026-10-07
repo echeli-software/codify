@@ -37,13 +37,17 @@ export interface AppSelectOption<T = string> {
       [labelPlacement]="labelPlacement()"
       [fill]="fill()"
       [attr.aria-invalid]="invalid() || null"
+      [attr.aria-label]="ariaLabel()"
       (ionChange)="onChangeEvent($event)"
       (ionBlur)="onBlur()"
     >
       @for (opt of options(); track $any(opt.value)) {
-      <ion-select-option [value]="opt.value" [disabled]="opt.disabled ?? false">
-        {{ opt.label }}
-      </ion-select-option>
+        <ion-select-option
+          [value]="opt.value"
+          [disabled]="opt.disabled ?? false"
+        >
+          {{ opt.label }}
+        </ion-select-option>
       }
     </ion-select>
   `,
@@ -59,11 +63,17 @@ export interface AppSelectOption<T = string> {
 export class AppSelect<T = string> implements ControlValueAccessor {
   readonly options = input.required<AppSelectOption<T>[]>();
   readonly placeholder = input<string | null>(null);
-  readonly interface = input<'action-sheet' | 'alert' | 'popover'>('action-sheet');
+  readonly interface = input<'action-sheet' | 'alert' | 'popover'>(
+    'action-sheet',
+  );
   readonly ionLabel = input<string | null>(null);
-  readonly labelPlacement = input<'fixed' | 'stacked' | 'floating' | 'start' | 'end'>('stacked');
+  readonly labelPlacement = input<
+    'fixed' | 'stacked' | 'floating' | 'start' | 'end'
+  >('stacked');
   readonly invalid = input(false);
   readonly fill = input<'outline' | 'solid'>('outline');
+  /** Accessible name when no visible `ionLabel` is shown. */
+  readonly ariaLabel = input<string | null>(null);
 
   protected readonly value = signal<T | null>(null);
   protected readonly disabled = signal(false);

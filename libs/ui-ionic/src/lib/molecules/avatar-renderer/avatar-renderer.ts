@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+} from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 
 export type AvatarSlot =
   | 'PET'
@@ -53,6 +59,7 @@ const SKIN_EMOJI: Record<string, string> = {
 @Component({
   selector: 'cdf-avatar-renderer',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div
       class="avatar"
@@ -62,24 +69,38 @@ const SKIN_EMOJI: Record<string, string> = {
       [class.avatar--ring]="showLevelRing() || !!frameLayer()"
       [style.--ring-color]="ringColor()"
       [attr.role]="'img'"
-      [attr.aria-label]="ariaLabel()"
+      [attr.aria-label]="
+        itemNames().length
+          ? ('ui.avatar.wearing' | translate: { items: itemNames().join(', ') })
+          : ('ui.avatar.label' | translate)
+      "
     >
-      <span class="avatar__base" [style.font-size.px]="size() * 0.6">{{ baseEmoji() }}</span>
+      <span class="avatar__base" [style.font-size.px]="size() * 0.6">{{
+        baseEmoji()
+      }}</span>
 
       @for (layer of layers(); track layer.slot) {
-      @if (layer.kind === 'emoji') {
-      <span class="avatar__layer" [style]="layer.style">{{ layer.value }}</span>
-      } @else {
-      <span class="avatar__layer avatar__layer--color" [style]="layer.style" [style.background]="layer.value"></span>
-      }
+        @if (layer.kind === 'emoji') {
+          <span class="avatar__layer" [style]="layer.style">{{
+            layer.value
+          }}</span>
+        } @else {
+          <span
+            class="avatar__layer avatar__layer--color"
+            [style]="layer.style"
+            [style.background]="layer.value"
+          ></span>
+        }
       }
 
       @if (petLayer(); as pet) {
-      <span class="avatar__pet" [style.font-size.px]="size() * 0.28">{{ pet }}</span>
+        <span class="avatar__pet" [style.font-size.px]="size() * 0.28">{{
+          pet
+        }}</span>
       }
 
       @if (showLevelRing() && level() !== null) {
-      <span class="avatar__level">{{ level() }}</span>
+        <span class="avatar__level">{{ level() }}</span>
       }
     </div>
   `,
@@ -95,7 +116,8 @@ const SKIN_EMOJI: Record<string, string> = {
         background: var(--cdf-color-surface-2, #eef1f6);
       }
       .avatar--ring {
-        box-shadow: 0 0 0 3px var(--ring-color, var(--cdf-color-primary, #5b8def));
+        box-shadow: 0 0 0 3px
+          var(--ring-color, var(--cdf-color-primary, #5b8def));
       }
       .avatar__base,
       .avatar__layer {
@@ -123,7 +145,7 @@ const SKIN_EMOJI: Record<string, string> = {
         bottom: -8px;
         right: -8px;
         background: var(--ring-color, var(--cdf-color-primary, #5b8def));
-        color: #fff;
+        color: var(--cdf-color-ink, #111827);
         font-size: 11px;
         font-weight: 700;
         min-width: 20px;
@@ -157,7 +179,9 @@ export class AvatarRenderer {
     return p.kind === 'color' ? p.value : '';
   });
 
-  protected readonly frameLayer = computed(() => this.equipped()['FRAME'] ?? null);
+  protected readonly frameLayer = computed(
+    () => this.equipped()['FRAME'] ?? null,
+  );
 
   protected readonly ringColor = computed(() => {
     const frame = this.frameLayer();
@@ -175,12 +199,11 @@ export class AvatarRenderer {
     return p.kind === 'emoji' ? p.value : '🐾';
   });
 
-  protected readonly ariaLabel = computed(() => {
-    const names = Object.values(this.equipped())
+  protected readonly itemNames = computed(() =>
+    Object.values(this.equipped())
       .map((s) => s?.name)
-      .filter(Boolean);
-    return names.length ? `Avatar wearing ${names.join(', ')}` : 'Avatar';
-  });
+      .filter((n): n is string => !!n),
+  );
 
   /** Stackable layers (excludes BACKGROUND/PET/FRAME which render specially). */
   protected readonly layers = computed<Layer[]>(() => {
@@ -205,7 +228,16 @@ export class AvatarRenderer {
 }
 
 /** Bottom-to-top draw order for stacked slots. */
-const STACK_ORDER: AvatarSlot[] = ['SHOES', 'BOTTOM', 'TOP', 'ACCESSORY', 'HAIR', 'GLASSES', 'HAT', 'EMOTE'];
+const STACK_ORDER: AvatarSlot[] = [
+  'SHOES',
+  'BOTTOM',
+  'TOP',
+  'ACCESSORY',
+  'HAIR',
+  'GLASSES',
+  'HAT',
+  'EMOTE',
+];
 
 /** Approximate anchor (% from top) + glyph scale per slot on the canvas. */
 const SLOT_POS: Record<AvatarSlot, { top: number; scale: number }> = {
@@ -222,9 +254,14 @@ const SLOT_POS: Record<AvatarSlot, { top: number; scale: number }> = {
   PET: { top: 70, scale: 0.28 },
 };
 
-function parseSprite(token: string): { kind: 'emoji' | 'color'; value: string } {
-  if (token.startsWith('emoji:')) return { kind: 'emoji', value: token.slice(6) };
-  if (token.startsWith('color:')) return { kind: 'color', value: token.slice(6) };
+function parseSprite(token: string): {
+  kind: 'emoji' | 'color';
+  value: string;
+} {
+  if (token.startsWith('emoji:'))
+    return { kind: 'emoji', value: token.slice(6) };
+  if (token.startsWith('color:'))
+    return { kind: 'color', value: token.slice(6) };
   // Unknown token → render a neutral block.
   return { kind: 'color', value: 'rgba(0,0,0,0.1)' };
 }
