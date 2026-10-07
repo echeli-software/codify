@@ -10,7 +10,13 @@ import {
   Min,
 } from 'class-validator';
 
-const LESSON_TYPES = ['READING', 'QUIZ', 'EXERCISE', 'AI_PROMPT', 'SCENARIO'] as const;
+const LESSON_TYPES = [
+  'READING',
+  'QUIZ',
+  'EXERCISE',
+  'AI_PROMPT',
+  'SCENARIO',
+] as const;
 
 /**
  * Body for POST /api/modules/:moduleId/lessons. `contentJson` defaults to
@@ -52,6 +58,14 @@ export class CreateLessonDto {
   @IsInt()
   @Min(0)
   order?: number;
+
+  /**
+   * Optional initial Tiptap doc. Migrated + validated against
+   * `lessonDocSchema` server-side (400 with `issues` when invalid).
+   */
+  @IsOptional()
+  @IsObject()
+  contentJson?: unknown;
 }
 
 export class UpdateLessonDto {
@@ -92,9 +106,10 @@ export class UpdateLessonDto {
   order?: number;
 
   /**
-   * Tiptap document JSON. The shape is validated by the lesson-schema lib
-   * on the client side; here we accept any object and let the renderer
-   * surface a diagnostic if it's malformed.
+   * Tiptap document JSON. Migrated (`migrateLessonDoc`) and validated
+   * against `lessonDocSchema` before persisting; invalid docs are rejected
+   * with 400 + `issues` (docs/14 §3). The whitelisted parse output is what
+   * gets stored.
    */
   @IsOptional()
   @IsObject()
@@ -114,5 +129,35 @@ export interface LessonResponse {
   title: string;
   contentJson: unknown;
   createdAt: string;
+  updatedAt: string;
+}
+
+/** Lesson metadata without content (offline bundle, paywalled views). */
+export type LessonMeta = Omit<LessonResponse, 'contentJson'>;
+
+/**
+ * GET /api/lessons/:id/offline-bundle — everything needed to read a lesson
+ * offline (docs/16 §5). Quiz answer keys are NOT included in the doc;
+ * `quizAnswerHashes` lets the client give instant feedback while the
+ * server stays authoritative when attempts sync.
+ */
+export interface LessonOfflineBundle {
+  lesson: LessonMeta;
+  /** Access-checked LessonDoc with quiz answers stripped. */
+  doc: unknown;
+  quizAnswerHashes: {
+    algorithm: 'sha256';
+    /** Per-bundle salt; hash = sha256(salt NUL quizId NUL sortedIds joined by U+0001). */
+    salt: string;
+    hashes: Record<string, string>;
+  };
+  /** Image URLs referenced by the doc, for asset prefetch. */
+  imageSrcs: string[];
+  updatedAt: string;
+}
+
+/** GET /api/courses/:id/lesson-versions item. */
+export interface LessonVersion {
+  lessonId: string;
   updatedAt: string;
 }
