@@ -29,6 +29,8 @@
       "network": "Você parece estar offline.",
       "notFound": "Não encontrado.",
       "forbidden": "Você não tem acesso a isso."
-    }
+    },
+    "continue": "Continuar",
+    "remove": "Remover"
   }
 }

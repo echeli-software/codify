@@ -26,8 +26,17 @@ import ptTime from '../strings/pt-BR/time.json' with { type: 'json' };
 import ptBilling from '../strings/pt-BR/billing.json' with { type: 'json' };
 import ptUi from '../strings/pt-BR/ui.json' with { type: 'json' };
 
+/**
+ * JSON modules arrive as the object itself (bundlers, esModuleInterop) or
+ * wrapped in `{ default }` (CommonJS test runners without interop).
+ */
+function unwrap(mod: object | undefined): object {
+  if (!mod) return {};
+  return (mod as { default?: object }).default ?? mod;
+}
+
 function mergeAll(...objs: object[]): TranslationObject {
-  return Object.assign({}, ...objs) as TranslationObject;
+  return Object.assign({}, ...objs.map(unwrap)) as TranslationObject;
 }
 
 /** Every shared namespace, merged per locale (exported for key-parity tests). */
