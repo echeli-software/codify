@@ -25,14 +25,22 @@ export function formatRelative(
 
   // Within 30 seconds, use "now" rather than "in N seconds" — feels weird.
   if (absMs < 30_000) {
-    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(0, 'second');
+    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
+      0,
+      'second',
+    );
   }
 
-  for (const { unit, ms } of UNITS) {
-    if (absMs >= ms) {
-      const value = Math.round(diffMs / ms);
-      return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(value, unit);
-    }
-  }
-  return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(0, 'second');
+  // absMs ≥ 30s here, so the 'second' row (1000ms) always matches.
+  const { unit, ms } = UNITS.find(
+    (u) => absMs >= u.ms,
+  ) as (typeof UNITS)[number];
+  const value = Math.round(diffMs / ms);
+  return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
+    value,
+    unit,
+  );
 }
+
+/** Alias matching the docs/03 name. */
+export const formatRelativeDate = formatRelative;
