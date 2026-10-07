@@ -3,14 +3,28 @@ import {
   Inject,
   Injectable,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import type { Prisma, Subscription, SubscriptionStatus } from '@prisma/client';
+import { reportException } from '../common/sentry.js';
+import { GamificationConfigService } from '../gamification/gamification-config.service.js';
+import {
+  GamificationService,
+  coinKey,
+} from '../gamification/gamification.service.js';
+import {
+  PushService,
+  type UserPushContent,
+} from '../notifications/push.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   BILLING_PROVIDER,
   idOf,
+  isRecurringStripeSubscriptionId,
   snapshotFromStripeSubscription,
+  toDate,
   type BillingProvider,
+  type ChargeContext,
   type StripeWebhookEvent,
   type SubscriptionSnapshot,
 } from './billing.provider.js';
@@ -18,10 +32,16 @@ import { addBillingPeriod } from './subscription-view.js';
 import {
   DUPLICATE_RESULT,
   DuplicateWebhookEvent,
+  QUEUED_RESULT,
   WEBHOOK_TX_OPTIONS,
   claimWebhookEvent,
   type WebhookResult,
 } from './webhook-idempotency.js';
+import {
+  BILLING_WEBHOOK_ENQUEUER,
+  type WebhookEnqueuer,
+} from './webhook-queue.js';
+import { paymentFailedCopy } from './billing-push-copy.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -48,9 +68,23 @@ const CHECKOUT_EVENTS = new Set([
   'checkout.session.async_payment_failed',
 ]);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Subscription state fetched before the transaction (network stays outside it). */
 interface Prefetched {
   snapshot: SubscriptionSnapshot | null;
+  /** charge.refunded: what the charge paid for. */
+  charge?: ChargeContext | null;
+}
+
+/** Side effects that must run only after the event's transaction commits. */
+type AfterCommit =
+  | { kind: 'push'; userId: string; content: UserPushContent; what: string }
+  | { kind: 'cancel_at_provider'; stripeSubscriptionId: string };
+
+/** GamificationService idempotency key of a subscription's first-payment bonus. */
+export function firstPaymentBonusKey(subscriptionRowId: string): string {
+  return `billing_bonus:${subscriptionRowId}`;
 }
 
 /**
@@ -66,7 +100,13 @@ interface Prefetched {
  * event delivered late can't roll state back. Without an API (dev), the
  * payload is applied behind a staleness guard (see `isStale`).
  *
- * Processing is inline; /docs/09 §6's BullMQ hand-off can wrap `handle`.
+ * Delivery (/docs/09 §6 steps 3–5): `handleStripe` verifies the signature
+ * and drops fast duplicates inside the HTTP request, then enqueues the
+ * verified event on the `billing-webhooks` BullMQ queue and returns 200.
+ * `WebhookProcessor` runs `processEvent` (claim + apply in one transaction)
+ * with 5 attempts and exponential backoff; the final failure goes to
+ * Sentry. Without Redis in development the event is processed inline; in
+ * production an unreachable queue answers 503 so Stripe retries.
  */
 @Injectable()
 export class WebhookService {
@@ -75,6 +115,11 @@ export class WebhookService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(BILLING_PROVIDER) private readonly billing: BillingProvider,
+    @Inject(BILLING_WEBHOOK_ENQUEUER)
+    private readonly enqueuer: WebhookEnqueuer,
+    private readonly gamification: GamificationService,
+    private readonly config: GamificationConfigService,
+    private readonly push: PushService,
   ) {}
 
   async handleStripe(
@@ -104,12 +149,38 @@ export class WebhookService {
     });
     if (seen) return DUPLICATE_RESULT;
 
+    if (await this.enqueuer.enqueue(event)) return QUEUED_RESULT;
+    if (process.env['NODE_ENV'] === 'production') {
+      this.logger.error(
+        `Billing webhook queue unreachable (REDIS_URL) — answering 503 so Stripe retries ${event.id}`,
+      );
+      throw new ServiceUnavailableException(
+        'Webhook queue unavailable; retry later',
+      );
+    }
+    this.logger.warn(
+      `Billing webhook queue unreachable (REDIS_URL) — processing ${event.type} ${event.id} inline (dev fallback).`,
+    );
+    return this.processEvent(event);
+  }
+
+  /**
+   * Apply one verified event: claim its idempotency key and process it in
+   * the same transaction, then run post-commit side effects (pushes,
+   * provider calls). Throws on failure so the queue retries; a replay of an
+   * applied event is a duplicate. Used by the worker and the dev fallback.
+   */
+  async processEvent(event: StripeWebhookEvent): Promise<WebhookResult> {
+    const key = `stripe:${event.id}`;
     const prefetched = await this.prefetch(event);
+    let effects: AfterCommit[] = [];
     try {
       const handled = await this.prisma.$transaction(async (tx) => {
+        effects = [];
         await claimWebhookEvent(tx, key, 'stripe_webhook');
-        return this.process(tx, event, prefetched);
+        return this.process(tx, event, prefetched, effects);
       }, WEBHOOK_TX_OPTIONS);
+      await this.runAfterCommit(effects, event);
       return { received: true, duplicate: false, handled };
     } catch (err) {
       if (err instanceof DuplicateWebhookEvent) return DUPLICATE_RESULT;
@@ -117,8 +188,18 @@ export class WebhookService {
     }
   }
 
-  /** Fetch the current subscription for subscription-related events (Stripe mode). */
+  /** Network reads for the event, done before (outside) the transaction. */
   private async prefetch(event: StripeWebhookEvent): Promise<Prefetched> {
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object;
+      const ctx =
+        (await this.billing.resolveChargeContext(charge)) ??
+        chargeContextFromPayload(charge);
+      const snapshot = isRecurringStripeSubscriptionId(ctx.subscriptionId)
+        ? await this.billing.retrieveSubscription(ctx.subscriptionId)
+        : null;
+      return { snapshot, charge: ctx };
+    }
     const id = subscriptionIdOf(event);
     if (!id) return { snapshot: null };
     return { snapshot: await this.billing.retrieveSubscription(id) };
@@ -128,6 +209,7 @@ export class WebhookService {
     tx: Tx,
     event: StripeWebhookEvent,
     pre: Prefetched,
+    effects: AfterCommit[],
   ): Promise<boolean> {
     const obj = event.data.object;
     if (SUBSCRIPTION_EVENTS.has(event.type)) {
@@ -144,24 +226,320 @@ export class WebhookService {
       event.type === 'invoice.paid' ||
       event.type === 'invoice.payment_failed'
     ) {
-      if (pre.snapshot) {
-        return this.applySnapshot(tx, pre.snapshot, event, { fromApi: true });
-      }
-      const subId = subscriptionIdOf(event);
-      if (!subId) return false;
-      return this.setStatusFromInvoice(
-        tx,
-        subId,
-        event.type === 'invoice.paid' ? 'ACTIVE' : 'PAST_DUE',
-        event,
-      );
+      return this.handleInvoice(tx, event, pre, effects);
     }
+
+    if (event.type === 'charge.refunded')
+      return this.handleRefund(tx, event, pre, effects);
 
     if (CHECKOUT_EVENTS.has(event.type))
       return this.handleCheckout(tx, event, pre);
 
     this.logger.debug(`Ignoring unhandled event type ${event.type}`);
     return false;
+  }
+
+  /**
+   * invoice.paid → mirror status + first-paid-invoice bonus.
+   * invoice.payment_failed → mirror status (PAST_DUE) + a recovery push on
+   * the transition into PAST_DUE (Stripe's retries fail again; one push).
+   */
+  private async handleInvoice(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    pre: Prefetched,
+    effects: AfterCommit[],
+  ): Promise<boolean> {
+    const paid = event.type === 'invoice.paid';
+    const subId = pre.snapshot?.id ?? subscriptionIdOf(event);
+    if (!subId) return false;
+    const statusBefore = (
+      await tx.subscription.findUnique({
+        where: { stripeSubscriptionId: subId },
+        select: { status: true },
+      })
+    )?.status;
+
+    const applied = pre.snapshot
+      ? await this.applySnapshot(tx, pre.snapshot, event, { fromApi: true })
+      : await this.setStatusFromInvoice(
+          tx,
+          subId,
+          paid ? 'ACTIVE' : 'PAST_DUE',
+          event,
+        );
+
+    const row = await tx.subscription.findUnique({
+      where: { stripeSubscriptionId: subId },
+    });
+    if (!row) return applied;
+
+    if (paid) {
+      const invoice = event.data.object;
+      if (!isFirstPaidInvoice(invoice, row)) return applied;
+      const granted = await this.grantFirstPaymentBonus(
+        tx,
+        row,
+        `invoice ${idOf(invoice['id']) ?? '?'}`,
+      );
+      return applied || granted;
+    }
+
+    if (row.status === 'PAST_DUE' && statusBefore !== 'PAST_DUE') {
+      effects.push({
+        kind: 'push',
+        userId: row.userId,
+        what: 'payment-failed',
+        content: ({ locale }) => ({
+          ...paymentFailedCopy(locale),
+          data: { type: 'billing_payment_failed', subscriptionId: row.id },
+        }),
+      });
+    }
+    return applied;
+  }
+
+  /**
+   * `billing.firstPaymentBonusCoins` once per subscription (docs/09 §5
+   * step 7), flat, journaled under `billing_bonus:<subscription row id>` so
+   * replays and later invoices never pay it twice. 0 = off.
+   */
+  private async grantFirstPaymentBonus(
+    tx: Tx,
+    row: Pick<Subscription, 'id' | 'userId'>,
+    reason: string,
+  ): Promise<boolean> {
+    const coins = await this.config.get('billing.firstPaymentBonusCoins', tx);
+    if (coins <= 0) return false;
+    const key = firstPaymentBonusKey(row.id);
+    if (await this.gamification.alreadyGranted(tx, key)) return false;
+    await this.gamification.grantReward(
+      {
+        userId: row.userId,
+        baseXp: 0,
+        baseCoins: coins,
+        xpSource: 'ADMIN_GRANT',
+        coinSource: 'PROMO_CODE',
+        refType: 'subscription',
+        refId: row.id,
+        idempotencyKey: key,
+        flat: true,
+      },
+      tx,
+    );
+    this.logger.log(
+      `First-payment bonus: ${coins} coins → user ${row.userId} (subscription ${row.id}, ${reason})`,
+    );
+    return true;
+  }
+
+  /**
+   * charge.refunded (docs/09 §5 "Refunds", §12). Always recorded
+   * (AuditLog `billing.refund`). A FULL refund of the subscription's latest
+   * invoice — or of a PIX/Boleto prepay — ends access now; a renewing
+   * Stripe subscription is also canceled at Stripe after commit so it is
+   * not charged again. A full refund within `billing.refundWindowDays` of
+   * the first-payment bonus claws the bonus back, capped at the balance.
+   */
+  private async handleRefund(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    pre: Prefetched,
+    effects: AfterCommit[],
+  ): Promise<boolean> {
+    const charge = event.data.object;
+    const ctx = pre.charge ?? chargeContextFromPayload(charge);
+    const amount = numberOr(charge['amount'], 0);
+    const amountRefunded = numberOr(charge['amount_refunded'], 0);
+    const full =
+      charge['refunded'] === true || (amount > 0 && amountRefunded >= amount);
+    const chargeId = idOf(charge['id']);
+    const record = {
+      eventId: event.id,
+      chargeId,
+      amount: amountRefunded,
+      chargeAmount: amount,
+      currency:
+        typeof charge['currency'] === 'string'
+          ? charge['currency'].toUpperCase()
+          : null,
+      full,
+      invoiceId: ctx.invoiceId,
+      checkoutSessionId: ctx.checkoutSessionId,
+      stripeSubscriptionId: ctx.subscriptionId ?? ctx.checkoutSessionId,
+    };
+
+    const row = await this.findRefundedSubscription(tx, ctx, charge);
+    if (!row) {
+      this.logger.warn(
+        `charge.refunded ${chargeId ?? '?'} (${event.id}): no subscription resolvable — recorded only`,
+      );
+      await this.recordRefund(tx, 'Charge', chargeId, {
+        ...record,
+        resolved: false,
+      });
+      return false;
+    }
+
+    const now = new Date();
+    const prepay = !isRecurringStripeSubscriptionId(row.stripeSubscriptionId);
+    const latest = prepay
+      ? true
+      : pre.snapshot?.latestInvoiceId
+        ? pre.snapshot.latestInvoiceId === ctx.invoiceId
+        : payloadInvoiceIsCurrent(charge['invoice'], row);
+
+    let accessEnded = false;
+    if (full && latest && row.currentPeriodEnd > now) {
+      await tx.subscription.update({
+        where: { id: row.id },
+        data: {
+          status: 'CANCELED',
+          currentPeriodEnd: now,
+          canceledAt: now,
+          pastDueSince: null,
+        },
+      });
+      accessEnded = true;
+      if (
+        !prepay &&
+        this.billing.mode === 'stripe' &&
+        row.stripeSubscriptionId &&
+        pre.snapshot?.status !== 'canceled'
+      ) {
+        effects.push({
+          kind: 'cancel_at_provider',
+          stripeSubscriptionId: row.stripeSubscriptionId,
+        });
+      }
+    }
+
+    let clawedBack = 0;
+    if (full) clawedBack = await this.clawBackBonus(tx, row, eventTime(event));
+
+    await this.recordRefund(tx, 'Subscription', row.id, {
+      ...record,
+      resolved: true,
+      userId: row.userId,
+      subscriptionId: row.id,
+      latestInvoice: latest,
+      accessEnded,
+      clawedBack,
+    });
+    this.logger.log(
+      `charge.refunded ${chargeId ?? '?'} → subscription ${row.id}: ${full ? 'full' : 'partial'}, accessEnded=${accessEnded}, clawedBack=${clawedBack}`,
+    );
+    return true;
+  }
+
+  /** Coins clawed back (0 when there was no bonus or the window passed). */
+  private async clawBackBonus(
+    tx: Tx,
+    row: Pick<Subscription, 'id' | 'userId'>,
+    refundedAt: Date,
+  ): Promise<number> {
+    const bonus = await tx.coinTransaction.findUnique({
+      where: { idempotencyKey: coinKey(firstPaymentBonusKey(row.id)) },
+      select: { delta: true, createdAt: true },
+    });
+    if (!bonus || bonus.delta <= 0) return 0;
+    const windowDays = await this.config.get('billing.refundWindowDays', tx);
+    if (refundedAt.getTime() - bonus.createdAt.getTime() > windowDays * DAY_MS)
+      return 0;
+    const { spent } = await this.gamification.spendCoins(
+      {
+        userId: row.userId,
+        amount: bonus.delta,
+        source: 'PURCHASE_REFUND',
+        refType: 'subscription',
+        refId: row.id,
+        idempotencyKey: `billing_bonus_clawback:${row.id}`,
+        capAtBalance: true,
+      },
+      tx,
+    );
+    return spent;
+  }
+
+  private async findRefundedSubscription(
+    tx: Tx,
+    ctx: ChargeContext,
+    charge: Record<string, unknown>,
+  ): Promise<Subscription | null> {
+    const id = ctx.subscriptionId ?? ctx.checkoutSessionId;
+    if (id) {
+      return tx.subscription.findUnique({
+        where: { stripeSubscriptionId: id },
+      });
+    }
+    // Prepay fallback: the PaymentIntent metadata set at checkout
+    // (userId/planId/priceId) → that user's latest prepay row for the plan.
+    const meta = stringRecord(charge['metadata']);
+    if (meta['userId'] && meta['planId']) {
+      return tx.subscription.findFirst({
+        where: {
+          userId: meta['userId'],
+          planId: meta['planId'],
+          stripeSubscriptionId: { startsWith: 'cs_' },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    return null;
+  }
+
+  private async recordRefund(
+    tx: Tx,
+    entity: string,
+    entityId: string | null,
+    diff: Record<string, unknown>,
+  ): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        action: 'billing.refund',
+        entity,
+        entityId,
+        diff: diff as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  /** Post-commit side effects. Never throws: the event is already applied. */
+  private async runAfterCommit(
+    effects: AfterCommit[],
+    event: StripeWebhookEvent,
+  ): Promise<void> {
+    for (const effect of effects) {
+      try {
+        if (effect.kind === 'push') {
+          const res = await this.push.sendToUser(
+            effect.userId,
+            effect.content,
+            { kind: 'BILLING' },
+          );
+          this.logger.log(
+            `${effect.what} push to ${effect.userId} (${event.id}): ${res.status}`,
+          );
+        } else {
+          await this.billing.cancelSubscriptionNow(effect.stripeSubscriptionId);
+          this.logger.log(
+            `Canceled ${effect.stripeSubscriptionId} at Stripe after a full refund (${event.id})`,
+          );
+        }
+      } catch (err) {
+        this.logger.error(
+          `post-commit ${effect.kind} for ${event.type} ${event.id} failed: ${(err as Error).message}`,
+        );
+        reportException(err, {
+          tags: {
+            job: 'billing-webhook',
+            stripe_event_id: event.id,
+            stripe_event_type: event.type,
+            effect: effect.kind,
+          },
+        });
+      }
+    }
   }
 
   private async handleCheckout(
@@ -240,7 +618,11 @@ export class WebhookService {
       return false;
     }
     const start = eventTime(event);
-    await tx.subscription.upsert({
+    const existing = await tx.subscription.findUnique({
+      where: { stripeSubscriptionId: sessionId },
+      select: { id: true },
+    });
+    const row = await tx.subscription.upsert({
       where: { stripeSubscriptionId: sessionId },
       create: {
         userId,
@@ -256,6 +638,9 @@ export class WebhookService {
       },
       update: {},
     });
+    // A prepay is the subscription's first (and only) payment.
+    if (!existing)
+      await this.grantFirstPaymentBonus(tx, row, `checkout ${sessionId}`);
     return true;
   }
 
@@ -474,6 +859,77 @@ function subscriptionIdOf(event: StripeWebhookEvent): string | null {
     return idOf(o['subscription']);
   }
   return null;
+}
+
+/**
+ * Is this paid invoice the subscription's FIRST paid one? Stripe marks the
+ * invoice that starts a subscription `subscription_create`; with a free
+ * trial that one is $0, and the first charge is the `subscription_cycle`
+ * invoice whose period starts when the trial ends.
+ */
+export function isFirstPaidInvoice(
+  invoice: Record<string, unknown>,
+  row: Pick<Subscription, 'trialEndsAt'>,
+): boolean {
+  if (numberOr(invoice['amount_paid'], 0) <= 0) return false;
+  const reason = invoice['billing_reason'];
+  if (reason === 'subscription_create') return true;
+  if (reason !== 'subscription_cycle' || !row.trialEndsAt) return false;
+  const lines = (invoice['lines'] as { data?: unknown[] } | undefined)?.data;
+  const firstLine = (lines?.[0] ?? null) as {
+    period?: { start?: unknown };
+  } | null;
+  const start = toDate(firstLine?.period?.start) ?? toDate(invoice['created']);
+  return (
+    start !== null &&
+    Math.abs(start.getTime() - row.trialEndsAt.getTime()) <= DAY_MS
+  );
+}
+
+/**
+ * Payload fallback for what a refunded Charge paid for (dev, or when the
+ * API lookup is unavailable): an `invoice` id / expanded invoice (older API
+ * versions) and `metadata.checkoutSessionId`.
+ */
+export function chargeContextFromPayload(
+  charge: Record<string, unknown>,
+): ChargeContext {
+  const inv = charge['invoice'];
+  const invObj =
+    inv && typeof inv === 'object' ? (inv as Record<string, unknown>) : null;
+  const parent = invObj?.['parent'] as
+    | { subscription_details?: { subscription?: unknown } | null }
+    | null
+    | undefined;
+  const meta = stringRecord(charge['metadata']);
+  return {
+    invoiceId: idOf(inv),
+    subscriptionId: invObj
+      ? (idOf(invObj['subscription']) ??
+        idOf(parent?.subscription_details?.subscription))
+      : null,
+    checkoutSessionId: meta['checkoutSessionId'] ?? null,
+  };
+}
+
+/**
+ * Without the API's `latest_invoice`: an expanded invoice created in the
+ * row's current period is the latest; no creation time → assume it is.
+ */
+function payloadInvoiceIsCurrent(
+  inv: unknown,
+  row: Pick<Subscription, 'currentPeriodStart'>,
+): boolean {
+  const created =
+    inv && typeof inv === 'object'
+      ? toDate((inv as Record<string, unknown>)['created'])
+      : null;
+  if (!created) return true;
+  return created.getTime() >= row.currentPeriodStart.getTime() - DAY_MS;
+}
+
+function numberOr(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
 function eventTime(event: StripeWebhookEvent): Date {

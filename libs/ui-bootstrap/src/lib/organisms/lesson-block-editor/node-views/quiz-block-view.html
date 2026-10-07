@@ -1,10 +1,14 @@
-<section class="cdf-nv cdf-nv--quiz" [attr.aria-labelledby]="uid + '-title'">
+<!-- Named "Quiz <id>" so several quiz blocks are distinct landmarks. -->
+<section
+  class="cdf-nv cdf-nv--quiz"
+  [attr.aria-labelledby]="uid + '-title ' + uid + '-meta'"
+>
   <header class="cdf-nv__header">
     <span class="cdf-nv__badge"
       ><cdf-editor-icon name="ListChecks" size="16"
     /></span>
     <h4 class="cdf-nv__title" [id]="uid + '-title'">Quiz</h4>
-    <span class="cdf-nv__meta">id: {{ quiz().id }}</span>
+    <span class="cdf-nv__meta" [id]="uid + '-meta'">id: {{ quiz().id }}</span>
     @if (editable()) {
     <button
       type="button"

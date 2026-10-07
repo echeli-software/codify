@@ -36,3 +36,249 @@
 :root {
   --bs-code-color: var(--cdf-color-danger-text);
 }
+
+// ─── Theme bridge: Bootstrap follows theme-light / theme-dark ────────────
+// Bootstrap compiles `$primary` (and tints/shades of it), the body colours
+// and its component colours into literal values, so `.btn-primary`,
+// `.text-primary`, links, alerts, pills, pagination, progress, list-group
+// and dropdown actives kept the light-theme violet (and light surfaces)
+// under `theme-dark`. Re-point them at the ui-tokens CSS variables that
+// `cdf.theme-light` / `cdf.theme-dark` set. In the light theme every value
+// below resolves to what Bootstrap compiled (same tokens), so light is
+// unchanged; dark now gets the dark-theme primary (#a78bfa with dark "on"
+// text) and dark surfaces. Contrast is checked in light + dark by the
+// Storybook test-runner (Foundations/Bootstrap Theme story).
+
+$_primary-focus-shadow: 0 0 0 0.25rem rgba(var(--cdf-color-primary-rgb), 0.25);
+$_primary-focus-border: color-mix(
+  in srgb,
+  var(--cdf-color-primary) 50%,
+  var(--cdf-color-surface)
+);
+
+// Variables are (re)declared on every element that sets the cdf theme, so a
+// scoped `.theme-dark` subtree resolves them against its own tokens.
+:root,
+.theme-light,
+.theme-dark {
+  --bs-primary: var(--cdf-color-primary);
+  --bs-primary-rgb: var(--cdf-color-primary-rgb);
+  --bs-primary-text-emphasis: color-mix(
+    in srgb,
+    var(--cdf-color-primary-text) 70%,
+    var(--cdf-color-text)
+  );
+  --bs-primary-bg-subtle: var(--cdf-color-primary-subtle);
+  --bs-primary-border-subtle: color-mix(
+    in srgb,
+    var(--cdf-color-primary) 40%,
+    var(--cdf-color-surface)
+  );
+
+  --bs-link-color: var(--cdf-color-primary-text);
+  --bs-link-color-rgb: var(--cdf-color-primary-text-rgb);
+  --bs-link-hover-color: var(--cdf-color-primary-hover);
+  --bs-link-hover-color-rgb: var(--cdf-color-primary-hover-rgb);
+  --bs-focus-ring-color: rgba(var(--cdf-color-primary-rgb), 0.25);
+
+  --bs-body-color: var(--cdf-color-text);
+  --bs-body-color-rgb: var(--cdf-color-text-rgb);
+  --bs-body-bg: var(--cdf-color-bg);
+  --bs-body-bg-rgb: var(--cdf-color-bg-rgb);
+  --bs-secondary-color: rgba(var(--cdf-color-text-rgb), 0.75);
+  --bs-secondary-color-rgb: var(--cdf-color-text-rgb);
+  --bs-tertiary-color: rgba(var(--cdf-color-text-rgb), 0.5);
+  --bs-tertiary-color-rgb: var(--cdf-color-text-rgb);
+  --bs-border-color: var(--cdf-color-border);
+}
+
+// Neutrals Bootstrap derives from its own gray scale (no ui-token in the
+// light theme) — dark values only, matching Bootstrap's own dark mode.
+@mixin _dark-neutrals {
+  --bs-emphasis-color: #{cdf.$palette-gray-0};
+  --bs-emphasis-color-rgb: #{cdf.rgb-triplet(cdf.$palette-gray-0)};
+  --bs-secondary-bg: #{cdf.$color-surface-elev-dark};
+  --bs-secondary-bg-rgb: #{cdf.rgb-triplet(cdf.$color-surface-elev-dark)};
+  --bs-tertiary-bg: #{cdf.$color-surface-dark};
+  --bs-tertiary-bg-rgb: #{cdf.rgb-triplet(cdf.$color-surface-dark)};
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.15);
+}
+
+// The checked/indeterminate marks are SVG data URIs (can't read a CSS
+// variable): on the light dark-theme primary they switch to dark ink.
+@function _check-svg($ink) {
+  @return url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='#{$ink}' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+@function _dash-svg($ink) {
+  @return url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='#{$ink}' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10h8'/%3e%3c/svg%3e");
+}
+@function _dot-svg($ink, $r: 2, $box: '-4 -4 8 8') {
+  @return url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='#{$box}'%3e%3ccircle r='#{$r}' fill='#{$ink}'/%3e%3c/svg%3e");
+}
+
+@mixin _dark-form-marks {
+  $ink: '%23030712'; // palette gray-950 = dark-theme primary "on"
+  .form-check-input:checked[type='checkbox'] {
+    --bs-form-check-bg-image: #{_check-svg($ink)};
+  }
+  .form-check-input:checked[type='radio'] {
+    --bs-form-check-bg-image: #{_dot-svg($ink)};
+  }
+  .form-check-input[type='checkbox']:indeterminate {
+    --bs-form-check-bg-image: #{_dash-svg($ink)};
+  }
+  .form-switch .form-check-input:checked {
+    --bs-form-check-bg-image: #{_dot-svg($ink, 3)};
+  }
+}
+
+// Same selectors the apps use to apply `cdf.theme-dark`.
+:root.theme-dark,
+.theme-dark {
+  @include _dark-neutrals;
+}
+.theme-dark {
+  @include _dark-form-marks;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) {
+    @include _dark-neutrals;
+    @include _dark-form-marks;
+  }
+}
+
+// ── Components with compiled $primary values ──
+.btn-primary {
+  --bs-btn-color: var(--cdf-color-primary-on);
+  --bs-btn-bg: var(--cdf-color-primary);
+  --bs-btn-border-color: var(--cdf-color-primary);
+  --bs-btn-hover-color: var(--cdf-color-primary-on);
+  --bs-btn-hover-bg: var(--cdf-color-primary-hover);
+  --bs-btn-hover-border-color: var(--cdf-color-primary-hover);
+  --bs-btn-focus-shadow-rgb: var(--cdf-color-primary-rgb);
+  --bs-btn-active-color: var(--cdf-color-primary-on);
+  --bs-btn-active-bg: var(--cdf-color-primary-active);
+  --bs-btn-active-border-color: var(--cdf-color-primary-active);
+  --bs-btn-disabled-color: var(--cdf-color-primary-on);
+  --bs-btn-disabled-bg: var(--cdf-color-primary);
+  --bs-btn-disabled-border-color: var(--cdf-color-primary);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--cdf-color-primary-text);
+  --bs-btn-border-color: var(--cdf-color-primary);
+  --bs-btn-hover-color: var(--cdf-color-primary-on);
+  --bs-btn-hover-bg: var(--cdf-color-primary);
+  --bs-btn-hover-border-color: var(--cdf-color-primary);
+  --bs-btn-focus-shadow-rgb: var(--cdf-color-primary-rgb);
+  --bs-btn-active-color: var(--cdf-color-primary-on);
+  --bs-btn-active-bg: var(--cdf-color-primary-active);
+  --bs-btn-active-border-color: var(--cdf-color-primary-active);
+  --bs-btn-disabled-color: var(--cdf-color-primary-text);
+  --bs-btn-disabled-border-color: var(--cdf-color-primary);
+}
+
+.text-bg-primary {
+  color: var(--cdf-color-primary-on) !important;
+}
+
+.link-primary:hover,
+.link-primary:focus {
+  color: rgba(
+    var(--cdf-color-primary-hover-rgb),
+    var(--bs-link-opacity, 1)
+  ) !important;
+  text-decoration-color: rgba(
+    var(--cdf-color-primary-hover-rgb),
+    var(--bs-link-underline-opacity, 1)
+  ) !important;
+}
+
+.dropdown-menu {
+  --bs-dropdown-link-active-color: var(--cdf-color-primary-on);
+  --bs-dropdown-link-active-bg: var(--cdf-color-primary);
+}
+
+.nav-pills {
+  --bs-nav-pills-link-active-color: var(--cdf-color-primary-on);
+  --bs-nav-pills-link-active-bg: var(--cdf-color-primary);
+}
+
+.nav-link:focus-visible {
+  box-shadow: $_primary-focus-shadow;
+}
+
+.pagination {
+  --bs-pagination-focus-box-shadow: #{$_primary-focus-shadow};
+  --bs-pagination-active-color: var(--cdf-color-primary-on);
+  --bs-pagination-active-bg: var(--cdf-color-primary);
+  --bs-pagination-active-border-color: var(--cdf-color-primary);
+}
+
+.progress,
+.progress-stacked {
+  --bs-progress-bar-color: var(--cdf-color-primary-on);
+  --bs-progress-bar-bg: var(--cdf-color-primary);
+}
+
+.list-group {
+  --bs-list-group-active-color: var(--cdf-color-primary-on);
+  --bs-list-group-active-bg: var(--cdf-color-primary);
+  --bs-list-group-active-border-color: var(--cdf-color-primary);
+}
+
+.accordion {
+  --bs-accordion-btn-focus-box-shadow: #{$_primary-focus-shadow};
+}
+
+.btn-close {
+  --bs-btn-close-focus-shadow: #{$_primary-focus-shadow};
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: $_primary-focus-border;
+  box-shadow: $_primary-focus-shadow;
+}
+
+.form-check-input:checked,
+.form-check-input[type='checkbox']:indeterminate {
+  background-color: var(--cdf-color-primary);
+  border-color: var(--cdf-color-primary);
+}
+
+// Vendor pseudo-elements stay in separate rules: one unknown selector in a
+// list drops the whole rule.
+.form-range {
+  &:focus::-webkit-slider-thumb {
+    box-shadow:
+      0 0 0 1px var(--cdf-color-bg),
+      $_primary-focus-shadow;
+  }
+  &:focus::-moz-range-thumb {
+    box-shadow:
+      0 0 0 1px var(--cdf-color-bg),
+      $_primary-focus-shadow;
+  }
+  &::-webkit-slider-thumb {
+    background-color: var(--cdf-color-primary);
+  }
+  &::-moz-range-thumb {
+    background-color: var(--cdf-color-primary);
+  }
+  &::-webkit-slider-thumb:active {
+    background-color: color-mix(
+      in srgb,
+      var(--cdf-color-primary) 30%,
+      var(--cdf-color-surface)
+    );
+  }
+  &::-moz-range-thumb:active {
+    background-color: color-mix(
+      in srgb,
+      var(--cdf-color-primary) 30%,
+      var(--cdf-color-surface)
+    );
+  }
+}

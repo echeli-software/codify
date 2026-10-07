@@ -4,8 +4,8 @@ import {
   type BillingProvider,
   type SubscriptionSnapshot,
 } from './billing.provider.js';
-import { WebhookService } from './webhook.service.js';
 import { FakeBillingPrisma } from './testing/fake-billing-prisma.js';
+import { makeWebhookService } from './testing/fake-billing-deps.js';
 
 const DAY = 86_400;
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -33,7 +33,7 @@ function setup(
       stripePriceId: 'price_PRO',
     },
   );
-  const svc = new WebhookService(prisma as never, provider);
+  const { svc } = makeWebhookService(prisma, provider);
   const send = (event: unknown) =>
     svc.handleStripe(Buffer.from(JSON.stringify(event)), event, undefined);
   return { prisma, svc, send };
@@ -511,7 +511,7 @@ describe('WebhookService — raw body', () => {
       mode: 'stripe',
       constructWebhookEvent: jest.fn(),
     } as unknown as BillingProvider;
-    const svc = new WebhookService(new FakeBillingPrisma() as never, provider);
+    const { svc } = makeWebhookService(new FakeBillingPrisma(), provider);
     await expect(
       svc.handleStripe(undefined, { id: 'evt' }, 't=1,v1=x'),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -529,7 +529,7 @@ describe('WebhookService — raw body', () => {
       constructWebhookEvent,
       retrieveSubscription: jest.fn(),
     } as unknown as BillingProvider;
-    const svc = new WebhookService(new FakeBillingPrisma() as never, provider);
+    const { svc } = makeWebhookService(new FakeBillingPrisma(), provider);
     const raw = Buffer.from('{"id":"evt_x"}');
     await svc.handleStripe(raw, {}, 'sig');
     expect(constructWebhookEvent).toHaveBeenCalledWith(raw, 'sig');

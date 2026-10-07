@@ -153,6 +153,17 @@ $color-primary-active-dark: #ddd6fe;
 $color-primary-subtle-dark: #2e1a6b;
 $color-primary-on-dark: $palette-gray-950;
 
+// ─── RGB triplets ────────────────────────────────────────────────────────
+// `r, g, b` for `rgba(var(--…-rgb), <alpha>)`. Bootstrap's utilities
+// (.text-primary, .bg-primary, links, focus rings…) are built that way, so
+// these let ui-bootstrap point them at the theme instead of compile-time
+// colours.
+@function rgb-triplet($c) {
+  @return color.channel($c, 'red', $space: rgb),
+    color.channel($c, 'green', $space: rgb),
+    color.channel($c, 'blue', $space: rgb);
+}
+
 // ─── CSS variable definitions ────────────────────────────────────────────
 // These mixins emit the runtime CSS custom properties for a theme.
 // `theme-light` and `theme-dark` in index.scss compose these.
@@ -163,6 +174,8 @@ $color-primary-on-dark: $palette-gray-950;
   --cdf-color-primary-active: #{$color-primary-active};
   --cdf-color-primary-subtle: #{$color-primary-subtle};
   --cdf-color-primary-on: #{$color-primary-on};
+  --cdf-color-primary-rgb: #{rgb-triplet($color-primary)};
+  --cdf-color-primary-hover-rgb: #{rgb-triplet($color-primary-hover)};
 
   --cdf-color-accent: #{$color-accent};
   --cdf-color-accent-hover: #{$color-accent-hover};
@@ -195,6 +208,7 @@ $color-primary-on-dark: $palette-gray-950;
 @mixin emit-text-tones($tones) {
   @each $name, $value in $tones {
     --cdf-color-#{$name}-text: #{$value};
+    --cdf-color-#{$name}-text-rgb: #{rgb-triplet($value)};
   }
 }
 
@@ -206,6 +220,8 @@ $color-primary-on-dark: $palette-gray-950;
   --cdf-color-text: #{$color-text-light};
   --cdf-color-text-muted: #{$color-text-muted-light};
   --cdf-color-text-subtle: #{$color-text-subtle-light};
+  --cdf-color-bg-rgb: #{rgb-triplet($color-bg-light)};
+  --cdf-color-text-rgb: #{rgb-triplet($color-text-light)};
   @include emit-text-tones($text-tones-light);
 }
 
@@ -217,6 +233,8 @@ $color-primary-on-dark: $palette-gray-950;
   --cdf-color-text: #{$color-text-dark};
   --cdf-color-text-muted: #{$color-text-muted-dark};
   --cdf-color-text-subtle: #{$color-text-subtle-dark};
+  --cdf-color-bg-rgb: #{rgb-triplet($color-bg-dark)};
+  --cdf-color-text-rgb: #{rgb-triplet($color-text-dark)};
   @include emit-text-tones($text-tones-dark);
 
   --cdf-color-primary: #{$color-primary-dark};
@@ -224,4 +242,6 @@ $color-primary-on-dark: $palette-gray-950;
   --cdf-color-primary-active: #{$color-primary-active-dark};
   --cdf-color-primary-subtle: #{$color-primary-subtle-dark};
   --cdf-color-primary-on: #{$color-primary-on-dark};
+  --cdf-color-primary-rgb: #{rgb-triplet($color-primary-dark)};
+  --cdf-color-primary-hover-rgb: #{rgb-triplet($color-primary-hover-dark)};
 }

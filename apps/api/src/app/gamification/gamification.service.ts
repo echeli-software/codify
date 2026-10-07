@@ -117,6 +117,9 @@ export class GamificationService {
    * Two guards against overdraw under concurrency: the user row is locked
    * for the rest of the transaction, and the decrement itself is
    * conditional (`coins >= amount`).
+   *
+   * `capAtBalance` (clawbacks, e.g. a refunded first-payment bonus): take
+   * at most the current balance instead of throwing — never negative.
    */
   async spendCoins(
     params: {
@@ -126,6 +129,7 @@ export class GamificationService {
       refType?: string | null;
       refId?: string | null;
       idempotencyKey?: string | null;
+      capAtBalance?: boolean;
     },
     tx?: Tx,
   ): Promise<{ coins: number; spent: number }> {
@@ -144,21 +148,24 @@ export class GamificationService {
         });
         if (seen) return { coins: user.coins, spent: 0 };
       }
-      if (user.coins < params.amount)
+      const amount = params.capAtBalance
+        ? Math.min(params.amount, Math.max(user.coins, 0))
+        : params.amount;
+      if (user.coins < amount)
         throw new BadRequestException('Insufficient coins');
-      if (params.amount === 0) return { coins: user.coins, spent: 0 };
+      if (amount === 0) return { coins: user.coins, spent: 0 };
 
       await this.ensureOpeningBalance(t, params.userId, user.coins);
       const dec = await t.user.updateMany({
-        where: { id: params.userId, coins: { gte: params.amount } },
-        data: { coins: { decrement: params.amount } },
+        where: { id: params.userId, coins: { gte: amount } },
+        data: { coins: { decrement: amount } },
       });
       if (dec.count !== 1) throw new BadRequestException('Insufficient coins');
-      const balanceAfter = user.coins - params.amount;
+      const balanceAfter = user.coins - amount;
       await t.coinTransaction.create({
         data: {
           userId: params.userId,
-          delta: -params.amount,
+          delta: -amount,
           source: params.source,
           balanceAfter,
           refType: params.refType ?? null,
@@ -166,7 +173,7 @@ export class GamificationService {
           idempotencyKey: params.idempotencyKey ?? null,
         },
       });
-      return { coins: balanceAfter, spent: params.amount };
+      return { coins: balanceAfter, spent: amount };
     };
     return tx ? run(tx) : this.prisma.$transaction(run);
   }

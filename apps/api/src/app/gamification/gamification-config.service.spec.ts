@@ -51,6 +51,23 @@ describe('validateConfigValue', () => {
     expect(validateConfigValue('multiplier.cap', 0)).not.toBeNull();
     expect(validateConfigValue('multiplier.cap', '30')).not.toBeNull();
     expect(validateConfigValue('billing.pastDueGraceDays', 2.5)).not.toBeNull();
+    expect(
+      validateConfigValue('billing.firstPaymentBonusCoins', -1),
+    ).not.toBeNull();
+    expect(
+      validateConfigValue('billing.firstPaymentBonusCoins', 100_001),
+    ).not.toBeNull();
+    expect(
+      validateConfigValue('billing.firstPaymentBonusCoins', 100_000),
+    ).toBeNull();
+    expect(validateConfigValue('billing.firstPaymentBonusCoins', 0)).toBeNull();
+    expect(validateConfigValue('billing.refundWindowDays', 366)).not.toBeNull();
+    expect(validateConfigValue('billing.refundWindowDays', 1.5)).not.toBeNull();
+    // Billing knobs: bonus off by default, 7-day refund window.
+    expect(GAMIFICATION_CONFIG_DEFAULTS['billing.firstPaymentBonusCoins']).toBe(
+      0,
+    );
+    expect(GAMIFICATION_CONFIG_DEFAULTS['billing.refundWindowDays']).toBe(7);
     expect(validateConfigValue('quest.dailyCount', 0)).not.toBeNull();
     expect(
       validateConfigValue('streak.milestones', { '0': { xp: 1, coins: 1 } }),
