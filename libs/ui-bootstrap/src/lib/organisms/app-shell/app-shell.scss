@@ -26,13 +26,21 @@
       left: 0;
       width: 280px;
       transform: translateX(-100%);
-      transition: transform var(--cdf-motion-duration-base) var(--cdf-motion-easing-emphasized);
+      // Hidden drawers must not be reachable by Tab / screen readers.
+      visibility: hidden;
+      transition:
+        transform var(--cdf-motion-duration-base)
+          var(--cdf-motion-easing-emphasized),
+        visibility 0s linear var(--cdf-motion-duration-base);
       z-index: var(--cdf-z-drawer);
       box-shadow: var(--cdf-shadow-3);
     }
 
     &--mobile-open .cdf-shell__sidebar {
       transform: translateX(0);
+      visibility: visible;
+      transition: transform var(--cdf-motion-duration-base)
+        var(--cdf-motion-easing-emphasized);
     }
 
     .cdf-shell__sidebar-foot {
@@ -104,7 +112,8 @@
     font-weight: var(--cdf-font-weight-medium);
     white-space: nowrap;
     transition:
-      background-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+      background-color var(--cdf-motion-duration-fast)
+        var(--cdf-motion-easing-standard),
       color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
 
     &:hover {

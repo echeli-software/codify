@@ -6,7 +6,11 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
+import {
+  ControlValueAccessor,
+  FormsModule,
+  NG_VALUE_ACCESSOR,
+} from '@angular/forms';
 
 /**
  * Lightweight monospace JSON editor for advanced fields like badge rules
@@ -28,9 +32,11 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
         [(ngModel)]="value"
         (blur)="onBlur()"
         [attr.aria-invalid]="!!validationError() || null"
+        [attr.aria-label]="ariaLabel()"
+        [id]="inputId() ?? null"
       ></textarea>
       @if (validationError(); as err) {
-      <p class="cdf-json__error" role="alert">{{ err }}</p>
+        <p class="cdf-json__error" role="alert">{{ err }}</p>
       }
     </div>
   `,
@@ -45,6 +51,9 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
 })
 export class JsonEditor implements ControlValueAccessor {
   readonly rows = input(8);
+  /** Accessible name when no `<label for>` points at the editor. */
+  readonly ariaLabel = input<string | null>(null);
+  readonly inputId = input<string | null>(null);
   /** When true, runs JSON.parse on blur and surfaces errors. */
   readonly validate = input(true);
 

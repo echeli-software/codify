@@ -27,6 +27,9 @@
       "path": "../ui-core/tsconfig.lib.json"
     },
     {
+      "path": "../ui-ionic/tsconfig.lib.json"
+    },
+    {
       "path": "../i18n/tsconfig.lib.json"
     }
   ]

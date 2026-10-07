@@ -26,6 +26,7 @@
   }
 
   &__hint {
+    display: block;
     margin: 0;
     font-size: var(--cdf-font-size-sm);
     color: var(--cdf-color-text-muted);

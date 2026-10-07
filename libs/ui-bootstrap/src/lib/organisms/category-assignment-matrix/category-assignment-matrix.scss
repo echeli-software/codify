@@ -1,0 +1,110 @@
+:host {
+  display: block;
+}
+
+.cdf-matrix {
+  overflow-x: auto;
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-md);
+  background: var(--cdf-color-surface);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--cdf-shadow-focus-ring);
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text);
+  }
+
+  &__caption {
+    caption-side: top;
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    text-align: start;
+    font-weight: var(--cdf-font-weight-semibold);
+    color: var(--cdf-color-text);
+  }
+
+  th,
+  td {
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    border-top: 1px solid var(--cdf-color-border);
+  }
+
+  &__corner,
+  &__category {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    background: var(--cdf-color-surface);
+    text-align: start;
+    font-weight: var(--cdf-font-weight-medium);
+    white-space: nowrap;
+  }
+
+  &__plan {
+    min-width: 120px;
+    text-align: center;
+    vertical-align: bottom;
+  }
+
+  &__plan-name {
+    display: block;
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__plan-hint {
+    display: block;
+    font-weight: var(--cdf-font-weight-normal);
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__all {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    margin-top: var(--cdf-space-1);
+    font-weight: var(--cdf-font-weight-normal);
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+    cursor: pointer;
+  }
+
+  &__cell {
+    text-align: center;
+  }
+
+  input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--cdf-color-primary);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  tbody tr:hover {
+    background: var(--cdf-color-surface-elev);
+
+    .cdf-matrix__category {
+      background: var(--cdf-color-surface-elev);
+    }
+  }
+
+  &__count {
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-xs);
+  }
+
+  &__empty {
+    text-align: center;
+    color: var(--cdf-color-text-muted);
+  }
+}

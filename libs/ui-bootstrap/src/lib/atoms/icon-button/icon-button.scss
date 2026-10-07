@@ -13,7 +13,8 @@
   color: var(--cdf-color-text);
   padding: 0;
   transition:
-    background-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+    background-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard),
     color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
 
   &:focus-visible {
@@ -27,23 +28,36 @@
   }
 
   // Sizes
-  &--sm { width: 28px; height: 28px; }
-  &--md { width: 36px; height: 36px; }
-  &--lg { width: 44px; height: 44px; }
+  &--sm {
+    width: 28px;
+    height: 28px;
+  }
+  &--md {
+    width: 36px;
+    height: 36px;
+  }
+  &--lg {
+    width: 44px;
+    height: 44px;
+  }
 
   // Variants
   &--primary {
     background: var(--cdf-color-primary);
     color: var(--cdf-color-primary-on);
 
-    &:hover:not(:disabled) { background: var(--cdf-color-primary-hover); }
+    &:hover:not(:disabled) {
+      background: var(--cdf-color-primary-hover);
+    }
   }
 
   &--secondary {
     background: var(--cdf-color-surface);
     border-color: var(--cdf-color-border);
 
-    &:hover:not(:disabled) { background: var(--cdf-color-surface-elev); }
+    &:hover:not(:disabled) {
+      background: var(--cdf-color-surface-elev);
+    }
   }
 
   &--ghost {
@@ -54,7 +68,7 @@
   }
 
   &--danger {
-    color: var(--cdf-color-danger);
+    color: var(--cdf-color-danger-text);
 
     &:hover:not(:disabled) {
       background: rgba(220, 38, 38, 0.1);

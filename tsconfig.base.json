@@ -20,7 +20,11 @@
     "paths": {
       "@codify/ui-bootstrap": ["./libs/ui-bootstrap/src/index.ts"],
       "@codify/ui-ionic": ["./libs/ui-ionic/src/index.ts"],
+      "@codify/ui-ionic/avatar-renderer": [
+        "./libs/ui-ionic/src/lib/molecules/avatar-renderer/avatar-renderer.ts"
+      ],
       "@codify/ui-core": ["./libs/ui-core/src/index.ts"],
+      "@codify/ui-core/*": ["./libs/ui-core/src/lib/*/index.ts"],
       "@codify/i18n": ["./libs/i18n/src/index.ts"],
       "@codify/auth": ["./libs/auth/src/index.ts"],
       "@codify/billing": ["./libs/billing/src/index.ts"],

@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon } from '../../atoms/icon/icon.js';
 import { ThemeService, type ThemeMode } from './theme.service.js';
 
@@ -9,9 +10,13 @@ import { ThemeService, type ThemeMode } from './theme.service.js';
 @Component({
   selector: 'cdf-theme-toggle',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   template: `
-    <fieldset class="cdf-theme-toggle" role="radiogroup" aria-label="Theme">
+    <fieldset
+      class="cdf-theme-toggle"
+      role="radiogroup"
+      [attr.aria-label]="'common.theme.label' | translate"
+    >
       <button
         type="button"
         role="radio"
@@ -20,7 +25,7 @@ import { ThemeService, type ThemeMode } from './theme.service.js';
         (click)="set('light')"
       >
         <cdf-icon name="sun" size="sm" />
-        Light
+        {{ 'common.theme.light' | translate }}
       </button>
       <button
         type="button"
@@ -30,7 +35,7 @@ import { ThemeService, type ThemeMode } from './theme.service.js';
         (click)="set('dark')"
       >
         <cdf-icon name="moon" size="sm" />
-        Dark
+        {{ 'common.theme.dark' | translate }}
       </button>
       <button
         type="button"
@@ -39,7 +44,7 @@ import { ThemeService, type ThemeMode } from './theme.service.js';
         [class.cdf-theme-toggle__active]="theme.mode() === 'system'"
         (click)="set('system')"
       >
-        System
+        {{ 'common.theme.system' | translate }}
       </button>
     </fieldset>
   `,

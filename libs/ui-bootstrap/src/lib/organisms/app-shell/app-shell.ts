@@ -1,11 +1,15 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  ElementRef,
+  inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon, type IconName } from '../../atoms/icon/icon.js';
 import { IconButton } from '../../atoms/icon-button/icon-button.js';
 import { LanguageSwitcher } from '../../molecules/language-switcher/language-switcher.js';
@@ -37,6 +41,8 @@ export interface NavSection {
  *     (avatar, search, user menu); rendered after the language/theme controls.
  *   - default — page content.
  */
+let shellSeq = 0;
+
 @Component({
   selector: 'cdf-app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,45 +53,63 @@ export interface NavSection {
     IconButton,
     LanguageSwitcher,
     ThemeToggle,
+    CdkTrapFocus,
+    TranslatePipe,
   ],
   template: `
-    <div class="cdf-shell" [class.cdf-shell--collapsed]="collapsed()" [class.cdf-shell--mobile-open]="mobileOpen()">
-      <aside class="cdf-shell__sidebar" [attr.aria-label]="'Primary navigation'">
+    <div
+      class="cdf-shell"
+      [class.cdf-shell--collapsed]="collapsed()"
+      [class.cdf-shell--mobile-open]="mobileOpen()"
+    >
+      <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- Esc bubbles up from the focused nav link -->
+      <aside
+        class="cdf-shell__sidebar"
+        [id]="sidebarId"
+        [attr.aria-label]="'ui.shell.primaryNav' | translate"
+        [cdkTrapFocus]="mobileOpen()"
+        [cdkTrapFocusAutoCapture]="true"
+        (keydown.escape)="closeMobile(true)"
+      >
         <div class="cdf-shell__brand">
           <cdf-icon [name]="brandIcon()" size="lg" />
           @if (!collapsed()) {
-          <span class="cdf-shell__brand-label">{{ brand() }}</span>
+            <span class="cdf-shell__brand-label">{{ brand() }}</span>
           }
         </div>
 
         <nav class="cdf-shell__nav">
           @for (section of nav(); track $index) {
-          <div class="cdf-shell__section">
-            @if (section.label && !collapsed()) {
-            <h3 class="cdf-shell__section-label">{{ section.label }}</h3>
-            }
-            <ul>
-              @for (item of section.items; track item.routerLink) {
-              <li>
-                <a
-                  class="cdf-shell__nav-link"
-                  [routerLink]="item.routerLink"
-                  routerLinkActive="cdf-shell__nav-link--active"
-                  [routerLinkActiveOptions]="{ exact: false }"
-                  (click)="closeMobile()"
-                >
-                  <cdf-icon [name]="item.icon" size="sm" />
-                  @if (!collapsed()) {
-                  <span class="cdf-shell__nav-label">{{ item.label }}</span>
-                  @if (item.badge) {
-                  <span class="cdf-shell__nav-badge">{{ item.badge }}</span>
-                  }
-                  }
-                </a>
-              </li>
+            <div class="cdf-shell__section">
+              @if (section.label && !collapsed()) {
+                <h3 class="cdf-shell__section-label">{{ section.label }}</h3>
               }
-            </ul>
-          </div>
+              <ul>
+                @for (item of section.items; track item.routerLink) {
+                  <li>
+                    <a
+                      class="cdf-shell__nav-link"
+                      [routerLink]="item.routerLink"
+                      routerLinkActive="cdf-shell__nav-link--active"
+                      [routerLinkActiveOptions]="{ exact: false }"
+                      (click)="closeMobile()"
+                    >
+                      <cdf-icon [name]="item.icon" size="sm" />
+                      @if (!collapsed()) {
+                        <span class="cdf-shell__nav-label">{{
+                          item.label
+                        }}</span>
+                        @if (item.badge) {
+                          <span class="cdf-shell__nav-badge">{{
+                            item.badge
+                          }}</span>
+                        }
+                      }
+                    </a>
+                  </li>
+                }
+              </ul>
+            </div>
           }
         </nav>
 
@@ -94,14 +118,23 @@ export interface NavSection {
             [icon]="collapsed() ? 'caret-right' : 'caret-left'"
             kind="ghost"
             size="sm"
-            [ariaLabel]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+            [ariaLabel]="
+              (collapsed()
+                ? 'ui.shell.expandSidebar'
+                : 'ui.shell.collapseSidebar'
+              ) | translate
+            "
             (click)="toggleCollapsed()"
           />
         </div>
       </aside>
 
       @if (mobileOpen()) {
-      <div class="cdf-shell__mobile-backdrop" (click)="closeMobile()" aria-hidden="true"></div>
+        <div
+          class="cdf-shell__mobile-backdrop"
+          (click)="closeMobile()"
+          aria-hidden="true"
+        ></div>
       }
 
       <div class="cdf-shell__main">
@@ -110,7 +143,9 @@ export interface NavSection {
             class="cdf-shell__mobile-menu"
             icon="menu"
             kind="ghost"
-            ariaLabel="Open menu"
+            [ariaLabel]="'ui.shell.openMenu' | translate"
+            [ariaExpanded]="mobileOpen()"
+            [ariaControls]="sidebarId"
             (click)="openMobile()"
           />
 
@@ -134,6 +169,9 @@ export interface NavSection {
   styleUrl: './app-shell.scss',
 })
 export class AppShell {
+  private readonly host = inject(ElementRef<HTMLElement>);
+  protected readonly sidebarId = `cdf-shell-sidebar-${++shellSeq}`;
+
   readonly brand = input.required<string>();
   readonly brandIcon = input<IconName>('gear');
   readonly nav = input.required<NavSection[]>();
@@ -152,7 +190,14 @@ export class AppShell {
   protected openMobile(): void {
     this.mobileOpen.set(true);
   }
-  protected closeMobile(): void {
+  /** Close the mobile drawer; on Esc, return focus to the menu button. */
+  protected closeMobile(restoreFocus = false): void {
+    if (!this.mobileOpen()) return;
     this.mobileOpen.set(false);
+    if (restoreFocus) {
+      (this.host.nativeElement as HTMLElement)
+        .querySelector<HTMLElement>('.cdf-shell__mobile-menu button')
+        ?.focus();
+    }
   }
 }

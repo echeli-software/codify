@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon } from '../../atoms/icon/icon.js';
 import { IconButton } from '../../atoms/icon-button/icon-button.js';
 
@@ -21,7 +22,7 @@ import { IconButton } from '../../atoms/icon-button/icon-button.js';
 @Component({
   selector: 'cdf-search-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, Icon, IconButton],
+  imports: [FormsModule, Icon, IconButton, TranslatePipe],
   template: `
     <div class="cdf-search">
       <cdf-icon class="cdf-search__leading" name="search" size="sm" />
@@ -29,18 +30,20 @@ import { IconButton } from '../../atoms/icon-button/icon-button.js';
         type="search"
         class="cdf-search__input"
         [placeholder]="placeholder()"
-        [attr.aria-label]="ariaLabel() || placeholder() || 'Search'"
+        [attr.aria-label]="
+          ariaLabel() || placeholder() || ('common.search' | translate)
+        "
         [(ngModel)]="value"
         (keydown.escape)="clear()"
       />
       @if (value()) {
-      <cdf-icon-button
-        class="cdf-search__clear"
-        icon="x"
-        size="sm"
-        ariaLabel="Clear search"
-        (click)="clear()"
-      />
+        <cdf-icon-button
+          class="cdf-search__clear"
+          icon="x"
+          size="sm"
+          [ariaLabel]="'ui.search.clear' | translate"
+          (click)="clear()"
+        />
       }
     </div>
   `,

@@ -39,6 +39,8 @@ import { Input as TextInput } from '../../atoms/input/input.js';
         [invalid]="invalid()"
         [placeholder]="placeholder()"
         inputmode="decimal"
+        [ariaLabel]="ariaLabel()"
+        [inputId]="inputId()"
       />
     </span>
   `,
@@ -55,6 +57,8 @@ export class MoneyInput implements ControlValueAccessor {
   readonly currency = input<string>('BRL');
   readonly invalid = input(false);
   readonly placeholder = input<string>('');
+  readonly ariaLabel = input<string | null>(null);
+  readonly inputId = input<string | null>(null);
 
   private readonly i18n = inject(I18nService);
 
