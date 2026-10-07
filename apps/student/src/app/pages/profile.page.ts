@@ -2,407 +2,406 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
 import {
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
-  IonList,
-  IonItem,
-  IonLabel,
 } from '@ionic/angular/standalone';
 import {
-  AppAvatar,
-  AppBadge,
   AppButton,
   AppCard,
   AppInput,
-  AppSelect,
-  type AppSelectOption,
   AppToggle,
+  AvatarRenderer,
   FormField,
   Icon,
+  LanguageSwitcher,
+  LevelBadge,
+  ThemeToggle,
+  type IconName,
 } from '@codify/ui-ionic';
 import { AuthService } from '@codify/auth';
-import { I18nService, type Locale } from '@codify/i18n';
-import { MeClient, ProblemDetailsError } from '@codify/api-client';
+import { TranslatePipe } from '@codify/i18n';
+import { ItemsClient, MeClient, type AvatarResponse } from '@codify/api-client';
+import {
+  MotionAndSoundService,
+  SoundService,
+  XpService,
+} from '@codify/gamification-engine';
+import { AppToastService } from '../platform/app-toast.service.js';
+import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
+import { ReferralCardComponent } from '../components/referral-card.component.js';
+import { equippedSprites } from './shared/avatar.js';
 
-type ThemeMode = 'light' | 'dark' | 'system';
-const THEME_KEY = 'codify.theme';
+interface NavLink {
+  path: string;
+  icon: IconName;
+  key: string;
+  testId: string;
+}
+
+const LINKS: NavLink[] = [
+  {
+    path: '/my-courses',
+    icon: 'school',
+    key: 'myCourses',
+    testId: 'my-courses-link',
+  },
+  {
+    path: '/subscription',
+    icon: 'diamond',
+    key: 'subscription',
+    testId: 'subscription-link',
+  },
+  { path: '/friends', icon: 'person', key: 'friends', testId: 'friends-link' },
+  { path: '/league', icon: 'podium', key: 'league', testId: 'league-link' },
+  {
+    path: '/downloads',
+    icon: 'download',
+    key: 'downloads',
+    testId: 'downloads-link',
+  },
+];
 
 /**
- * Profile page — display name + locale + theme + role + sign out. Fulfils
- * the "profile basics in both apps" deliverable from Phase 4. Edits to
- * `displayName` / `locale` go through `AuthService.updateProfile()` so the
- * topbar avatar reflects the change instantly. Theme is owned locally and
- * persisted to `codify.theme` (same key the today.page header reads).
- *
- * Real Clerk-managed profile (avatar upload, password reset) lands later
- * with the Clerk SDK swap.
+ * Profile & settings (docs/05 §3 Profile / Settings): avatar + level,
+ * display name, language (persisted to the profile), theme, sound and
+ * reduced-motion toggles (the reward engine's own prefs), certificates,
+ * the referral card and links to the rest of the account surfaces.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     IonHeader,
     IonToolbar,
     IonTitle,
     IonContent,
-    IonList,
-    IonItem,
-    IonLabel,
-    RouterLink,
-    AppAvatar,
-    AppBadge,
     AppButton,
     AppCard,
     AppInput,
-    AppSelect,
     AppToggle,
+    AvatarRenderer,
     FormField,
     Icon,
+    LanguageSwitcher,
+    LevelBadge,
+    ThemeToggle,
     ProfileCertificatesComponent,
+    ReferralCardComponent,
+    TranslatePipe,
   ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Profile</ion-title>
+        <ion-title>{{ 'student.profile.title' | translate }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="ion-padding">
-      @if (user(); as u) {
-      <cdf-app-card padding="spacious">
-        <header class="profile-hero">
-          <cdf-app-avatar [name]="u.displayName" size="lg" />
-          <div class="profile-hero__copy">
-            <h2>{{ u.displayName }}</h2>
-            <p class="muted">{{ u.email }}</p>
-            <cdf-app-badge variant="primary" [subtle]="true">{{ u.role }}</cdf-app-badge>
-          </div>
-        </header>
-      </cdf-app-card>
+      <div class="pf">
+        @if (user(); as u) {
+          <cdf-app-card padding="spacious">
+            <header class="pf__hero" data-testid="profile-hero">
+              <a
+                routerLink="/avatar"
+                class="pf__avatar"
+                [attr.aria-label]="'student.today.editAvatar' | translate"
+              >
+                <cdf-avatar-renderer
+                  [config]="avatar()?.config ?? null"
+                  [equipped]="sprites()"
+                  [size]="96"
+                  [showLevelRing]="true"
+                  [level]="xp.level()"
+                />
+              </a>
+              <div class="pf__copy">
+                <h1>{{ u.displayName }}</h1>
+                <p class="pf__muted">{{ u.email }}</p>
+                <cdf-level-badge [level]="xp.level()" size="sm" />
+              </div>
+            </header>
+            <a class="pf__public" [routerLink]="['/u', u.id]">{{
+              'student.profile.viewPublic' | translate
+            }}</a>
+          </cdf-app-card>
 
-      <cdf-profile-certificates />
+          <nav [attr.aria-label]="'student.profile.navLabel' | translate">
+            <ul class="pf__links">
+              @for (l of links; track l.path) {
+                <li>
+                  <a
+                    [routerLink]="l.path"
+                    [attr.data-testid]="l.testId"
+                    class="pf__link"
+                  >
+                    <cdf-icon [name]="l.icon" size="md" />
+                    <span>
+                      <strong>{{
+                        'student.profile.links.' + l.key + '.title' | translate
+                      }}</strong>
+                      <small>{{
+                        'student.profile.links.' + l.key + '.body' | translate
+                      }}</small>
+                    </span>
+                    <cdf-icon name="chevron-forward" size="sm" />
+                  </a>
+                </li>
+              }
+            </ul>
+          </nav>
 
-      <h2>Account</h2>
-      <cdf-app-card padding="normal">
-        <cdf-form-field label="Display name">
-          <cdf-app-input
-            [(ngModel)]="displayNameModel"
-            (ngModelChange)="onDisplayNameChange($event)"
-          />
-        </cdf-form-field>
+          <cdf-referral-card />
+          <cdf-profile-certificates />
 
-        <cdf-form-field label="Language" style="margin-top: 12px;">
-          <cdf-app-select
-            [options]="localeOptions"
-            [ngModel]="localeModel()"
-            (ngModelChange)="onLocaleChange($event)"
-          />
-        </cdf-form-field>
+          <h2>{{ 'student.profile.account' | translate }}</h2>
+          <cdf-app-card padding="normal">
+            <form class="pf__form" (submit)="saveName($event)">
+              <cdf-form-field
+                [label]="'student.profile.displayName' | translate"
+                class="pf__field"
+              >
+                <cdf-app-input
+                  name="displayName"
+                  [(ngModel)]="displayName"
+                  [maxLength]="60"
+                  data-testid="display-name"
+                />
+              </cdf-form-field>
+              <cdf-app-button
+                kind="secondary"
+                type="submit"
+                [loading]="savingName()"
+                >{{ 'common.save' | translate }}</cdf-app-button
+              >
+            </form>
+            @if (auth.mode === 'clerk') {
+              <cdf-app-button
+                kind="ghost"
+                (buttonClick)="auth.openUserProfile()"
+              >
+                {{ 'student.profile.manageAccount' | translate }}
+              </cdf-app-button>
+            }
+          </cdf-app-card>
 
-        @if (savedLabel()) {
-        <p class="profile-saved">
-          <cdf-icon name="check-circle" size="sm" /> {{ savedLabel() }}
-        </p>
+          <h2>{{ 'student.profile.preferences' | translate }}</h2>
+          <cdf-app-card padding="normal">
+            <div class="pf__prefs">
+              <cdf-language-switcher data-testid="language-switcher" />
+              <div>
+                <p class="pf__label">{{ 'common.theme.label' | translate }}</p>
+                <cdf-theme-toggle />
+              </div>
+              <cdf-app-toggle
+                [label]="'student.profile.sound' | translate"
+                [ngModel]="soundOn()"
+                (ngModelChange)="setSound($event)"
+                data-testid="sound-toggle"
+              />
+              <cdf-app-toggle
+                [label]="'student.profile.reduceMotion' | translate"
+                [ngModel]="reducedMotion()"
+                (ngModelChange)="setReducedMotion($event)"
+                data-testid="motion-toggle"
+              />
+              <p class="pf__muted">
+                {{ 'student.profile.reduceMotionHint' | translate }}
+              </p>
+            </div>
+          </cdf-app-card>
+
+          <h2>{{ 'student.profile.session' | translate }}</h2>
+          <cdf-app-card padding="normal">
+            <p class="pf__muted">
+              {{ 'student.profile.signedInAs' | translate: { email: u.email } }}
+            </p>
+            <cdf-app-button
+              kind="danger"
+              [loading]="signingOut()"
+              (buttonClick)="signOut()"
+              data-testid="sign-out"
+            >
+              <cdf-icon name="log-out" size="sm" />
+              {{ 'common.signOut' | translate }}
+            </cdf-app-button>
+          </cdf-app-card>
         }
-        @if (apiSyncStatus() === 'syncing') {
-        <p class="profile-sync profile-sync--syncing">
-          <cdf-icon name="hourglass" size="sm" /> Syncing with server…
-        </p>
-        }
-        @if (apiSyncStatus() === 'offline') {
-        <p class="profile-sync profile-sync--offline">
-          <cdf-icon name="cloud-offline" size="sm" /> API offline — changes saved locally.
-        </p>
-        }
-      </cdf-app-card>
-
-      <h2>Membership</h2>
-      <cdf-app-card padding="normal">
-        <ion-list inset="false">
-          <ion-item button [routerLink]="['/subscription']" lines="none" detail="true" data-testid="subscription-link">
-            <cdf-icon name="diamond" slot="start" size="md" />
-            <ion-label>
-              <h3>Subscription</h3>
-              <p>Manage your plan, billing, and trial</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </cdf-app-card>
-
-      <h2>Social</h2>
-      <cdf-app-card padding="normal">
-        <ion-list inset="false">
-          <ion-item button [routerLink]="['/friends']" lines="none" detail="true" data-testid="friends-link">
-            <cdf-icon name="person" slot="start" size="md" />
-            <ion-label>
-              <h3>Friends</h3>
-              <p>Add friends, accept requests, and nudge</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </cdf-app-card>
-
-      <h2>Storage</h2>
-      <cdf-app-card padding="normal">
-        <ion-list inset="false">
-          <ion-item button [routerLink]="['/downloads']" lines="none" detail="true" data-testid="downloads-link">
-            <cdf-icon name="download" slot="start" size="md" />
-            <ion-label>
-              <h3>Downloads</h3>
-              <p>Manage offline courses, storage, and sync</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </cdf-app-card>
-
-      <h2>Appearance</h2>
-      <cdf-app-card padding="normal">
-        <cdf-form-field label="Theme" hint="System follows your OS preference.">
-          <cdf-app-select
-            [options]="themeOptions"
-            [ngModel]="themeMode()"
-            (ngModelChange)="onThemeChange($event)"
-          />
-        </cdf-form-field>
-
-        <cdf-app-toggle
-          [(ngModel)]="reduceMotionModel"
-          (ngModelChange)="onReduceMotionChange($event)"
-          label="Reduce motion (skip celebrations)"
-        />
-      </cdf-app-card>
-
-      <h2>Session</h2>
-      <cdf-app-card padding="normal">
-        <ion-list inset="false">
-          <ion-item lines="none">
-            <ion-label>
-              <h3>Signed in as</h3>
-              <p>{{ u.email }}</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-        <cdf-app-button kind="danger" (buttonClick)="signOut()">
-          Sign out
-        </cdf-app-button>
-      </cdf-app-card>
-      }
+      </div>
     </ion-content>
   `,
   styles: [
     `
-      :host {
-        display: block;
-        max-width: 640px;
+      .pf {
+        max-width: 720px;
         margin: 0 auto;
-      }
-      .profile-hero {
-        display: flex;
-        align-items: center;
-        gap: var(--cdf-space-3);
-      }
-      .profile-hero__copy {
         display: flex;
         flex-direction: column;
-        gap: 4px;
-      }
-      .profile-hero__copy h2 {
-        margin: 0;
-        font-size: var(--cdf-font-size-lg);
-        font-weight: 700;
-      }
-      .muted {
-        color: var(--cdf-color-text-muted);
-        font-size: 13px;
-        margin: 0;
+        gap: var(--cdf-space-3);
       }
       h2 {
-        margin: var(--cdf-space-5) 0 var(--cdf-space-2);
-        font-size: var(--cdf-font-size-md);
+        margin: var(--cdf-space-3) 0 0;
+        font-size: var(--cdf-font-size-sm);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--cdf-color-text-muted);
       }
-      .profile-saved {
-        margin: var(--cdf-space-2) 0 0;
-        color: var(--cdf-color-success);
-        font-size: 13px;
+      .pf__hero {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--cdf-space-3);
       }
-      .profile-sync {
-        margin: var(--cdf-space-2) 0 0;
-        font-size: 13px;
+      .pf__avatar {
+        border-radius: 50%;
+        display: inline-flex;
+      }
+      .pf__copy h1 {
+        margin: 0;
+        font-size: var(--cdf-font-size-lg);
+      }
+      .pf__muted {
+        color: var(--cdf-color-text-muted);
+        font-size: var(--cdf-font-size-sm);
+        margin: 2px 0 6px;
+      }
+      .pf__public {
+        display: inline-block;
+        margin-top: var(--cdf-space-2);
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+        font-size: var(--cdf-font-size-sm);
+      }
+      .pf__links {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: var(--cdf-space-1);
+      }
+      .pf__link {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--cdf-space-2);
+        padding: var(--cdf-space-2) var(--cdf-space-3);
+        border-radius: 12px;
+        background: var(--cdf-color-surface);
+        border: 1px solid var(--cdf-color-border);
+        color: inherit;
+        text-decoration: none;
+        min-height: 56px;
       }
-      .profile-sync--syncing {
+      .pf__link span {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .pf__link small {
         color: var(--cdf-color-text-muted);
       }
-      .profile-sync--offline {
-        color: var(--cdf-color-warning);
+      .pf__link:focus-visible,
+      .pf__avatar:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
+      .pf__form {
+        display: flex;
+        gap: var(--cdf-space-2);
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .pf__field {
+        flex: 1 1 220px;
+      }
+      .pf__prefs {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cdf-space-3);
+      }
+      .pf__label {
+        margin: 0 0 4px;
+        font-size: var(--cdf-font-size-sm);
+        font-weight: 600;
       }
     `,
   ],
 })
 export class ProfilePage {
-  private readonly auth = inject(AuthService);
-  private readonly i18n = inject(I18nService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly meClient = inject(MeClient);
+  private readonly me = inject(MeClient);
+  private readonly items = inject(ItemsClient);
+  private readonly sound = inject(SoundService);
+  private readonly motion = inject(MotionAndSoundService);
+  private readonly toast = inject(AppToastService);
+  protected readonly xp = inject(XpService);
 
-  protected readonly user = computed(() => this.auth.user());
-  protected displayNameModel = '';
-  protected reduceMotionModel = false;
-  protected readonly apiSyncStatus = signal<'idle' | 'syncing' | 'offline'>('idle');
-
-  protected readonly localeOptions: AppSelectOption<Locale>[] =
-    this.i18n.availableLocales.map((m) => ({ value: m.code, label: m.nativeName }));
-
-  protected readonly themeOptions: AppSelectOption<ThemeMode>[] = [
-    { value: 'system', label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-  ];
-
-  protected readonly localeModel = computed<Locale>(
-    () => (this.user()?.locale as Locale | undefined) ?? this.i18n.currentLocale(),
-  );
-
-  protected readonly themeMode = signal<ThemeMode>(this.readPersistedTheme());
-  protected readonly savedLabel = signal<string | null>(null);
-  private savedTimer: ReturnType<typeof setTimeout> | null = null;
+  protected readonly links = LINKS;
+  protected readonly user = this.auth.user;
+  protected readonly avatar = signal<AvatarResponse | null>(null);
+  protected readonly sprites = computed(() => equippedSprites(this.avatar()));
+  protected readonly soundOn = this.sound.soundEnabled;
+  protected readonly reducedMotion = this.motion.reducedMotion;
+  protected readonly savingName = signal(false);
+  protected readonly signingOut = signal(false);
+  protected displayName = this.auth.user()?.displayName ?? '';
 
   constructor() {
-    // Sync displayNameModel from the authoritative AuthService user when it
-    // (re)hydrates — `effect` reacts to user signal changes.
-    effect(() => {
-      const u = this.user();
-      if (u) this.displayNameModel = u.displayName;
-    });
-
-    this.applyTheme(this.themeMode());
-    void this.syncFromApi();
+    void this.loadAvatar();
   }
 
-  /**
-   * Pull canonical /api/me on mount. Falls back silently when the API
-   * is offline so dev work without a running NestJS instance still
-   * loads the page (state stays from AuthService.localStorage).
-   */
-  private async syncFromApi(): Promise<void> {
-    this.apiSyncStatus.set('syncing');
+  private async loadAvatar(): Promise<void> {
     try {
-      const me = await this.meClient.me();
-      // Mirror server canonical state into AuthService — locale + display
-      // name are the only fields the user can edit, but the response
-      // also tells us about server-side patches (admin-driven role bumps,
-      // for example) so we trust it as the source of truth.
-      this.auth.updateProfile({
-        displayName: me.displayName,
-        locale: me.locale,
+      this.avatar.set(await this.items.avatar());
+    } catch {
+      // The level ring + base body still render without equipment.
+      this.avatar.set(null);
+    }
+  }
+
+  protected async saveName(ev: Event): Promise<void> {
+    ev.preventDefault();
+    const next = this.displayName.trim();
+    if (!next || next === this.user()?.displayName) return;
+    this.savingName.set(true);
+    try {
+      const me = await this.me.update({ displayName: next });
+      this.auth.updateProfile({ displayName: me.displayName });
+      this.toast.show({
+        message: 'student.profile.nameSaved',
+        kind: 'success',
       });
-      if (me.locale && me.locale !== this.i18n.currentLocale()) {
-        this.i18n.setLocale(me.locale as Locale);
-      }
-      this.apiSyncStatus.set('idle');
     } catch (err) {
-      if (err instanceof ProblemDetailsError && err.isUnauthorized) {
-        // Auth interceptor already cleared the session — guard will redirect.
-        return;
-      }
-      this.apiSyncStatus.set('offline');
+      this.toast.error(err);
+    } finally {
+      this.savingName.set(false);
     }
   }
 
-  protected onDisplayNameChange(value: string): void {
-    const next = value.trim();
-    if (!next) return;
-    // Optimistic local update so the topbar avatar reflects instantly.
-    this.auth.updateProfile({ displayName: next });
-    this.flashSaved('Display name saved');
-    void this.persistToApi({ displayName: next });
+  protected setSound(on: boolean): void {
+    this.sound.setSoundEnabled(on);
   }
 
-  protected onLocaleChange(value: Locale | null): void {
-    if (!value) return;
-    this.i18n.setLocale(value);
-    this.auth.updateProfile({ locale: value });
-    this.flashSaved('Language updated');
-    void this.persistToApi({ locale: value });
+  protected setReducedMotion(on: boolean): void {
+    this.motion.setMotionPref(on ? 'off' : 'system');
   }
 
-  /** Best-effort PATCH /api/me. Errors flip the offline indicator. */
-  private async persistToApi(patch: {
-    displayName?: string;
-    locale?: string;
-  }): Promise<void> {
+  protected async signOut(): Promise<void> {
+    this.signingOut.set(true);
     try {
-      await this.meClient.update(patch);
-      this.apiSyncStatus.set('idle');
+      await this.auth.signOut();
+      await this.router.navigateByUrl('/login');
     } catch (err) {
-      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
-      this.apiSyncStatus.set('offline');
+      this.toast.error(err);
+    } finally {
+      this.signingOut.set(false);
     }
-  }
-
-  protected onThemeChange(mode: ThemeMode | null): void {
-    if (!mode) return;
-    this.themeMode.set(mode);
-    this.applyTheme(mode);
-    try {
-      localStorage.setItem(THEME_KEY, mode);
-    } catch {
-      /* private browsing — ignore */
-    }
-  }
-
-  protected onReduceMotionChange(value: boolean): void {
-    try {
-      localStorage.setItem('codify.motion', value ? 'off' : 'system');
-    } catch {
-      /* ignore */
-    }
-  }
-
-  protected signOut(): void {
-    this.auth.signOut();
-    void this.router.navigateByUrl('/login');
-  }
-
-  private applyTheme(mode: ThemeMode): void {
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    root.classList.remove('theme-light', 'theme-dark');
-    if (mode === 'light') root.classList.add('theme-light');
-    if (mode === 'dark') root.classList.add('theme-dark');
-  }
-
-  private readPersistedTheme(): ThemeMode {
-    try {
-      const v = localStorage.getItem(THEME_KEY);
-      if (v === 'light' || v === 'dark' || v === 'system') return v;
-    } catch {
-      /* ignore */
-    }
-    return 'system';
-  }
-
-  private flashSaved(label: string): void {
-    this.savedLabel.set(label);
-    if (this.savedTimer) clearTimeout(this.savedTimer);
-    this.savedTimer = setTimeout(() => this.savedLabel.set(null), 1800);
   }
 }
