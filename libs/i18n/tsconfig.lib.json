@@ -13,11 +13,16 @@
     "emitDecoratorMetadata": true
   },
   "include": ["src/**/*.ts", "src/**/*.json"],
-  "references": [],
+  "references": [
+    {
+      "path": "../ui-core/tsconfig.lib.json"
+    }
+  ],
   "exclude": [
     "jest.config.ts",
     "jest.config.cts",
     "src/**/*.spec.ts",
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/test-setup.ts"
   ]
 }

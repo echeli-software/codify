@@ -21,17 +21,28 @@ import {
   type LocaleMeta,
 } from './locales.js';
 
+import {
+  ContentTranslationService,
+  type ContentEntityType,
+  type ContentLookupOptions,
+} from './content-translation.js';
+import { LOCALE_PERSISTENCE } from './persistence.js';
+
 const STORAGE_KEY = 'codify.locale';
 
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly translate = inject(TranslateService);
+  private readonly content = inject(ContentTranslationService);
+  private readonly persistence = inject(LOCALE_PERSISTENCE, { optional: true });
   private readonly _current = signal<Locale>(DEFAULT_LOCALE);
 
   /** Current locale. Reactive. */
   readonly currentLocale = this._current.asReadonly();
   /** Read-only list of supported locales for the language switcher. */
-  readonly availableLocales: readonly LocaleMeta[] = SUPPORTED_LOCALES.map((c) => LOCALE_META[c]);
+  readonly availableLocales: readonly LocaleMeta[] = SUPPORTED_LOCALES.map(
+    (c) => LOCALE_META[c],
+  );
   /** Convenience: meta for the current locale. */
   readonly currentMeta = computed(() => LOCALE_META[this._current()]);
 
@@ -48,9 +59,47 @@ export class I18nService {
     this.persist(locale);
   }
 
+  /**
+   * User-initiated switch (LanguageSwitcher): applies the locale locally,
+   * then persists it server-side through the optional `LOCALE_PERSISTENCE`.
+   * Resolves once the remote save settles; never rejects.
+   */
+  async changeLocale(locale: Locale): Promise<void> {
+    if (!SUPPORTED_LOCALES.includes(locale)) return;
+    this.setLocale(locale);
+    if (!this.persistence) return;
+    try {
+      await this.persistence.persist(locale);
+    } catch {
+      // Remote save failed — the local choice (localStorage) still holds.
+    }
+  }
+
   /** Translate a key with optional ICU params. Synchronous instant lookup. */
   t(key: string, params?: Record<string, unknown>): string {
     return this.translate.instant(key, params) as string;
+  }
+
+  /**
+   * Content translation for the current locale (docs/03). Signal-backed:
+   * call it inside a template / computed and it re-renders once the batch
+   * lands. Returns `opts.fallback` (or '') until then / when missing.
+   */
+  tContent(
+    entityType: ContentEntityType,
+    entityId: string | null | undefined,
+    field: string,
+    opts: ContentLookupOptions = {},
+  ): string {
+    return (
+      this.content.translate(
+        entityType,
+        entityId,
+        field,
+        opts.locale ?? this._current(),
+        opts.fallback ?? null,
+      ) ?? ''
+    );
   }
 
   /**
