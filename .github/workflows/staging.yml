@@ -1,0 +1,201 @@
+name: Staging
+
+# Push to the default branch → staging (docs/13 §9, roadmap Phase 0:
+# "Pushing to main deploys to staging and runs migrations").
+#
+#   image   build + push ghcr.io/<owner>/codify-api:{sha,staging}
+#   api     migrate (on vps-staging-01) → Coolify deploy → smoke /api/health
+#   web     build admin + student against the staging API → Pages production
+#           deployments of the *-staging projects
+#
+# GitHub environment `staging` holds the secrets (see infra/README.md). Any job
+# whose secrets are missing skips with a summary instead of failing.
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+env:
+  NX_DAEMON: 'false'
+  NX_IGNORE_UNSUPPORTED_TS_SETUP: 'true'
+  PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.out.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name
+        id: name
+        run: echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/codify-api" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.name.outputs.repo }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=staging
+
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Output digest reference
+        id: out
+        run: |
+          image="${{ steps.name.outputs.repo }}@${{ steps.build.outputs.digest }}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "### API image" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$image\` (tags: staging, sha-${GITHUB_SHA})" >> "$GITHUB_STEP_SUMMARY"
+
+  api:
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_API_URL || 'https://api.staging.codify.app/api' }}/health
+    env:
+      IMAGE: ${{ needs.image.outputs.image }}
+      API_URL: ${{ vars.STAGING_API_URL || 'https://api.staging.codify.app/api' }}
+      SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+      SSH_USER: ${{ vars.STAGING_SSH_USER || 'deploy' }}
+      SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      COOLIFY_WEBHOOK_URL: ${{ secrets.STAGING_COOLIFY_WEBHOOK_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight
+        id: preflight
+        run: |
+          missing=()
+          if [ -n "$DATABASE_URL" ] && [ -n "$SSH_HOST" ] && [ -n "$SSH_PRIVATE_KEY" ] && [ -n "$SSH_KNOWN_HOSTS" ]; then
+            echo "migrate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "migrate=false" >> "$GITHUB_OUTPUT"
+            missing+=("STAGING_DATABASE_URL + STAGING_SSH_HOST/STAGING_SSH_PRIVATE_KEY/STAGING_SSH_KNOWN_HOSTS (migrations)")
+          fi
+          if [ -n "$COOLIFY_WEBHOOK_URL" ] && [ -n "$COOLIFY_TOKEN" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            missing+=("STAGING_COOLIFY_WEBHOOK_URL + COOLIFY_TOKEN (deploy, smoke)")
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            {
+              echo "### Staging API: partially skipped"
+              echo "Not configured in the \`staging\` environment:"
+              for m in "${missing[@]}"; do echo "- $m"; done
+              echo
+              echo "The image was still pushed. See infra/README.md → GitHub configuration."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Staging deploy::Some staging secrets are not configured — see the job summary."
+          fi
+
+      - name: Migrate staging database (prisma migrate deploy on vps-staging-01)
+        if: steps.preflight.outputs.migrate == 'true'
+        run: infra/deploy/remote-migrate.sh
+
+      - name: Trigger Coolify deploy
+        if: steps.preflight.outputs.deploy == 'true'
+        run: infra/deploy/coolify-deploy.sh
+
+      - name: Smoke /api/health
+        if: steps.preflight.outputs.deploy == 'true'
+        run: infra/deploy/smoke.sh "$API_URL" 600
+
+  web:
+    needs: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_STUDENT_URL || 'https://staging.codify.app' }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      API_URL: ${{ vars.STAGING_API_URL || 'https://api.staging.codify.app/api' }}
+      STUDENT_PROJECT: ${{ vars.PAGES_PROJECT_STUDENT_STAGING || 'codify-student-staging' }}
+      ADMIN_PROJECT: ${{ vars.PAGES_PROJECT_ADMIN_STAGING || 'codify-admin-staging' }}
+      PAGES_BRANCH: ${{ vars.PAGES_PRODUCTION_BRANCH || 'main' }}
+    steps:
+      - name: Preflight
+        id: preflight
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "### Staging web skipped — CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not configured" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.preflight.outputs.enabled == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.preflight.outputs.enabled == 'true'
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        if: steps.preflight.outputs.enabled == 'true'
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - if: steps.preflight.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build student + admin
+        if: steps.preflight.outputs.enabled == 'true'
+        run: |
+          bash infra/web/build-frontend.sh student "$API_URL" pages
+          bash infra/web/build-frontend.sh admin "$API_URL" pages
+
+      - name: Deploy student (staging)
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/apps/student/browser --project-name=${{ env.STUDENT_PROJECT }} --branch=${{ env.PAGES_BRANCH }} --commit-hash=${{ github.sha }}
+
+      - name: Deploy admin (staging)
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/apps/admin/browser --project-name=${{ env.ADMIN_PROJECT }} --branch=${{ env.PAGES_BRANCH }} --commit-hash=${{ github.sha }}

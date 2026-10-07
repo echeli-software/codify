@@ -1,0 +1,37 @@
+# Grafana Alloy agent — one per droplet (vps-app-01, vps-staging-01,
+# vps-judge0-01). Runs outside Coolify so it keeps shipping even when the app
+# stack is being redeployed.
+#
+#   cp .env.example .env   # fill in Grafana Cloud values (never commit .env)
+#   docker compose up -d
+#
+# Alloy UI (debugging): ssh -L 12345:127.0.0.1:12345 deploy@<host>
+
+name: observability
+
+services:
+  alloy:
+    image: grafana/alloy:v1.10.2
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    env_file: .env
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/host/root:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 256m }
+
+volumes:
+  alloy-data:

@@ -7,6 +7,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideI18n } from '@codify/i18n';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
+import { API_BASE_URL } from './api-base-url';
 import { appRoutes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -17,7 +18,7 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([authInterceptor(), ...apiClientInterceptors()]),
     ),
     provideAuth(),
-    provideApiClient({ baseUrl: 'http://localhost:3000/api' }),
+    provideApiClient({ baseUrl: API_BASE_URL }),
     provideI18n(),
   ],
 };

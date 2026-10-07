@@ -4,15 +4,53 @@ on:
   push:
     branches:
       - master
+      - main
   pull_request:
 
 permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NX_DAEMON: 'false'
+  NX_IGNORE_UNSUPPORTED_TS_SETUP: 'true'
+  PUPPETEER_SKIP_DOWNLOAD: 'true'
+  DATABASE_URL: postgresql://codify:codify@localhost:5432/codify_ci?schema=public
+  REDIS_URL: redis://localhost:6379
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: codify
+          POSTGRES_PASSWORD: codify
+          POSTGRES_DB: codify_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codify -d codify_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,4 +72,72 @@ jobs:
       - run: pnpm prisma:generate
 
       - run: pnpm exec nx format:check --base=origin/master
-      - run: pnpm exec nx affected -t lint test typecheck build --base=origin/master
+      - run: pnpm exec nx affected -t lint test typecheck build --base=origin/master --parallel=2
+
+      # ── API smoke: the same runtime the Docker image ships ─────────────────
+      # Mirrors apps/api/Dockerfile (build → runtime manifest → hoisted prod
+      # install → prisma generate), then migrates the service database and
+      # boots the bundle against it.
+      - name: Build API bundle
+        run: pnpm exec nx run api:build --parallel=1
+
+      - name: Assemble API runtime (as in apps/api/Dockerfile)
+        run: |
+          node infra/docker/api-runtime-manifest.mjs apps/api/dist
+          rm -rf "$RUNNER_TEMP/api-runtime" && mkdir -p "$RUNNER_TEMP/api-runtime"
+          cp apps/api/dist/main.js apps/api/dist/package.json apps/api/dist/pnpm-lock.yaml "$RUNNER_TEMP/api-runtime/"
+          cp -r prisma prisma.config.ts "$RUNNER_TEMP/api-runtime/"
+          cd "$RUNNER_TEMP/api-runtime"
+          pnpm install --prod --frozen-lockfile --config.node-linker=hoisted
+          ./node_modules/.bin/prisma generate --schema=prisma/schema.prisma
+
+      - name: prisma migrate deploy
+        working-directory: ${{ runner.temp }}/api-runtime
+        run: ./node_modules/.bin/prisma migrate deploy
+
+      - name: Boot API and probe /api/health
+        working-directory: ${{ runner.temp }}/api-runtime
+        env:
+          NODE_ENV: development
+          API_PORT: '3000'
+          JOBS_ENABLED: 'false'
+        run: |
+          node main.js > api.log 2>&1 &
+          echo $! > api.pid
+          for _ in $(seq 1 60); do
+            if body=$(curl -fsS http://127.0.0.1:3000/api/health 2>/dev/null); then
+              echo "health: $body"
+              if [ "$(echo "$body" | jq -r .status)" = "ok" ] && [ "$(echo "$body" | jq -r .database)" = "up" ]; then
+                # shellcheck disable=SC2016 # backticks are Markdown, not command substitution
+                printf '### API smoke ✅\n`GET /api/health` → `%s`\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+                kill "$(cat api.pid)"
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          echo "::error::API did not become healthy"
+          cat api.log
+          kill "$(cat api.pid)" || true
+          exit 1
+
+  # Builds (does not push) the production images so Dockerfile breakage is
+  # caught on the PR that causes it (API on every PR; the optional static
+  # admin/student images on pushes). Pushing happens in staging/release.
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ github.event_name == 'pull_request' && fromJSON('["api"]') || fromJSON('["api","admin","student"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

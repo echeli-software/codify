@@ -1,0 +1,34 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Secrets go in env vars:
+#   export TF_VAR_do_token=...            # DigitalOcean API token
+#   export TF_VAR_cloudflare_api_token=... # Cloudflare API token
+
+cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+zone_name             = "codify.app"
+
+# Confirm with `doctl compute region list` (docs/13 wants São Paulo).
+region = "REPLACE_ME"
+
+ssh_key_fingerprints = [
+  "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99",
+]
+
+# Operator / VPN egress addresses — SSH (22) and Coolify (8000) only.
+admin_ssh_cidrs = [
+  "203.0.113.10/32",
+]
+
+judge0_allow_staging            = true
+cloudflare_plan_has_managed_waf = false
+
+# Stripe publishes its webhook IPs at https://stripe.com/files/ips/ips_webhooks.txt
+stripe_webhook_ips     = []
+revenuecat_webhook_ips = []
+
+# email_dns_records = {
+#   mx1   = { name = "@", type = "MX", content = "inbound.postmarkapp.com", priority = 10 }
+#   spf   = { name = "@", type = "TXT", content = "v=spf1 include:spf.mtasv.net ~all" }
+#   dkim  = { name = "20261007pm._domainkey", type = "TXT", content = "k=rsa; p=..." }
+#   dmarc = { name = "_dmarc", type = "TXT", content = "v=DMARC1; p=quarantine; rua=mailto:dmarc@codify.app" }
+# }
+
+# cdn_r2_target = "public.r2.dev target from the R2 custom-domain setup"

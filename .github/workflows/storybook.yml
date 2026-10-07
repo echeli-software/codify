@@ -1,0 +1,136 @@
+name: Storybook
+
+# Builds both component catalogs, runs every story through the Storybook
+# test-runner with axe (roadmap Phase 2/3 a11y acceptance), and publishes them
+# to Cloudflare Pages ("Storybook URL deployed").
+#   PRs  → preview deployment (branch pr-<n>), URL in the job summary
+#   push → production deployment of each Storybook project
+# Publishing skips with a notice when CLOUDFLARE_API_TOKEN isn't configured.
+
+on:
+  pull_request:
+    paths:
+      - 'libs/**'
+      - 'infra/storybook/**'
+      - '.github/workflows/storybook.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  push:
+    branches: [master, main]
+    paths:
+      - 'libs/**'
+      - 'infra/storybook/**'
+      - '.github/workflows/storybook.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storybook-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NX_DAEMON: 'false'
+  NX_IGNORE_UNSUPPORTED_TS_SETUP: 'true'
+  PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+jobs:
+  storybook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lib: ui-bootstrap
+            port: 4400
+            project: codify-storybook-admin
+          - lib: ui-ionic
+            port: 4401
+            project: codify-storybook-student
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build Storybook (${{ matrix.lib }})
+        run: pnpm exec nx run ${{ matrix.lib }}:build-storybook:ci --parallel=1
+
+      - name: Ensure axe test-runner hooks
+        id: runner
+        run: |
+          if [ ! -x node_modules/.bin/test-storybook ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::@storybook/test-runner is not installed — a11y run skipped"
+            exit 0
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          cfg="libs/${{ matrix.lib }}/.storybook/test-runner.ts"
+          if [ ! -f "$cfg" ]; then
+            cp infra/storybook/test-runner.ts "$cfg"
+            echo "Using the default axe hooks from infra/storybook/test-runner.ts"
+          fi
+
+      - name: Install Playwright Chromium
+        if: steps.runner.outputs.available == 'true'
+        # Use the playwright that @storybook/test-runner resolves (it isn't
+        # hoisted to node_modules/.bin) so browser and library versions match.
+        run: |
+          cli="$(find node_modules/.pnpm -maxdepth 4 -path '*/playwright@*/node_modules/playwright/cli.js' 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$cli" ]; then node "$cli" install --with-deps chromium; else npx --yes playwright install --with-deps chromium; fi
+
+      - name: Run stories + axe
+        if: steps.runner.outputs.available == 'true'
+        run: |
+          python3 -m http.server ${{ matrix.port }} --bind 127.0.0.1 \
+            --directory dist/storybook/${{ matrix.lib }} > /dev/null 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:${{ matrix.port }}/index.json >/dev/null && break; sleep 1; done
+          pnpm exec test-storybook -c libs/${{ matrix.lib }}/.storybook \
+            --url http://127.0.0.1:${{ matrix.port }} --index-json --maxWorkers=2
+
+      - name: Upload Storybook artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-${{ matrix.lib }}
+          path: dist/storybook/${{ matrix.lib }}
+          retention-days: 7
+
+      - name: Publish preflight
+        id: publish
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "### ${{ matrix.lib }} Storybook built + tested; publishing skipped (no Cloudflare credentials) — see the artifact" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "branch=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            else
+              echo "branch=${{ vars.PAGES_PRODUCTION_BRANCH || 'main' }}" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Publish to Cloudflare Pages
+        id: deploy
+        if: steps.publish.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/storybook/${{ matrix.lib }} --project-name=${{ matrix.project }} --branch=${{ steps.publish.outputs.branch }} --commit-hash=${{ github.sha }}
+
+      - name: Summary
+        if: steps.publish.outputs.enabled == 'true'
+        run: |
+          echo "### ${{ matrix.lib }} Storybook" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}" >> "$GITHUB_STEP_SUMMARY"

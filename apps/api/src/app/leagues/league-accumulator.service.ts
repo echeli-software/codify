@@ -43,6 +43,18 @@ export class LeagueAccumulatorService {
     if (existing) return existing;
 
     const tier = await this.resolveTier(tx, userId, weekStart);
+    // Serialize cohort placement per (tier, week). Without this, concurrent
+    // first-time placements all read the same "open" cohort count and
+    // overfill it (tools/load/league-sharding.mjs measured cohorts of 31–35 at
+    // 25 concurrent users). The transaction-scoped advisory lock is released
+    // on commit/rollback and only taken on a user's first placement of the
+    // week, so steady-state XP accumulation never contends on it.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`league:${tier}:${weekStart.toISOString()}`}))`;
+    const placed = await tx.leagueMembership.findFirst({
+      where: { userId, league: { weekStart } },
+      select: { leagueId: true },
+    });
+    if (placed) return placed;
     const league = await this.findOrCreateCohort(tx, tier, weekStart);
     await tx.leagueMembership.create({
       data: { leagueId: league.id, userId, weeklyXp: 0 },

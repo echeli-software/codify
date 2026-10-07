@@ -61,3 +61,19 @@ prisma/.env
 
 
 storybook-static
+# Terraform (infra/terraform) — state lives in the remote backend
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+infra/terraform/backend.hcl
+crash.log
+
+# Fastlane output + signing material (never committed; mobile.yml restores from secrets)
+apps/student/fastlane/report.xml
+apps/student/fastlane/README.md
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
