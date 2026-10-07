@@ -145,6 +145,7 @@
     "@tiptap/extension-placeholder": "^3.22.5",
     "@tiptap/extension-table": "^3.22.5",
     "@tiptap/extension-youtube": "^3.22.5",
+    "@tiptap/pm": "3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
     "bootstrap": "^5.3.8",
     "bullmq": "^6.3.11",

@@ -2,9 +2,14 @@
 
 export {
   LESSON_DOC_VERSION,
+  EMBED_PROVIDERS,
   type CalloutKind,
   type LessonDoc,
   type BlockNode,
+  type NestableBlockNode,
+  type RootOnlyBlockNode,
+  type AnyBlockNode,
+  type BlockType,
   type ParagraphNode,
   type HeadingNode,
   type BulletListNode,
@@ -14,15 +19,96 @@ export {
   type CalloutNode,
   type CodeBlockNode,
   type DividerNode,
+  type ImageNode,
+  type ImageWidth,
+  type EmbedNode,
+  type EmbedProvider,
+  type TableNode,
+  type TableRowNode,
+  type TableHeaderNode,
+  type TableCellNode,
+  type TableCellAttrs,
+  type QuizNode,
+  type QuizAttrs,
+  type QuizKind,
+  type QuizOption,
+  type ExerciseRefNode,
+  type AiPromptRefNode,
+  type ScenarioRefNode,
+  type RefNode,
+  type RefBlockType,
   type TextNode,
+  type HardBreakNode,
+  type InlineNode,
   type MarkType,
+  type MarkName,
+  type LinkTarget,
 } from './lib/types.js';
 
-export { lessonDocSchema, type LessonDocInput } from './lib/schema.js';
-export { migrateLessonDoc, registeredMigrationTargets } from './lib/migrate.js';
+export {
+  lessonDocSchema,
+  quizAttrsSchema,
+  validateLessonDoc,
+  formatLessonDocIssues,
+  LESSON_DOC_MAX_BYTES,
+  type LessonDocInput,
+  type LessonDocOutput,
+  type LessonDocIssue,
+  type ValidateLessonDocResult,
+} from './lib/schema.js';
+export {
+  migrateLessonDoc,
+  registeredMigrationTargets,
+  LESSON_DOC_MIGRATIONS,
+  LessonDocMigrationError,
+  type MigrationFn,
+  type MigrationMap,
+  type MigrationValidator,
+  type MigrateLessonDocOptions,
+} from './lib/migrate.js';
 export {
   LESSON_BLOCK_REGISTRY,
+  NESTABLE_PARENTS,
   enabledBlocks,
+  insertableBlocks,
+  blockEntry,
+  isAllowedIn,
   type BlockRegistryEntry,
+  type BlockGroup,
 } from './lib/registry.js';
+export {
+  type BlockRendererProtocol,
+  type BlockRenderInputs,
+  type LessonRefActivation,
+} from './lib/render.js';
+export {
+  isAllowedHref,
+  isAllowedImageSrc,
+  embedSrcFor,
+  parseEmbedUrl,
+  EMBED_PROVIDER_LABELS,
+  type ParsedEmbed,
+} from './lib/urls.js';
+export {
+  gradeQuiz,
+  extractQuizzes,
+  stripQuizAnswers,
+  sanitizeQuizAnswers,
+  hashQuizAnswer,
+  buildQuizAnswerHashes,
+  checkQuizAnswerHash,
+  DEFAULT_QUIZ_PASS_PCT,
+  type QuizAnswers,
+  type QuizGradeResult,
+  type QuizQuestionResult,
+  type GradeQuizOptions,
+} from './lib/quiz.js';
+export {
+  walkBlocks,
+  collectLessonRefs,
+  type BlockParent,
+  type BlockVisitor,
+  type LessonDocRefs,
+} from './lib/walk.js';
 export { emptyLessonDoc } from './lib/empty.js';
+export { kitchenSinkLessonDoc } from './lib/fixtures.js';

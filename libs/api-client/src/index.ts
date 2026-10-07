@@ -218,3 +218,11 @@ export type {
   AdminUserListResponse,
   HealthResponse,
 } from './lib/types.js';
+
+// Lesson content delivery: offline bundle + lesson versions.
+export type {
+  LessonMeta,
+  LessonOfflineBundle,
+  LessonVersion,
+  LessonContentIssue,
+} from './lib/lessons.client.js';

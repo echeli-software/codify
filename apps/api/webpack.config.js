@@ -18,6 +18,10 @@ module.exports = {
     alias: {
       '@codify/domain': join(__dirname, '../../libs/domain/src/index.ts'),
       '@codify/ui-core': join(__dirname, '../../libs/ui-core/src/index.ts'),
+      '@codify/lesson-schema': join(
+        __dirname,
+        '../../libs/lesson-schema/src/index.ts',
+      ),
     },
     extensions: ['.ts', '.js'],
     extensionAlias: {

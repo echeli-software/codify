@@ -1,0 +1,120 @@
+<section class="cdf-nv cdf-nv--quiz" [attr.aria-labelledby]="uid + '-title'">
+  <header class="cdf-nv__header">
+    <span class="cdf-nv__badge"
+      ><cdf-editor-icon name="ListChecks" size="16"
+    /></span>
+    <h4 class="cdf-nv__title" [id]="uid + '-title'">Quiz</h4>
+    <span class="cdf-nv__meta">id: {{ quiz().id }}</span>
+    @if (editable()) {
+    <button
+      type="button"
+      class="cdf-nv__icon-btn"
+      aria-label="Delete quiz block"
+      title="Delete quiz block"
+      (click)="remove.emit()"
+    >
+      <cdf-editor-icon name="Trash" size="16" />
+    </button>
+    }
+  </header>
+
+  <label class="cdf-nv__field">
+    <span class="cdf-nv__label">Question</span>
+    <textarea
+      rows="2"
+      [value]="quiz().question"
+      [readOnly]="!editable()"
+      (input)="setQuestion($event)"
+      placeholder="What do you want to ask?"
+    ></textarea>
+  </label>
+
+  <fieldset class="cdf-nv__kind" [disabled]="!editable()">
+    <legend class="cdf-nv__label">Answer type</legend>
+    <label>
+      <input
+        type="radio"
+        [name]="uid + '-kind'"
+        value="single"
+        [checked]="quiz().kind === 'single'"
+        (change)="setKind('single')"
+      />
+      Single choice
+    </label>
+    <label>
+      <input
+        type="radio"
+        [name]="uid + '-kind'"
+        value="multiple"
+        [checked]="quiz().kind === 'multiple'"
+        (change)="setKind('multiple')"
+      />
+      Multiple choice
+    </label>
+  </fieldset>
+
+  <fieldset class="cdf-nv__options" [disabled]="!editable()">
+    <legend class="cdf-nv__label">
+      Options — mark the correct {{ quiz().kind === 'single' ? 'one' : 'ones' }}
+    </legend>
+    <ol class="cdf-nv__option-list">
+      @for (opt of quiz().options; track opt.id; let i = $index) {
+      <li
+        class="cdf-nv__option"
+        [class.cdf-nv__option--correct]="isCorrect(opt.id)"
+      >
+        <input
+          [type]="quiz().kind === 'single' ? 'radio' : 'checkbox'"
+          [name]="uid + '-correct'"
+          [checked]="isCorrect(opt.id)"
+          [attr.aria-label]="'Option ' + (i + 1) + ' is correct'"
+          (change)="toggleCorrect(opt.id)"
+        />
+        <input
+          type="text"
+          class="cdf-nv__option-text"
+          [value]="opt.text"
+          [attr.aria-label]="'Option ' + (i + 1) + ' text'"
+          placeholder="Option text"
+          (input)="setOptionText(opt.id, $event)"
+        />
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="'Remove option ' + (i + 1)"
+          [disabled]="quiz().options.length <= 2"
+          (click)="removeOption(opt.id)"
+        >
+          <cdf-editor-icon name="XSquare" size="16" />
+        </button>
+      </li>
+      }
+    </ol>
+    <button
+      type="button"
+      class="cdf-nv__text-btn"
+      [disabled]="quiz().options.length >= maxOptions"
+      (click)="addOption()"
+    >
+      <cdf-editor-icon name="Plus" size="16" /> Add option
+    </button>
+  </fieldset>
+
+  <label class="cdf-nv__field">
+    <span class="cdf-nv__label">Explanation (shown after answering)</span>
+    <textarea
+      rows="2"
+      [value]="quiz().explanation ?? ''"
+      [readOnly]="!editable()"
+      (input)="setExplanation($event)"
+    ></textarea>
+  </label>
+
+  @if (issues().length) {
+  <ul class="cdf-nv__issues" role="status" aria-label="Quiz problems">
+    @for (issue of issues(); track issue) {
+    <li><cdf-editor-icon name="WarningCircle" size="14" /> {{ issue }}</li>
+    }
+  </ul>
+  }
+</section>

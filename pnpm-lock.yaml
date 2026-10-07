@@ -176,6 +176,9 @@ importers:
       '@tiptap/extension-youtube':
         specifier: ^3.22.5
         version: 3.22.5(@tiptap/core@3.22.5(@tiptap/pm@3.22.5))
+      '@tiptap/pm':
+        specifier: 3.22.5
+        version: 3.22.5
       '@tiptap/starter-kit':
         specifier: ^3.22.5
         version: 3.22.5

@@ -1,0 +1,111 @@
+@for (block of blocks() ?? []; track $index) { @if (override(block); as cmp) {
+<ng-container *ngComponentOutlet="cmp; inputs: { node: block }" />
+} @else { @switch (block.type) { @case ('paragraph') {
+<p [cdfLessonInline]="p(block).content"></p>
+} @case ('heading') { @if (h(block).attrs.level === 3) {
+<h3 [id]="slug(block)"><span [cdfLessonInline]="h(block).content"></span></h3>
+} @else {
+<h2 [id]="slug(block)"><span [cdfLessonInline]="h(block).content"></span></h2>
+} } @case ('bulletList') {
+<ul>
+  @for (item of list(block).content; track $index) {
+  <li><cdf-lesson-blocks [blocks]="item.content" /></li>
+  }
+</ul>
+} @case ('orderedList') {
+<ol [attr.start]="ol(block).attrs?.start ?? null">
+  @for (item of ol(block).content; track $index) {
+  <li><cdf-lesson-blocks [blocks]="item.content" /></li>
+  }
+</ol>
+} @case ('blockquote') {
+<blockquote>
+  <cdf-lesson-blocks [blocks]="container(block).content" />
+</blockquote>
+} @case ('callout') {
+<div
+  class="cdf-callout"
+  role="note"
+  [attr.data-callout]="callout(block).attrs.kind"
+  [attr.aria-label]="calloutLabel(block)"
+>
+  <cdf-lesson-blocks [blocks]="callout(block).content" />
+</div>
+} @case ('codeBlock') {
+<pre
+  class="cdf-code"
+  [attr.data-language]="codeLanguage(block)"
+><code [class]="'language-' + codeLanguage(block)" [textContent]="codeText(block)"></code></pre>
+} @case ('horizontalRule') {
+<hr />
+} @case ('image') {
+<figure
+  class="cdf-figure"
+  [attr.data-width]="image(block).attrs.width ?? 'full'"
+>
+  @if (imageSrc(block); as src) {
+  <img
+    [src]="src"
+    [alt]="image(block).attrs.alt"
+    loading="lazy"
+    decoding="async"
+  />
+  } @if (image(block).attrs.caption) {
+  <figcaption>{{ image(block).attrs.caption }}</figcaption>
+  }
+</figure>
+} @case ('embed') {
+<cdf-lesson-embed [node]="embed(block)" />
+} @case ('table') { @let parts = tableParts(block);
+<div
+  class="cdf-table-wrap"
+  role="region"
+  tabindex="0"
+  aria-label="Table, scroll horizontally if needed"
+>
+  <table class="cdf-table">
+    @if (parts.head; as head) {
+    <thead>
+      <tr>
+        @for (cell of head.content; track $index) {
+        <th
+          scope="col"
+          [attr.colspan]="span(cell, 'colspan')"
+          [attr.rowspan]="span(cell, 'rowspan')"
+        >
+          <cdf-lesson-blocks [blocks]="cell.content" />
+        </th>
+        }
+      </tr>
+    </thead>
+    }
+    <tbody>
+      @for (row of parts.body; track $index) {
+      <tr>
+        @for (cell of row.content; track $index) { @if (cell.type ===
+        'tableHeader') {
+        <th
+          scope="row"
+          [attr.colspan]="span(cell, 'colspan')"
+          [attr.rowspan]="span(cell, 'rowspan')"
+        >
+          <cdf-lesson-blocks [blocks]="cell.content" />
+        </th>
+        } @else {
+        <td
+          [attr.colspan]="span(cell, 'colspan')"
+          [attr.rowspan]="span(cell, 'rowspan')"
+        >
+          <cdf-lesson-blocks [blocks]="cell.content" />
+        </td>
+        } }
+      </tr>
+      }
+    </tbody>
+  </table>
+</div>
+} @case ('quiz') {
+<cdf-lesson-quiz [quiz]="quiz(block).attrs" />
+} @default { @if (ref(block); as r) {
+<cdf-lesson-ref [ref]="r" />
+} } } } }
