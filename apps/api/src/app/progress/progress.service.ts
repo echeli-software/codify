@@ -13,11 +13,32 @@ import { GamificationService } from '../gamification/gamification.service.js';
 import { QuestsService } from '../gamification/quests.service.js';
 import { BadgesService } from '../gamification/badges.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
+import type { CoinSource, XpSource } from '@prisma/client';
+import type { QuestEventContext } from '../gamification/quests.service.js';
 import type {
   CompleteLessonResponse,
   CourseProgressResponse,
   ProgressItem,
 } from './progress.dto.js';
+
+export interface RecordCompletionParams {
+  userId: string;
+  lessonId: string;
+  xpSource: XpSource;
+  coinSource: CoinSource;
+  /** What earned it, for the ledger: 'lesson' | 'quiz' | 'exercise' | 'ai_prompt' | 'scenario' | 'capstone'. */
+  refType: string;
+  refId: string;
+  /** Quest event kind; defaults to 'lesson_complete'. */
+  questEvent?: QuestEventContext['type'];
+  /** Offline-queue client time, so streak credit lands on the right local day. */
+  clientTimestamp?: string | null;
+}
+
+export type RecordCompletionResult = CompleteLessonResponse & {
+  /** True when the lesson was already complete; nothing was granted. */
+  alreadyCompleted: boolean;
+};
 
 /**
  * Service backing the Progress feature.
@@ -66,17 +87,10 @@ export class ProgressService {
       throw new ForbiddenException('Only students can complete lessons');
     }
 
-    const lesson = await this.prisma.lesson.findFirst({
-      where: { id: lessonId, deletedAt: null },
-      include: { module: { include: { course: true } } },
-    });
-    if (!lesson || lesson.module.course.status !== 'PUBLISHED') {
-      throw new NotFoundException('Lesson not found');
-    }
-
     // Phase 6: server-authoritative access. The same @codify/domain rule the
     // client uses for UI gating decides here, so they never drift. A paywall
     // verdict becomes 402 carrying the plans the student could buy.
+    // (resolveLessonAccess also 404s a missing / unpublished lesson.)
     const { access } = await this.access.resolveLessonAccess(
       actor.userId,
       lessonId,
@@ -93,10 +107,57 @@ export class ProgressService {
       );
     }
 
-    const existing = await this.prisma.progress.findUnique({
-      where: { userId_lessonId: { userId: actor.userId, lessonId } },
+    const out = await this.recordCompletion({
+      userId: actor.userId,
+      lessonId,
+      xpSource: 'LESSON_COMPLETE',
+      coinSource: 'LESSON_COMPLETE',
+      refType: 'lesson',
+      refId: lessonId,
     });
-    if (existing) throw await this.conflictFromExisting(actor.userId, existing);
+    if (out.alreadyCompleted) {
+      throw new ConflictException({
+        message: 'Lesson already completed',
+        statusCode: 409,
+        progress: out.progress,
+        totals: out.totals,
+      });
+    }
+    const { alreadyCompleted: _replay, ...response } = out;
+    return response;
+  }
+
+  /**
+   * The single place a lesson becomes complete and pays its reward. Every
+   * completion flow (reading, quiz pass, exercise first pass, AI-prompt
+   * pass, scenario ending, capstone) calls this, so a lesson can never be
+   * rewarded twice regardless of which flow got there first.
+   *
+   * Writes the Progress row, grants XP/coins (multipliers, streak, level-up,
+   * milestones), advances quests and evaluates badges in ONE transaction.
+   * Idempotent: if the lesson is already complete — including when a
+   * concurrent request wins the race — it returns the existing record with
+   * `alreadyCompleted: true` and grants nothing. Callers decide whether a
+   * replay is an error (the public `complete()` maps it to 409).
+   *
+   * Does not check role or paywall access; callers do that first.
+   */
+  async recordCompletion(
+    params: RecordCompletionParams,
+  ): Promise<RecordCompletionResult> {
+    const { userId, lessonId } = params;
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, deletedAt: null },
+      include: { module: { include: { course: true } } },
+    });
+    if (!lesson || lesson.module.course.status !== 'PUBLISHED') {
+      throw new NotFoundException('Lesson not found');
+    }
+
+    const existing = await this.prisma.progress.findUnique({
+      where: { userId_lessonId: { userId, lessonId } },
+    });
+    if (existing) return this.replay(userId, existing);
 
     // Course categories — needed for category-scoped quests.
     const courseId = lesson.module.course.id;
@@ -112,46 +173,43 @@ export class ProgressService {
         // constraint is the authoritative double-award guard — a racing
         // duplicate fails here and the whole tx (including the grant) rolls back.
         const created = await tx.progress.create({
-          data: {
-            userId: actor.userId,
-            lessonId,
-            xpAwarded: 0,
-            coinsAwarded: 0,
-          },
+          data: { userId, lessonId, xpAwarded: 0, coinsAwarded: 0 },
         });
         // Server-authoritative reward: XP/coins (with multipliers), streak,
-        // level-up, streak milestone — all in this transaction.
+        // level-up, streak milestone — all in this transaction. One key per
+        // (user, lesson) across every flow.
         const granted = await this.gamification.grantReward(
           {
-            userId: actor.userId,
+            userId,
             baseXp: lesson.baseXp,
             baseCoins: lesson.baseCoins,
-            xpSource: 'LESSON_COMPLETE',
-            coinSource: 'LESSON_COMPLETE',
-            refType: 'lesson',
-            refId: lessonId,
-            idempotencyKey: `lesson_complete:${actor.userId}:${lessonId}`,
+            xpSource: params.xpSource,
+            coinSource: params.coinSource,
+            refType: params.refType,
+            refId: params.refId,
+            idempotencyKey: `lesson_reward:${userId}:${lessonId}`,
             courseId,
             lessonId,
             countsForStreak: true,
+            clientTimestamp: params.clientTimestamp ?? null,
           },
           tx,
         );
 
         // Advance daily quests + evaluate badges in the same transaction so
         // their (flat) rewards land atomically with the completion.
-        const questsCompleted = await this.quests.onEvent(tx, actor.userId, {
-          type: 'lesson_complete',
+        const questsCompleted = await this.quests.onEvent(tx, userId, {
+          type: params.questEvent ?? 'lesson_complete',
           courseId,
           categoryIds,
           xpEarned: granted.xp,
-          streakAdvanced: true,
+          streakAdvanced: granted.streak !== null,
         });
-        const badgesUnlocked = await this.badges.evaluate(tx, actor.userId);
+        const badgesUnlocked = await this.badges.evaluate(tx, userId);
 
         // Re-read final totals (quest/badge bonuses may have added more).
         const finalUser = await tx.user.findUniqueOrThrow({
-          where: { id: actor.userId },
+          where: { id: userId },
           select: { totalXp: true, coins: true },
         });
         granted.totals = {
@@ -173,6 +231,7 @@ export class ProgressService {
         };
       });
       return {
+        alreadyCompleted: false,
         progress: toItem(out.progress),
         totals: out.reward.totals,
         reward: out.reward,
@@ -181,21 +240,20 @@ export class ProgressService {
       };
     } catch (err) {
       // Race window between findUnique and create — another request
-      // (different device, retried offline-queue, etc.) just landed
-      // the row. Translate the Prisma P2002 into the same 409 shape so
-      // clients have a single conflict path to handle.
+      // (different device, retried offline-queue, a parallel flow) just
+      // landed the row. Report it as a replay, never as a second award.
       if (isUniqueViolation(err)) {
         const raced = await this.prisma.progress.findUnique({
-          where: { userId_lessonId: { userId: actor.userId, lessonId } },
+          where: { userId_lessonId: { userId, lessonId } },
         });
-        if (raced) throw await this.conflictFromExisting(actor.userId, raced);
+        if (raced) return this.replay(userId, raced);
       }
       throw err;
     }
   }
 
-  /** Build the 409 payload referenced from both the fast and slow conflict paths. */
-  private async conflictFromExisting(
+  /** The already-completed response: original Progress + current totals. */
+  private async replay(
     userId: string,
     existing: {
       lessonId: string;
@@ -203,17 +261,16 @@ export class ProgressService {
       xpAwarded: number;
       coinsAwarded: number;
     },
-  ): Promise<ConflictException> {
+  ): Promise<RecordCompletionResult> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { totalXp: true, coins: true },
     });
-    return new ConflictException({
-      message: 'Lesson already completed',
-      statusCode: 409,
+    return {
+      alreadyCompleted: true,
       progress: toItem(existing),
       totals: { totalXp: user.totalXp, coins: user.coins },
-    });
+    };
   }
 
   async forCourse(

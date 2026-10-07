@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Prisma, QuestKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GamificationService } from './gamification.service.js';
@@ -43,7 +47,19 @@ export interface QuestTemplateInput {
 
 /** Context for advancing quest progress after a reward-bearing event. */
 export interface QuestEventContext {
-  type: 'lesson_complete' | 'exercise_pass';
+  /**
+   * Which flow completed the lesson. Every kind is also a lesson
+   * completion (it arrives through ProgressService.recordCompletion), so
+   * lesson-count quests advance on all of them; kind-specific quests
+   * (e.g. EXERCISE_PASS) only on their own kind.
+   */
+  type:
+    | 'lesson_complete'
+    | 'quiz_pass'
+    | 'exercise_pass'
+    | 'ai_prompt_pass'
+    | 'scenario_complete'
+    | 'capstone_pass';
   courseId?: string | null;
   categoryIds?: string[];
   xpEarned?: number;
@@ -73,7 +89,9 @@ export class QuestsService {
   }
 
   async createTemplate(input: QuestTemplateInput) {
-    const dupe = await this.prisma.questTemplate.findUnique({ where: { slug: input.slug } });
+    const dupe = await this.prisma.questTemplate.findUnique({
+      where: { slug: input.slug },
+    });
     if (dupe) throw new ConflictException('Slug already in use');
     return this.prisma.questTemplate.create({
       data: {
@@ -82,7 +100,9 @@ export class QuestsService {
         title: input.title,
         difficulty: input.difficulty ?? 1,
         target: input.target,
-        paramsJson: (input.paramsJson ?? undefined) as Prisma.InputJsonValue | undefined,
+        paramsJson: (input.paramsJson ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         xpReward: input.xpReward ?? 0,
         coinReward: input.coinReward ?? 0,
         isActive: input.isActive ?? true,
@@ -91,7 +111,9 @@ export class QuestsService {
   }
 
   async updateTemplate(id: string, patch: Partial<QuestTemplateInput>) {
-    const target = await this.prisma.questTemplate.findUnique({ where: { id } });
+    const target = await this.prisma.questTemplate.findUnique({
+      where: { id },
+    });
     if (!target) throw new NotFoundException('Quest template not found');
     return this.prisma.questTemplate.update({
       where: { id },
@@ -100,7 +122,9 @@ export class QuestsService {
         title: patch.title,
         difficulty: patch.difficulty,
         target: patch.target,
-        paramsJson: (patch.paramsJson ?? undefined) as Prisma.InputJsonValue | undefined,
+        paramsJson: (patch.paramsJson ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         xpReward: patch.xpReward,
         coinReward: patch.coinReward,
         isActive: patch.isActive,
@@ -109,9 +133,14 @@ export class QuestsService {
   }
 
   async deleteTemplate(id: string): Promise<void> {
-    const target = await this.prisma.questTemplate.findUnique({ where: { id } });
+    const target = await this.prisma.questTemplate.findUnique({
+      where: { id },
+    });
     if (!target) throw new NotFoundException('Quest template not found');
-    await this.prisma.questTemplate.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.questTemplate.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 
   // ─── Daily assignment + read ────────────────────────────────────────────
@@ -142,12 +171,18 @@ export class QuestsService {
   }
 
   private async ensureAssigned(userId: string, forDate: Date): Promise<void> {
-    const existing = await this.prisma.questAssignment.count({ where: { userId, assignedFor: forDate } });
+    const existing = await this.prisma.questAssignment.count({
+      where: { userId, assignedFor: forDate },
+    });
     if (existing > 0) return;
     const picks = await this.pickDaily();
     if (picks.length === 0) return;
     await this.prisma.questAssignment.createMany({
-      data: picks.map((t) => ({ userId, templateId: t.id, assignedFor: forDate })),
+      data: picks.map((t) => ({
+        userId,
+        templateId: t.id,
+        assignedFor: forDate,
+      })),
       skipDuplicates: true,
     });
   }
@@ -185,8 +220,15 @@ export class QuestsService {
    * the caller's transaction so quest rewards land atomically with the event.
    * Returns the quests that just completed.
    */
-  async onEvent(tx: Tx, userId: string, ctx: QuestEventContext): Promise<CompletedQuest[]> {
-    const u = await tx.user.findUnique({ where: { id: userId }, select: { timezone: true } });
+  async onEvent(
+    tx: Tx,
+    userId: string,
+    ctx: QuestEventContext,
+  ): Promise<CompletedQuest[]> {
+    const u = await tx.user.findUnique({
+      where: { id: userId },
+      select: { timezone: true },
+    });
     const forDate = this.localMidnight(u?.timezone || DEFAULT_TZ);
     const assignments = await tx.questAssignment.findMany({
       where: { userId, assignedFor: forDate, completedAt: null },
@@ -218,7 +260,12 @@ export class QuestsService {
           },
           tx,
         );
-        completed.push({ id: a.id, title: a.template.title, xpReward: a.template.xpReward, coinReward: a.template.coinReward });
+        completed.push({
+          id: a.id,
+          title: a.template.title,
+          xpReward: a.template.xpReward,
+          coinReward: a.template.coinReward,
+        });
       }
     }
     return completed;
@@ -231,9 +278,8 @@ export class QuestsService {
   ): number {
     switch (kind) {
       case 'LESSON_COUNT':
-        return ctx.type === 'lesson_complete' ? 1 : 0;
+        return 1;
       case 'CATEGORY_LESSON_COUNT': {
-        if (ctx.type !== 'lesson_complete') return 0;
         const params = (template.paramsJson ?? {}) as { categoryId?: string };
         if (!params.categoryId) return 1; // un-scoped → any lesson counts
         return ctx.categoryIds?.includes(params.categoryId) ? 1 : 0;
@@ -252,7 +298,10 @@ export class QuestsService {
   // ─── Helpers ────────────────────────────────────────────────────────────
 
   private async userTz(userId: string): Promise<string> {
-    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { timezone: true },
+    });
     return u?.timezone || DEFAULT_TZ;
   }
 
