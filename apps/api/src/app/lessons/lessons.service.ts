@@ -4,10 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Course, Lesson, Module as PrismaModule, Prisma } from '@prisma/client';
+import type { Course, Module as PrismaModule, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import type { CreateLessonDto, LessonResponse, UpdateLessonDto } from './lessons.dto.js';
+import type {
+  CreateLessonDto,
+  LessonResponse,
+  UpdateLessonDto,
+} from './lessons.dto.js';
 
 /** Empty Tiptap doc — same shape `lesson-schema/emptyLessonDoc()` emits. */
 const EMPTY_DOC: unknown = {
@@ -85,7 +89,8 @@ export class LessonsService {
       const data: Prisma.LessonUpdateInput = {};
       if (patch.type !== undefined) data.type = patch.type;
       if (patch.isFree !== undefined) data.isFree = patch.isFree;
-      if (patch.estimatedMinutes !== undefined) data.estimatedMinutes = patch.estimatedMinutes;
+      if (patch.estimatedMinutes !== undefined)
+        data.estimatedMinutes = patch.estimatedMinutes;
       if (patch.baseXp !== undefined) data.baseXp = patch.baseXp;
       if (patch.baseCoins !== undefined) data.baseCoins = patch.baseCoins;
       if (patch.contentJson !== undefined)
@@ -93,9 +98,12 @@ export class LessonsService {
 
       if (typeof patch.order === 'number' && patch.order !== target.order) {
         const collision = await tx.lesson.findUnique({
-          where: { moduleId_order: { moduleId: target.moduleId, order: patch.order } },
+          where: {
+            moduleId_order: { moduleId: target.moduleId, order: patch.order },
+          },
         });
-        if (collision) throw new ConflictException(`Lesson order ${patch.order} taken`);
+        if (collision)
+          throw new ConflictException(`Lesson order ${patch.order} taken`);
         data.order = patch.order;
       }
 
@@ -156,10 +164,7 @@ export class LessonsService {
       include: { module: { include: { course: true } } },
     });
     if (!l) throw new NotFoundException('Lesson not found');
-    if (
-      actor.role === 'STUDENT' &&
-      l.module.course.status !== 'PUBLISHED'
-    ) {
+    if (actor.role === 'STUDENT' && l.module.course.status !== 'PUBLISHED') {
       throw new NotFoundException('Lesson not found');
     }
     const titleRow = await this.prisma.contentTranslation.findUnique({
@@ -214,7 +219,9 @@ export class LessonsService {
         throw new ForbiddenException('Only ADMIN/TEACHER can edit lessons');
       }
       if (actor.role === 'TEACHER' && m.course.authorId !== actor.userId) {
-        throw new ForbiddenException('Teachers can only edit their own courses');
+        throw new ForbiddenException(
+          'Teachers can only edit their own courses',
+        );
       }
     } else if (actor.role === 'STUDENT' && m.course.status !== 'PUBLISHED') {
       throw new NotFoundException('Module not found');

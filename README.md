@@ -6,25 +6,25 @@
 
 Specs live under [`docs/`](./docs). Read in order on first pass; cross-references are absolute paths from the repo root.
 
-| # | File | Purpose |
-|---|------|---------|
-| 00 | [Vision & Goals](./docs/00-vision.md) | Mission, audience, success metrics, non-goals |
-| 01 | [Architecture](./docs/01-architecture.md) | Monorepo layout, tech stack, system topology |
-| 02 | [Data Model](./docs/02-data-model.md) | Prisma schema and entity descriptions |
-| 03 | [Shared Libraries](./docs/03-shared-libraries.md) | Atomic component inventory, all libs |
-| 04 | [Admin App](./docs/04-admin-app.md) | Admin (Bootstrap) screens, flows, permissions |
-| 05 | [Student App](./docs/05-student-app.md) | Student (Ionic) screens, responsive layout |
-| 06 | [Content Authoring](./docs/06-content-authoring.md) | Tiptap block schema, lesson rendering |
-| 07 | [Gamification](./docs/07-gamification.md) | XP, coins, multipliers, streaks, badges, leagues |
-| 08 | [Avatar & Shop](./docs/08-avatar-and-shop.md) | 2D avatar system, items, dressing room |
-| 09 | [Billing](./docs/09-billing.md) | Stripe, plans, categories, access control |
-| 10 | [Engagement](./docs/10-engagement.md) | Onboarding, notifications, animations, anti-patterns |
-| 11 | [i18n](./docs/11-i18n.md) | Localization, content translation, RTL |
-| 12 | [Code Execution](./docs/12-code-execution.md) | Self-hosted Judge0, exercise runner |
-| 13 | [Deployment](./docs/13-deployment.md) | VPS, Coolify, Cloudflare, CI/CD |
-| 14 | [Security](./docs/14-security.md) | Auth, sandboxing, secrets, compliance |
-| 15 | [Roadmap](./docs/15-roadmap.md) | Phased plan with deliverables |
-| 16 | [Offline & Sync](./docs/16-offline.md) | Download, asset caching, conflict resolution, token semantics |
+| #   | File                                                | Purpose                                                       |
+| --- | --------------------------------------------------- | ------------------------------------------------------------- |
+| 00  | [Vision & Goals](./docs/00-vision.md)               | Mission, audience, success metrics, non-goals                 |
+| 01  | [Architecture](./docs/01-architecture.md)           | Monorepo layout, tech stack, system topology                  |
+| 02  | [Data Model](./docs/02-data-model.md)               | Prisma schema and entity descriptions                         |
+| 03  | [Shared Libraries](./docs/03-shared-libraries.md)   | Atomic component inventory, all libs                          |
+| 04  | [Admin App](./docs/04-admin-app.md)                 | Admin (Bootstrap) screens, flows, permissions                 |
+| 05  | [Student App](./docs/05-student-app.md)             | Student (Ionic) screens, responsive layout                    |
+| 06  | [Content Authoring](./docs/06-content-authoring.md) | Tiptap block schema, lesson rendering                         |
+| 07  | [Gamification](./docs/07-gamification.md)           | XP, coins, multipliers, streaks, badges, leagues              |
+| 08  | [Avatar & Shop](./docs/08-avatar-and-shop.md)       | 2D avatar system, items, dressing room                        |
+| 09  | [Billing](./docs/09-billing.md)                     | Stripe, plans, categories, access control                     |
+| 10  | [Engagement](./docs/10-engagement.md)               | Onboarding, notifications, animations, anti-patterns          |
+| 11  | [i18n](./docs/11-i18n.md)                           | Localization, content translation, RTL                        |
+| 12  | [Code Execution](./docs/12-code-execution.md)       | Self-hosted Judge0, exercise runner                           |
+| 13  | [Deployment](./docs/13-deployment.md)               | VPS, Coolify, Cloudflare, CI/CD                               |
+| 14  | [Security](./docs/14-security.md)                   | Auth, sandboxing, secrets, compliance                         |
+| 15  | [Roadmap](./docs/15-roadmap.md)                     | Phased plan with deliverables                                 |
+| 16  | [Offline & Sync](./docs/16-offline.md)              | Download, asset caching, conflict resolution, token semantics |
 
 ## Quick reference
 
@@ -50,6 +50,7 @@ pnpm nx serve student      # Run the student app
 ```
 
 Workspace layout:
+
 ```
 apps/{admin,student,api}    Angular admin · Angular student · NestJS api
 libs/                       Shared libs per docs/03-shared-libraries.md
@@ -57,6 +58,11 @@ prisma/                     Schema + migrations
 docs/                       Specs (see index above)
 ```
 
-### Known issue
+### Typecheck notes
 
-The `typecheck` target fails for Angular projects (`admin`, `student`, `ui-bootstrap`, `ui-ionic`) because the `@nx/js` workspace's TypeScript-references setup is incompatible with the Angular compiler. Build does typechecking implicitly via Angular CLI, so this isn't blocking. Tracked for a follow-up fix in Phase 1.
+`pnpm nx run-many -t typecheck` runs `tsc --build --emitDeclarationOnly` per project, including the Angular ones. Two conventions keep it working alongside the Angular CLI build:
+
+- Each project's `tsconfig.spec.json` uses `moduleResolution: bundler` with the `dom` lib and references its `tsconfig.lib.json` / `tsconfig.app.json`, so specs resolve `@angular/core/testing` and lib imports go through built declarations rather than re-compiling lib sources.
+- Every project emits declarations into its own `dist/` (never a shared `dist/out-tsc`), otherwise `ui-bootstrap` and `ui-ionic` overwrite each other's `index.d.ts`.
+
+Storybook configs (`.storybook/tsconfig.json`) are not composite projects and are intentionally left out of the `tsc --build` graph; stories are still linted and compiled by the Storybook build.

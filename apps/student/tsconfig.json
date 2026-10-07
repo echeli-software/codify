@@ -6,9 +6,6 @@
     "moduleResolution": "bundler",
     "module": "preserve",
     "emitDeclarationOnly": false,
-    "declaration": false,
-    "declarationMap": false,
-    "composite": false,
     "lib": ["es2022", "dom"]
   },
   "angularCompilerOptions": {

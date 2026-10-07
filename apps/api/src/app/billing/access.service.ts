@@ -35,10 +35,17 @@ export class AccessService {
     }));
   }
 
-  private async loadUserSubscriptions(userId: string): Promise<SubscriptionLike[]> {
+  private async loadUserSubscriptions(
+    userId: string,
+  ): Promise<SubscriptionLike[]> {
     const subs = await this.prisma.subscription.findMany({
       where: { userId },
-      select: { planId: true, status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true },
+      select: {
+        planId: true,
+        status: true,
+        currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+      },
     });
     return subs.map((s) => ({
       planId: s.planId,
@@ -51,19 +58,15 @@ export class AccessService {
   private async courseShape(
     courseId: string,
   ): Promise<{ categoryIds: string[]; allLessonsFree: boolean }> {
-    const [cats, lessonAgg] = await this.prisma.$transaction([
+    const lessonWhere = { deletedAt: null, module: { courseId } };
+    const [cats, total, paid] = await this.prisma.$transaction([
       this.prisma.courseCategory.findMany({
         where: { courseId },
         select: { categoryId: true },
       }),
-      this.prisma.lesson.groupBy({
-        by: ['isFree'],
-        where: { deletedAt: null, module: { courseId } },
-        _count: { _all: true },
-      }),
+      this.prisma.lesson.count({ where: lessonWhere }),
+      this.prisma.lesson.count({ where: { ...lessonWhere, isFree: false } }),
     ]);
-    const total = lessonAgg.reduce((s, g) => s + g._count._all, 0);
-    const paid = lessonAgg.find((g) => g.isFree === false)?._count._all ?? 0;
     return {
       categoryIds: cats.map((c) => c.categoryId),
       allLessonsFree: total > 0 && paid === 0,

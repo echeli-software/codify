@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 
@@ -34,7 +35,7 @@ export class AuditService {
           actorRole: actor?.role ?? null,
           entity: input.entity ?? null,
           entityId: input.entityId ?? null,
-          diff: input.diff ?? undefined,
+          diff: (input.diff ?? undefined) as Prisma.InputJsonValue | undefined,
           ip: input.ip ?? null,
           userAgent: input.userAgent ?? null,
         },

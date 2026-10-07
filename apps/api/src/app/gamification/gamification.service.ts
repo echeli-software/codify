@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, type CoinSource } from '@prisma/client';
 import {
   applyMultiplier,
@@ -9,7 +9,11 @@ import {
 import { levelFromXp, xpForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LeagueAccumulatorService } from '../leagues/league-accumulator.service.js';
-import type { GrantRewardParams, RewardResult, StreakInfo } from './gamification.types.js';
+import type {
+  GrantRewardParams,
+  RewardResult,
+  StreakInfo,
+} from './gamification.types.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -38,8 +42,6 @@ const STREAK_MILESTONES: Record<number, { xp: number; coins: number }> = {
  */
 @Injectable()
 export class GamificationService {
-  private readonly logger = new Logger(GamificationService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly leagues: LeagueAccumulatorService,
@@ -53,7 +55,10 @@ export class GamificationService {
     streak: StreakInfo;
   }> {
     const [user, streak] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { totalXp: true, coins: true } }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { totalXp: true, coins: true },
+      }),
       this.prisma.streak.findUnique({ where: { userId } }),
     ]);
     return {
@@ -61,7 +66,11 @@ export class GamificationService {
       level: levelFromXp(user.totalXp),
       coins: user.coins,
       streak: streak
-        ? { currentDays: streak.currentDays, longestDays: streak.longestDays, freezesAvailable: streak.freezesAvailable }
+        ? {
+            currentDays: streak.currentDays,
+            longestDays: streak.longestDays,
+            freezesAvailable: streak.freezesAvailable,
+          }
         : { currentDays: 0, longestDays: 0, freezesAvailable: 0 },
     };
   }
@@ -78,11 +87,21 @@ export class GamificationService {
    * keeps holding). Throws 400 if the balance is insufficient.
    */
   async spendCoins(
-    params: { userId: string; amount: number; source: CoinSource; refType?: string | null; refId?: string | null; idempotencyKey?: string | null },
+    params: {
+      userId: string;
+      amount: number;
+      source: CoinSource;
+      refType?: string | null;
+      refId?: string | null;
+      idempotencyKey?: string | null;
+    },
     tx?: Tx,
   ): Promise<{ coins: number; spent: number }> {
     const run = async (t: Tx) => {
-      const user = await t.user.findUniqueOrThrow({ where: { id: params.userId }, select: { coins: true } });
+      const user = await t.user.findUniqueOrThrow({
+        where: { id: params.userId },
+        select: { coins: true },
+      });
       if (params.idempotencyKey) {
         const seen = await t.coinTransaction.findUnique({
           where: { idempotencyKey: params.idempotencyKey },
@@ -90,8 +109,11 @@ export class GamificationService {
         });
         if (seen) return { coins: user.coins, spent: 0 };
       }
-      if (user.coins < params.amount) throw new BadRequestException('Insufficient coins');
-      const balanceAfter = (await this.prevLedgerBalance(t, params.userId, user.coins)) - params.amount;
+      if (user.coins < params.amount)
+        throw new BadRequestException('Insufficient coins');
+      const balanceAfter =
+        (await this.prevLedgerBalance(t, params.userId, user.coins)) -
+        params.amount;
       await t.coinTransaction.create({
         data: {
           userId: params.userId,
@@ -118,7 +140,11 @@ export class GamificationService {
    * Writes a one-time opening-balance row for coins earned before the ledger
    * existed (pre-Phase-7), so SUM(delta) == latest balanceAfter.
    */
-  private async prevLedgerBalance(tx: Tx, userId: string, userCoins: number): Promise<number> {
+  private async prevLedgerBalance(
+    tx: Tx,
+    userId: string,
+    userCoins: number,
+  ): Promise<number> {
     const last = await tx.coinTransaction.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -127,14 +153,23 @@ export class GamificationService {
     if (last) return last.balanceAfter;
     if (userCoins > 0) {
       await tx.coinTransaction.create({
-        data: { userId, delta: userCoins, source: 'ADMIN_GRANT', balanceAfter: userCoins, refType: 'opening_balance' },
+        data: {
+          userId,
+          delta: userCoins,
+          source: 'ADMIN_GRANT',
+          balanceAfter: userCoins,
+          refType: 'opening_balance',
+        },
       });
       return userCoins;
     }
     return 0;
   }
 
-  private async grantInTx(tx: Tx, params: GrantRewardParams): Promise<RewardResult> {
+  private async grantInTx(
+    tx: Tx,
+    params: GrantRewardParams,
+  ): Promise<RewardResult> {
     const user = await tx.user.findUniqueOrThrow({
       where: { id: params.userId },
       select: { totalXp: true, coins: true, timezone: true },
@@ -160,7 +195,11 @@ export class GamificationService {
         params.timezone ?? user.timezone,
         params.clientTimestamp,
       );
-      streak = { currentDays: adv.currentDays, longestDays: adv.longestDays, freezesAvailable: adv.freezesAvailable };
+      streak = {
+        currentDays: adv.currentDays,
+        longestDays: adv.longestDays,
+        freezesAvailable: adv.freezesAvailable,
+      };
       reachedMilestone = adv.reachedMilestone;
     } else {
       streak = await this.readStreak(tx, params.userId);
@@ -184,7 +223,8 @@ export class GamificationService {
     const coins = applyMultiplier(params.baseCoins, coinMult);
 
     // 3. Journals (idempotent on key). balanceAfter chains from the ledger.
-    const balanceAfter = (await this.prevLedgerBalance(tx, params.userId, user.coins)) + coins;
+    const balanceAfter =
+      (await this.prevLedgerBalance(tx, params.userId, user.coins)) + coins;
     if (xp > 0) {
       await tx.xpEvent.create({
         data: {
@@ -209,7 +249,9 @@ export class GamificationService {
           refType: params.refType ?? null,
           refId: params.refId ?? null,
           // Suffix so XP + Coin keys never collide on the shared unique index.
-          idempotencyKey: params.idempotencyKey ? `${params.idempotencyKey}:coin` : null,
+          idempotencyKey: params.idempotencyKey
+            ? `${params.idempotencyKey}:coin`
+            : null,
         },
       });
     }
@@ -226,8 +268,8 @@ export class GamificationService {
 
     // 5. Level-up.
     const levelBefore = levelFromXp(user.totalXp);
-    let levelAfter = levelFromXp(updated.totalXp);
-    let levelUp =
+    const levelAfter = levelFromXp(updated.totalXp);
+    const levelUp =
       levelAfter > levelBefore
         ? { newLevel: levelAfter, xpForNextLevel: xpForLevel(levelAfter + 1) }
         : null;
@@ -239,7 +281,11 @@ export class GamificationService {
       xpMultiplier: xpMult,
       coinMultiplier: coinMult,
       breakdown: buildBreakdown(params.baseXp, params.baseCoins, resolved),
-      totals: { totalXp: updated.totalXp, coins: updated.coins, level: levelAfter },
+      totals: {
+        totalXp: updated.totalXp,
+        coins: updated.coins,
+        level: levelAfter,
+      },
       levelUp,
       streak,
       streakMilestone: null,
@@ -263,7 +309,11 @@ export class GamificationService {
         },
         tx,
       );
-      result.streakMilestone = { days: reachedMilestone, xp: bonus.xp, coins: bonus.coins };
+      result.streakMilestone = {
+        days: reachedMilestone,
+        xp: bonus.xp,
+        coins: bonus.coins,
+      };
       result.totals = bonus.totals;
       if (bonus.levelUp) result.levelUp = bonus.levelUp;
     }
@@ -276,7 +326,11 @@ export class GamificationService {
   private async readStreak(tx: Tx, userId: string): Promise<StreakInfo | null> {
     const s = await tx.streak.findUnique({ where: { userId } });
     return s
-      ? { currentDays: s.currentDays, longestDays: s.longestDays, freezesAvailable: s.freezesAvailable }
+      ? {
+          currentDays: s.currentDays,
+          longestDays: s.longestDays,
+          freezesAvailable: s.freezesAvailable,
+        }
       : null;
   }
 
@@ -300,7 +354,13 @@ export class GamificationService {
     const existing = await tx.streak.findUnique({ where: { userId } });
     if (!existing) {
       const created = await tx.streak.create({
-        data: { userId, currentDays: 1, longestDays: 1, freezesAvailable: 0, lastActivityDate: todayDate },
+        data: {
+          userId,
+          currentDays: 1,
+          longestDays: 1,
+          freezesAvailable: 0,
+          lastActivityDate: todayDate,
+        },
       });
       return { ...toStreakInfo(created), reachedMilestone: milestoneFor(1) };
     }
@@ -334,9 +394,17 @@ export class GamificationService {
     const longestDays = Math.max(existing.longestDays, currentDays);
     const updated = await tx.streak.update({
       where: { userId },
-      data: { currentDays, longestDays, freezesAvailable, lastActivityDate: todayDate },
+      data: {
+        currentDays,
+        longestDays,
+        freezesAvailable,
+        lastActivityDate: todayDate,
+      },
     });
-    return { ...toStreakInfo(updated), reachedMilestone: milestoneFor(currentDays) };
+    return {
+      ...toStreakInfo(updated),
+      reachedMilestone: milestoneFor(currentDays),
+    };
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────
@@ -348,7 +416,14 @@ export class GamificationService {
     });
     const now = new Date();
     return subs.some((s) =>
-      subscriptionGrantsAccess({ planId: s.planId, status: s.status, currentPeriodEnd: s.currentPeriodEnd }, now),
+      subscriptionGrantsAccess(
+        {
+          planId: s.planId,
+          status: s.status,
+          currentPeriodEnd: s.currentPeriodEnd,
+        },
+        now,
+      ),
     );
   }
 
@@ -369,7 +444,9 @@ export class GamificationService {
   }
 
   private async readCap(tx: Tx): Promise<number | undefined> {
-    const row = await tx.gamificationConfig.findUnique({ where: { key: 'multiplier.cap' } });
+    const row = await tx.gamificationConfig.findUnique({
+      where: { key: 'multiplier.cap' },
+    });
     const v = row?.value;
     return typeof v === 'number' ? v : undefined;
   }
@@ -387,7 +464,11 @@ export class GamificationService {
       xpMultiplier: 1,
       coinMultiplier: 1,
       breakdown: [],
-      totals: { totalXp: user.totalXp, coins: user.coins, level: levelFromXp(user.totalXp) },
+      totals: {
+        totalXp: user.totalXp,
+        coins: user.coins,
+        level: levelFromXp(user.totalXp),
+      },
       levelUp: null,
       streak,
     };
@@ -399,7 +480,11 @@ function toStreakInfo(s: {
   longestDays: number;
   freezesAvailable: number;
 }): StreakInfo {
-  return { currentDays: s.currentDays, longestDays: s.longestDays, freezesAvailable: s.freezesAvailable };
+  return {
+    currentDays: s.currentDays,
+    longestDays: s.longestDays,
+    freezesAvailable: s.freezesAvailable,
+  };
 }
 
 /** The milestone day (7/14/30/100/365) iff `days` is exactly one, else null. */
@@ -435,5 +520,8 @@ function localDateKey(ts: Date, tz: string): string {
 
 /** Whole-day difference a − b for YYYY-MM-DD keys. */
 function dayDiff(aKey: string, bKey: string): number {
-  return Math.round((Date.parse(`${aKey}T00:00:00Z`) - Date.parse(`${bKey}T00:00:00Z`)) / 86_400_000);
+  return Math.round(
+    (Date.parse(`${aKey}T00:00:00Z`) - Date.parse(`${bKey}T00:00:00Z`)) /
+      86_400_000,
+  );
 }

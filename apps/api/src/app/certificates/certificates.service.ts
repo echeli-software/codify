@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import type { Certificate } from '@prisma/client';
-import { Prisma } from '@prisma/client';
 import { formatSerial, isCourseComplete } from '@codify/domain';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 
 export interface CertificateView {
   serial: string;
@@ -26,22 +30,39 @@ export class CertificatesService {
 
   /** Issue (idempotently) a certificate when the user has completed the course. */
   async claim(userId: string, courseId: string): Promise<CertificateView> {
-    const existing = await this.prisma.certificate.findUnique({ where: { userId_courseId: { userId, courseId } } });
+    const existing = await this.prisma.certificate.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
     if (existing) return this.toView(existing);
 
-    const course = await this.prisma.course.findFirst({ where: { id: courseId, deletedAt: null } });
-    if (!course || course.status !== 'PUBLISHED') throw new NotFoundException('Course not found');
+    const course = await this.prisma.course.findFirst({
+      where: { id: courseId, deletedAt: null },
+    });
+    if (!course || course.status !== 'PUBLISHED')
+      throw new NotFoundException('Course not found');
 
     const lessonIds = (
-      await this.prisma.lesson.findMany({ where: { deletedAt: null, module: { courseId } }, select: { id: true } })
+      await this.prisma.lesson.findMany({
+        where: { deletedAt: null, module: { courseId } },
+        select: { id: true },
+      })
     ).map((l) => l.id);
-    const completed = await this.prisma.progress.count({ where: { userId, lessonId: { in: lessonIds } } });
+    const completed = await this.prisma.progress.count({
+      where: { userId, lessonId: { in: lessonIds } },
+    });
     if (!isCourseComplete(lessonIds.length, completed)) {
       throw new BadRequestException('Course is not complete yet');
     }
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { displayName: true } });
-    const courseTitle = await this.resolveCourseTitle(courseId, course.sourceLocale, course.slug);
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { displayName: true },
+    });
+    const courseTitle = await this.resolveCourseTitle(
+      courseId,
+      course.sourceLocale,
+      course.slug,
+    );
 
     // Retry on the (tiny) chance of a serial collision.
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -58,9 +79,11 @@ export class CertificatesService {
         });
         return this.toView(cert);
       } catch (err) {
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        if (isUniqueViolation(err)) {
           // userId+courseId conflict → another request issued it; return that.
-          const dup = await this.prisma.certificate.findUnique({ where: { userId_courseId: { userId, courseId } } });
+          const dup = await this.prisma.certificate.findUnique({
+            where: { userId_courseId: { userId, courseId } },
+          });
           if (dup) return this.toView(dup);
           continue; // serial collision → retry with a fresh serial
         }
@@ -71,37 +94,54 @@ export class CertificatesService {
   }
 
   async listMine(userId: string): Promise<CertificateView[]> {
-    const certs = await this.prisma.certificate.findMany({ where: { userId }, orderBy: { issuedAt: 'desc' } });
+    const certs = await this.prisma.certificate.findMany({
+      where: { userId },
+      orderBy: { issuedAt: 'desc' },
+    });
     return certs.map((c) => this.toView(c));
   }
 
   /** Public verification by serial. */
   async verify(serial: string): Promise<CertificateView | null> {
-    const cert = await this.prisma.certificate.findUnique({ where: { serial } });
+    const cert = await this.prisma.certificate.findUnique({
+      where: { serial },
+    });
     return cert ? this.toView(cert) : null;
   }
 
   // ─── Referrals ──────────────────────────────────────────────────────────
 
   async getReferral(userId: string, appBaseUrl: string): Promise<ReferralView> {
-    let user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { referralCode: true } });
+    let user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { referralCode: true },
+    });
     if (!user.referralCode) {
       // Generate lazily; retry on the unlikely unique collision.
       for (let attempt = 0; attempt < 5; attempt++) {
         const code = this.newReferralCode();
         try {
-          await this.prisma.user.update({ where: { id: userId }, data: { referralCode: code } });
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: { referralCode: code },
+          });
           user = { referralCode: code };
           break;
         } catch (err) {
-          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+          if (isUniqueViolation(err)) continue;
           throw err;
         }
       }
     }
     const code = user.referralCode!;
-    const referredCount = await this.prisma.user.count({ where: { referredById: userId } });
-    return { code, shareUrl: `${appBaseUrl.replace(/\/$/, '')}/r/${code}`, referredCount };
+    const referredCount = await this.prisma.user.count({
+      where: { referredById: userId },
+    });
+    return {
+      code,
+      shareUrl: `${appBaseUrl.replace(/\/$/, '')}/r/${code}`,
+      referredCount,
+    };
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────
@@ -111,12 +151,26 @@ export class CertificatesService {
   }
 
   private newReferralCode(): string {
-    return randomBytes(5).toString('hex').toUpperCase().replace(/[^0-9A-HJ-NP-Z]/g, '').slice(0, 8).padEnd(6, '0');
+    return randomBytes(5)
+      .toString('hex')
+      .toUpperCase()
+      .replace(/[^0-9A-HJ-NP-Z]/g, '')
+      .slice(0, 8)
+      .padEnd(6, '0');
   }
 
-  private async resolveCourseTitle(courseId: string, sourceLocale: string, fallbackSlug: string): Promise<string> {
+  private async resolveCourseTitle(
+    courseId: string,
+    sourceLocale: string,
+    fallbackSlug: string,
+  ): Promise<string> {
     const t = await this.prisma.contentTranslation.findFirst({
-      where: { entityType: 'COURSE', entityId: courseId, field: 'title', locale: sourceLocale },
+      where: {
+        entityType: 'COURSE',
+        entityId: courseId,
+        field: 'title',
+        locale: sourceLocale,
+      },
       select: { value: true },
     });
     return t?.value || fallbackSlug;
@@ -136,9 +190,19 @@ export class CertificatesService {
 
 /** Branded SVG certificate (server-rendered, shareable/printable). */
 export function renderCertificateSvg(cert: CertificateView): string {
-  const esc = (s: string) => s.replace(/[<>&]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch] as string));
-  const date = new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const kind = cert.isCapstone ? 'Capstone Certificate' : 'Certificate of Completion';
+  const esc = (s: string) =>
+    s.replace(
+      /[<>&]/g,
+      (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[ch] as string,
+    );
+  const date = new Date(cert.issuedAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const kind = cert.isCapstone
+    ? 'Capstone Certificate'
+    : 'Certificate of Completion';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="848" viewBox="0 0 1200 848" role="img" aria-label="${esc(kind)}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">

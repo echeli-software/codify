@@ -7,7 +7,11 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
+import {
+  ControlValueAccessor,
+  FormsModule,
+  NG_VALUE_ACCESSOR,
+} from '@angular/forms';
 import { I18nService } from '@codify/i18n';
 import { Input as TextInput } from '../../atoms/input/input.js';
 
@@ -65,7 +69,9 @@ export class MoneyInput implements ControlValueAccessor {
   });
 
   /** Currency symbol prefix derived from Intl format. */
-  protected readonly symbol = computed(() => this.symbolFor(this.currency(), this.i18n.currentLocale()));
+  protected readonly symbol = computed(() =>
+    this.symbolFor(this.currency(), this.i18n.currentLocale()),
+  );
 
   private onChange: (v: number | null) => void = () => undefined;
   private onTouched: () => void = () => undefined;
@@ -95,7 +101,7 @@ export class MoneyInput implements ControlValueAccessor {
   private parseToCents(raw: string): number | null {
     if (!raw || raw.trim() === '') return null;
     // Strip everything except digits, commas, dots, and minus.
-    let cleaned = raw.replace(/[^\d,.\-]/g, '');
+    let cleaned = raw.replace(/[^\d,.-]/g, '');
     // If both `,` and `.` appear, assume the LAST one is the decimal separator.
     const lastComma = cleaned.lastIndexOf(',');
     const lastDot = cleaned.lastIndexOf('.');
@@ -110,7 +116,9 @@ export class MoneyInput implements ControlValueAccessor {
         .filter((ch, i) => {
           if (ch !== ',' && ch !== '.') return true;
           // Keep only the last decimal separator instance
-          return ch === decimalSep && (ch === ',' ? i === lastComma : i === lastDot);
+          return (
+            ch === decimalSep && (ch === ',' ? i === lastComma : i === lastDot)
+          );
         })
         .join('');
       // Normalize to '.'
@@ -130,7 +138,10 @@ export class MoneyInput implements ControlValueAccessor {
 
   private symbolFor(currency: string, locale: string): string {
     try {
-      const parts = new Intl.NumberFormat(locale, { style: 'currency', currency }).formatToParts(0);
+      const parts = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+      }).formatToParts(0);
       return parts.find((p) => p.type === 'currency')?.value ?? currency;
     } catch {
       return currency;

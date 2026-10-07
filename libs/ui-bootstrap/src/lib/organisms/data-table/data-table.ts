@@ -4,6 +4,7 @@ import {
   computed,
   contentChildren,
   Directive,
+  inject,
   input,
   output,
   signal,
@@ -42,7 +43,7 @@ export interface SortState {
 @Directive({ selector: '[cdfDataTableCell]' })
 export class DataTableCell {
   readonly column = input.required<string>({ alias: 'cdfDataTableCell' });
-  constructor(public readonly tpl: TemplateRef<unknown>) {}
+  readonly tpl = inject<TemplateRef<unknown>>(TemplateRef);
 }
 
 @Component({
@@ -55,75 +56,101 @@ export class DataTableCell {
         <thead>
           <tr>
             @if (selectable()) {
-            <th class="cdf-table__select">
-              <cdf-checkbox
-                [(ngModel)]="allSelected"
-                (ngModelChange)="onToggleAll($event)"
-              />
-            </th>
-            } @for (col of columns(); track col.key) {
-            <th
-              [style.width]="col.width"
-              [style.text-align]="col.align ?? 'start'"
-              [class.cdf-table__th--sortable]="col.sortable"
-              [attr.aria-sort]="ariaSortFor(col.key)"
-            >
-              @if (col.sortable) {
-              <button type="button" class="cdf-table__sort" (click)="onSort(col.key)">
-                {{ col.label }}
-                @if (sort()?.key === col.key) {
-                <cdf-icon
-                  [name]="sort()!.direction === 'asc' ? 'caret-up' : 'caret-down'"
-                  size="xs"
+              <th class="cdf-table__select">
+                <cdf-checkbox
+                  [(ngModel)]="allSelected"
+                  (ngModelChange)="onToggleAll($event)"
                 />
+              </th>
+            }
+            @for (col of columns(); track col.key) {
+              <th
+                [style.width]="col.width"
+                [style.text-align]="col.align ?? 'start'"
+                [class.cdf-table__th--sortable]="col.sortable"
+                [attr.aria-sort]="ariaSortFor(col.key)"
+              >
+                @if (col.sortable) {
+                  <button
+                    type="button"
+                    class="cdf-table__sort"
+                    (click)="onSort(col.key)"
+                  >
+                    {{ col.label }}
+                    @if (sort()?.key === col.key) {
+                      <cdf-icon
+                        [name]="
+                          sort()!.direction === 'asc'
+                            ? 'caret-up'
+                            : 'caret-down'
+                        "
+                        size="xs"
+                      />
+                    }
+                  </button>
+                } @else {
+                  {{ col.label }}
                 }
-              </button>
-              } @else {
-              {{ col.label }}
-              }
-            </th>
-            } @if (rowActionsTpl()) {
-            <th class="cdf-table__actions">&nbsp;</th>
+              </th>
+            }
+            @if (rowActions()) {
+              <th class="cdf-table__actions">&nbsp;</th>
             }
           </tr>
         </thead>
 
         <tbody>
           @for (row of rows(); track trackBy()(row)) {
-          <tr [class.cdf-table__tr--selected]="isSelected(trackBy()(row))">
-            @if (selectable()) {
-            <td class="cdf-table__select">
-              <cdf-checkbox
-                [ngModel]="isSelected(trackBy()(row))"
-                (ngModelChange)="onToggleRow(trackBy()(row), $event)"
-              />
-            </td>
-            } @for (col of columns(); track col.key) {
-            <td
-              [style.text-align]="col.align ?? 'start'"
-              [class.cdf-table__td--right]="col.align === 'end'"
-            >
-              @if (cellTplFor(col.key); as tpl) {
-              <ng-container *ngTemplateOutlet="tpl; context: { $implicit: row, row: row, col: col }" />
-              } @else {
-              {{ col.value(row) }}
+            <tr [class.cdf-table__tr--selected]="isSelected(trackBy()(row))">
+              @if (selectable()) {
+                <td class="cdf-table__select">
+                  <cdf-checkbox
+                    [ngModel]="isSelected(trackBy()(row))"
+                    (ngModelChange)="onToggleRow(trackBy()(row), $event)"
+                  />
+                </td>
               }
-            </td>
-            } @if (rowActionsTpl(); as tpl) {
-            <td class="cdf-table__actions">
-              <ng-container *ngTemplateOutlet="tpl; context: { $implicit: row, row: row }" />
-            </td>
-            }
-          </tr>
+              @for (col of columns(); track col.key) {
+                <td
+                  [style.text-align]="col.align ?? 'start'"
+                  [class.cdf-table__td--right]="col.align === 'end'"
+                >
+                  @if (cellTplFor(col.key); as tpl) {
+                    <ng-container
+                      *ngTemplateOutlet="
+                        tpl;
+                        context: { $implicit: row, row: row, col: col }
+                      "
+                    />
+                  } @else {
+                    {{ col.value(row) }}
+                  }
+                </td>
+              }
+              @if (rowActions(); as tpl) {
+                <td class="cdf-table__actions">
+                  <ng-container
+                    *ngTemplateOutlet="
+                      tpl;
+                      context: { $implicit: row, row: row }
+                    "
+                  />
+                </td>
+              }
+            </tr>
           } @empty {
-          <tr>
-            <td
-              class="cdf-table__empty"
-              [attr.colspan]="columns().length + (selectable() ? 1 : 0) + (rowActionsTpl() ? 1 : 0)"
-            >
-              {{ emptyMessage() }}
-            </td>
-          </tr>
+            <tr>
+              <td
+                class="cdf-table__empty"
+                [attr.colspan]="
+                  columns().length +
+                  (selectable() ? 1 : 0) +
+                  (rowActions() ? 1 : 0)
+                "
+              >
+                {{ emptyMessage() }}
+              </td>
+            </tr>
           }
         </tbody>
       </table>
@@ -141,7 +168,7 @@ export class DataTable<T> {
   readonly selectable = input(false);
   readonly emptyMessage = input('No items.');
   /** Optional row-actions template projected via `<ng-template #actions let-row>…</ng-template>`. */
-  readonly rowActionsTpl = input<TemplateRef<unknown> | null>(null, { alias: 'rowActions' });
+  readonly rowActions = input<TemplateRef<unknown> | null>(null);
 
   /** Current sort. Two-way bindable. */
   readonly sort = signal<SortState | null>(null);
@@ -169,7 +196,9 @@ export class DataTable<T> {
     return this.cellMap().get(key) ?? null;
   }
 
-  protected ariaSortFor(key: string): 'ascending' | 'descending' | 'none' | null {
+  protected ariaSortFor(
+    key: string,
+  ): 'ascending' | 'descending' | 'none' | null {
     const s = this.sort();
     if (!s || s.key !== key) return null;
     return s.direction === 'asc' ? 'ascending' : 'descending';

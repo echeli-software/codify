@@ -1,6 +1,12 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { Prisma, type SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import {
   BILLING_PROVIDER,
   type BillingProvider,
@@ -69,7 +75,7 @@ export class WebhookService {
     } catch (err) {
       // Only a unique-key conflict means "already processed" — ack + skip.
       // Anything else is a real failure Stripe should retry on.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      if (isUniqueViolation(err)) {
         return { received: true, duplicate: true, handled: false };
       }
       throw err;
@@ -83,13 +89,23 @@ export class WebhookService {
     switch (event.type) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        return this.upsertSubscription(event.data.object as unknown as SubscriptionObject);
+        return this.upsertSubscription(
+          event.data.object as unknown as SubscriptionObject,
+        );
       case 'customer.subscription.deleted':
-        return this.cancelSubscription(event.data.object as unknown as SubscriptionObject);
+        return this.cancelSubscription(
+          event.data.object as unknown as SubscriptionObject,
+        );
       case 'invoice.payment_failed':
-        return this.setStatusByInvoice(event.data.object as unknown as InvoiceObject, 'PAST_DUE');
+        return this.setStatusByInvoice(
+          event.data.object as unknown as InvoiceObject,
+          'PAST_DUE',
+        );
       case 'invoice.paid':
-        return this.setStatusByInvoice(event.data.object as unknown as InvoiceObject, 'ACTIVE');
+        return this.setStatusByInvoice(
+          event.data.object as unknown as InvoiceObject,
+          'ACTIVE',
+        );
       default:
         this.logger.debug(`Ignoring unhandled event type ${event.type}`);
         return false;
@@ -98,21 +114,33 @@ export class WebhookService {
 
   private async upsertSubscription(obj: SubscriptionObject): Promise<boolean> {
     if (!obj.id) return false;
-    const status = obj.status ? STATUS_MAP[obj.status] ?? 'ACTIVE' : 'ACTIVE';
+    const status = obj.status ? (STATUS_MAP[obj.status] ?? 'ACTIVE') : 'ACTIVE';
     const existing = await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId: obj.id },
     });
 
-    const periodStart = toDate(obj.current_period_start) ?? existing?.currentPeriodStart ?? new Date();
+    const periodStart =
+      toDate(obj.current_period_start) ??
+      existing?.currentPeriodStart ??
+      new Date();
     const periodEnd =
-      toDate(obj.current_period_end) ?? existing?.currentPeriodEnd ?? addDays(new Date(), 30);
+      toDate(obj.current_period_end) ??
+      existing?.currentPeriodEnd ??
+      addDays(new Date(), 30);
     const trialEndsAt = toDate(obj.trial_end) ?? existing?.trialEndsAt ?? null;
-    const cancelAtPeriodEnd = obj.cancel_at_period_end ?? existing?.cancelAtPeriodEnd ?? false;
+    const cancelAtPeriodEnd =
+      obj.cancel_at_period_end ?? existing?.cancelAtPeriodEnd ?? false;
 
     if (existing) {
       await this.prisma.subscription.update({
         where: { stripeSubscriptionId: obj.id },
-        data: { status, currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, trialEndsAt, cancelAtPeriodEnd },
+        data: {
+          status,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          trialEndsAt,
+          cancelAtPeriodEnd,
+        },
       });
       return true;
     }
@@ -122,7 +150,9 @@ export class WebhookService {
     const userId = obj.metadata?.userId;
     const planId = obj.metadata?.planId;
     if (!userId || !planId) {
-      this.logger.warn(`subscription.created for ${obj.id} missing userId/planId metadata — skipping`);
+      this.logger.warn(
+        `subscription.created for ${obj.id} missing userId/planId metadata — skipping`,
+      );
       return false;
     }
     const data: Prisma.SubscriptionUncheckedCreateInput = {
@@ -163,7 +193,10 @@ export class WebhookService {
     return true;
   }
 
-  private async setStatusByInvoice(obj: InvoiceObject, status: SubscriptionStatus): Promise<boolean> {
+  private async setStatusByInvoice(
+    obj: InvoiceObject,
+    status: SubscriptionStatus,
+  ): Promise<boolean> {
     if (!obj.subscription) return false;
     const existing = await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId: obj.subscription },

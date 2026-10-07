@@ -1,6 +1,10 @@
-import { Logger } from '@nestjs/common';
 import vm from 'node:vm';
-import { deepEqual, type ExecutionErrorKind, type TestCase, type TestResult } from '@codify/domain';
+import {
+  deepEqual,
+  type ExecutionErrorKind,
+  type TestCase,
+  type TestResult,
+} from '@codify/domain';
 
 /**
  * Code-execution seam. In production this is Judge0 on an isolated VPS
@@ -44,7 +48,6 @@ interface RawResult {
 export class DevJsExecutor implements CodeExecutor {
   readonly mode = 'dev' as const;
   readonly supportedLanguages = ['javascript'];
-  private readonly logger = new Logger(DevJsExecutor.name);
 
   async run(req: RunRequest): Promise<RunResponse> {
     if (req.language !== 'javascript') {
@@ -59,7 +62,11 @@ export class DevJsExecutor implements CodeExecutor {
     const started = Date.now();
     const context = vm.createContext({
       // No require/process/network — just a no-op console.
-      console: { log: () => undefined, error: () => undefined, warn: () => undefined },
+      console: {
+        log: () => undefined,
+        error: () => undefined,
+        warn: () => undefined,
+      },
       __tests: req.tests.map((t) => ({ id: t.id, name: t.name, args: t.args })),
     });
 
@@ -81,18 +88,33 @@ export class DevJsExecutor implements CodeExecutor {
 
     let raw: RawResult[];
     try {
-      raw = vm.runInContext(harness, context, { timeout: req.timeLimitMs }) as RawResult[];
+      raw = vm.runInContext(harness, context, {
+        timeout: req.timeLimitMs,
+      }) as RawResult[];
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const errorKind: ExecutionErrorKind = /timed out/i.test(message) ? 'timeout' : 'runtime';
-      return { results: [], errorKind, runtimeMs: Date.now() - started, output: message };
+      const errorKind: ExecutionErrorKind = /timed out/i.test(message)
+        ? 'timeout'
+        : 'runtime';
+      return {
+        results: [],
+        errorKind,
+        runtimeMs: Date.now() - started,
+        output: message,
+      };
     }
 
     // Compare actual vs expected outside the sandbox (host-side deepEqual).
     const results: TestResult[] = req.tests.map((t, i) => {
       const r = raw[i] ?? { id: t.id, name: t.name };
       if (r.error !== undefined) {
-        return { id: t.id, name: t.name, passed: false, error: r.error, runtimeMs: r.runtimeMs };
+        return {
+          id: t.id,
+          name: t.name,
+          passed: false,
+          error: r.error,
+          runtimeMs: r.runtimeMs,
+        };
       }
       const passed = deepEqual(r.actual, t.expected);
       return {

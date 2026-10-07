@@ -42,7 +42,10 @@ export class BillingService {
     @Inject(BILLING_PROVIDER) private readonly billing: BillingProvider,
   ) {}
 
-  async createCheckout(actor: ApiUser, dto: CreateCheckoutDto): Promise<CheckoutSessionResponse> {
+  async createCheckout(
+    actor: ApiUser,
+    dto: CreateCheckoutDto,
+  ): Promise<CheckoutSessionResponse> {
     const price = await this.prisma.planPrice.findUnique({
       where: { id: dto.planPriceId },
       include: { plan: true },
@@ -56,7 +59,11 @@ export class BillingService {
 
     const session = await this.billing.createCheckoutSession({
       user: { id: actor.userId, email: actor.email },
-      plan: { id: price.plan.id, name: price.plan.name, trialDays: price.plan.trialDays },
+      plan: {
+        id: price.plan.id,
+        name: price.plan.name,
+        trialDays: price.plan.trialDays,
+      },
       price: {
         id: price.id,
         stripePriceId: price.stripePriceId,
@@ -70,15 +77,27 @@ export class BillingService {
       cancelUrl,
     });
 
-    return { url: session.url, sessionId: session.sessionId, mode: this.billing.mode };
+    return {
+      url: session.url,
+      sessionId: session.sessionId,
+      mode: this.billing.mode,
+    };
   }
 
-  async createPortal(actor: ApiUser, returnUrl?: string): Promise<PortalResponse> {
+  async createPortal(
+    actor: ApiUser,
+    returnUrl?: string,
+  ): Promise<PortalResponse> {
     const sub = await this.prisma.subscription.findFirst({
       where: { userId: actor.userId },
       orderBy: { createdAt: 'desc' },
     });
     if (!sub) throw new NotFoundException('No subscription to manage');
+    if (!sub.stripeCustomerId) {
+      throw new BadRequestException(
+        'This subscription is managed by the app store, not the billing portal',
+      );
+    }
     return this.billing.createPortalSession({
       user: { id: actor.userId },
       customerId: sub.stripeCustomerId,
@@ -94,7 +113,9 @@ export class BillingService {
     });
     const now = new Date();
     const items = subs.map((s) => toSubscriptionResponse(s, s.plan.name, now));
-    const activePlanIds = [...new Set(items.filter((i) => i.grantsAccess).map((i) => i.planId))];
+    const activePlanIds = [
+      ...new Set(items.filter((i) => i.grantsAccess).map((i) => i.planId)),
+    ];
     return { subscriptions: items, activePlanIds };
   }
 
@@ -103,9 +124,14 @@ export class BillingService {
    * Stripe `checkout.session.completed` + `customer.subscription.created`
    * webhooks. Idempotent on the synthesized stripeSubscriptionId.
    */
-  async completeDevCheckout(actor: ApiUser, sessionId: string): Promise<SubscriptionResponse> {
+  async completeDevCheckout(
+    actor: ApiUser,
+    sessionId: string,
+  ): Promise<SubscriptionResponse> {
     if (this.billing.mode !== 'dev') {
-      throw new ForbiddenException('Dev checkout completion is disabled outside dev mode');
+      throw new ForbiddenException(
+        'Dev checkout completion is disabled outside dev mode',
+      );
     }
     const payload = decodeDevSession(sessionId);
     if (!payload) throw new BadRequestException('Invalid dev session id');
@@ -122,7 +148,9 @@ export class BillingService {
     const now = new Date();
     const periodMs = payload.period === 'ANNUAL' ? 365 * DAY_MS : 30 * DAY_MS;
     const trialing = payload.trialDays > 0;
-    const trialEndsAt = trialing ? new Date(now.getTime() + payload.trialDays * DAY_MS) : null;
+    const trialEndsAt = trialing
+      ? new Date(now.getTime() + payload.trialDays * DAY_MS)
+      : null;
     // Deterministic per (user, plan) so re-completing the same checkout is a no-op upsert.
     const stripeSubscriptionId = `sub_dev_${payload.userId.replace(/-/g, '').slice(0, 12)}_${payload.planId
       .replace(/-/g, '')
@@ -171,7 +199,11 @@ function toSubscriptionResponse(
     cancelAtPeriodEnd: s.cancelAtPeriodEnd,
     trialEndsAt: s.trialEndsAt?.toISOString() ?? null,
     grantsAccess: subscriptionGrantsAccess(
-      { planId: s.planId, status: s.status, currentPeriodEnd: s.currentPeriodEnd },
+      {
+        planId: s.planId,
+        status: s.status,
+        currentPeriodEnd: s.currentPeriodEnd,
+      },
       now,
     ),
   };

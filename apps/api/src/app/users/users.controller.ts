@@ -15,14 +15,15 @@ import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { AuditService } from '../audit/audit.service.js';
 import { UsersService } from './users.service.js';
-import { UpdateMeDto, type AdminUserListItem, type MeResponse } from './users.dto.js';
+import {
+  UpdateMeDto,
+  type AdminUserListItem,
+  type MeResponse,
+} from './users.dto.js';
 
 @Controller('users')
 export class UsersController {
-  constructor(
-    private readonly users: UsersService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly users: UsersService) {}
 
   /** List all users — Admin/Support only. Paginated. */
   @Roles('ADMIN', 'SUPPORT')
