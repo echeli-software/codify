@@ -1,5 +1,5 @@
 import nx from '@nx/eslint-plugin';
-import baseConfig from '../../eslint.config.mjs';
+import baseConfig, { noRawTemplateTextOptions } from '../../eslint.config.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -28,7 +28,9 @@ export default [
   },
   {
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      // docs/11 §11 — warn while the app pages are being translated.
+      'codify/no-raw-template-text': ['warn', noRawTemplateTextOptions],
+    },
   },
 ];
