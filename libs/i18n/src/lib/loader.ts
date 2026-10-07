@@ -19,12 +19,16 @@ import enGamification from '../strings/en-US/gamification.json' with { type: 'js
 import enTime from '../strings/en-US/time.json' with { type: 'json' };
 import enBilling from '../strings/en-US/billing.json' with { type: 'json' };
 import enUi from '../strings/en-US/ui.json' with { type: 'json' };
+import enAdmin from '../strings/en-US/admin.json' with { type: 'json' };
+import enStudent from '../strings/en-US/student.json' with { type: 'json' };
 
 import ptCommon from '../strings/pt-BR/common.json' with { type: 'json' };
 import ptGamification from '../strings/pt-BR/gamification.json' with { type: 'json' };
 import ptTime from '../strings/pt-BR/time.json' with { type: 'json' };
 import ptBilling from '../strings/pt-BR/billing.json' with { type: 'json' };
 import ptUi from '../strings/pt-BR/ui.json' with { type: 'json' };
+import ptAdmin from '../strings/pt-BR/admin.json' with { type: 'json' };
+import ptStudent from '../strings/pt-BR/student.json' with { type: 'json' };
 
 /**
  * JSON modules arrive as the object itself (bundlers, esModuleInterop) or
@@ -42,8 +46,24 @@ function mergeAll(...objs: object[]): TranslationObject {
 /** Every shared namespace, merged per locale (exported for key-parity tests). */
 export const TRANSLATION_BUNDLES: Readonly<Record<Locale, TranslationObject>> =
   {
-    'en-US': mergeAll(enCommon, enGamification, enTime, enBilling, enUi),
-    'pt-BR': mergeAll(ptCommon, ptGamification, ptTime, ptBilling, ptUi),
+    'en-US': mergeAll(
+      enCommon,
+      enGamification,
+      enTime,
+      enBilling,
+      enUi,
+      enAdmin,
+      enStudent,
+    ),
+    'pt-BR': mergeAll(
+      ptCommon,
+      ptGamification,
+      ptTime,
+      ptBilling,
+      ptUi,
+      ptAdmin,
+      ptStudent,
+    ),
   };
 
 export class CodifyTranslateLoader implements TranslateLoader {
