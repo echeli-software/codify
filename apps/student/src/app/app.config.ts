@@ -8,6 +8,7 @@ import { provideIonicAngular } from '@ionic/angular/standalone';
 import { provideI18n } from '@codify/i18n';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
+import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
 import { appRoutes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -26,8 +27,11 @@ export const appConfig: ApplicationConfig = {
       // docs/05-student-app §1).
       mode: 'md',
     }),
-    provideAuth({ apiBaseUrl: 'http://localhost:3000/api' }),
-    provideApiClient({ baseUrl: 'http://localhost:3000/api' }),
+    provideAuth({
+      apiBaseUrl: API_BASE_URL,
+      clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
+    }),
+    provideApiClient({ baseUrl: API_BASE_URL }),
     provideI18n(),
   ],
 };

@@ -1,0 +1,89 @@
+# Judge0 configuration for vps-judge0-01 — rendered with
+#   envsubst < judge0.conf.template > judge0.conf && chmod 600 judge0.conf
+# Required env when rendering: JUDGE0_AUTHN_TOKEN, JUDGE0_AUTHZ_TOKEN,
+# JUDGE0_DB_PASSWORD, JUDGE0_REDIS_PASSWORD. Never commit the rendered file.
+# Limits follow docs/12-code-execution.md §3/§9; reference:
+# https://github.com/judge0/judge0/blob/master/judge0.conf
+
+################################################################################
+# Auth — the API sends X-Auth-Token (JUDGE0_AUTH_TOKEN in Coolify).
+################################################################################
+AUTHN_HEADER=X-Auth-Token
+AUTHN_TOKEN=${JUDGE0_AUTHN_TOKEN}
+AUTHZ_HEADER=X-Auth-User
+AUTHZ_TOKEN=${JUDGE0_AUTHZ_TOKEN}
+
+################################################################################
+# Surface area — everything we don't use is off.
+################################################################################
+USE_DOCS_AS_HOMEPAGE=false
+MAINTENANCE_MODE=false
+# No callbacks: they would make the Judge0 host open outbound connections.
+ENABLE_CALLBACKS=false
+ENABLE_WAIT_RESULT=true
+ENABLE_BATCHED_SUBMISSIONS=false
+ENABLE_COMPILER_OPTIONS=false
+ENABLE_COMMAND_LINE_ARGUMENTS=false
+ENABLE_ADDITIONAL_FILES=false
+ENABLE_SUBMISSION_DELETE=true
+ALLOWED_LANGUAGES_FOR_COMPILE_OPTIONS=
+SUBMISSION_CACHE_DURATION=1
+
+################################################################################
+# Sandbox limits (per submission). The API may lower CPU/memory per exercise
+# (Exercise.timeLimitMs / memoryLimitKb) but never above the MAX_* values.
+################################################################################
+# Network: disabled and not overridable by a request.
+ENABLE_NETWORK=false
+ALLOW_ENABLE_NETWORK=false
+
+CPU_TIME_LIMIT=2
+MAX_CPU_TIME_LIMIT=5
+CPU_EXTRA_TIME=0.5
+MAX_CPU_EXTRA_TIME=1
+WALL_TIME_LIMIT=5
+MAX_WALL_TIME_LIMIT=5
+
+# Kilobytes.
+MEMORY_LIMIT=128000
+MAX_MEMORY_LIMIT=256000
+STACK_LIMIT=64000
+MAX_STACK_LIMIT=64000
+# Largest file (incl. captured stdout) a program may write: 64 KB output cap.
+MAX_FILE_SIZE=64
+MAX_MAX_FILE_SIZE=64
+
+MAX_PROCESSES_AND_OR_THREADS=30
+MAX_MAX_PROCESSES_AND_OR_THREADS=30
+ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=false
+ALLOW_ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=false
+ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=false
+ALLOW_ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=false
+
+NUMBER_OF_RUNS=1
+MAX_NUMBER_OF_RUNS=1
+REDIRECT_STDERR_TO_STDOUT=false
+
+################################################################################
+# Concurrency (docs/12 §9: per-VPS cap ~8, excess queues).
+################################################################################
+COUNT=8
+MAX_QUEUE_SIZE=100
+INTERVAL=0.1
+
+################################################################################
+# Internal services (Docker `internal` network only).
+################################################################################
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=${JUDGE0_REDIS_PASSWORD}
+
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_DB=judge0
+POSTGRES_USER=judge0
+POSTGRES_PASSWORD=${JUDGE0_DB_PASSWORD}
+
+RAILS_ENV=production
+RAILS_MAX_THREADS=5
+RAILS_SERVER_PROCESSES=2

@@ -1,0 +1,86 @@
+# Judge0 on vps-judge0-01 (docs/12-code-execution.md). Stateless code runner:
+# its Postgres/Redis hold only transient submissions.
+#
+#   envsubst < judge0.conf.template > judge0.conf   # fill secrets first
+#   JUDGE0_BIND_ADDR=<vpc private ip> docker compose up -d
+#
+# Network lockdown (see README.md):
+#   - `internal` network (db, redis, workers) has no route out of the host.
+#   - `edge` network only exists so the server can publish :2358 on the VPC
+#     address; judge0-egress-lockdown.sh drops any NEW outbound connection from
+#     it. Sandboxed programs additionally run with networking disabled by
+#     isolate (ENABLE_NETWORK=false, ALLOW_ENABLE_NETWORK=false).
+
+name: judge0
+
+x-judge0: &judge0
+  image: judge0/judge0:${JUDGE0_VERSION:-1.13.1}
+  env_file: judge0.conf
+  # isolate needs cgroups + mount namespaces → privileged (host is dedicated
+  # to Judge0 for exactly this reason, docs/12 §2).
+  privileged: true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: '20m', max-file: '5' }
+
+services:
+  server:
+    <<: *judge0
+    ports:
+      - '${JUDGE0_BIND_ADDR:?set JUDGE0_BIND_ADDR to the VPC private IP}:2358:2358'
+    networks: [edge, internal]
+    depends_on: [db, redis]
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 1g }
+
+  workers:
+    <<: *judge0
+    command: ['./scripts/workers']
+    networks: [internal]
+    depends_on: [db, redis]
+    deploy:
+      resources:
+        # Leaves ~0.5 vCPU / 1.5 GB for the OS, server, db and redis on a
+        # 4 vCPU / 8 GB droplet. Per-submission caps live in judge0.conf.
+        limits: { cpus: '2.5', memory: 5g }
+
+  db:
+    image: postgres:16.4-alpine
+    env_file: judge0.conf
+    networks: [internal]
+    volumes: [judge0-db:/var/lib/postgresql/data]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 768m }
+
+  redis:
+    image: redis:7.4-alpine
+    env_file: judge0.conf
+    command:
+      [
+        'sh',
+        '-c',
+        'exec redis-server --appendonly no --requirepass "$$REDIS_PASSWORD"',
+      ]
+    networks: [internal]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 256m }
+
+networks:
+  edge:
+    driver: bridge
+    ipam:
+      config: [{ subnet: 172.30.0.0/24 }]
+  internal:
+    driver: bridge
+    internal: true # no default route → no egress for db, redis, workers
+    ipam:
+      config: [{ subnet: 172.30.1.0/24 }]
+
+volumes:
+  judge0-db:

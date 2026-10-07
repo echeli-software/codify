@@ -1,0 +1,67 @@
+#cloud-config
+# Baseline hardening for every Codify droplet (role: ${role}).
+# Runs once at first boot; later changes go through the runbook, not Terraform
+# (droplets ignore user_data drift).
+
+package_update: true
+package_upgrade: true
+packages:
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - ca-certificates
+  - curl
+
+users:
+  - default
+  - name: deploy
+    groups: [sudo] # docker group is added after Docker is installed (runcmd)
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    # Keys are copied from root (DO injects the project SSH keys there).
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-codify.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+      MaxAuthTries 3
+  - path: /etc/fail2ban/jail.d/sshd.local
+    content: |
+      [sshd]
+      enabled = true
+      maxretry = 5
+      bantime = 1h
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "20m", "max-file": "5" },
+        "live-restore": true
+      }
+
+runcmd:
+  - install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
+  - cp /root/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
+  - chown deploy:deploy /home/deploy/.ssh/authorized_keys
+  - systemctl restart ssh || systemctl restart sshd
+  - systemctl enable --now fail2ban
+  # Host firewall mirrors the DO cloud firewall (defense in depth).
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+%{ if role == "judge0" ~}
+  # Judge0 API only on the VPC interface; the cloud firewall narrows it to
+  # the app droplet(s).
+  - ufw allow in on eth1 to any port 2358 proto tcp
+%{ else ~}
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 8000/tcp
+  - ufw allow 6001:6002/tcp
+%{ endif ~}
+  - ufw --force enable
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker deploy
