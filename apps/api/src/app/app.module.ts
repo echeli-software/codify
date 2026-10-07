@@ -27,6 +27,9 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
 import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { UsersModule } from './users/users.module.js';
+import { AppConfigModule } from './config/config.module.js';
+import { PlatformModule } from './common/platform.module.js';
+import { OpsModule } from './ops/ops.module.js';
 
 @Module({
   imports: [
@@ -53,6 +56,9 @@ import { UsersModule } from './users/users.module.js';
     PlansModule,
     ProgressModule,
     ScenariosModule,
+    AppConfigModule,
+    PlatformModule,
+    OpsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

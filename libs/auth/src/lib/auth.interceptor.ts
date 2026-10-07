@@ -1,57 +1,66 @@
+import { type HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { HTTP_INTERCEPTORS, type HttpInterceptorFn } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { from } from 'rxjs';
+import { switchMap, tap } from 'rxjs/operators';
 import { AuthService } from './auth.service.js';
-import { tap } from 'rxjs/operators';
-import type { Provider } from '@angular/core';
+import { AUTH_CONFIG, type AuthConfig, isTokenAllowed } from './config.js';
+
+function statusOf(err: unknown): number | undefined {
+  return err && typeof err === 'object' && 'status' in err
+    ? (err as { status: number }).status
+    : undefined;
+}
+
+/** Sign out and send the user to the login page, remembering where they were. */
+function handleUnauthorized(
+  auth: AuthService,
+  router: Router | null,
+  config: AuthConfig,
+): void {
+  void auth.signOut();
+  if (!router) return;
+  const loginPath = config.loginPath ?? '/login';
+  const current = router.url;
+  if (current === loginPath || current.startsWith(`${loginPath}?`)) return;
+  void router.navigate([loginPath], { queryParams: { redirect: current } });
+}
 
 /**
- * Functional HTTP interceptor: attaches the AuthService bearer token to
- * outgoing requests, and clears the session on 401.
- *
- * Skips the Authorization header when the token is missing — public
- * endpoints (e.g. `/health`) keep working pre-login.
+ * Functional HTTP interceptor:
+ *  - attaches `Authorization: Bearer <token>` ONLY to requests under the
+ *    configured API base URL / allowlist (never to third parties);
+ *  - obtains the token asynchronously per request (`AuthService.getToken()`
+ *    — Clerk refreshes it transparently);
+ *  - on a 401 for an authenticated request, signs out and navigates to
+ *    `/login?redirect=<current url>`.
  */
 export const authInterceptorFn: HttpInterceptorFn = (req, next) => {
+  const config = inject(AUTH_CONFIG);
+  if (!isTokenAllowed(req.url, config)) return next(req);
   const auth = inject(AuthService);
-  const token = auth.currentToken();
-  const authReq = token
-    ? req.clone({
-        setHeaders: { Authorization: `Bearer ${token}` },
-      })
-    : req;
+  const router = inject(Router, { optional: true });
 
-  return next(authReq).pipe(
-    tap({
-      error: (err: unknown) => {
-        if (
-          err &&
-          typeof err === 'object' &&
-          'status' in err &&
-          (err as { status: number }).status === 401
-        ) {
-          auth.signOut();
-        }
-      },
+  return from(auth.getToken()).pipe(
+    switchMap((token) => {
+      const authReq = token
+        ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+        : req;
+      return next(authReq).pipe(
+        tap({
+          error: (err: unknown) => {
+            if (token && statusOf(err) === 401)
+              handleUnauthorized(auth, router, config);
+          },
+        }),
+      );
     }),
   );
 };
 
 /**
- * Provider for `provideHttpClient(withInterceptors([...]))`. Use this
- * inline in app config:
- *
- *   provideHttpClient(withInterceptors([authInterceptor()]))
+ * For `provideHttpClient(withInterceptors([authInterceptor(), …]))`.
  */
 export function authInterceptor(): HttpInterceptorFn {
   return authInterceptorFn;
 }
-
-/**
- * Legacy class-style provider escape hatch in case the host wires a
- * non-standalone bootstrap. Most callers should use `authInterceptor()`.
- */
-export const AUTH_INTERCEPTOR_PROVIDER: Provider = {
-  provide: HTTP_INTERCEPTORS,
-  useValue: authInterceptorFn,
-  multi: true,
-};

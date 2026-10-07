@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
       // docs/05-student-app §1).
       mode: 'md',
     }),
-    provideAuth(),
+    provideAuth({ apiBaseUrl: 'http://localhost:3000/api' }),
     provideApiClient({ baseUrl: 'http://localhost:3000/api' }),
     provideI18n(),
   ],

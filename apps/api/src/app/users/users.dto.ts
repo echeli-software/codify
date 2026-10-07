@@ -1,4 +1,12 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+} from 'class-validator';
 
 /**
  * Allowed mutation surface for `PATCH /api/me`. Role/email/clerkId are
@@ -24,13 +32,13 @@ export class UpdateMeDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(1440)
+  @Max(1439)
   quietHoursStart?: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(1440)
+  @Max(1439)
   quietHoursEnd?: number;
 
   @IsOptional()

@@ -1,15 +1,9 @@
-import {
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ProgressService } from './progress.service.js';
 import type {
@@ -39,6 +33,7 @@ export class ProgressController {
 
   @Roles('STUDENT')
   @Post('lessons/:id/complete')
+  @RewardThrottle()
   @HttpCode(201)
   async complete(
     @CurrentUser() actor: ApiUser,

@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
+import { CodeThrottle } from '../common/throttling/throttle.decorators.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
   ExercisesService,
@@ -10,7 +11,11 @@ import {
   type StudentExerciseView,
   type SubmitResult,
 } from './exercises.service.js';
-import { CodeDto, CreateExerciseDto, UpdateExerciseDto } from './exercises.dto.js';
+import {
+  CodeDto,
+  CreateExerciseDto,
+  UpdateExerciseDto,
+} from './exercises.dto.js';
 import type { TestCase } from '@codify/domain';
 
 function toInput(dto: CreateExerciseDto | UpdateExerciseDto) {
@@ -32,9 +37,22 @@ export class ExercisesController {
 
   @Roles('ADMIN', 'TEACHER')
   @Post('lessons/:lessonId/exercise')
-  async create(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string, @Body() body: CreateExerciseDto, @Req() req: Request) {
-    const created = await this.exercises.createForLesson(lessonId, toInput(body) as Parameters<ExercisesService['createForLesson']>[1]);
-    void this.audit.record(actor, { action: 'exercise.create', entity: 'Exercise', entityId: created.id, ip: req.ip ?? null });
+  async create(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+    @Body() body: CreateExerciseDto,
+    @Req() req: Request,
+  ) {
+    const created = await this.exercises.createForLesson(
+      lessonId,
+      toInput(body) as Parameters<ExercisesService['createForLesson']>[1],
+    );
+    void this.audit.record(actor, {
+      action: 'exercise.create',
+      entity: 'Exercise',
+      entityId: created.id,
+      ip: req.ip ?? null,
+    });
     return created;
   }
 
@@ -66,25 +84,43 @@ export class ExercisesController {
 
   @Roles('STUDENT')
   @Get('lessons/:lessonId/exercise')
-  forStudent(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string): Promise<StudentExerciseView> {
+  forStudent(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+  ): Promise<StudentExerciseView> {
     return this.exercises.getForStudent(actor.userId, lessonId);
   }
 
   @Roles('STUDENT')
   @Post('exercises/:id/run')
-  run(@CurrentUser() actor: ApiUser, @Param('id') id: string, @Body() body: CodeDto): Promise<RunResult> {
+  @CodeThrottle()
+  run(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: CodeDto,
+  ): Promise<RunResult> {
     return this.exercises.run(actor.userId, id, body.code);
   }
 
   @Roles('STUDENT')
   @Post('exercises/:id/submit')
-  async submit(@CurrentUser() actor: ApiUser, @Param('id') id: string, @Body() body: CodeDto, @Req() req: Request): Promise<SubmitResult> {
+  @CodeThrottle()
+  async submit(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: CodeDto,
+    @Req() req: Request,
+  ): Promise<SubmitResult> {
     const res = await this.exercises.submit(actor.userId, id, body.code);
     void this.audit.record(actor, {
       action: 'exercise.submit',
       entity: 'Exercise',
       entityId: id,
-      diff: { verdict: res.verdict, scorePct: res.scorePct, firstReward: !!res.reward },
+      diff: {
+        verdict: res.verdict,
+        scorePct: res.scorePct,
+        firstReward: !!res.reward,
+      },
       ip: req.ip ?? null,
     });
     return res;

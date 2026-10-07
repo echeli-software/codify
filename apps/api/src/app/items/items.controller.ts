@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ItemsService } from './items.service.js';
 import {
@@ -45,12 +46,16 @@ export class ItemsController {
 
   @Roles('STUDENT')
   @Get('shop')
-  shop(@CurrentUser() actor: ApiUser, @Query() query: ShopQueryDto): Promise<ShopItem[]> {
+  shop(
+    @CurrentUser() actor: ApiUser,
+    @Query() query: ShopQueryDto,
+  ): Promise<ShopItem[]> {
     return this.items.shop(actor.userId, query);
   }
 
   @Roles('STUDENT')
   @Post('shop/:id/purchase')
+  @RewardThrottle()
   @HttpCode(201)
   async purchase(
     @CurrentUser() actor: ApiUser,
@@ -83,13 +88,19 @@ export class ItemsController {
 
   @Roles('STUDENT')
   @Put('avatar/config')
-  saveConfig(@CurrentUser() actor: ApiUser, @Body() body: SaveAvatarConfigDto): Promise<AvatarResponse> {
+  saveConfig(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: SaveAvatarConfigDto,
+  ): Promise<AvatarResponse> {
     return this.items.saveConfig(actor.userId, body.config);
   }
 
   @Roles('STUDENT')
   @Put('avatar/equip')
-  equip(@CurrentUser() actor: ApiUser, @Body() body: EquipDto): Promise<AvatarResponse> {
+  equip(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: EquipDto,
+  ): Promise<AvatarResponse> {
     return this.items.equip(actor.userId, body.slot, body.itemId ?? null);
   }
 
@@ -115,15 +126,26 @@ export class ItemsController {
 
   @Roles('ADMIN')
   @Post('items')
-  async createItem(@CurrentUser() actor: ApiUser, @Body() body: CreateItemDto): Promise<ItemResponse> {
+  async createItem(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: CreateItemDto,
+  ): Promise<ItemResponse> {
     const created = await this.items.createItem(body);
-    void this.audit.record(actor, { action: 'item.create', entity: 'Item', entityId: created.id, diff: { ...body } });
+    void this.audit.record(actor, {
+      action: 'item.create',
+      entity: 'Item',
+      entityId: created.id,
+      diff: { ...body },
+    });
     return created;
   }
 
   @Roles('ADMIN')
   @Patch('items/:id')
-  updateItem(@Param('id') id: string, @Body() body: UpdateItemDto): Promise<ItemResponse> {
+  updateItem(
+    @Param('id') id: string,
+    @Body() body: UpdateItemDto,
+  ): Promise<ItemResponse> {
     return this.items.updateItem(id, body);
   }
 

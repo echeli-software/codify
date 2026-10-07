@@ -4,12 +4,24 @@ import type { RubricCriterion } from '@codify/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
+import { AiThrottle } from '../common/throttling/throttle.decorators.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { AiGradingService, type GradeResult, type StudentAiPromptView } from './ai-grading.service.js';
-import { CreateAiPromptDto, ResponseDto, UpdateAiPromptDto } from './ai-grading.dto.js';
+import {
+  AiGradingService,
+  type GradeResult,
+  type StudentAiPromptView,
+} from './ai-grading.service.js';
+import {
+  CreateAiPromptDto,
+  ResponseDto,
+  UpdateAiPromptDto,
+} from './ai-grading.dto.js';
 
 function toInput(dto: CreateAiPromptDto | UpdateAiPromptDto) {
-  return { ...dto, rubric: dto.rubric as unknown as RubricCriterion[] | undefined };
+  return {
+    ...dto,
+    rubric: dto.rubric as unknown as RubricCriterion[] | undefined,
+  };
 }
 
 @Controller()
@@ -23,9 +35,22 @@ export class AiGradingController {
 
   @Roles('ADMIN', 'TEACHER')
   @Post('lessons/:lessonId/ai-prompt')
-  async create(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string, @Body() body: CreateAiPromptDto, @Req() req: Request) {
-    const created = await this.ai.createForLesson(lessonId, toInput(body) as Parameters<AiGradingService['createForLesson']>[1]);
-    void this.audit.record(actor, { action: 'ai_prompt.create', entity: 'AiPrompt', entityId: created.id, ip: req.ip ?? null });
+  async create(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+    @Body() body: CreateAiPromptDto,
+    @Req() req: Request,
+  ) {
+    const created = await this.ai.createForLesson(
+      lessonId,
+      toInput(body) as Parameters<AiGradingService['createForLesson']>[1],
+    );
+    void this.audit.record(actor, {
+      action: 'ai_prompt.create',
+      entity: 'AiPrompt',
+      entityId: created.id,
+      ip: req.ip ?? null,
+    });
     return created;
   }
 
@@ -57,19 +82,33 @@ export class AiGradingController {
 
   @Roles('STUDENT')
   @Get('lessons/:lessonId/ai-prompt')
-  forStudent(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string): Promise<StudentAiPromptView> {
+  forStudent(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+  ): Promise<StudentAiPromptView> {
     return this.ai.getForStudent(actor.userId, lessonId);
   }
 
   @Roles('STUDENT')
   @Post('ai-prompts/:id/submit')
-  async submit(@CurrentUser() actor: ApiUser, @Param('id') id: string, @Body() body: ResponseDto, @Req() req: Request): Promise<GradeResult> {
+  @AiThrottle()
+  async submit(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: ResponseDto,
+    @Req() req: Request,
+  ): Promise<GradeResult> {
     const res = await this.ai.submit(actor.userId, id, body.response);
     void this.audit.record(actor, {
       action: 'ai_prompt.submit',
       entity: 'AiPrompt',
       entityId: id,
-      diff: { scorePct: res.scorePct, passed: res.passed, cached: res.cached, firstReward: !!res.reward },
+      diff: {
+        scorePct: res.scorePct,
+        passed: res.passed,
+        cached: res.cached,
+        firstReward: !!res.reward,
+      },
       ip: req.ip ?? null,
     });
     return res;
