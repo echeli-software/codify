@@ -1,0 +1,115 @@
+:host {
+  display: block;
+}
+
+.cdf-builder {
+  display: grid;
+  gap: var(--cdf-space-4);
+  grid-template-columns: 1fr;
+
+  @media (min-width: 768px) {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-4);
+    border-radius: var(--cdf-radius-lg);
+    background: var(--cdf-color-surface-elev);
+  }
+
+  &__dirty {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-3);
+    min-width: 0;
+  }
+
+  &__slots {
+    display: flex;
+    gap: var(--cdf-space-1);
+    overflow-x: auto;
+    padding-bottom: var(--cdf-space-1);
+  }
+
+  &__slot {
+    flex: 0 0 auto;
+    padding: var(--cdf-space-1) var(--cdf-space-3);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-pill);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+
+    &[aria-selected='true'] {
+      background: var(--cdf-color-primary);
+      border-color: var(--cdf-color-primary);
+      color: var(--cdf-color-primary-on);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--cdf-space-2);
+  }
+
+  &__option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    padding: var(--cdf-space-2);
+    border: 2px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    font-size: var(--cdf-font-size-xs);
+    cursor: pointer;
+
+    &[aria-checked='true'] {
+      border-color: var(--cdf-color-primary);
+      background: var(--cdf-color-primary-subtle);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__glyph {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  &__swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--cdf-radius-sm);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--cdf-space-2);
+  }
+}

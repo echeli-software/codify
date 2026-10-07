@@ -12,12 +12,19 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./avatar-renderer": {
+      "@codify/source": "./src/lib/molecules/avatar-renderer/avatar-renderer.ts",
+      "types": "./src/lib/molecules/avatar-renderer/avatar-renderer.ts",
+      "import": "./src/lib/molecules/avatar-renderer/avatar-renderer.ts",
+      "default": "./src/lib/molecules/avatar-renderer/avatar-renderer.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {
     "name": "ui-ionic"
   },
   "peerDependencies": {
+    "@angular/cdk": "^21.0.0",
     "@angular/common": "^21.0.0",
     "@angular/core": "^21.0.0",
     "@angular/forms": "^21.0.0",

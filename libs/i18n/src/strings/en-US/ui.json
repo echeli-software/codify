@@ -1,0 +1,346 @@
+{
+  "ui": {
+    "aiPrompt": {
+      "answer": "Your answer",
+      "attempts": "Attempt {used} of {max}",
+      "cached": "Graded earlier",
+      "passed": "Nice work — rubric met!",
+      "placeholder": "Write your answer…",
+      "rubric": "Rubric",
+      "scoreKeepGoing": "{score}% · keep going (pass at {threshold}%)",
+      "scorePassed": "{score}% · passed",
+      "state": {
+        "idle": "Not graded yet",
+        "pass": "Met",
+        "fail": "Not met"
+      },
+      "submit": "Submit",
+      "words": "{count, plural, one {# word} other {# words}}"
+    },
+    "assetPicker": {
+      "change": "Change…",
+      "choose": "Choose…",
+      "dialogTitle": "Choose an asset",
+      "none": "No asset selected",
+      "use": "Use this asset"
+    },
+    "avatar": {
+      "label": "Avatar",
+      "wearing": "Avatar wearing {items}"
+    },
+    "avatarBuilder": {
+      "none": "None",
+      "reset": "Reset",
+      "slots": "Item slots",
+      "unsaved": "Unsaved changes"
+    },
+    "breadcrumb": {
+      "label": "Breadcrumb"
+    },
+    "celebration": {
+      "awesome": "Awesome"
+    },
+    "coins": {
+      "total": "{count, plural, one {# coin} other {# coins}}",
+      "unit": "{count, plural, one {coin} other {coins}}"
+    },
+    "combobox": {
+      "noResults": "No results"
+    },
+    "confirm": {
+      "typeToConfirm": "Type “{value}” to confirm"
+    },
+    "course": {
+      "byAuthor": "by {author}",
+      "lessons": "{count, plural, one {# lesson} other {# lessons}}"
+    },
+    "coursePreview": {
+      "close": "Close preview",
+      "curriculum": "Curriculum",
+      "moreLessons": "{count, plural, one {+# more lesson} other {+# more lessons}}",
+      "start": "Start course",
+      "unlock": "Unlock with Premium"
+    },
+    "cropper": {
+      "apply": "Apply crop",
+      "area": "Crop area",
+      "empty": "No image selected",
+      "help": "Drag or use the arrow keys to move the image; use the slider or + and − to zoom.",
+      "reset": "Reset",
+      "zoom": "Zoom"
+    },
+    "dataTable": {
+      "actions": "Actions",
+      "empty": "No items.",
+      "selectAll": "Select all rows",
+      "selectRow": "Select row {index}"
+    },
+    "dateRange": {
+      "clear": "Clear dates",
+      "end": "End",
+      "invalid": "The end must be after the start.",
+      "presetMonth": "Next 30 days",
+      "presetWeek": "Next 7 days",
+      "presetWeekend": "This weekend",
+      "presets": "Quick ranges",
+      "start": "Start"
+    },
+    "duration": {
+      "hours": "{h} h",
+      "hoursMinutes": "{h} h {m} min",
+      "minutes": "{m} min"
+    },
+    "exercise": {
+      "diff": "got {actual}, expected {expected}",
+      "editor": "Your code",
+      "failed": "Failed",
+      "passed": "Passed",
+      "reset": "Reset code",
+      "run": "Run",
+      "signature": "{language} · function {fn}",
+      "solved": "Solved! All tests pass.",
+      "submit": "Submit",
+      "testsSummary": "{passed} of {total} tests passing",
+      "verdict": "{verdict} · {score}%"
+    },
+    "inventory": {
+      "empty": "You don’t own any items yet — visit the shop!",
+      "equip": "Equip",
+      "equipped": "Equipped"
+    },
+    "item": {
+      "cost": "{value, plural, one {# coin} other {# coins}}",
+      "itemOnly": "Item only",
+      "onAvatar": "On avatar",
+      "previewMode": "Preview mode",
+      "rarity": {
+        "COMMON": "Common",
+        "UNCOMMON": "Uncommon",
+        "RARE": "Rare",
+        "EPIC": "Epic",
+        "LEGENDARY": "Legendary"
+      },
+      "slot": {
+        "PET": "Pet",
+        "BACKGROUND": "Background",
+        "TOP": "Top",
+        "BOTTOM": "Bottom",
+        "SHOES": "Shoes",
+        "HAT": "Hat",
+        "HAIR": "Hair",
+        "GLASSES": "Glasses",
+        "ACCESSORY": "Accessory",
+        "FRAME": "Frame",
+        "EMOTE": "Emote"
+      },
+      "untitled": "Untitled item"
+    },
+    "leaderboard": {
+      "demote": "Demotion zone",
+      "promote": "Promotion zone",
+      "rows": "{count, plural, one {# learner} other {# learners}}",
+      "title": "League standings",
+      "you": "Your position",
+      "youShort": "you"
+    },
+    "lesson": {
+      "status": {
+        "not-started": "Not started",
+        "in-progress": "In progress",
+        "completed": "Completed",
+        "locked": "Locked"
+      }
+    },
+    "level": {
+      "aria": "Level {level}, {tier} tier"
+    },
+    "levelUp": {
+      "toNext": "{xp} XP to level {level}"
+    },
+    "matrix": {
+      "allCategories": "All",
+      "caption": "Categories included in each plan",
+      "category": "Category",
+      "count": "{count} of {total}",
+      "include": "Include {category} in {plan}",
+      "noCategories": "No categories yet.",
+      "total": "Included"
+    },
+    "media": {
+      "empty": "No assets yet — upload one above.",
+      "filterKind": "Filter by kind",
+      "kind": {
+        "ALL": "All kinds",
+        "IMAGE": "Images",
+        "SPRITE": "Sprites",
+        "COVER": "Covers",
+        "OTHER": "Other files"
+      },
+      "loadFailed": "Could not load the media library.",
+      "loadMore": "Load more",
+      "noBackend": "The media library is not available here.",
+      "title": "Media library"
+    },
+    "multiplier": {
+      "active": "Active",
+      "course": "Course",
+      "description": "Internal note",
+      "errors": {
+        "courseRequired": "Pick a course.",
+        "lessonRequired": "Pick a lesson.",
+        "streakDaysRequired": "Set the minimum streak (days).",
+        "valueRange": "Use a factor between 0.1 and {max}."
+      },
+      "kind": "Kind",
+      "lesson": "Lesson",
+      "schedule": "Schedule window",
+      "scheduleHint": "Leave empty for an always-on multiplier.",
+      "scope": "Applies to",
+      "scopes": {
+        "global": "Everything",
+        "course": "One course",
+        "lesson": "One lesson"
+      },
+      "streakDaysMin": "Minimum streak (days)",
+      "summary": "×{value} {target} on {scope}",
+      "target": "Boosts",
+      "targets": {
+        "BOTH": "XP and coins",
+        "XP": "XP",
+        "COINS": "Coins"
+      },
+      "value": "Factor"
+    },
+    "onboarding": {
+      "carousel": "carousel",
+      "getStarted": "Get started",
+      "label": "Welcome to Codify",
+      "slide": "slide",
+      "slideOf": "{index} of {total}"
+    },
+    "pagination": {
+      "label": "Pagination",
+      "next": "Next page",
+      "page": "Page {page}",
+      "previous": "Previous page"
+    },
+    "paywall": {
+      "cadence": {
+        "monthly": "Monthly",
+        "yearly": "Yearly"
+      },
+      "close": "Close",
+      "plans": "Plans",
+      "reason": {
+        "courseLocked": "Unlock the full course",
+        "featureLocked": "Premium feature",
+        "lessonLocked": "This lesson is in Premium",
+        "limitReached": "You hit today’s free limit",
+        "soft": "Go further with Premium"
+      }
+    },
+    "plan": {
+      "includes": "Includes",
+      "recommended": "Recommended"
+    },
+    "price": {
+      "installments": "or {count}x of {amount}",
+      "was": "Was"
+    },
+    "progress": {
+      "label": "Progress"
+    },
+    "quests": {
+      "progress": "Progress: {title}"
+    },
+    "scenario": {
+      "choices": "Your reply",
+      "complete": "Scenario complete",
+      "replay": "Play again",
+      "saving": "Saving your run…"
+    },
+    "search": {
+      "clear": "Clear search",
+      "voice": "Search by voice",
+      "voiceStop": "Stop listening"
+    },
+    "select": {
+      "countSelected": "{count} selected",
+      "none": "None selected"
+    },
+    "shell": {
+      "collapseSidebar": "Collapse sidebar",
+      "expandSidebar": "Expand sidebar",
+      "openMenu": "Open menu",
+      "primaryNav": "Primary navigation"
+    },
+    "shop": {
+      "all": "All",
+      "buy": "Buy",
+      "buyNamed": "Buy {name} for {cost} coins",
+      "empty": "Nothing here — try another rarity.",
+      "filterRarity": "Filter by rarity",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "needsLevel": "Unlocks at level {level}",
+      "notEnough": "{count, plural, one {Need # more} other {Need # more}}",
+      "owned": "Owned",
+      "preview": "Preview {name}"
+    },
+    "state": {
+      "errorCode": "Reference: {code}",
+      "errorTitle": "Something went wrong",
+      "offlineBody": "Check your connection. Downloaded lessons still work offline.",
+      "offlineTitle": "You’re offline",
+      "queued": "{count, plural, one {# completion will sync when you’re back online} other {# completions will sync when you’re back online}}",
+      "seeDownloads": "See downloads"
+    },
+    "streak": {
+      "aria": "{count, plural, one {#-day streak} other {#-day streak}}",
+      "ariaWithFreezes": "{count, plural, one {#-day streak} other {#-day streak}}, {freezes, plural, one {# freeze available} other {# freezes available}}",
+      "dayState": {
+        "completed": "{date}: completed",
+        "frozen": "{date}: saved by a freeze",
+        "missed": "{date}: missed"
+      },
+      "dayUnit": "{count, plural, one {day} other {days}}",
+      "lastDays": "Last {count} days",
+      "message": {
+        "century": "{days} days. Century streak in sight.",
+        "first": "Day 1 — keep going tomorrow!",
+        "legendary": "{days} days — legendary streak.",
+        "month": "{days} days! Aim for the 30-day mark.",
+        "start": "Start a streak today — finish one lesson.",
+        "week": "{days} days strong. {left} to your first weekly badge."
+      },
+      "title": "Your streak",
+      "useFreeze": "Use a freeze"
+    },
+    "tier": {
+      "BRONZE": "Bronze",
+      "SILVER": "Silver",
+      "GOLD": "Gold",
+      "PLATINUM": "Platinum",
+      "DIAMOND": "Diamond",
+      "MYTHIC": "Mythic",
+      "PRESTIGE": "Prestige"
+    },
+    "toast": {
+      "dismiss": "Dismiss"
+    },
+    "uploader": {
+      "browse": "Choose files",
+      "done": "Uploaded",
+      "failed": "Upload failed",
+      "maxSize": "Up to {size} per file",
+      "noBackend": "Uploads are not available here.",
+      "orDrop": "or drag and drop them here",
+      "removeItem": "Remove {name} from the list",
+      "tooLarge": "Too large (max {size})",
+      "uploading": "Uploading {name}",
+      "wrongType": "File type not allowed"
+    },
+    "xp": {
+      "toNextLevel": "XP toward next level"
+    }
+  }
+}

@@ -1,4 +1,11 @@
-import { Email, Slug, LocaleCode, Currency, HexColor, DisplayName } from './primitives.js';
+import {
+  Email,
+  Slug,
+  LocaleCode,
+  Currency,
+  HexColor,
+  DisplayName,
+} from './primitives.js';
 
 describe('Email', () => {
   it('accepts and lowercases', () => {
@@ -10,21 +17,32 @@ describe('Email', () => {
 });
 
 describe('Slug', () => {
-  it.each(['react-fundamentals', 'frontend', 'a-b-c', 'abc'])('accepts %s', (s) => {
-    expect(Slug.parse(s)).toBe(s);
-  });
-  it.each(['-leading', 'trailing-', 'double--hyphen', 'WithCaps', 'sp ace', 'ab', 'x'.repeat(61)])(
-    'rejects %s',
+  it.each(['react-fundamentals', 'frontend', 'a-b-c', 'abc'])(
+    'accepts %s',
     (s) => {
-      expect(() => Slug.parse(s)).toThrow();
+      expect(Slug.parse(s)).toBe(s);
     },
   );
+  it.each([
+    '-leading',
+    'trailing-',
+    'double--hyphen',
+    'WithCaps',
+    'sp ace',
+    'ab',
+    'x'.repeat(61),
+  ])('rejects %s', (s) => {
+    expect(() => Slug.parse(s)).toThrow();
+  });
 });
 
 describe('LocaleCode', () => {
-  it.each(['pt-BR', 'en-US', 'es-419', 'pt', 'zh-Hans-CN'])('accepts %s', (l) => {
-    expect(LocaleCode.parse(l)).toBe(l);
-  });
+  it.each(['pt-BR', 'en-US', 'es-419', 'pt', 'zh-Hans-CN'])(
+    'accepts %s',
+    (l) => {
+      expect(LocaleCode.parse(l)).toBe(l);
+    },
+  );
   it.each(['PT-BR', 'pt_BR', 'p', '123'])('rejects %s', (l) => {
     expect(() => LocaleCode.parse(l)).toThrow();
   });

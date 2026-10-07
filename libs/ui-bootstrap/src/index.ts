@@ -123,3 +123,102 @@ export {
   blockMenuItemsFromRegistry,
   type BlockMenuItem,
 } from './lib/organisms/block-menu/block-menu.js';
+
+
+// ─── Roadmap completion additions ─────────────────────────────────────────
+export { Chip, type ChipVariant } from './lib/atoms/chip/chip.js';
+export { Popover } from './lib/atoms/popover/popover.js';
+export {
+  Combobox,
+  type ComboboxOption,
+  type ComboboxSource,
+} from './lib/atoms/combobox/combobox.js';
+export {
+  Drawer,
+  type DrawerPosition,
+  type DrawerSize,
+} from './lib/molecules/drawer/drawer.js';
+export {
+  FileUploader,
+  matchesAccept,
+  type UploadItem,
+  type UploadStatus,
+} from './lib/molecules/file-uploader/file-uploader.js';
+export {
+  FILE_UPLOADER,
+  type FileUploaderBackend,
+  type UploadEvent,
+} from './lib/molecules/file-uploader/file-uploader.token.js';
+export {
+  ImageCropper,
+  type CroppedImage,
+} from './lib/molecules/image-cropper/image-cropper.js';
+export {
+  clampOffsets,
+  cropRect,
+  initialCrop,
+  minCoverScale,
+  zoomTo,
+  type CropRect,
+  type CropState,
+} from './lib/molecules/image-cropper/crop-math.js';
+export {
+  DateRangePicker,
+  isInvertedRange,
+  type DateRange,
+  type DateRangePreset,
+} from './lib/molecules/date-range-picker/date-range-picker.js';
+export {
+  AssetPicker,
+  AssetPickerDialog,
+} from './lib/molecules/asset-picker/asset-picker.js';
+export {
+  MediaLibrary,
+  assetDisplayName,
+} from './lib/organisms/media-library/media-library.js';
+export {
+  ASSET_LIBRARY,
+  ASSET_KINDS,
+  type AssetKind,
+  type AssetLibrary,
+  type AssetPage,
+  type AssetSummary,
+} from './lib/organisms/media-library/asset-library.token.js';
+export { FakeAssetLibrary } from './lib/organisms/media-library/fake-asset-library.js';
+export {
+  ItemSpritePreview,
+  type PreviewItem,
+  type ItemRarity,
+} from './lib/organisms/item-sprite-preview/item-sprite-preview.js';
+export {
+  MultiplierEditor,
+  MULTIPLIER_KINDS,
+  MULTIPLIER_MAX,
+  emptyMultiplier,
+  scopeOf,
+  validateMultiplier,
+  type MultiplierDraft,
+  type MultiplierError,
+  type MultiplierKind,
+  type MultiplierScope,
+  type MultiplierTarget,
+} from './lib/organisms/multiplier-editor/multiplier-editor.js';
+export {
+  CategoryAssignmentMatrix,
+  toggleAssignment,
+  type CategoryAssignments,
+  type MatrixCategory,
+  type MatrixPlan,
+} from './lib/organisms/category-assignment-matrix/category-assignment-matrix.js';
+export {
+  type PaginationMode,
+  type CursorPageEvent,
+} from './lib/molecules/pagination/pagination.js';
+export { applyModalInputs } from './lib/organisms/modal/modal.service.js';
+// Truly shared visual (docs/03): the same AvatarRenderer as the student app.
+export {
+  AvatarRenderer,
+  type AvatarSlot,
+  type AvatarSprite,
+  type AvatarConfigLike,
+} from '@codify/ui-ionic/avatar-renderer';

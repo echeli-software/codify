@@ -1,0 +1,129 @@
+:host {
+  display: block;
+  --rarity-common: var(--cdf-color-border);
+  --rarity-uncommon: var(--cdf-color-success);
+  --rarity-rare: var(--cdf-color-info);
+  --rarity-epic: var(--cdf-color-primary);
+  --rarity-legendary: var(--cdf-color-premium);
+}
+
+.cdf-shop {
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-2);
+    margin-bottom: var(--cdf-space-3);
+  }
+
+  &__filter {
+    padding: var(--cdf-space-1) var(--cdf-space-3);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-pill);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--cdf-color-primary);
+      border-color: var(--cdf-color-primary);
+      color: var(--cdf-color-primary-on);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    padding: var(--cdf-space-6);
+    text-align: center;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__row {
+    display: grid;
+    gap: var(--cdf-space-3);
+    padding-bottom: var(--cdf-space-3);
+    box-sizing: border-box;
+  }
+
+  &__tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    padding: var(--cdf-space-3);
+    border: 2px solid var(--rarity-common);
+    border-radius: var(--cdf-radius-lg);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    min-width: 0;
+
+    &[data-rarity='UNCOMMON'] {
+      border-color: var(--rarity-uncommon);
+    }
+
+    &[data-rarity='RARE'] {
+      border-color: var(--rarity-rare);
+    }
+
+    &[data-rarity='EPIC'] {
+      border-color: var(--rarity-epic);
+    }
+
+    &[data-rarity='LEGENDARY'] {
+      border-color: var(--rarity-legendary);
+      box-shadow: 0 0 0 3px
+        color-mix(in srgb, var(--rarity-legendary) 25%, transparent);
+    }
+  }
+
+  &__art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border: 0;
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface-elev);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__glyph {
+    font-size: 40px;
+    line-height: 1;
+  }
+
+  &__swatch {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--cdf-radius-md);
+  }
+
+  &__name {
+    margin: 0;
+    max-width: 100%;
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__rarity,
+  &__status {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+}

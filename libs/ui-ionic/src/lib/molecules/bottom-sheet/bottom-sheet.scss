@@ -1,0 +1,109 @@
+.cdf-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: var(--cdf-z-drawer);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  border-radius: var(--cdf-radius-xl) var(--cdf-radius-xl) 0 0;
+  background: var(--cdf-color-surface-elev);
+  color: var(--cdf-color-text);
+  box-shadow: var(--cdf-shadow-4);
+  animation: cdf-sheet-up var(--cdf-motion-duration-slow)
+    var(--cdf-motion-easing-decelerate);
+
+  @media (min-width: 768px) {
+    inset-inline: auto 0;
+    top: 0;
+    width: min(420px, 100vw);
+    max-height: none;
+    border-radius: 0;
+    animation-name: cdf-sheet-side;
+  }
+
+  &__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--cdf-z-drawer) - 1);
+    background: rgba(3, 7, 18, 0.45);
+  }
+
+  &__handle {
+    width: 40px;
+    height: 4px;
+    margin: var(--cdf-space-2) auto 0;
+    border-radius: var(--cdf-radius-pill);
+    background: var(--cdf-color-border);
+
+    @media (min-width: 768px) {
+      display: none;
+    }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-lg);
+    font-weight: var(--cdf-font-weight-bold);
+  }
+
+  &__close {
+    display: inline-flex;
+    padding: var(--cdf-space-2);
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cdf-color-text-muted);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 var(--cdf-space-4) var(--cdf-space-4);
+  }
+
+  &__foot {
+    display: flex;
+    gap: var(--cdf-space-2);
+    justify-content: flex-end;
+    padding: var(--cdf-space-3) var(--cdf-space-4);
+    border-top: 1px solid var(--cdf-color-border);
+
+    &:empty {
+      display: none;
+    }
+  }
+}
+
+@keyframes cdf-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes cdf-sheet-side {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdf-sheet {
+    animation: none;
+  }
+}

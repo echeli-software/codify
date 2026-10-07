@@ -9,24 +9,30 @@
 
 // Override Bootstrap defaults via the modern @use ... with API.
 @use 'bootstrap/scss/bootstrap' with (
-  $primary:           cdf.$color-primary,
-  $secondary:         cdf.$color-accent,
-  $success:           cdf.$color-success,
-  $info:              cdf.$color-info,
-  $warning:           cdf.$color-warning,
-  $danger:            cdf.$color-danger,
-  $light:             cdf.$color-bg-light,
-  $dark:              cdf.$color-text-light,
-  $body-bg:           cdf.$color-bg-light,
-  $body-color:        cdf.$color-text-light,
-  $border-color:      cdf.$color-border-light,
-  $font-family-base:  cdf.$font-family-sans,
-  $font-family-code:  cdf.$font-family-mono,
-  $border-radius-sm:  cdf.$radius-sm,
-  $border-radius:     cdf.$radius-md,
-  $border-radius-lg:  cdf.$radius-lg,
-  $border-radius-xl:  cdf.$radius-xl,
+  $primary: cdf.$color-primary,
+  $secondary: cdf.$color-accent,
+  $success: cdf.$color-success,
+  $info: cdf.$color-info,
+  $warning: cdf.$color-warning,
+  $danger: cdf.$color-danger,
+  $light: cdf.$color-bg-light,
+  $dark: cdf.$color-text-light,
+  $body-bg: cdf.$color-bg-light,
+  $body-color: cdf.$color-text-light,
+  $border-color: cdf.$color-border-light,
+  $font-family-base: cdf.$font-family-sans,
+  $font-family-code: cdf.$font-family-mono,
+  $border-radius-sm: cdf.$radius-sm,
+  $border-radius: cdf.$radius-md,
+  $border-radius-lg: cdf.$radius-lg,
+  $border-radius-xl: cdf.$radius-xl,
   $border-radius-pill: cdf.$radius-pill,
-  $spacer:            cdf.$space-4,
-  $grid-breakpoints:  cdf.$breakpoints
+  $spacer: cdf.$space-4,
+  $grid-breakpoints: cdf.$breakpoints
 );
+
+// Bootstrap colours `<code>` with a fixed pink that fails contrast on dark
+// surfaces; follow the theme-aware token instead.
+:root {
+  --bs-code-color: var(--cdf-color-danger-text);
+}

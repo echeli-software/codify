@@ -12,5 +12,8 @@ const meta: Meta<MoneyInput> = {
 export default meta;
 type Story = StoryObj<MoneyInput>;
 
-export const BRL: Story = { args: { currency: 'BRL' } };
-export const USD: Story = { args: { currency: 'USD' } };
+export const BRL: Story = { args: { currency: 'BRL', ariaLabel: 'Price' } };
+export const USD: Story = { args: { currency: 'USD', ariaLabel: 'Price' } };
+export const Invalid: Story = {
+  args: { currency: 'BRL', ariaLabel: 'Price', invalid: true },
+};

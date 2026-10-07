@@ -1,8 +1,11 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input } from '@angular/core';
 import {
-  formatCurrency,
-  formatInstallmentAmount,
-} from '@codify/ui-core';
+  Component,
+  ChangeDetectionStrategy,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
+import { formatCurrency, formatInstallmentAmount } from '@codify/ui-core';
 import { I18nService, TranslatePipe } from '@codify/i18n';
 
 export type BillingPeriod = 'monthly' | 'annual' | 'oneoff';
@@ -21,18 +24,29 @@ export type BillingPeriod = 'monthly' | 'annual' | 'oneoff';
   imports: [TranslatePipe],
   template: `
     <span class="cdf-price">
-      @switch (period()) { @case ('oneoff') {
-      <span class="cdf-price__amount">{{ formatted() }}</span>
-      } @case ('annual') {
-      <span class="cdf-price__amount">{{
-        'billing.perYear' | translate: { price: formatted() }
-      }}</span>
-      } @default {
-      <span class="cdf-price__amount">{{
-        'billing.perMonth' | translate: { price: formatted() }
-      }}</span>
-      } } @if (installmentText(); as txt) {
-      <span class="cdf-price__installments">· {{ txt }}</span>
+      @switch (period()) {
+        @case ('oneoff') {
+          <span class="cdf-price__amount">{{ formatted() }}</span>
+        }
+        @case ('annual') {
+          <span class="cdf-price__amount">{{
+            'billing.perYear' | translate: { price: formatted() }
+          }}</span>
+        }
+        @default {
+          <span class="cdf-price__amount">{{
+            'billing.perMonth' | translate: { price: formatted() }
+          }}</span>
+        }
+      }
+      @if (installmentText(); as per) {
+        <span class="cdf-price__installments"
+          >·
+          {{
+            'ui.price.installments'
+              | translate: { count: installments(), amount: per }
+          }}</span
+        >
       }
     </span>
   `,
@@ -48,7 +62,11 @@ export class PriceTag {
   private readonly i18n = inject(I18nService);
 
   protected readonly formatted = computed(() =>
-    formatCurrency(this.amountCents(), this.currency(), this.i18n.currentLocale()),
+    formatCurrency(
+      this.amountCents(),
+      this.currency(),
+      this.i18n.currentLocale(),
+    ),
   );
 
   protected readonly installmentText = computed(() => {
@@ -60,6 +78,6 @@ export class PriceTag {
       this.currency(),
       this.i18n.currentLocale(),
     );
-    return `${n}x ${per}`;
+    return per;
   });
 }

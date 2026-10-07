@@ -1,0 +1,46 @@
+:host {
+  display: block;
+}
+
+.cdf-search {
+  display: flex;
+  align-items: center;
+  gap: var(--cdf-space-1);
+
+  &__bar {
+    flex: 1;
+    padding: 0;
+    --background: var(--cdf-color-surface);
+    --color: var(--cdf-color-text);
+    --placeholder-color: var(--cdf-color-text-muted);
+    --placeholder-opacity: 1;
+    --icon-color: var(--cdf-color-text-muted);
+    --clear-button-color: var(--cdf-color-text-muted);
+    --border-radius: var(--cdf-radius-lg);
+    --box-shadow: inset 0 0 0 1px var(--cdf-color-border);
+  }
+
+  &__mic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-circle);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text-muted);
+    cursor: pointer;
+
+    &--on {
+      background: var(--cdf-color-danger);
+      border-color: var(--cdf-color-danger);
+      color: var(--cdf-color-danger-on);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+}

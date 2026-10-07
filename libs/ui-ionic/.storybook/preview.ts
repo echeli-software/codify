@@ -11,7 +11,7 @@ import { provideI18n } from '@codify/i18n';
 const preview: Preview = {
   parameters: {
     layout: 'padded',
-    a11y: { test: 'todo' },
+    a11y: { test: 'error' },
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -20,7 +20,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ['Atoms', 'Molecules', 'Organisms', 'Demo'],
+        order: ['Foundations', 'Atoms', 'Molecules', 'Organisms', 'Demo'],
       },
     },
   },

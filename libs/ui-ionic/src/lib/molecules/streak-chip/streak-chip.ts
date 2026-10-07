@@ -4,6 +4,7 @@ import {
   computed,
   input,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon } from '../../atoms/icon/icon.js';
 
 /**
@@ -17,23 +18,32 @@ import { Icon } from '../../atoms/icon/icon.js';
 @Component({
   selector: 'cdf-streak-chip',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   host: {
     '[attr.data-tier]': 'tierClass()',
     '[attr.data-cold]': 'days() === 0 ? "" : null',
   },
   template: `
-    <span class="cdf-streak" role="img" [attr.aria-label]="ariaLabel()">
+    <span
+      class="cdf-streak"
+      role="img"
+      [attr.aria-label]="
+        ((freezes() ?? 0) > 0 ? 'ui.streak.ariaWithFreezes' : 'ui.streak.aria')
+          | translate: { count: days(), freezes: freezes() ?? 0 }
+      "
+    >
       <cdf-icon name="flame" size="sm" />
       <span class="cdf-streak__days">{{ days() }}</span>
       @if (showLabel()) {
-      <span class="cdf-streak__label">{{ days() === 1 ? 'day' : 'days' }}</span>
+        <span class="cdf-streak__label">{{
+          'ui.streak.dayUnit' | translate: { count: days() }
+        }}</span>
       }
       @if ((freezes() ?? 0) > 0) {
-      <span class="cdf-streak__sep" aria-hidden="true">·</span>
-      <span class="cdf-streak__freezes" [attr.aria-label]="freezeLabel()">
-        ❄ {{ freezes() }}
-      </span>
+        <span class="cdf-streak__sep" aria-hidden="true">·</span>
+        <span class="cdf-streak__freezes" aria-hidden="true">
+          ❄ {{ freezes() }}
+        </span>
       }
     </span>
   `,
@@ -53,13 +63,4 @@ export class StreakChip {
     if (d >= 7) return 'week';
     return 'starter';
   });
-
-  protected readonly ariaLabel = computed(() => {
-    const d = this.days();
-    return `${d}-day streak`;
-  });
-
-  protected readonly freezeLabel = computed(
-    () => `${this.freezes()} freeze${(this.freezes() ?? 0) === 1 ? '' : 's'} available`,
-  );
 }

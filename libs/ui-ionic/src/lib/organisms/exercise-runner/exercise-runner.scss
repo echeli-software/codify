@@ -1,0 +1,104 @@
+:host {
+  display: block;
+}
+
+.cdf-runner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+  color: var(--cdf-color-text);
+
+  &__lang {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__label {
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__editor {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--cdf-space-3);
+    font-family: var(--cdf-font-family-mono);
+    font-size: var(--cdf-font-size-sm);
+    line-height: 1.5;
+    tab-size: 2;
+    color: #e6e6f0;
+    background: #1e1e2e;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    resize: vertical;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cdf-space-2);
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-danger-text);
+  }
+
+  &__heading {
+    margin: var(--cdf-space-2) 0 0;
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__tests {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--cdf-space-2);
+      font-size: var(--cdf-font-size-sm);
+      color: var(--cdf-color-success-text);
+    }
+  }
+
+  &__test--fail {
+    color: var(--cdf-color-danger-text) !important;
+  }
+
+  &__test-name {
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__diff {
+    font-family: var(--cdf-font-family-mono);
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__done {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    margin: var(--cdf-space-2) 0 0;
+    font-weight: var(--cdf-font-weight-bold);
+    color: var(--cdf-color-success-text);
+  }
+}

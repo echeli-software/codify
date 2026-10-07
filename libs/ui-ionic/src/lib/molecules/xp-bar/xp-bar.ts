@@ -5,7 +5,7 @@ import {
   inject,
   input,
 } from '@angular/core';
-import { I18nService } from '@codify/i18n';
+import { I18nService, TranslatePipe } from '@codify/i18n';
 import {
   formatXp,
   levelFromXp,
@@ -29,20 +29,25 @@ import { LevelBadge } from '../level-badge/level-badge.js';
 @Component({
   selector: 'cdf-xp-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AppProgressBar, LevelBadge],
+  imports: [AppProgressBar, LevelBadge, TranslatePipe],
   host: { '[attr.data-compact]': 'compact() ? "" : null' },
   template: `
     <cdf-level-badge [level]="level()" [size]="badgeSize()" />
     <div class="cdf-xp-bar__main">
       @if (!compact()) {
-      <div class="cdf-xp-bar__row">
-        <span class="cdf-xp-bar__current">{{ formattedCurrent() }}</span>
-        <span class="cdf-xp-bar__sep">/</span>
-        <span class="cdf-xp-bar__next">{{ formattedNext() }}</span>
-        <span class="cdf-xp-bar__unit">XP</span>
-      </div>
+        <div class="cdf-xp-bar__row">
+          <span class="cdf-xp-bar__current">{{ formattedCurrent() }}</span>
+          <span class="cdf-xp-bar__sep">/</span>
+          <span class="cdf-xp-bar__next">{{ formattedNext() }}</span>
+          <span class="cdf-xp-bar__unit">XP</span>
+        </div>
       }
-      <cdf-app-progress-bar [value]="progressPct()" variant="xp" size="md" label="XP toward next level" />
+      <cdf-app-progress-bar
+        [value]="progressPct()"
+        variant="xp"
+        size="md"
+        [label]="'ui.xp.toNextLevel' | translate"
+      />
     </div>
   `,
   styleUrl: './xp-bar.scss',
@@ -56,7 +61,9 @@ export class XpBar {
   protected readonly level = computed(() => levelFromXp(this.xp()));
   protected readonly progressPct = computed(() => levelProgressPct(this.xp()));
   protected readonly remaining = computed(() => xpToNextLevel(this.xp()));
-  protected readonly nextThreshold = computed(() => xpForLevel(this.level() + 1));
+  protected readonly nextThreshold = computed(() =>
+    xpForLevel(this.level() + 1),
+  );
 
   protected readonly formattedCurrent = computed(() =>
     formatXp(this.xp(), this.i18n.currentLocale()),

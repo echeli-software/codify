@@ -23,8 +23,10 @@
     color: var(--flame-color);
   }
 
+  // Numerals stay on the text colour (the flame icon carries the tier
+  // colour) so the count meets 4.5:1 on every tinted background.
   &__days {
-    color: var(--flame-color);
+    color: var(--cdf-color-text);
   }
 
   &__label,
@@ -34,7 +36,7 @@
   }
 
   &__freezes {
-    color: #38bdf8;
+    color: var(--cdf-color-text);
     font-weight: var(--cdf-font-weight-medium);
   }
 }
@@ -51,20 +53,26 @@
   --border: rgba(220, 38, 38, 0.35);
 
   .cdf-streak {
-    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.2),
-                0 0 12px rgba(220, 38, 38, 0.15);
+    box-shadow:
+      0 0 0 1px rgba(220, 38, 38, 0.2),
+      0 0 12px rgba(220, 38, 38, 0.15);
   }
 }
 
 :host([data-tier='century']),
 :host([data-tier='year']) {
   --flame-color: var(--cdf-color-premium);
-  --bg: linear-gradient(90deg, rgba(212, 175, 55, 0.18), rgba(249, 115, 22, 0.18));
+  --bg: linear-gradient(
+    90deg,
+    rgba(212, 175, 55, 0.18),
+    rgba(249, 115, 22, 0.18)
+  );
   --border: rgba(212, 175, 55, 0.5);
 
   .cdf-streak {
-    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.3),
-                0 0 16px rgba(249, 115, 22, 0.2);
+    box-shadow:
+      0 0 0 1px rgba(212, 175, 55, 0.3),
+      0 0 16px rgba(249, 115, 22, 0.2);
   }
 }
 

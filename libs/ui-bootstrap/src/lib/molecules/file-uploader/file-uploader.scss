@@ -1,0 +1,125 @@
+:host {
+  display: block;
+}
+
+.cdf-uploader {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--cdf-space-2);
+  padding: var(--cdf-space-6) var(--cdf-space-4);
+  text-align: center;
+  border: 2px dashed var(--cdf-color-border);
+  border-radius: var(--cdf-radius-lg);
+  background: var(--cdf-color-surface);
+  color: var(--cdf-color-text);
+  transition:
+    border-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard),
+    background var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
+
+  &:focus-within {
+    border-color: var(--cdf-color-primary);
+    box-shadow: var(--cdf-shadow-focus-ring);
+  }
+
+  &--over {
+    border-color: var(--cdf-color-primary);
+    background: var(--cdf-color-primary-subtle);
+  }
+
+  &--disabled {
+    opacity: 0.55;
+  }
+
+  &__icon {
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__label {
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+  }
+
+  &__cta {
+    color: var(--cdf-color-primary-text);
+    font-weight: var(--cdf-font-weight-semibold);
+    text-decoration: underline;
+  }
+
+  // Visually hidden but focusable: the label is the visible target.
+  &__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  &__error {
+    margin: var(--cdf-space-2) 0 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-danger-text);
+  }
+
+  &__list {
+    list-style: none;
+    margin: var(--cdf-space-3) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-2);
+  }
+
+  &__item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface);
+    font-size: var(--cdf-font-size-sm);
+
+    &--done {
+      border-color: var(--cdf-color-success);
+    }
+
+    &--error,
+    &--rejected {
+      border-color: var(--cdf-color-danger);
+    }
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__size,
+  &__status {
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-xs);
+  }
+
+  &__status--error {
+    color: var(--cdf-color-danger-text);
+  }
+
+  &__progress {
+    grid-column: 1 / -1;
+  }
+}

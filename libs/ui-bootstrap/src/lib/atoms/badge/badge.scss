@@ -25,31 +25,31 @@
   }
   &--success {
     background: var(--cdf-color-success);
-    color: #fff;
+    color: var(--cdf-color-success-on);
   }
   &--warning {
     background: var(--cdf-color-warning);
-    color: #000;
+    color: var(--cdf-color-warning-on);
   }
   &--danger {
     background: var(--cdf-color-danger);
-    color: #fff;
+    color: var(--cdf-color-danger-on);
   }
   &--info {
     background: var(--cdf-color-info);
-    color: #fff;
+    color: var(--cdf-color-info-on);
   }
   &--coin {
     background: var(--cdf-color-coin);
-    color: #000;
+    color: var(--cdf-color-coin-on);
   }
   &--xp {
     background: var(--cdf-color-xp);
-    color: #fff;
+    color: var(--cdf-color-xp-on);
   }
   &--premium {
     background: var(--cdf-color-premium);
-    color: #000;
+    color: var(--cdf-color-premium-on);
   }
 
   // Subtle variants — muted background, colored text
@@ -63,25 +63,25 @@
       border-color: transparent;
     }
     &.cdf-badge--success {
-      color: var(--cdf-color-success);
+      color: var(--cdf-color-success-text);
     }
     &.cdf-badge--warning {
-      color: var(--cdf-color-warning);
+      color: var(--cdf-color-warning-text);
     }
     &.cdf-badge--danger {
-      color: var(--cdf-color-danger);
+      color: var(--cdf-color-danger-text);
     }
     &.cdf-badge--info {
-      color: var(--cdf-color-info);
+      color: var(--cdf-color-info-text);
     }
     &.cdf-badge--coin {
-      color: var(--cdf-color-coin);
+      color: var(--cdf-color-coin-text);
     }
     &.cdf-badge--xp {
-      color: var(--cdf-color-xp);
+      color: var(--cdf-color-xp-text);
     }
     &.cdf-badge--premium {
-      color: var(--cdf-color-premium);
+      color: var(--cdf-color-premium-text);
     }
     &.cdf-badge--neutral {
       color: var(--cdf-color-text-muted);

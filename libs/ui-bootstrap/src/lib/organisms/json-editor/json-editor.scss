@@ -20,8 +20,10 @@
     resize: vertical;
     tab-size: 2;
     transition:
-      border-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
-      box-shadow var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
+      border-color var(--cdf-motion-duration-fast)
+        var(--cdf-motion-easing-standard),
+      box-shadow var(--cdf-motion-duration-fast)
+        var(--cdf-motion-easing-standard);
 
     &:focus-visible {
       outline: none;
@@ -39,7 +41,7 @@
   &__error {
     margin: var(--cdf-space-1) 0 0;
     font-size: var(--cdf-font-size-xs);
-    color: var(--cdf-color-danger);
+    color: var(--cdf-color-danger-text);
     font-weight: var(--cdf-font-weight-medium);
     font-family: var(--cdf-font-family-mono);
   }

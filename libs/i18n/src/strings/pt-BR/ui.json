@@ -1,0 +1,346 @@
+{
+  "ui": {
+    "aiPrompt": {
+      "answer": "Sua resposta",
+      "attempts": "Tentativa {used} de {max}",
+      "cached": "Avaliada antes",
+      "passed": "Mandou bem — rubrica atendida!",
+      "placeholder": "Escreva sua resposta…",
+      "rubric": "Rubrica",
+      "scoreKeepGoing": "{score}% · continue (aprova com {threshold}%)",
+      "scorePassed": "{score}% · aprovado",
+      "state": {
+        "idle": "Ainda não avaliado",
+        "pass": "Atendido",
+        "fail": "Não atendido"
+      },
+      "submit": "Enviar",
+      "words": "{count, plural, one {# palavra} other {# palavras}}"
+    },
+    "assetPicker": {
+      "change": "Trocar…",
+      "choose": "Escolher…",
+      "dialogTitle": "Escolha um arquivo",
+      "none": "Nenhum arquivo selecionado",
+      "use": "Usar este arquivo"
+    },
+    "avatar": {
+      "label": "Avatar",
+      "wearing": "Avatar usando {items}"
+    },
+    "avatarBuilder": {
+      "none": "Nenhum",
+      "reset": "Desfazer",
+      "slots": "Partes do avatar",
+      "unsaved": "Alterações não salvas"
+    },
+    "breadcrumb": {
+      "label": "Trilha de navegação"
+    },
+    "celebration": {
+      "awesome": "Demais!"
+    },
+    "coins": {
+      "total": "{count, plural, one {# moeda} other {# moedas}}",
+      "unit": "{count, plural, one {moeda} other {moedas}}"
+    },
+    "combobox": {
+      "noResults": "Nenhum resultado"
+    },
+    "confirm": {
+      "typeToConfirm": "Digite “{value}” para confirmar"
+    },
+    "course": {
+      "byAuthor": "por {author}",
+      "lessons": "{count, plural, one {# aula} other {# aulas}}"
+    },
+    "coursePreview": {
+      "close": "Fechar prévia",
+      "curriculum": "Conteúdo do curso",
+      "moreLessons": "{count, plural, one {+# aula} other {+# aulas}}",
+      "start": "Começar curso",
+      "unlock": "Desbloquear com Premium"
+    },
+    "cropper": {
+      "apply": "Aplicar recorte",
+      "area": "Área de recorte",
+      "empty": "Nenhuma imagem selecionada",
+      "help": "Arraste ou use as setas para mover a imagem; use o controle ou + e − para dar zoom.",
+      "reset": "Restaurar",
+      "zoom": "Zoom"
+    },
+    "dataTable": {
+      "actions": "Ações",
+      "empty": "Nenhum item.",
+      "selectAll": "Selecionar todas as linhas",
+      "selectRow": "Selecionar linha {index}"
+    },
+    "dateRange": {
+      "clear": "Limpar datas",
+      "end": "Fim",
+      "invalid": "O fim precisa ser depois do início.",
+      "presetMonth": "Próximos 30 dias",
+      "presetWeek": "Próximos 7 dias",
+      "presetWeekend": "Este fim de semana",
+      "presets": "Períodos rápidos",
+      "start": "Início"
+    },
+    "duration": {
+      "hours": "{h} h",
+      "hoursMinutes": "{h} h {m} min",
+      "minutes": "{m} min"
+    },
+    "exercise": {
+      "diff": "recebido {actual}, esperado {expected}",
+      "editor": "Seu código",
+      "failed": "Falhou",
+      "passed": "Passou",
+      "reset": "Restaurar código",
+      "run": "Executar",
+      "signature": "{language} · função {fn}",
+      "solved": "Resolvido! Todos os testes passaram.",
+      "submit": "Enviar",
+      "testsSummary": "{passed} de {total} testes passando",
+      "verdict": "{verdict} · {score}%"
+    },
+    "inventory": {
+      "empty": "Você ainda não tem itens — passe na loja!",
+      "equip": "Equipar",
+      "equipped": "Equipado"
+    },
+    "item": {
+      "cost": "{value, plural, one {# moeda} other {# moedas}}",
+      "itemOnly": "Só o item",
+      "onAvatar": "No avatar",
+      "previewMode": "Modo de prévia",
+      "rarity": {
+        "COMMON": "Comum",
+        "UNCOMMON": "Incomum",
+        "RARE": "Raro",
+        "EPIC": "Épico",
+        "LEGENDARY": "Lendário"
+      },
+      "slot": {
+        "PET": "Pet",
+        "BACKGROUND": "Fundo",
+        "TOP": "Parte de cima",
+        "BOTTOM": "Parte de baixo",
+        "SHOES": "Calçados",
+        "HAT": "Chapéu",
+        "HAIR": "Cabelo",
+        "GLASSES": "Óculos",
+        "ACCESSORY": "Acessório",
+        "FRAME": "Moldura",
+        "EMOTE": "Emote"
+      },
+      "untitled": "Item sem nome"
+    },
+    "leaderboard": {
+      "demote": "Zona de rebaixamento",
+      "promote": "Zona de promoção",
+      "rows": "{count, plural, one {# aluno} other {# alunos}}",
+      "title": "Classificação da liga",
+      "you": "Sua posição",
+      "youShort": "você"
+    },
+    "lesson": {
+      "status": {
+        "not-started": "Não iniciada",
+        "in-progress": "Em andamento",
+        "completed": "Concluída",
+        "locked": "Bloqueada"
+      }
+    },
+    "level": {
+      "aria": "Nível {level}, categoria {tier}"
+    },
+    "levelUp": {
+      "toNext": "{xp} XP para o nível {level}"
+    },
+    "matrix": {
+      "allCategories": "Todas",
+      "caption": "Categorias incluídas em cada plano",
+      "category": "Categoria",
+      "count": "{count} de {total}",
+      "include": "Incluir {category} no plano {plan}",
+      "noCategories": "Nenhuma categoria ainda.",
+      "total": "Incluídas"
+    },
+    "media": {
+      "empty": "Nenhum arquivo ainda — envie um acima.",
+      "filterKind": "Filtrar por tipo",
+      "kind": {
+        "ALL": "Todos os tipos",
+        "IMAGE": "Imagens",
+        "SPRITE": "Sprites",
+        "COVER": "Capas",
+        "OTHER": "Outros arquivos"
+      },
+      "loadFailed": "Não foi possível carregar a biblioteca de mídia.",
+      "loadMore": "Carregar mais",
+      "noBackend": "A biblioteca de mídia não está disponível aqui.",
+      "title": "Biblioteca de mídia"
+    },
+    "multiplier": {
+      "active": "Ativo",
+      "course": "Curso",
+      "description": "Observação interna",
+      "errors": {
+        "courseRequired": "Escolha um curso.",
+        "lessonRequired": "Escolha uma aula.",
+        "streakDaysRequired": "Defina a ofensiva mínima (dias).",
+        "valueRange": "Use um fator entre 0,1 e {max}."
+      },
+      "kind": "Tipo",
+      "lesson": "Aula",
+      "schedule": "Período de vigência",
+      "scheduleHint": "Deixe vazio para um multiplicador sempre ativo.",
+      "scope": "Vale para",
+      "scopes": {
+        "global": "Tudo",
+        "course": "Um curso",
+        "lesson": "Uma aula"
+      },
+      "streakDaysMin": "Ofensiva mínima (dias)",
+      "summary": "×{value} em {target} para {scope}",
+      "target": "Impulsiona",
+      "targets": {
+        "BOTH": "XP e moedas",
+        "XP": "XP",
+        "COINS": "Moedas"
+      },
+      "value": "Fator"
+    },
+    "onboarding": {
+      "carousel": "carrossel",
+      "getStarted": "Vamos lá",
+      "label": "Boas-vindas ao Codify",
+      "slide": "slide",
+      "slideOf": "{index} de {total}"
+    },
+    "pagination": {
+      "label": "Paginação",
+      "next": "Próxima página",
+      "page": "Página {page}",
+      "previous": "Página anterior"
+    },
+    "paywall": {
+      "cadence": {
+        "monthly": "Mensal",
+        "yearly": "Anual"
+      },
+      "close": "Fechar",
+      "plans": "Planos",
+      "reason": {
+        "courseLocked": "Desbloqueie o curso completo",
+        "featureLocked": "Recurso Premium",
+        "lessonLocked": "Esta aula é Premium",
+        "limitReached": "Você atingiu o limite grátis de hoje",
+        "soft": "Vá além com o Premium"
+      }
+    },
+    "plan": {
+      "includes": "Inclui",
+      "recommended": "Recomendado"
+    },
+    "price": {
+      "installments": "ou {count}x de {amount}",
+      "was": "De"
+    },
+    "progress": {
+      "label": "Progresso"
+    },
+    "quests": {
+      "progress": "Progresso: {title}"
+    },
+    "scenario": {
+      "choices": "Sua resposta",
+      "complete": "Cenário concluído",
+      "replay": "Jogar de novo",
+      "saving": "Salvando sua jogada…"
+    },
+    "search": {
+      "clear": "Limpar busca",
+      "voice": "Buscar por voz",
+      "voiceStop": "Parar de ouvir"
+    },
+    "select": {
+      "countSelected": "{count} selecionados",
+      "none": "Nenhum selecionado"
+    },
+    "shell": {
+      "collapseSidebar": "Recolher menu lateral",
+      "expandSidebar": "Expandir menu lateral",
+      "openMenu": "Abrir menu",
+      "primaryNav": "Navegação principal"
+    },
+    "shop": {
+      "all": "Todos",
+      "buy": "Comprar",
+      "buyNamed": "Comprar {name} por {cost} moedas",
+      "empty": "Nada por aqui — tente outra raridade.",
+      "filterRarity": "Filtrar por raridade",
+      "items": "{count, plural, one {# item} other {# itens}}",
+      "needsLevel": "Libera no nível {level}",
+      "notEnough": "{count, plural, one {Falta # moeda} other {Faltam # moedas}}",
+      "owned": "Já é seu",
+      "preview": "Ver {name}"
+    },
+    "state": {
+      "errorCode": "Referência: {code}",
+      "errorTitle": "Algo deu errado",
+      "offlineBody": "Verifique sua conexão. As aulas baixadas continuam funcionando offline.",
+      "offlineTitle": "Você está offline",
+      "queued": "{count, plural, one {# conclusão será sincronizada quando você voltar} other {# conclusões serão sincronizadas quando você voltar}}",
+      "seeDownloads": "Ver downloads"
+    },
+    "streak": {
+      "aria": "{count, plural, one {Ofensiva de # dia} other {Ofensiva de # dias}}",
+      "ariaWithFreezes": "{count, plural, one {Ofensiva de # dia} other {Ofensiva de # dias}}, {freezes, plural, one {# proteção disponível} other {# proteções disponíveis}}",
+      "dayState": {
+        "completed": "{date}: concluído",
+        "frozen": "{date}: salvo por uma proteção",
+        "missed": "{date}: perdido"
+      },
+      "dayUnit": "{count, plural, one {dia} other {dias}}",
+      "lastDays": "Últimos {count} dias",
+      "message": {
+        "century": "{days} dias. A ofensiva de 100 está chegando.",
+        "first": "Dia 1 — continue amanhã!",
+        "legendary": "{days} dias — ofensiva lendária.",
+        "month": "{days} dias! Mire nos 30 dias.",
+        "start": "Comece uma ofensiva hoje — conclua uma aula.",
+        "week": "{days} dias seguidos. Faltam {left} para sua primeira conquista semanal."
+      },
+      "title": "Sua ofensiva",
+      "useFreeze": "Usar uma proteção"
+    },
+    "tier": {
+      "BRONZE": "Bronze",
+      "SILVER": "Prata",
+      "GOLD": "Ouro",
+      "PLATINUM": "Platina",
+      "DIAMOND": "Diamante",
+      "MYTHIC": "Mítico",
+      "PRESTIGE": "Prestígio"
+    },
+    "toast": {
+      "dismiss": "Dispensar"
+    },
+    "uploader": {
+      "browse": "Escolher arquivos",
+      "done": "Enviado",
+      "failed": "Falha no envio",
+      "maxSize": "Até {size} por arquivo",
+      "noBackend": "Envios não estão disponíveis aqui.",
+      "orDrop": "ou arraste e solte aqui",
+      "removeItem": "Remover {name} da lista",
+      "tooLarge": "Grande demais (máx. {size})",
+      "uploading": "Enviando {name}",
+      "wrongType": "Tipo de arquivo não permitido"
+    },
+    "xp": {
+      "toNextLevel": "XP para o próximo nível"
+    }
+  }
+}

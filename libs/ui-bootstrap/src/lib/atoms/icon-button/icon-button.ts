@@ -22,6 +22,9 @@ import type { ButtonKind, ButtonSize } from '../button/button.js';
       [disabled]="disabled()"
       [attr.aria-label]="ariaLabel()"
       [attr.aria-pressed]="pressed() ?? null"
+      [attr.aria-expanded]="ariaExpanded() ?? null"
+      [attr.aria-controls]="ariaControls()"
+      [attr.aria-haspopup]="ariaHaspopup()"
     >
       <cdf-icon [name]="icon()" [size]="iconSize()" />
     </button>
@@ -36,6 +39,11 @@ export class IconButton {
   readonly disabled = input(false);
   /** Optional toggle state (for buttons that toggle on/off). */
   readonly pressed = input<boolean | null>(null);
+  /** Disclosure state for buttons that open a menu / drawer / panel. */
+  readonly ariaExpanded = input<boolean | null>(null);
+  /** Id of the element this button controls. */
+  readonly ariaControls = input<string | null>(null);
+  readonly ariaHaspopup = input<string | null>(null);
 
   protected readonly iconSize = computed<'sm' | 'md' | 'lg'>(() => {
     const s = this.size();
@@ -45,7 +53,11 @@ export class IconButton {
   });
 
   protected readonly cssClass = computed(() => {
-    const cls = ['cdf-icon-button', `cdf-icon-button--${this.kind()}`, `cdf-icon-button--${this.size()}`];
+    const cls = [
+      'cdf-icon-button',
+      `cdf-icon-button--${this.kind()}`,
+      `cdf-icon-button--${this.size()}`,
+    ];
     if (this.pressed() === true) cls.push('cdf-icon-button--pressed');
     return cls.join(' ');
   });

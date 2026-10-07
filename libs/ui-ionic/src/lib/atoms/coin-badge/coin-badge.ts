@@ -1,5 +1,11 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input } from '@angular/core';
-import { I18nService } from '@codify/i18n';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
+import { I18nService, TranslatePipe } from '@codify/i18n';
 import { formatCoins, formatCompact } from '@codify/ui-core';
 
 /**
@@ -13,6 +19,7 @@ import { formatCoins, formatCompact } from '@codify/ui-core';
 @Component({
   selector: 'cdf-coin-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   host: {
     '[attr.data-size]': 'size()',
     '[attr.data-tone]': 'tone()',
@@ -21,7 +28,9 @@ import { formatCoins, formatCompact } from '@codify/ui-core';
     <span class="cdf-coin-badge__icon" aria-hidden="true"></span>
     <span class="cdf-coin-badge__value">{{ formatted() }}</span>
     @if (showLabel()) {
-    <span class="cdf-coin-badge__label">{{ unitLabel() }}</span>
+      <span class="cdf-coin-badge__label">{{
+        'ui.coins.unit' | translate: { count: value() }
+      }}</span>
     }
   `,
   styleUrl: './coin-badge.scss',
@@ -44,8 +53,4 @@ export class CoinBadge {
     }
     return this.compact() ? formatCompact(v, locale) : formatCoins(v, locale);
   });
-
-  protected readonly unitLabel = computed(() =>
-    Math.abs(this.value()) === 1 ? 'coin' : 'coins',
-  );
 }

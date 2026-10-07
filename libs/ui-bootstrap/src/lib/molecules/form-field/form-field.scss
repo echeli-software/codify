@@ -18,7 +18,7 @@
   }
 
   &__required {
-    color: var(--cdf-color-danger);
+    color: var(--cdf-color-danger-text);
     font-weight: var(--cdf-font-weight-bold);
   }
 
@@ -35,7 +35,7 @@
   &__error {
     margin: 0;
     font-size: var(--cdf-font-size-xs);
-    color: var(--cdf-color-danger);
+    color: var(--cdf-color-danger-text);
     font-weight: var(--cdf-font-weight-medium);
   }
 }
