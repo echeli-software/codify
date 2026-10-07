@@ -21,6 +21,7 @@ import enBilling from '../strings/en-US/billing.json' with { type: 'json' };
 import enUi from '../strings/en-US/ui.json' with { type: 'json' };
 import enAdmin from '../strings/en-US/admin.json' with { type: 'json' };
 import enStudent from '../strings/en-US/student.json' with { type: 'json' };
+import enStudentPlatform from '../strings/en-US/student-platform.json' with { type: 'json' };
 
 import ptCommon from '../strings/pt-BR/common.json' with { type: 'json' };
 import ptGamification from '../strings/pt-BR/gamification.json' with { type: 'json' };
@@ -29,6 +30,7 @@ import ptBilling from '../strings/pt-BR/billing.json' with { type: 'json' };
 import ptUi from '../strings/pt-BR/ui.json' with { type: 'json' };
 import ptAdmin from '../strings/pt-BR/admin.json' with { type: 'json' };
 import ptStudent from '../strings/pt-BR/student.json' with { type: 'json' };
+import ptStudentPlatform from '../strings/pt-BR/student-platform.json' with { type: 'json' };
 
 /**
  * JSON modules arrive as the object itself (bundlers, esModuleInterop) or
@@ -54,6 +56,7 @@ export const TRANSLATION_BUNDLES: Readonly<Record<Locale, TranslationObject>> =
       enUi,
       enAdmin,
       enStudent,
+      enStudentPlatform,
     ),
     'pt-BR': mergeAll(
       ptCommon,
@@ -63,6 +66,7 @@ export const TRANSLATION_BUNDLES: Readonly<Record<Locale, TranslationObject>> =
       ptUi,
       ptAdmin,
       ptStudent,
+      ptStudentPlatform,
     ),
   };
 
