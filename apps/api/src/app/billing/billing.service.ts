@@ -1,44 +1,57 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Subscription } from '@prisma/client';
-import { subscriptionGrantsAccess } from '@codify/domain';
+import type { Prisma, Subscription } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
+import { AccessService } from './access.service.js';
 import {
   BILLING_PROVIDER,
-  decodeDevSession,
+  DevBillingProvider,
+  isRecurringStripeSubscriptionId,
   type BillingProvider,
+  type SubscriptionSnapshot,
 } from './billing.provider.js';
 import type {
+  ChangeSubscriptionDto,
   CheckoutSessionResponse,
   CreateCheckoutDto,
   MySubscriptionResponse,
   PortalResponse,
   SubscriptionResponse,
 } from './billing.dto.js';
-
-const DAY_MS = 86_400_000;
+import {
+  addBillingPeriod,
+  addDays,
+  toSubscriptionResponse,
+} from './subscription-view.js';
 
 function studentAppUrl(): string {
   return process.env['STUDENT_APP_URL'] ?? 'http://localhost:4202';
 }
 
+/** Statuses a user can still cancel / resume (the subscription is live). */
+const LIVE_STATUSES = ['TRIALING', 'ACTIVE', 'PAST_DUE'] as const;
+
+type SubscriptionWithPlan = Subscription & { plan: { name: string } };
+
 /**
  * Subscription lifecycle from the app's side: start a checkout, open the
- * customer portal, and read the user's current subscription state. In dev
- * mode the checkout is completed locally via `completeDevCheckout` (which
- * stands in for the Stripe webhook); in Stripe mode the webhook handler
- * (Phase 6e) creates the Subscription row instead.
+ * customer portal, read state, and cancel/resume (docs/09 §5 — cancel at
+ * period end, single confirm, no win-back flow). In dev mode the checkout
+ * is completed locally via `completeDevCheckout` (which stands in for the
+ * Stripe webhook); in Stripe mode the webhook creates the Subscription row.
  */
 @Injectable()
 export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly access: AccessService,
     @Inject(BILLING_PROVIDER) private readonly billing: BillingProvider,
   ) {}
 
@@ -50,19 +63,39 @@ export class BillingService {
       where: { id: dto.planPriceId },
       include: { plan: true },
     });
-    if (!price || price.plan.deletedAt || !price.plan.isActive) {
+    if (
+      !price ||
+      !price.isActive ||
+      price.plan.deletedAt ||
+      !price.plan.isActive
+    ) {
       throw new NotFoundException('Plan price not found');
     }
+    const paymentMethod = dto.paymentMethod ?? 'card';
+    if (
+      paymentMethod !== 'card' &&
+      (price.period !== 'ANNUAL' || price.currency.toUpperCase() !== 'BRL')
+    ) {
+      // docs/09 §4: PIX / Boleto are one-shot annual prepay (no recurring charge).
+      throw new BadRequestException(
+        'PIX and Boleto are only available for the BRL annual plan',
+      );
+    }
 
-    const successUrl = dto.successUrl ?? `${studentAppUrl()}/billing/success`;
-    const cancelUrl = dto.cancelUrl ?? `${studentAppUrl()}/subscription`;
+    const known = await this.prisma.subscription.findFirst({
+      where: { userId: actor.userId, stripeCustomerId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { stripeCustomerId: true },
+    });
 
     const session = await this.billing.createCheckoutSession({
       user: { id: actor.userId, email: actor.email },
+      customerId: known?.stripeCustomerId ?? null,
       plan: {
         id: price.plan.id,
         name: price.plan.name,
         trialDays: price.plan.trialDays,
+        stripeProductId: price.plan.stripeProductId,
       },
       price: {
         id: price.id,
@@ -72,9 +105,9 @@ export class BillingService {
         period: price.period,
         maxInstallments: price.maxInstallments,
       },
-      paymentMethod: dto.paymentMethod ?? 'card',
-      successUrl,
-      cancelUrl,
+      paymentMethod,
+      successUrl: dto.successUrl ?? `${studentAppUrl()}/billing/success`,
+      cancelUrl: dto.cancelUrl ?? `${studentAppUrl()}/subscription`,
     });
 
     return {
@@ -89,14 +122,11 @@ export class BillingService {
     returnUrl?: string,
   ): Promise<PortalResponse> {
     const sub = await this.prisma.subscription.findFirst({
-      where: { userId: actor.userId },
+      where: { userId: actor.userId, stripeCustomerId: { not: null } },
       orderBy: { createdAt: 'desc' },
     });
-    if (!sub) throw new NotFoundException('No subscription to manage');
-    if (!sub.stripeCustomerId) {
-      throw new BadRequestException(
-        'This subscription is managed by the app store, not the billing portal',
-      );
+    if (!sub?.stripeCustomerId) {
+      throw new NotFoundException('No web billing account to manage');
     }
     return this.billing.createPortalSession({
       user: { id: actor.userId },
@@ -106,13 +136,18 @@ export class BillingService {
   }
 
   async getMySubscriptions(actor: ApiUser): Promise<MySubscriptionResponse> {
-    const subs = await this.prisma.subscription.findMany({
-      where: { userId: actor.userId },
-      include: { plan: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [subs, grace] = await Promise.all([
+      this.prisma.subscription.findMany({
+        where: { userId: actor.userId },
+        include: { plan: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.access.pastDueGraceDays(),
+    ]);
     const now = new Date();
-    const items = subs.map((s) => toSubscriptionResponse(s, s.plan.name, now));
+    const items = subs.map((s) =>
+      toSubscriptionResponse(s, s.plan.name, now, grace),
+    );
     const activePlanIds = [
       ...new Set(items.filter((i) => i.grantsAccess).map((i) => i.planId)),
     ];
@@ -122,89 +157,230 @@ export class BillingService {
   /**
    * Dev-mode completion of a checkout session — the local stand-in for the
    * Stripe `checkout.session.completed` + `customer.subscription.created`
-   * webhooks. Idempotent on the synthesized stripeSubscriptionId.
+   * webhooks. The session id is HMAC-signed by the dev provider, so it
+   * can't be forged for another plan/period. Idempotent per (user, plan).
    */
   async completeDevCheckout(
     actor: ApiUser,
     sessionId: string,
   ): Promise<SubscriptionResponse> {
-    if (this.billing.mode !== 'dev') {
+    if (!(this.billing instanceof DevBillingProvider)) {
       throw new ForbiddenException(
         'Dev checkout completion is disabled outside dev mode',
       );
     }
-    const payload = decodeDevSession(sessionId);
+    const payload = this.billing.verifySession(sessionId);
     if (!payload) throw new BadRequestException('Invalid dev session id');
     if (payload.userId !== actor.userId) {
       throw new ForbiddenException('Session belongs to a different user');
     }
 
-    const plan = await this.prisma.plan.findFirst({
-      where: { id: payload.planId, deletedAt: null },
-      select: { id: true, name: true },
+    const price = await this.prisma.planPrice.findFirst({
+      where: {
+        id: payload.priceId,
+        planId: payload.planId,
+        plan: { deletedAt: null },
+      },
+      include: { plan: { select: { name: true } } },
     });
-    if (!plan) throw new NotFoundException('Plan not found');
+    if (!price) throw new NotFoundException('Plan not found');
 
     const now = new Date();
-    const periodMs = payload.period === 'ANNUAL' ? 365 * DAY_MS : 30 * DAY_MS;
-    const trialing = payload.trialDays > 0;
-    const trialEndsAt = trialing
-      ? new Date(now.getTime() + payload.trialDays * DAY_MS)
-      : null;
-    // Deterministic per (user, plan) so re-completing the same checkout is a no-op upsert.
-    const stripeSubscriptionId = `sub_dev_${payload.userId.replace(/-/g, '').slice(0, 12)}_${payload.planId
-      .replace(/-/g, '')
-      .slice(0, 12)}`;
+    const short = (id: string) => id.replace(/-/g, '').slice(0, 12);
     const stripeCustomerId = `cus_dev_${payload.userId.replace(/-/g, '').slice(0, 16)}`;
+    const prepaid = payload.paymentMethod !== 'card';
 
-    const sub = await this.prisma.subscription.upsert({
-      where: { stripeSubscriptionId },
-      create: {
-        userId: payload.userId,
+    let data: Omit<
+      Prisma.SubscriptionUncheckedCreateInput,
+      'userId' | 'stripeSubscriptionId'
+    >;
+    let stripeSubscriptionId: string;
+    if (prepaid) {
+      // Mirrors the PIX/Boleto webhook path: a non-renewing paid period.
+      stripeSubscriptionId = `cs_dev_prepaid_${short(payload.userId)}_${short(payload.planId)}`;
+      data = {
         planId: payload.planId,
         source: 'STRIPE_WEB',
-        stripeSubscriptionId,
+        stripeCustomerId,
+        status: 'ACTIVE',
+        currentPeriodStart: now,
+        currentPeriodEnd: addBillingPeriod(now, price.period),
+        cancelAtPeriodEnd: true,
+        canceledAt: null,
+        trialEndsAt: null,
+        pastDueSince: null,
+      };
+    } else {
+      // Deterministic per (user, plan) so re-completing is a no-op upsert.
+      stripeSubscriptionId = `sub_dev_${short(payload.userId)}_${short(payload.planId)}`;
+      const trialing = payload.trialDays > 0;
+      data = {
+        planId: payload.planId,
+        source: 'STRIPE_WEB',
         stripeCustomerId,
         status: trialing ? 'TRIALING' : 'ACTIVE',
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + periodMs),
-        trialEndsAt,
-      },
-      update: {
-        planId: payload.planId,
-        status: trialing ? 'TRIALING' : 'ACTIVE',
-        currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + periodMs),
+        currentPeriodEnd: trialing
+          ? addDays(now, payload.trialDays)
+          : addBillingPeriod(now, price.period),
         cancelAtPeriodEnd: false,
         canceledAt: null,
-        trialEndsAt,
+        trialEndsAt: trialing ? addDays(now, payload.trialDays) : null,
+        pastDueSince: null,
+      };
+    }
+
+    const sub = await this.prisma.subscription.upsert({
+      where: { stripeSubscriptionId },
+      create: { ...data, userId: payload.userId, stripeSubscriptionId },
+      update: data,
+    });
+    return toSubscriptionResponse(
+      sub,
+      price.plan.name,
+      now,
+      await this.access.pastDueGraceDays(),
+    );
+  }
+
+  /** Self-serve cancel: turn auto-renew off; access continues to period end. */
+  async cancelMine(
+    actor: ApiUser,
+    dto: ChangeSubscriptionDto,
+  ): Promise<SubscriptionResponse> {
+    const sub = await this.findOwnLive(actor.userId, dto.subscriptionId, false);
+    assertWebManaged(sub);
+    const updated = sub.cancelAtPeriodEnd
+      ? sub
+      : await this.setCancelAtPeriodEnd(sub, true);
+    return this.view(updated, sub.plan.name);
+  }
+
+  /** Undo a pending cancellation while the paid period is still running. */
+  async resumeMine(
+    actor: ApiUser,
+    dto: ChangeSubscriptionDto,
+  ): Promise<SubscriptionResponse> {
+    const sub = await this.findOwnLive(actor.userId, dto.subscriptionId, true);
+    assertWebManaged(sub);
+    if (!sub.cancelAtPeriodEnd) return this.view(sub, sub.plan.name);
+    if (!isRecurringStripeSubscriptionId(sub.stripeSubscriptionId)) {
+      throw new BadRequestException(
+        'This is a one-time (non-renewing) purchase — buy the plan again to extend it',
+      );
+    }
+    if (sub.currentPeriodEnd.getTime() <= Date.now()) {
+      throw new ConflictException('The billing period has already ended');
+    }
+    const updated = await this.setCancelAtPeriodEnd(sub, false);
+    return this.view(updated, sub.plan.name);
+  }
+
+  /**
+   * Set/clear cancel-at-period-end on the provider (renewing Stripe
+   * subscriptions) and mirror it locally. Non-renewing rows (prepay, grants)
+   * and the dev provider just flip the local flag.
+   */
+  async setCancelAtPeriodEnd(
+    sub: Subscription,
+    cancel: boolean,
+  ): Promise<Subscription> {
+    const snap = isRecurringStripeSubscriptionId(sub.stripeSubscriptionId)
+      ? await this.billing.setCancelAtPeriodEnd(
+          sub.stripeSubscriptionId,
+          cancel,
+        )
+      : null;
+    return this.prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        cancelAtPeriodEnd: snap?.cancelAtPeriodEnd ?? cancel,
+        canceledAt: cancel ? (snap?.canceledAt ?? new Date()) : null,
+        ...periodFrom(snap),
       },
     });
-    return toSubscriptionResponse(sub, plan.name, now);
+  }
+
+  /** End a subscription now (provider first for renewing Stripe subscriptions). */
+  async endNow(sub: Subscription): Promise<Subscription> {
+    if (isRecurringStripeSubscriptionId(sub.stripeSubscriptionId)) {
+      await this.billing.cancelSubscriptionNow(sub.stripeSubscriptionId);
+    }
+    const now = new Date();
+    return this.prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        status: 'CANCELED',
+        cancelAtPeriodEnd: false,
+        canceledAt: now,
+        pastDueSince: null,
+        currentPeriodEnd:
+          sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now,
+      },
+    });
+  }
+
+  async view(
+    sub: Subscription,
+    planName: string,
+  ): Promise<SubscriptionResponse> {
+    return toSubscriptionResponse(
+      sub,
+      planName,
+      new Date(),
+      await this.access.pastDueGraceDays(),
+    );
+  }
+
+  /**
+   * The user's live subscription: by id, or else the newest one in the
+   * state the operation needs (cancel → still renewing, resume → pending
+   * cancellation).
+   */
+  private async findOwnLive(
+    userId: string,
+    subscriptionId: string | undefined,
+    pendingCancel: boolean,
+  ): Promise<SubscriptionWithPlan> {
+    const sub = await this.prisma.subscription.findFirst({
+      where: subscriptionId
+        ? { id: subscriptionId, userId }
+        : {
+            userId,
+            status: { in: [...LIVE_STATUSES] },
+            cancelAtPeriodEnd: pendingCancel,
+            currentPeriodEnd: { gt: new Date() },
+          },
+      include: { plan: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!sub) throw new NotFoundException('Subscription not found');
+    if (!(LIVE_STATUSES as readonly string[]).includes(sub.status)) {
+      throw new ConflictException('Subscription is no longer active');
+    }
+    return sub;
   }
 }
 
-function toSubscriptionResponse(
-  s: Subscription,
-  planName: string,
-  now: Date,
-): SubscriptionResponse {
+/** App-store subscriptions can only be changed in the store (Apple/Google rules). */
+export function assertWebManaged(sub: Subscription): void {
+  if (sub.source === 'APPLE_IAP' || sub.source === 'GOOGLE_PLAY') {
+    throw new BadRequestException(
+      'This subscription is managed by the App Store / Google Play — change it there',
+    );
+  }
+}
+
+function periodFrom(
+  snap: SubscriptionSnapshot | null,
+): Prisma.SubscriptionUpdateInput {
+  if (!snap) return {};
   return {
-    id: s.id,
-    planId: s.planId,
-    planName,
-    status: s.status,
-    currentPeriodStart: s.currentPeriodStart.toISOString(),
-    currentPeriodEnd: s.currentPeriodEnd.toISOString(),
-    cancelAtPeriodEnd: s.cancelAtPeriodEnd,
-    trialEndsAt: s.trialEndsAt?.toISOString() ?? null,
-    grantsAccess: subscriptionGrantsAccess(
-      {
-        planId: s.planId,
-        status: s.status,
-        currentPeriodEnd: s.currentPeriodEnd,
-      },
-      now,
-    ),
+    ...(snap.currentPeriodStart
+      ? { currentPeriodStart: snap.currentPeriodStart }
+      : {}),
+    ...(snap.currentPeriodEnd
+      ? { currentPeriodEnd: snap.currentPeriodEnd }
+      : {}),
   };
 }

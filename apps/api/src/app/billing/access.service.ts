@@ -1,8 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   canUserAccessLesson,
+  normalizeGraceDays,
+  PAST_DUE_GRACE_DAYS_CONFIG_KEY,
   plansIncludingCourse,
   type AccessResult,
+  type EnrollmentLike,
   type PlanAccessLike,
   type SubscriptionLike,
 } from '@codify/domain';
@@ -19,9 +23,24 @@ export class AccessService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** All active plans, shaped for the domain layer (categoryIds inlined). */
-  async loadActivePlans(): Promise<PlanAccessLike[]> {
+  loadActivePlans(): Promise<PlanAccessLike[]> {
+    return this.loadPlans({ isActive: true, deletedAt: null });
+  }
+
+  /**
+   * Every non-deleted plan, inactive ones included: a subscription keeps
+   * granting its plan's categories after the plan stops being sold. The
+   * domain filters `requiredPlans` suggestions back to active plans.
+   */
+  loadPlansForAccess(): Promise<PlanAccessLike[]> {
+    return this.loadPlans({ deletedAt: null });
+  }
+
+  private async loadPlans(
+    where: Prisma.PlanWhereInput,
+  ): Promise<PlanAccessLike[]> {
     const plans = await this.prisma.plan.findMany({
-      where: { isActive: true, deletedAt: null },
+      where,
       include: { categories: { select: { categoryId: true } } },
       orderBy: { sortOrder: 'asc' },
     });
@@ -35,6 +54,14 @@ export class AccessService {
     }));
   }
 
+  /** PAST_DUE grace window: GamificationConfig `billing.pastDueGraceDays`, default 3. */
+  async pastDueGraceDays(): Promise<number> {
+    const row = await this.prisma.gamificationConfig.findUnique({
+      where: { key: PAST_DUE_GRACE_DAYS_CONFIG_KEY },
+    });
+    return normalizeGraceDays(row?.value);
+  }
+
   private async loadUserSubscriptions(
     userId: string,
   ): Promise<SubscriptionLike[]> {
@@ -45,6 +72,7 @@ export class AccessService {
         status: true,
         currentPeriodEnd: true,
         cancelAtPeriodEnd: true,
+        pastDueSince: true,
       },
     });
     return subs.map((s) => ({
@@ -52,7 +80,19 @@ export class AccessService {
       status: s.status,
       currentPeriodEnd: s.currentPeriodEnd,
       cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+      pastDueSince: s.pastDueSince,
     }));
+  }
+
+  private async loadEnrollments(
+    userId: string,
+    courseId: string,
+  ): Promise<EnrollmentLike[]> {
+    const rows = await this.prisma.enrollment.findMany({
+      where: { userId, courseId, source: { in: ['PROMO', 'ADMIN_GRANT'] } },
+      select: { source: true, accessUntil: true },
+    });
+    return rows.map((e) => ({ source: e.source, accessUntil: e.accessUntil }));
   }
 
   private async courseShape(
@@ -86,16 +126,21 @@ export class AccessService {
       throw new NotFoundException('Lesson not found');
     }
     const courseId = lesson.module.course.id;
-    const [course, subscriptions, plans] = await Promise.all([
-      this.courseShape(courseId),
-      this.loadUserSubscriptions(userId),
-      this.loadActivePlans(),
-    ]);
+    const [course, subscriptions, enrollments, plans, pastDueGraceDays] =
+      await Promise.all([
+        this.courseShape(courseId),
+        this.loadUserSubscriptions(userId),
+        this.loadEnrollments(userId, courseId),
+        this.loadPlansForAccess(),
+        this.pastDueGraceDays(),
+      ]);
     const access = canUserAccessLesson({
       lesson: { isFree: lesson.isFree },
       course,
       subscriptions,
+      enrollments,
       plans,
+      pastDueGraceDays,
     });
     return { access, courseId };
   }

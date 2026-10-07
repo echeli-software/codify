@@ -4,18 +4,28 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import {
+import type {
   Prisma,
-  type SubscriptionSource,
-  type SubscriptionStatus,
+  Subscription,
+  SubscriptionSource,
+  SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import {
   REVENUECAT_PROVIDER,
   type RcEvent,
   type RevenueCatProvider,
 } from './revenuecat.provider.js';
+import { addDays } from './subscription-view.js';
+import {
+  DUPLICATE_RESULT,
+  DuplicateWebhookEvent,
+  WEBHOOK_TX_OPTIONS,
+  claimWebhookEvent,
+  type WebhookResult,
+} from './webhook-idempotency.js';
+
+type Tx = Prisma.TransactionClient;
 
 /** RevenueCat store → our SubscriptionSource. */
 function sourceFromStore(store: string | undefined): SubscriptionSource {
@@ -31,21 +41,21 @@ function sourceFromStore(store: string | undefined): SubscriptionSource {
   }
 }
 
-interface SyncResult {
-  received: boolean;
-  duplicate: boolean;
-  handled: boolean;
-}
-
 /**
- * Turns RevenueCat entitlement events into our `Subscription` mirror.
- * Idempotent on the RevenueCat event id, and identity-stable on the store's
- * `original_transaction_id` (which survives renewals) so renewals update the
- * same row rather than creating duplicates. See /docs/17-mobile.md.
+ * Turns RevenueCat entitlement events into our `Subscription` mirror
+ * (/docs/17-mobile.md §RevenueCat).
  *
- * Access is resolved purely from `Subscription` rows (AccessService is
- * source-agnostic), so a synced store purchase grants access with no extra
- * wiring — exactly like a Stripe-web subscription.
+ * - Idempotent on the RevenueCat event id, with the idempotency record
+ *   written in the same transaction as the processing (a failed delivery
+ *   is retried, never mistaken for a duplicate).
+ * - Identity-stable on the store's `original_transaction_id` (survives
+ *   renewals) so renewals update the same row.
+ * - Plan resolution: `PlanPrice.storeProductId === product_id`, then the
+ *   plan's `revenueCatEntitlementId`.
+ * - Ordering: an event describing an older store period (expiration before
+ *   the row's current period end) is skipped, so a late CANCELLATION or
+ *   EXPIRATION can't undo a renewal.
+ * - Unknown `app_user_id` → acked with handled:false (no FK error loop).
  */
 @Injectable()
 export class RevenueCatWebhookService {
@@ -59,47 +69,58 @@ export class RevenueCatWebhookService {
   async handle(
     rawBody: string,
     authHeader: string | undefined,
-  ): Promise<SyncResult> {
+  ): Promise<WebhookResult> {
     const event = this.rc.constructEvent(rawBody, authHeader);
     if (!event)
       throw new BadRequestException(
         'Invalid or unauthenticated RevenueCat webhook',
       );
 
-    // Idempotency: insert-first so concurrent duplicate deliveries collide on
-    // the PK rather than double-processing.
     const key = `revenuecat:${event.id}`;
     try {
-      await this.prisma.idempotencyRecord.create({
-        data: { key, scope: 'revenuecat_webhook' },
-      });
+      const handled = await this.prisma.$transaction(async (tx) => {
+        await claimWebhookEvent(tx, key, 'revenuecat_webhook');
+        return this.process(tx, event);
+      }, WEBHOOK_TX_OPTIONS);
+      return { received: true, duplicate: false, handled };
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        return { received: true, duplicate: true, handled: false };
-      }
+      if (err instanceof DuplicateWebhookEvent) return DUPLICATE_RESULT;
       throw err;
     }
-
-    const handled = await this.process(event);
-    return { received: true, duplicate: false, handled };
   }
 
-  private async process(event: RcEvent): Promise<boolean> {
+  private async process(tx: Tx, event: RcEvent): Promise<boolean> {
     switch (event.type) {
       case 'INITIAL_PURCHASE':
       case 'RENEWAL':
       case 'PRODUCT_CHANGE':
       case 'UNCANCELLATION':
-        return this.upsertActive(event);
+        return this.upsertActive(tx, event);
       case 'CANCELLATION':
         // Auto-renew turned off (or refund pending): access continues until
         // the current period ends.
-        return this.markCancelAtPeriodEnd(event);
+        return this.update(tx, event, () => ({
+          cancelAtPeriodEnd: true,
+          canceledAt: eventAt(event),
+        }));
       case 'EXPIRATION':
         // Access has actually ended.
-        return this.expire(event);
+        return this.update(tx, event, (existing) => ({
+          status: 'CANCELED',
+          cancelAtPeriodEnd: false,
+          pastDueSince: null,
+          canceledAt: existing.canceledAt ?? eventAt(event),
+          currentPeriodEnd: msToDate(event.expiration_at_ms) ?? eventAt(event),
+        }));
       case 'BILLING_ISSUE':
-        return this.setStatus(event, 'PAST_DUE');
+        return this.update(tx, event, (existing) => ({
+          status: 'PAST_DUE',
+          // Keep the start of an ongoing past-due episode; a new one starts now.
+          pastDueSince:
+            existing.status === 'PAST_DUE'
+              ? existing.pastDueSince
+              : eventAt(event),
+        }));
       default:
         this.logger.debug(
           `Ignoring unhandled RevenueCat event type ${event.type}`,
@@ -108,16 +129,20 @@ export class RevenueCatWebhookService {
     }
   }
 
-  /** Resolve the local plan from the event's entitlement ids. */
-  private async resolvePlanId(event: RcEvent): Promise<string | null> {
+  /** Resolve the local plan: store product id first, then entitlement. */
+  private async resolvePlanId(tx: Tx, event: RcEvent): Promise<string | null> {
+    if (event.product_id) {
+      const price = await tx.planPrice.findFirst({
+        where: { storeProductId: event.product_id, plan: { deletedAt: null } },
+        select: { planId: true },
+      });
+      if (price) return price.planId;
+    }
     const entitlements = event.entitlement_ids ?? [];
     if (entitlements.length === 0) return null;
-    const plan = await this.prisma.plan.findFirst({
-      where: {
-        revenueCatEntitlementId: { in: entitlements },
-        isActive: true,
-        deletedAt: null,
-      },
+    // Inactive plans still resolve: the store sold it, the user paid.
+    const plan = await tx.plan.findFirst({
+      where: { revenueCatEntitlementId: { in: entitlements }, deletedAt: null },
       select: { id: true },
     });
     return plan?.id ?? null;
@@ -128,7 +153,13 @@ export class RevenueCatWebhookService {
     return event.original_transaction_id ?? event.transaction_id ?? null;
   }
 
-  private async upsertActive(event: RcEvent): Promise<boolean> {
+  /** Does this event describe an older store period than the row already holds? */
+  private isStale(existing: Subscription, event: RcEvent): boolean {
+    const exp = msToDate(event.expiration_at_ms);
+    return !!exp && exp.getTime() < existing.currentPeriodEnd.getTime();
+  }
+
+  private async upsertActive(tx: Tx, event: RcEvent): Promise<boolean> {
     const transactionId = this.txId(event);
     const userId = event.app_user_id;
     if (!transactionId || !userId) {
@@ -138,32 +169,35 @@ export class RevenueCatWebhookService {
       return false;
     }
 
-    const planId = await this.resolvePlanId(event);
-    const existing = await this.prisma.subscription.findUnique({
+    const existing = await tx.subscription.findUnique({
       where: { storeTransactionId: transactionId },
     });
+    if (existing && this.isStale(existing, event)) {
+      this.logger.log(`Skipping stale RevenueCat ${event.type} ${event.id}`);
+      return false;
+    }
 
+    const planId = await this.resolvePlanId(tx, event);
     if (!planId && !existing) {
       this.logger.warn(
-        `RevenueCat ${event.type} ${event.id}: no plan matches entitlements ${JSON.stringify(event.entitlement_ids)} — skipping`,
+        `RevenueCat ${event.type} ${event.id}: no plan matches product ${event.product_id ?? '-'} / entitlements ${JSON.stringify(event.entitlement_ids)} — skipping`,
       );
       return false;
     }
 
+    const now = eventAt(event);
     const periodStart =
-      msToDate(event.purchased_at_ms) ??
-      existing?.currentPeriodStart ??
-      new Date();
+      msToDate(event.purchased_at_ms) ?? existing?.currentPeriodStart ?? now;
     const periodEnd =
       msToDate(event.expiration_at_ms) ??
       existing?.currentPeriodEnd ??
-      addDays(new Date(), 30);
+      addDays(now, 30);
     const isTrial = event.period_type === 'TRIAL';
     const status: SubscriptionStatus = isTrial ? 'TRIALING' : 'ACTIVE';
 
     if (existing) {
-      await this.prisma.subscription.update({
-        where: { storeTransactionId: transactionId },
+      await tx.subscription.update({
+        where: { id: existing.id },
         data: {
           planId: planId ?? existing.planId,
           status,
@@ -171,6 +205,7 @@ export class RevenueCatWebhookService {
           currentPeriodEnd: periodEnd,
           cancelAtPeriodEnd: false,
           canceledAt: null,
+          pastDueSince: null,
           trialEndsAt: isTrial ? periodEnd : existing.trialEndsAt,
           storeProductId: event.product_id ?? existing.storeProductId,
           revenueCatUserId: userId,
@@ -179,70 +214,56 @@ export class RevenueCatWebhookService {
       return true;
     }
 
-    const data: Prisma.SubscriptionUncheckedCreateInput = {
-      userId,
-      planId: planId!,
-      source: sourceFromStore(event.store),
-      revenueCatUserId: userId,
-      storeTransactionId: transactionId,
-      storeProductId: event.product_id ?? null,
-      status,
-      currentPeriodStart: periodStart,
-      currentPeriodEnd: periodEnd,
-      cancelAtPeriodEnd: false,
-      trialEndsAt: isTrial ? periodEnd : null,
-    };
-    await this.prisma.subscription.create({ data });
-    return true;
-  }
+    // app_user_id must be one of our User ids (the app logs in to RevenueCat
+    // with it). Anonymous / foreign ids are acked, not retried forever.
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      this.logger.warn(
+        `RevenueCat ${event.type} ${event.id}: app_user_id "${userId}" is not a known user — acked, not applied`,
+      );
+      return false;
+    }
 
-  private async markCancelAtPeriodEnd(event: RcEvent): Promise<boolean> {
-    const transactionId = this.txId(event);
-    if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({
-      where: { storeTransactionId: transactionId },
-    });
-    if (!existing) return false;
-    await this.prisma.subscription.update({
-      where: { storeTransactionId: transactionId },
-      data: { cancelAtPeriodEnd: true, canceledAt: new Date() },
-    });
-    return true;
-  }
-
-  private async expire(event: RcEvent): Promise<boolean> {
-    const transactionId = this.txId(event);
-    if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({
-      where: { storeTransactionId: transactionId },
-    });
-    if (!existing) return false;
-    const now = new Date();
-    const periodEnd = msToDate(event.expiration_at_ms) ?? now;
-    await this.prisma.subscription.update({
-      where: { storeTransactionId: transactionId },
+    await tx.subscription.create({
       data: {
-        status: 'CANCELED',
-        canceledAt: existing.canceledAt ?? now,
+        userId,
+        planId: planId as string,
+        source: sourceFromStore(event.store),
+        revenueCatUserId: userId,
+        storeTransactionId: transactionId,
+        storeProductId: event.product_id ?? null,
+        status,
+        currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        trialEndsAt: isTrial ? periodEnd : null,
       },
     });
     return true;
   }
 
-  private async setStatus(
+  /** Apply a patch to the mirrored row, unless the event is stale. */
+  private async update(
+    tx: Tx,
     event: RcEvent,
-    status: SubscriptionStatus,
+    patch: (existing: Subscription) => Prisma.SubscriptionUpdateInput,
   ): Promise<boolean> {
     const transactionId = this.txId(event);
     if (!transactionId) return false;
-    const existing = await this.prisma.subscription.findUnique({
+    const existing = await tx.subscription.findUnique({
       where: { storeTransactionId: transactionId },
     });
     if (!existing) return false;
-    await this.prisma.subscription.update({
-      where: { storeTransactionId: transactionId },
-      data: { status },
+    if (this.isStale(existing, event)) {
+      this.logger.log(`Skipping stale RevenueCat ${event.type} ${event.id}`);
+      return false;
+    }
+    await tx.subscription.update({
+      where: { id: existing.id },
+      data: patch(existing),
     });
     return true;
   }
@@ -255,6 +276,6 @@ function msToDate(ms: number | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function addDays(d: Date, days: number): Date {
-  return new Date(d.getTime() + days * 86_400_000);
+function eventAt(event: RcEvent): Date {
+  return msToDate(event.event_timestamp_ms) ?? new Date();
 }

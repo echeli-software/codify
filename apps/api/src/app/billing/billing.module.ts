@@ -1,30 +1,30 @@
-import { Global, Logger, Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AccessService } from './access.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingService } from './billing.service.js';
+import { BillingAdminService } from './billing-admin.service.js';
 import { WebhookController } from './webhook.controller.js';
 import { WebhookService } from './webhook.service.js';
 import { RevenueCatWebhookService } from './revenuecat-webhook.service.js';
-import {
-  BILLING_PROVIDER,
-  DevBillingProvider,
-  type BillingProvider,
-} from './billing.provider.js';
+import { BILLING_PROVIDER, type BillingProvider } from './billing.provider.js';
 import {
   REVENUECAT_PROVIDER,
-  DevRevenueCatProvider,
-  RevenueCatHttpProvider,
   type RevenueCatProvider,
 } from './revenuecat.provider.js';
+import {
+  createBillingProvider,
+  createRevenueCatProvider,
+} from './billing-provider.factory.js';
 
 /**
  * Global billing module. Provides the BILLING_PROVIDER seam, the reusable
  * AccessService (used by progress enforcement + the paywall query), and the
- * student-facing BillingService.
+ * student-facing + support/admin billing services.
  *
- * Provider selection: when STRIPE_SECRET_KEY is set we'd wire the real
- * Stripe implementation; until then (and in tests) we use the deterministic
- * DevBillingProvider so the whole flow is exercisable without Stripe keys.
+ * Provider selection (billing-provider.factory.ts): STRIPE_SECRET_KEY set →
+ * StripeBillingProvider; otherwise the deterministic DevBillingProvider —
+ * except in production, where a missing Stripe (or RevenueCat) config
+ * fails boot instead of silently falling back.
  */
 @Global()
 @Module({
@@ -32,31 +32,17 @@ import {
   providers: [
     AccessService,
     BillingService,
+    BillingAdminService,
     WebhookService,
     RevenueCatWebhookService,
     {
       provide: BILLING_PROVIDER,
-      useFactory: (): BillingProvider => {
-        const hasStripe = !!process.env['STRIPE_SECRET_KEY'];
-        if (hasStripe) {
-          // Phase 6: real StripeBillingProvider lands here once the SDK +
-          // keys are wired. Until then fall through to dev with a warning.
-          new Logger('BillingModule').warn(
-            'STRIPE_SECRET_KEY is set but StripeBillingProvider is not implemented yet — using DevBillingProvider.',
-          );
-        }
-        return new DevBillingProvider();
-      },
+      useFactory: (): BillingProvider => createBillingProvider(process.env),
     },
     {
       provide: REVENUECAT_PROVIDER,
-      useFactory: (): RevenueCatProvider => {
-        // Verify the shared Authorization secret when configured; otherwise
-        // use the dev provider so the store-purchase → access flow works
-        // offline (Phase 11). Real native delivery is store-side.
-        const secret = process.env['REVENUECAT_WEBHOOK_AUTH'];
-        return secret ? new RevenueCatHttpProvider(secret) : new DevRevenueCatProvider();
-      },
+      useFactory: (): RevenueCatProvider =>
+        createRevenueCatProvider(process.env),
     },
   ],
   exports: [BILLING_PROVIDER, AccessService, BillingService],

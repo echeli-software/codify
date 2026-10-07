@@ -21,6 +21,7 @@ import {
   ListPlansQueryDto,
   PlanPriceInputDto,
   UpdatePlanDto,
+  UpdatePlanPriceDto,
   type PlanListResponse,
   type PlanResponse,
 } from './plans.dto.js';
@@ -62,7 +63,10 @@ export class PlansController {
     @Req() req: Request,
   ): Promise<PlanResponse> {
     const created = await this.plans.create(body);
-    void this.audit.record(actor, auditMeta('plan.create', created.id, { ...body }, req));
+    void this.audit.record(
+      actor,
+      auditMeta('plan.create', created.id, { ...body }, req),
+    );
     return created;
   }
 
@@ -75,7 +79,10 @@ export class PlansController {
     @Req() req: Request,
   ): Promise<PlanResponse> {
     const updated = await this.plans.update(id, body);
-    void this.audit.record(actor, auditMeta('plan.update', id, { ...body }, req));
+    void this.audit.record(
+      actor,
+      auditMeta('plan.update', id, { ...body }, req),
+    );
     return updated;
   }
 
@@ -100,7 +107,27 @@ export class PlansController {
     @Req() req: Request,
   ): Promise<PlanResponse> {
     const updated = await this.plans.addPrice(id, body);
-    void this.audit.record(actor, auditMeta('plan.price.add', id, { ...body }, req));
+    void this.audit.record(
+      actor,
+      auditMeta('plan.price.add', id, { ...body }, req),
+    );
+    return updated;
+  }
+
+  @Roles('ADMIN')
+  @Patch(':id/prices/:priceId')
+  async updatePrice(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Param('priceId') priceId: string,
+    @Body() body: UpdatePlanPriceDto,
+    @Req() req: Request,
+  ): Promise<PlanResponse> {
+    const updated = await this.plans.updatePrice(id, priceId, body);
+    void this.audit.record(
+      actor,
+      auditMeta('plan.price.update', id, { priceId, ...body }, req),
+    );
     return updated;
   }
 
@@ -113,7 +140,10 @@ export class PlansController {
     @Req() req: Request,
   ): Promise<PlanResponse> {
     const updated = await this.plans.removePrice(id, priceId);
-    void this.audit.record(actor, auditMeta('plan.price.remove', id, { priceId }, req));
+    void this.audit.record(
+      actor,
+      auditMeta('plan.price.remove', id, { priceId }, req),
+    );
     return updated;
   }
 
@@ -127,14 +157,23 @@ export class PlansController {
     const synced = await this.plans.syncToStripe(id);
     void this.audit.record(
       actor,
-      auditMeta('plan.sync_stripe', id, { stripeProductId: synced.stripeProductId }, req),
+      auditMeta(
+        'plan.sync_stripe',
+        id,
+        { stripeProductId: synced.stripeProductId },
+        req,
+      ),
     );
     return synced;
   }
 }
 
 function isStaff(actor: ApiUser): boolean {
-  return actor.role === 'ADMIN' || actor.role === 'TEACHER' || actor.role === 'SUPPORT';
+  return (
+    actor.role === 'ADMIN' ||
+    actor.role === 'TEACHER' ||
+    actor.role === 'SUPPORT'
+  );
 }
 
 function auditMeta(

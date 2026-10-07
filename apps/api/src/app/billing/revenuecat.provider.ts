@@ -1,4 +1,16 @@
 import { Logger } from '@nestjs/common';
+import { createHash, timingSafeEqual } from 'node:crypto';
+
+/**
+ * Constant-time string comparison. Both sides are hashed first so the
+ * comparison is fixed-length and neither the secret's length nor a
+ * matching prefix leaks through timing.
+ */
+export function constantTimeEquals(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a, 'utf8').digest();
+  const hb = createHash('sha256').update(b, 'utf8').digest();
+  return timingSafeEqual(ha, hb);
+}
 
 /**
  * RevenueCat webhook seam. RevenueCat is the cross-store IAP layer (App Store
@@ -15,7 +27,12 @@ import { Logger } from '@nestjs/common';
 
 export const REVENUECAT_PROVIDER = Symbol('REVENUECAT_PROVIDER');
 
-export type RcStore = 'APP_STORE' | 'PLAY_STORE' | 'STRIPE' | 'PROMOTIONAL' | string;
+export type RcStore =
+  | 'APP_STORE'
+  | 'PLAY_STORE'
+  | 'STRIPE'
+  | 'PROMOTIONAL'
+  | string;
 export type RcPeriodType = 'TRIAL' | 'INTRO' | 'NORMAL' | string;
 
 /** The event types RevenueCat posts; we act on the subscription-lifecycle ones. */
@@ -40,6 +57,8 @@ export interface RcEvent {
   period_type?: RcPeriodType;
   purchased_at_ms?: number | null;
   expiration_at_ms?: number | null;
+  /** When RevenueCat emitted the event (unix ms). */
+  event_timestamp_ms?: number | null;
   store?: RcStore;
   transaction_id?: string;
   original_transaction_id?: string;
@@ -60,7 +79,10 @@ export interface RevenueCatProvider {
    * the Authorization header against the configured shared secret; the dev
    * provider trusts the parsed JSON (no secret).
    */
-  constructEvent(rawBody: string, authHeader: string | undefined): RcEvent | null;
+  constructEvent(
+    rawBody: string,
+    authHeader: string | undefined,
+  ): RcEvent | null;
 }
 
 export class DevRevenueCatProvider implements RevenueCatProvider {
@@ -72,7 +94,12 @@ export class DevRevenueCatProvider implements RevenueCatProvider {
       const parsed = JSON.parse(rawBody) as RcWebhookPayload | RcEvent;
       // Accept either the wrapped `{ event }` shape or a bare event.
       const event = (parsed as RcWebhookPayload).event ?? (parsed as RcEvent);
-      if (event && typeof event.id === 'string' && typeof event.type === 'string' && typeof event.app_user_id === 'string') {
+      if (
+        event &&
+        typeof event.id === 'string' &&
+        typeof event.type === 'string' &&
+        typeof event.app_user_id === 'string'
+      ) {
         return event;
       }
       this.logger.warn('RevenueCat dev payload missing id/type/app_user_id');
@@ -94,15 +121,22 @@ export class RevenueCatHttpProvider implements RevenueCatProvider {
 
   constructor(private readonly authSecret: string) {}
 
-  constructEvent(rawBody: string, authHeader: string | undefined): RcEvent | null {
-    if (!authHeader || authHeader !== this.authSecret) {
+  constructEvent(
+    rawBody: string,
+    authHeader: string | undefined,
+  ): RcEvent | null {
+    if (!authHeader || !constantTimeEquals(authHeader, this.authSecret)) {
       this.logger.warn('RevenueCat webhook rejected: bad Authorization header');
       return null;
     }
     try {
       const parsed = JSON.parse(rawBody) as RcWebhookPayload;
       const event = parsed.event;
-      if (event && typeof event.id === 'string' && typeof event.type === 'string') {
+      if (
+        event &&
+        typeof event.id === 'string' &&
+        typeof event.type === 'string'
+      ) {
         return event;
       }
       return null;

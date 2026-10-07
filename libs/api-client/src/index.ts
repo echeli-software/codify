@@ -141,10 +141,20 @@ export {
   type MySubscriptionResponse,
   type CheckoutSessionResponse,
   type LessonAccess,
+  type SubscriptionSource,
+  type AdminSubscriptionView,
+  type ChangeSubscriptionBody,
+  type GrantSubscriptionBody,
+  type AdminCancelBody,
 } from './lib/billing.client.js';
+export { type UpdatePlanPriceBody } from './lib/plans.client.js';
 
 // Idempotency helpers
-export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';
+export {
+  withIdempotency,
+  IDEMPOTENCY_TOKEN,
+  uuidV4,
+} from './lib/idempotency.js';
 
 // Error mapping
 export {

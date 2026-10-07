@@ -4,14 +4,26 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { Prisma, type SubscriptionStatus } from '@prisma/client';
+import type { Prisma, Subscription, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import {
   BILLING_PROVIDER,
+  idOf,
+  snapshotFromStripeSubscription,
   type BillingProvider,
   type StripeWebhookEvent,
+  type SubscriptionSnapshot,
 } from './billing.provider.js';
+import { addBillingPeriod } from './subscription-view.js';
+import {
+  DUPLICATE_RESULT,
+  DuplicateWebhookEvent,
+  WEBHOOK_TX_OPTIONS,
+  claimWebhookEvent,
+  type WebhookResult,
+} from './webhook-idempotency.js';
+
+type Tx = Prisma.TransactionClient;
 
 /** Stripe status string → our enum. */
 const STATUS_MAP: Record<string, SubscriptionStatus> = {
@@ -25,29 +37,36 @@ const STATUS_MAP: Record<string, SubscriptionStatus> = {
   paused: 'PAUSED',
 };
 
-interface SubscriptionObject {
-  id: string;
-  customer?: string;
-  status?: string;
-  current_period_start?: number | string;
-  current_period_end?: number | string;
-  cancel_at_period_end?: boolean;
-  trial_end?: number | string | null;
-  canceled_at?: number | string | null;
-  metadata?: { userId?: string; planId?: string };
-}
+const SUBSCRIPTION_EVENTS = new Set([
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+]);
+const CHECKOUT_EVENTS = new Set([
+  'checkout.session.completed',
+  'checkout.session.async_payment_succeeded',
+  'checkout.session.async_payment_failed',
+]);
 
-interface InvoiceObject {
-  subscription?: string;
+/** Subscription state fetched before the transaction (network stays outside it). */
+interface Prefetched {
+  snapshot: SubscriptionSnapshot | null;
 }
 
 /**
- * Processes Stripe webhook events into our `Subscription` mirror, with
- * Postgres-backed idempotency keyed on the Stripe event id (duplicate
- * deliveries are dropped). See /docs/09-billing.md §6.
+ * Processes Stripe webhook events into our `Subscription` mirror
+ * (/docs/09-billing.md §5–§6).
  *
- * Real production should enqueue handlers in BullMQ and return 200 to Stripe
- * immediately; here we process inline since the dev provider is synchronous.
+ * Idempotency: the `IdempotencyRecord` for `event.id` is written in the SAME
+ * transaction that applies the event, so a failed delivery is retried by
+ * Stripe instead of being dropped as a duplicate.
+ *
+ * Ordering: in Stripe mode every subscription-related event re-reads the
+ * subscription from the API and applies that (current) state, so an old
+ * event delivered late can't roll state back. Without an API (dev), the
+ * payload is applied behind a staleness guard (see `isStale`).
+ *
+ * Processing is inline; /docs/09 §6's BullMQ hand-off can wrap `handle`.
  */
 @Injectable()
 export class WebhookService {
@@ -59,165 +78,415 @@ export class WebhookService {
   ) {}
 
   async handleStripe(
-    rawBody: string,
+    rawBody: Buffer | string | undefined,
+    parsedBody: unknown,
     signature: string | undefined,
-  ): Promise<{ received: boolean; duplicate: boolean; handled: boolean }> {
-    const event = this.billing.constructWebhookEvent(rawBody, signature);
+  ): Promise<WebhookResult> {
+    let payload: Buffer | string;
+    if (rawBody != null && rawBody.length > 0) {
+      payload = rawBody;
+    } else if (this.billing.mode === 'stripe') {
+      // Signature verification is over the exact bytes Stripe sent.
+      throw new BadRequestException(
+        'Raw request body unavailable; cannot verify signature',
+      );
+    } else {
+      payload = JSON.stringify(parsedBody ?? {});
+    }
+
+    const event = this.billing.constructWebhookEvent(payload, signature);
     if (!event) throw new BadRequestException('Invalid webhook payload');
 
-    // Idempotency: the unique key drops replays. Insert first so concurrent
-    // duplicate deliveries collide on the PK rather than double-processing.
     const key = `stripe:${event.id}`;
+    // Cheap fast path for replays (the in-transaction claim is the real guard).
+    const seen = await this.prisma.idempotencyRecord.findUnique({
+      where: { key },
+    });
+    if (seen) return DUPLICATE_RESULT;
+
+    const prefetched = await this.prefetch(event);
     try {
-      await this.prisma.idempotencyRecord.create({
-        data: { key, scope: 'stripe_webhook' },
-      });
+      const handled = await this.prisma.$transaction(async (tx) => {
+        await claimWebhookEvent(tx, key, 'stripe_webhook');
+        return this.process(tx, event, prefetched);
+      }, WEBHOOK_TX_OPTIONS);
+      return { received: true, duplicate: false, handled };
     } catch (err) {
-      // Only a unique-key conflict means "already processed" — ack + skip.
-      // Anything else is a real failure Stripe should retry on.
-      if (isUniqueViolation(err)) {
-        return { received: true, duplicate: true, handled: false };
-      }
+      if (err instanceof DuplicateWebhookEvent) return DUPLICATE_RESULT;
       throw err;
     }
-
-    const handled = await this.process(event);
-    return { received: true, duplicate: false, handled };
   }
 
-  private async process(event: StripeWebhookEvent): Promise<boolean> {
-    switch (event.type) {
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        return this.upsertSubscription(
-          event.data.object as unknown as SubscriptionObject,
-        );
-      case 'customer.subscription.deleted':
-        return this.cancelSubscription(
-          event.data.object as unknown as SubscriptionObject,
-        );
-      case 'invoice.payment_failed':
-        return this.setStatusByInvoice(
-          event.data.object as unknown as InvoiceObject,
-          'PAST_DUE',
-        );
-      case 'invoice.paid':
-        return this.setStatusByInvoice(
-          event.data.object as unknown as InvoiceObject,
-          'ACTIVE',
-        );
-      default:
-        this.logger.debug(`Ignoring unhandled event type ${event.type}`);
-        return false;
+  /** Fetch the current subscription for subscription-related events (Stripe mode). */
+  private async prefetch(event: StripeWebhookEvent): Promise<Prefetched> {
+    const id = subscriptionIdOf(event);
+    if (!id) return { snapshot: null };
+    return { snapshot: await this.billing.retrieveSubscription(id) };
+  }
+
+  private async process(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    pre: Prefetched,
+  ): Promise<boolean> {
+    const obj = event.data.object;
+    if (SUBSCRIPTION_EVENTS.has(event.type)) {
+      const snap = pre.snapshot ?? snapshotFromStripeSubscription(obj);
+      if (!snap) return false;
+      if (event.type === 'customer.subscription.deleted')
+        snap.status = 'canceled';
+      return this.applySnapshot(tx, snap, event, {
+        fromApi: pre.snapshot !== null,
+      });
     }
+
+    if (
+      event.type === 'invoice.paid' ||
+      event.type === 'invoice.payment_failed'
+    ) {
+      if (pre.snapshot) {
+        return this.applySnapshot(tx, pre.snapshot, event, { fromApi: true });
+      }
+      const subId = subscriptionIdOf(event);
+      if (!subId) return false;
+      return this.setStatusFromInvoice(
+        tx,
+        subId,
+        event.type === 'invoice.paid' ? 'ACTIVE' : 'PAST_DUE',
+        event,
+      );
+    }
+
+    if (CHECKOUT_EVENTS.has(event.type))
+      return this.handleCheckout(tx, event, pre);
+
+    this.logger.debug(`Ignoring unhandled event type ${event.type}`);
+    return false;
   }
 
-  private async upsertSubscription(obj: SubscriptionObject): Promise<boolean> {
-    if (!obj.id) return false;
-    const status = obj.status ? (STATUS_MAP[obj.status] ?? 'ACTIVE') : 'ACTIVE';
-    const existing = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: obj.id },
+  private async handleCheckout(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    pre: Prefetched,
+  ): Promise<boolean> {
+    const session = event.data.object;
+    const mode = session['mode'];
+    const metadata = stringRecord(session['metadata']);
+
+    if (event.type === 'checkout.session.async_payment_failed') {
+      this.logger.warn(
+        `Checkout ${String(session['id'])} async payment failed (user ${metadata['userId'] ?? '?'}) — no access granted`,
+      );
+      return false;
+    }
+
+    if (mode === 'subscription') {
+      // Card path: the subscription itself is the source of truth.
+      if (!pre.snapshot) return false;
+      return this.applySnapshot(tx, pre.snapshot, event, {
+        fromApi: true,
+        fallbackMetadata: metadata,
+        fallbackCustomerId: idOf(session['customer']),
+      });
+    }
+
+    if (mode === 'payment') {
+      const paid =
+        event.type === 'checkout.session.async_payment_succeeded' ||
+        session['payment_status'] === 'paid' ||
+        session['payment_status'] === 'no_payment_required';
+      // PIX / Boleto complete the session before the money arrives —
+      // wait for async_payment_succeeded.
+      if (!paid) return false;
+      return this.grantPrepaid(tx, session, metadata, event);
+    }
+    return false;
+  }
+
+  /**
+   * One-shot PIX / Boleto prepay → a non-renewing Subscription for the
+   * paid period (1 year for the annual price). Keyed on the Checkout
+   * Session id so replays and completed+async_succeeded pairs are no-ops.
+   */
+  private async grantPrepaid(
+    tx: Tx,
+    session: Record<string, unknown>,
+    metadata: Record<string, string>,
+    event: StripeWebhookEvent,
+  ): Promise<boolean> {
+    const sessionId = typeof session['id'] === 'string' ? session['id'] : null;
+    const { userId, planId, priceId } = metadata;
+    if (!sessionId || !userId || !planId || !priceId) {
+      this.logger.warn(
+        `Checkout ${sessionId ?? '?'} missing userId/planId/priceId metadata`,
+      );
+      return false;
+    }
+    const [user, price] = await Promise.all([
+      tx.user.findUnique({ where: { id: userId }, select: { id: true } }),
+      tx.planPrice.findUnique({
+        where: { id: priceId },
+        select: {
+          planId: true,
+          period: true,
+          plan: { select: { deletedAt: true } },
+        },
+      }),
+    ]);
+    if (!user || !price || price.planId !== planId || price.plan.deletedAt) {
+      this.logger.warn(
+        `Checkout ${sessionId}: unknown user/plan/price (${userId}/${planId}/${priceId}) — not granting`,
+      );
+      return false;
+    }
+    const start = eventTime(event);
+    await tx.subscription.upsert({
+      where: { stripeSubscriptionId: sessionId },
+      create: {
+        userId,
+        planId,
+        source: 'STRIPE_WEB',
+        stripeSubscriptionId: sessionId,
+        stripeCustomerId: idOf(session['customer']),
+        status: 'ACTIVE',
+        currentPeriodStart: start,
+        currentPeriodEnd: addBillingPeriod(start, price.period),
+        // Prepaid: nothing renews, access ends with the paid period.
+        cancelAtPeriodEnd: true,
+      },
+      update: {},
     });
+    return true;
+  }
+
+  private async applySnapshot(
+    tx: Tx,
+    snap: SubscriptionSnapshot,
+    event: StripeWebhookEvent,
+    opts: {
+      fromApi: boolean;
+      fallbackMetadata?: Record<string, string>;
+      fallbackCustomerId?: string | null;
+    },
+  ): Promise<boolean> {
+    const existing = await tx.subscription.findUnique({
+      where: { stripeSubscriptionId: snap.id },
+    });
+    if (!opts.fromApi && existing && this.isStale(existing, snap, event)) {
+      this.logger.log(
+        `Skipping stale ${event.type} ${event.id} for ${snap.id}`,
+      );
+      return false;
+    }
+
+    const at = eventTime(event);
+    const mapped = STATUS_MAP[snap.status];
+    if (!mapped && !existing) {
+      this.logger.warn(
+        `Unknown Stripe status "${snap.status}" for new ${snap.id} — skipping`,
+      );
+      return false;
+    }
+    const status: SubscriptionStatus =
+      mapped ?? (existing as Subscription).status;
+
+    const metadata = { ...opts.fallbackMetadata, ...snap.metadata };
+    const planId = await this.resolvePlanId(tx, snap, metadata, existing);
+    if (!planId) {
+      this.logger.warn(
+        `No plan resolvable for ${snap.id} (${event.type}) — skipping`,
+      );
+      return false;
+    }
 
     const periodStart =
-      toDate(obj.current_period_start) ??
-      existing?.currentPeriodStart ??
-      new Date();
-    const periodEnd =
-      toDate(obj.current_period_end) ??
+      snap.currentPeriodStart ?? existing?.currentPeriodStart ?? at;
+    let periodEnd =
+      snap.currentPeriodEnd ??
       existing?.currentPeriodEnd ??
-      addDays(new Date(), 30);
-    const trialEndsAt = toDate(obj.trial_end) ?? existing?.trialEndsAt ?? null;
-    const cancelAtPeriodEnd =
-      obj.cancel_at_period_end ?? existing?.cancelAtPeriodEnd ?? false;
+      addBillingPeriod(at, 'MONTHLY');
+    let canceledAt = snap.canceledAt ?? existing?.canceledAt ?? null;
+    if (status === 'CANCELED') {
+      // A canceled Stripe subscription has ended: close the window.
+      const ended = snap.endedAt ?? snap.canceledAt ?? at;
+      if (ended < periodEnd) periodEnd = ended;
+      canceledAt = canceledAt ?? ended;
+    }
+    const pastDueSince =
+      status === 'PAST_DUE'
+        ? (existing?.pastDueSince ??
+          (existing?.status === 'PAST_DUE' ? null : at))
+        : null;
+    const common = {
+      planId,
+      status,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd:
+        snap.cancelAtPeriodEnd ?? existing?.cancelAtPeriodEnd ?? false,
+      canceledAt,
+      trialEndsAt: snap.trialEnd ?? existing?.trialEndsAt ?? null,
+      pastDueSince,
+    };
 
     if (existing) {
-      await this.prisma.subscription.update({
-        where: { stripeSubscriptionId: obj.id },
+      await tx.subscription.update({
+        where: { id: existing.id },
         data: {
-          status,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-          trialEndsAt,
-          cancelAtPeriodEnd,
+          ...common,
+          stripeCustomerId:
+            snap.customerId ??
+            opts.fallbackCustomerId ??
+            existing.stripeCustomerId,
         },
       });
       return true;
     }
 
-    // New subscription — needs userId + planId (carried in metadata on the
-    // Stripe object, which we set at creation time).
-    const userId = obj.metadata?.userId;
-    const planId = obj.metadata?.planId;
-    if (!userId || !planId) {
+    const userId = metadata['userId'];
+    const user = userId
+      ? await tx.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        })
+      : null;
+    if (!user) {
       this.logger.warn(
-        `subscription.created for ${obj.id} missing userId/planId metadata — skipping`,
+        `${event.type} for ${snap.id}: unknown userId "${userId ?? ''}" — skipping`,
       );
       return false;
     }
-    const data: Prisma.SubscriptionUncheckedCreateInput = {
-      userId,
-      planId,
-      source: 'STRIPE_WEB',
-      stripeSubscriptionId: obj.id,
-      stripeCustomerId: obj.customer ?? `cus_${userId}`,
-      status,
-      currentPeriodStart: periodStart,
-      currentPeriodEnd: periodEnd,
-      cancelAtPeriodEnd,
-      trialEndsAt,
-    };
-    await this.prisma.subscription.create({ data });
-    return true;
-  }
-
-  private async cancelSubscription(obj: SubscriptionObject): Promise<boolean> {
-    if (!obj.id) return false;
-    const existing = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: obj.id },
-    });
-    if (!existing) return false;
-    const now = new Date();
-    // `subscription.deleted` means the subscription has fully ended — access
-    // should stop now. CANCELED grants access until currentPeriodEnd, so we
-    // close the period (to the event's end if it supplies one, else now).
-    const periodEnd = toDate(obj.current_period_end) ?? now;
-    await this.prisma.subscription.update({
-      where: { stripeSubscriptionId: obj.id },
+    await tx.subscription.create({
       data: {
-        status: 'CANCELED',
-        canceledAt: toDate(obj.canceled_at) ?? now,
-        currentPeriodEnd: periodEnd,
+        ...common,
+        userId: user.id,
+        source: 'STRIPE_WEB',
+        stripeSubscriptionId: snap.id,
+        stripeCustomerId: snap.customerId ?? opts.fallbackCustomerId ?? null,
       },
     });
     return true;
   }
 
-  private async setStatusByInvoice(
-    obj: InvoiceObject,
-    status: SubscriptionStatus,
+  /**
+   * Plan from the subscription's Stripe Price (follows portal upgrades /
+   * downgrades), else the metadata set at checkout, else the current row.
+   */
+  private async resolvePlanId(
+    tx: Tx,
+    snap: SubscriptionSnapshot,
+    metadata: Record<string, string>,
+    existing: Subscription | null,
+  ): Promise<string | null> {
+    if (snap.priceIds.length) {
+      const price = await tx.planPrice.findFirst({
+        where: { stripePriceId: { in: snap.priceIds } },
+        select: { planId: true },
+      });
+      if (price) return price.planId;
+    }
+    const candidate = metadata['planId'];
+    if (candidate && candidate !== existing?.planId) {
+      const plan = await tx.plan.findUnique({
+        where: { id: candidate },
+        select: { id: true },
+      });
+      if (plan) return plan.id;
+    }
+    return existing?.planId ?? null;
+  }
+
+  /**
+   * Payload-path ordering guard (no API to re-read from). Canceled is
+   * terminal on Stripe's side (a resubscription is a new subscription id),
+   * so an end-of-subscription event always applies and nothing may revive
+   * a canceled row. Otherwise an event is stale when it describes an older
+   * billing period or was created before our row last changed — the latter
+   * uses `updatedAt` as the high-water mark; exact ordering needs a
+   * `lastStripeEventAt` column.
+   */
+  private isStale(
+    existing: Subscription,
+    snap: SubscriptionSnapshot,
+    event: StripeWebhookEvent,
+  ): boolean {
+    if (snap.status === 'canceled') return false;
+    if (existing.status === 'CANCELED') return true;
+    if (
+      snap.currentPeriodEnd &&
+      snap.currentPeriodEnd < existing.currentPeriodEnd
+    )
+      return true;
+    return (
+      typeof event.created === 'number' &&
+      event.created * 1000 < existing.updatedAt.getTime()
+    );
+  }
+
+  /** Dev/payload fallback for invoice events: flip status on the mirrored row. */
+  private async setStatusFromInvoice(
+    tx: Tx,
+    stripeSubscriptionId: string,
+    status: 'ACTIVE' | 'PAST_DUE',
+    event: StripeWebhookEvent,
   ): Promise<boolean> {
-    if (!obj.subscription) return false;
-    const existing = await this.prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: obj.subscription },
+    const existing = await tx.subscription.findUnique({
+      where: { stripeSubscriptionId },
     });
-    if (!existing) return false;
-    await this.prisma.subscription.update({
-      where: { stripeSubscriptionId: obj.subscription },
-      data: { status },
+    if (!existing || existing.status === 'CANCELED') return false;
+    if (
+      typeof event.created === 'number' &&
+      event.created * 1000 < existing.updatedAt.getTime()
+    ) {
+      this.logger.log(`Skipping stale ${event.type} ${event.id}`);
+      return false;
+    }
+    await tx.subscription.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        pastDueSince:
+          status === 'PAST_DUE'
+            ? (existing.pastDueSince ?? eventTime(event))
+            : null,
+      },
     });
     return true;
   }
 }
 
-/** Accept Stripe unix-seconds or ISO strings; null/undefined → null. */
-function toDate(v: number | string | null | undefined): Date | null {
-  if (v == null) return null;
-  if (typeof v === 'number') return new Date(v * 1000);
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? null : d;
+/** The Stripe subscription an event is about, if any. */
+function subscriptionIdOf(event: StripeWebhookEvent): string | null {
+  const o = event.data.object;
+  if (SUBSCRIPTION_EVENTS.has(event.type))
+    return typeof o['id'] === 'string' ? o['id'] : null;
+  if (event.type.startsWith('invoice.')) {
+    const parent = o['parent'] as
+      | { subscription_details?: { subscription?: unknown } | null }
+      | null
+      | undefined;
+    return (
+      idOf(o['subscription']) ??
+      idOf(parent?.subscription_details?.subscription)
+    );
+  }
+  if (CHECKOUT_EVENTS.has(event.type) && o['mode'] === 'subscription') {
+    return idOf(o['subscription']);
+  }
+  return null;
 }
 
-function addDays(d: Date, days: number): Date {
-  return new Date(d.getTime() + days * 86_400_000);
+function eventTime(event: StripeWebhookEvent): Date {
+  return typeof event.created === 'number'
+    ? new Date(event.created * 1000)
+    : new Date();
+}
+
+function stringRecord(v: unknown): Record<string, string> {
+  if (!v || typeof v !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val === 'string') out[k] = val;
+  }
+  return out;
 }
