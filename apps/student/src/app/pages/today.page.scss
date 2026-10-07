@@ -1,127 +1,136 @@
-:host {
-  display: block;
-  width: 100%;
+.today {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-4);
+}
+
+h2 {
+  font-size: var(--cdf-font-size-lg);
+  margin: 0 0 var(--cdf-space-2);
 }
 
 .hero {
   display: flex;
   align-items: center;
-  gap: var(--cdf-space-4);
-  margin-bottom: var(--cdf-space-4);
+  gap: var(--cdf-space-3);
 
-  &__copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--cdf-space-1);
-    min-width: 0;
+  &__avatar {
+    border-radius: 50%;
+    display: inline-flex;
 
-    h1 {
-      margin: 0;
-      font-size: var(--cdf-font-size-xl);
-      font-weight: var(--cdf-font-weight-semibold);
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 3px;
     }
   }
-}
 
-.stats {
-  display: flex;
-  gap: var(--cdf-space-6);
-  margin-top: var(--cdf-space-3);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.reward-row {
-  display: flex;
-  align-items: center;
-  gap: var(--cdf-space-3);
-  flex-wrap: wrap;
-
-  .muted {
-    color: var(--cdf-color-text-muted);
+  &__copy h1 {
+    margin: 0 0 var(--cdf-space-1);
+    font-size: var(--cdf-font-size-xl);
   }
-  .small {
-    font-size: var(--cdf-font-size-sm);
+
+  &__chips {
+    display: flex;
+    gap: var(--cdf-space-2);
+    align-items: center;
+    flex-wrap: wrap;
   }
 }
 
-.settings-grid {
+.stats__row {
   display: flex;
-  flex-direction: column;
-  gap: var(--cdf-space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cdf-space-2);
+  margin-top: var(--cdf-space-2);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--cdf-space-2);
+}
+
+.link {
+  color: var(--cdf-color-primary);
+  font-weight: 600;
+  font-size: var(--cdf-font-size-sm);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--cdf-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cdf-color-text-muted);
+}
+
+.continue__lesson {
+  margin: 4px 0 var(--cdf-space-2);
+  font-size: var(--cdf-font-size-md);
+}
+
+.muted {
+  color: var(--cdf-color-text-muted);
+  font-size: var(--cdf-font-size-sm);
+  margin: 4px 0 var(--cdf-space-2);
+}
+
+.league-widget {
+  display: flex;
+  align-items: center;
+  gap: var(--cdf-space-2);
+  padding: var(--cdf-space-3);
+  border-radius: 14px;
+  border: 1px solid var(--cdf-color-border);
+  background: var(--cdf-color-surface);
+  color: inherit;
+  text-decoration: none;
+
+  &__copy {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
+    .muted {
+      margin: 0;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--cdf-color-primary);
+    outline-offset: 2px;
+  }
 }
 
 .rec-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1fr;
   gap: var(--cdf-space-3);
+  grid-template-columns: 1fr;
 
   @media (min-width: 480px) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  @media (min-width: 1024px) {
-    grid-template-columns: repeat(3, 1fr);
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  &__btn {
-    all: unset;
-    cursor: pointer;
+  &__link {
     display: block;
-    border-radius: var(--cdf-radius-lg);
+    color: inherit;
+    text-decoration: none;
+    border-radius: 12px;
 
     &:focus-visible {
       outline: 2px solid var(--cdf-color-primary);
       outline-offset: 2px;
     }
-  }
-}
-
-.onboarding-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  background: var(--cdf-color-bg);
-}
-
-h2 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--cdf-space-2);
-  font-size: var(--cdf-font-size-md);
-  color: var(--cdf-color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: var(--cdf-space-6) 0 var(--cdf-space-2);
-  padding: 0 var(--cdf-space-2);
-}
-
-// Constrain content width on desktop while letting it fill the screen on
-// mobile per the responsive philosophy in docs/05-student-app.md §1.
-ion-content {
-  --max-width: 720px;
-  // Keep in sync with the app shell's fixed sidebar (app-shell.scss).
-  --shell-sidebar: 240px;
-
-  > * {
-    max-width: var(--max-width);
-    margin-left: auto;
-    margin-right: auto;
-    width: 100%;
-  }
-
-  > .rec-grid {
-    max-width: var(--max-width);
-  }
-}
-
-// The shell's fixed 240px sidebar offsets ion-content's left edge, so plain
-// auto-centering drifts the readable column right-of-centre on screen (lots of
-// empty space on the left). Re-centre the column on the *full* viewport on
-// desktop, clamped so it keeps a comfortable gap on narrower windows.
-@media (min-width: 768px) {
-  ion-content > * {
-    margin-left: max(16px, calc(50vw - (var(--max-width) / 2) - var(--shell-sidebar)));
   }
 }

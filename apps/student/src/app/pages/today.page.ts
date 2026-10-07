@@ -1,54 +1,71 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
-  IonButton,
-  IonButtons,
-  IonList,
+  IonRefresher,
+  IonRefresherContent,
+  type RefresherCustomEvent,
 } from '@ionic/angular/standalone';
 import {
   AppButton,
   AppCard,
-  AppCheckbox,
-  AppSelect,
-  type AppSelectOption,
+  AppProgressBar,
   AppSkeleton,
-  AppToggle,
-  AvatarWithFrame,
+  AvatarRenderer,
+  type AvatarSlot,
+  type AvatarSprite,
   CoinBadge,
   CourseCard,
-  type CourseCategoryRef,
-  CoursePreviewModal,
-  type CoursePreview,
   DailyQuestList,
   type DailyQuest,
   EmptyState,
   Icon,
-  LessonItem,
-  type LessonItemStatus,
-  type LessonItemType,
-  OnboardingCarousel,
-  type OnboardingSlide,
-  PaywallSheet,
-  type PaywallContent,
-  RewardToast,
+  LevelBadge,
   StreakChip,
-  StreakWidget,
-  type StreakDay,
   XpBar,
+  type OnboardingSlide,
 } from '@codify/ui-ionic';
-import { I18nService, type Locale } from '@codify/i18n';
+import { ContentTranslatePipe, I18nService, TranslatePipe } from '@codify/i18n';
+import { AuthService } from '@codify/auth';
 import {
   CoinService,
   CoinTarget,
   RewardOrchestrator,
-  XpService,
   StreakService,
+  XpService,
 } from '@codify/gamification-engine';
-import { GamificationClient, type QuestView } from '@codify/api-client';
+import {
+  CategoriesClient,
+  CoursesClient,
+  EnrollmentsClient,
+  GamificationClient,
+  ItemsClient,
+  LeaguesClient,
+  ProgressClient,
+  type AvatarResponse,
+  type Category,
+  type CourseListItem,
+  type CurrentLeague,
+  type MyEnrollment,
+  type QuestView,
+} from '@codify/api-client';
+import { AppToastService } from '../platform/app-toast.service.js';
+import {
+  OnboardingFlowComponent,
+  type OnboardingGoal,
+} from '../components/onboarding-flow.component.js';
+import { GrowthLinksService } from './shared/growth-links.service.js';
+import { formatCountdown } from './shared/countdown.js';
 
 const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
   LESSON_COUNT: 'lesson-count',
@@ -58,361 +75,17 @@ const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
   EXERCISE_PASS: 'exercise-pass',
 };
 
-interface ContinueLessonRow {
-  title: string;
-  subtitle: string;
-  type: LessonItemType;
-  status: LessonItemStatus;
-  estimateMinutes: number;
-  isFree: boolean;
-}
+const ONBOARDING_KEY = 'codify.onboarding.';
 
-interface Recommendation {
-  id: string;
-  title: string;
-  author: string;
-  lessonCount: number;
-  estimatedMinutes: number;
-  difficulty: string;
-  categories: CourseCategoryRef[];
-  hasFreePreview: boolean;
-  premiumOnly?: boolean;
-}
-
-type Theme = 'light' | 'dark' | 'system';
-const THEME_STORAGE_KEY = 'codify.theme';
-
-@Component({
-  imports: [
-    FormsModule,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
-    IonContent,
-    IonButton,
-    IonButtons,
-    IonList,
-    AppButton,
-    AppCard,
-    AppCheckbox,
-    AppSelect,
-    AppSkeleton,
-    AppToggle,
-    AvatarWithFrame,
-    CoinBadge,
-    CoinTarget,
-    CourseCard,
-    CoursePreviewModal,
-    DailyQuestList,
-    EmptyState,
-    Icon,
-    LessonItem,
-    OnboardingCarousel,
-    PaywallSheet,
-    RewardToast,
-    StreakChip,
-    StreakWidget,
-    XpBar,
-  ],
-  templateUrl: './today.page.html',
-  styleUrl: './today.page.scss',
-})
-export class TodayPage {
-  private readonly i18n = inject(I18nService);
-  private readonly orchestrator = inject(RewardOrchestrator);
-  private readonly gamificationClient = inject(GamificationClient);
-  protected readonly xpSvc = inject(XpService);
-  protected readonly coinSvc = inject(CoinService);
-  protected readonly streakSvc = inject(StreakService);
-  protected readonly theme = signal<Theme>(this.readPersistedTheme());
-  protected readonly locale = computed(() => this.i18n.currentLocale());
-
-  // Reward demo button — used as the source point for coin-fly.
-  protected readonly rewardBtn = viewChild('rewardBtn', { read: ElementRef });
-
-  // Last 7 days of streak (oldest first; today is last).
-  protected readonly streakWeek: StreakDay[] = [
-    { date: '2026-04-26', completed: true },
-    { date: '2026-04-27', completed: true },
-    { date: '2026-04-28', completed: false, frozen: true },
-    { date: '2026-04-29', completed: true },
-    { date: '2026-04-30', completed: true },
-    { date: '2026-05-01', completed: true },
-    { date: '2026-05-02', completed: true },
-  ];
-
-  /** Today's quests from the server (lazy-assigned on read). */
-  protected readonly dailyQuests = signal<DailyQuest[]>([]);
-
-  // Form-controls demo state.
-  protected readonly notifyDaily = signal(true);
-  protected readonly acceptTerms = signal(false);
-  protected readonly localeChoice = signal<Locale>(this.i18n.currentLocale());
-  protected readonly localeOptions: AppSelectOption<Locale>[] = this.i18n.availableLocales.map(
-    (m) => ({ value: m.code, label: m.nativeName }),
-  );
-
-  // Continue learning + recommendations (mock data — wired to API in Phase 5).
-  protected readonly catalogLoading = signal(true);
-  protected readonly continueLessons: ContinueLessonRow[] = [
-    {
-      title: 'Hooks intro',
-      subtitle: 'React Fundamentals · Lesson 4 of 12',
-      type: 'reading',
-      status: 'in-progress',
-      estimateMinutes: 5,
-      isFree: false,
-    },
-    {
-      title: 'Conditional rendering',
-      subtitle: 'React Fundamentals · Lesson 5 of 12',
-      type: 'quiz',
-      status: 'not-started',
-      estimateMinutes: 7,
-      isFree: false,
-    },
-    {
-      title: 'Building a counter',
-      subtitle: 'React Fundamentals · Lesson 6 of 12',
-      type: 'exercise',
-      status: 'locked',
-      estimateMinutes: 12,
-      isFree: false,
-    },
-  ];
-
-  protected readonly recommendations: Recommendation[] = [
-    {
-      id: 'r1',
-      title: 'Prompt engineering with AI',
-      author: 'Ana T.',
-      lessonCount: 8,
-      estimatedMinutes: 95,
-      difficulty: 'Intermediário',
-      categories: [{ id: 'ai', label: 'AI usage' }],
-      hasFreePreview: true,
-    },
-    {
-      id: 'r2',
-      title: 'Capacitor for Angular devs',
-      author: 'Lucas K.',
-      lessonCount: 10,
-      estimatedMinutes: 140,
-      difficulty: 'Avançado',
-      categories: [
-        { id: 'mobile', label: 'Mobile' },
-        { id: 'frontend', label: 'Frontend' },
-      ],
-      hasFreePreview: false,
-      premiumOnly: true,
-    },
-    {
-      id: 'r3',
-      title: 'Reading code reviews',
-      author: 'Priya M.',
-      lessonCount: 5,
-      estimatedMinutes: 60,
-      difficulty: 'Iniciante',
-      categories: [{ id: 'soft', label: 'Soft skills' }],
-      hasFreePreview: true,
-    },
-  ];
-
-  protected readonly noRecommendations = signal(false);
-
-  // Modal / sheet demo state.
-  protected readonly previewCourse = signal<CoursePreview | null>(null);
-  protected readonly paywallOpen = signal(false);
-  protected readonly onboardingOpen = signal(false);
-
-  protected readonly paywallContent: PaywallContent = {
-    title: 'Go Premium',
-    subtitle: 'Unlock every course, no daily limits, exclusive content.',
-    perks: [
-      'Unlimited lessons across all courses',
-      'Premium-only courses (advanced + AI tracks)',
-      'Double XP on weekends',
-      '+50% Mystery Chest drops',
-    ],
-    plans: [
-      { id: 'monthly', name: 'Monthly', cadence: 'monthly', priceLabel: 'R$ 19,90/mo' },
-      {
-        id: 'yearly',
-        name: 'Yearly',
-        cadence: 'yearly',
-        priceLabel: 'R$ 149/yr',
-        badge: 'Save 37%',
-        highlight: true,
-      },
-    ],
-    footnote: 'Cancel anytime. Restore purchase from Profile > Settings.',
-  };
-
-  protected readonly onboardingSlides: OnboardingSlide[] = [
-    {
-      id: 's1',
-      title: 'Learn by doing',
-      body: 'Bite-sized lessons, quizzes, and code exercises — designed for daily practice.',
-      icon: 'school',
-    },
-    {
-      id: 's2',
-      title: 'Build a streak',
-      body: 'Finish at least one lesson a day to grow your flame and unlock weekly badges.',
-      icon: 'flame',
-    },
-    {
-      id: 's3',
-      title: 'Earn rewards',
-      body: 'XP, coins, levels, and Mystery Chests reward your progress.',
-      icon: 'gift',
-    },
-  ];
-
-  constructor() {
-    this.applyTheme(this.theme());
-    setTimeout(() => this.catalogLoading.set(false), 1500);
-    void this.loadGamification();
-  }
-
-  /**
-   * Reconcile the canonical XP/coins/streak into the engine state services
-   * and load today's quests. Best-effort — the page still renders offline.
-   */
-  private async loadGamification(): Promise<void> {
-    try {
-      const [summary, quests] = await Promise.all([
-        this.gamificationClient.summary(),
-        this.gamificationClient.questsToday(),
-      ]);
-      this.orchestrator.reconcile({
-        totalXp: summary.totalXp,
-        coins: summary.coins,
-        streakDays: summary.streak.currentDays,
-        freezesAvailable: summary.streak.freezesAvailable,
-      });
-      this.dailyQuests.set(quests.map(toDailyQuest));
-    } catch {
-      /* offline / signed out — leave defaults */
-    }
-  }
-
-  protected toggleTheme(): void {
-    const next = this.theme() === 'dark' ? 'light' : 'dark';
-    this.theme.set(next);
-    this.applyTheme(next);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch {
-      /* private browsing — ignore */
-    }
-  }
-
-  protected onLocaleChange(value: Locale | null): void {
-    if (value) {
-      this.localeChoice.set(value);
-      this.i18n.setLocale(value);
-    }
-  }
-
-  protected toggleRecommendations(): void {
-    this.noRecommendations.update((v) => !v);
-  }
-
-  protected openPreview(rec: Recommendation): void {
-    this.previewCourse.set({
-      id: rec.id,
-      title: rec.title,
-      description: `A short preview of ${rec.title}. The first lesson is free; the rest unlocks once you start.`,
-      author: rec.author,
-      lessonCount: rec.lessonCount,
-      estimatedMinutes: rec.estimatedMinutes,
-      difficulty: rec.difficulty,
-      categories: rec.categories,
-      hasFreePreview: rec.hasFreePreview,
-      premiumOnly: rec.premiumOnly,
-      curriculum: Array.from({ length: rec.lessonCount }, (_, i) => ({
-        id: `${rec.id}-l${i + 1}`,
-        title: `Lesson ${i + 1}`,
-        type: i % 3 === 0 ? 'quiz' : i % 3 === 1 ? 'exercise' : 'reading',
-        status: i === 0 ? 'in-progress' : (rec.premiumOnly && i > 0) ? 'locked' : 'not-started',
-        estimateMinutes: 6 + (i % 4) * 2,
-        isFree: i === 0 && rec.hasFreePreview,
-      })),
-    });
-  }
-
-  protected onPreviewStart(id: string): void {
-    console.log('[demo] start course', id);
-    this.previewCourse.set(null);
-  }
-
-  protected onPreviewUnlock(_id: string): void {
-    this.previewCourse.set(null);
-    this.paywallOpen.set(true);
-  }
-
-  protected onPaywallSelected(planId: string): void {
-    console.log('[demo] paywall selected', planId);
-    this.paywallOpen.set(false);
-  }
-
-  protected triggerReward(): void {
-    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
-    void this.orchestrator.grant({
-      kind: 'lessonComplete',
-      canonical: { xp: 25, coins: 10, multiplier: 1 },
-      sourceEl,
-    });
-  }
-
-  protected triggerLevelUp(): void {
-    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
-    void this.orchestrator.grant({
-      kind: 'levelUp',
-      canonical: { xp: 200, coins: 50 },
-      levelUp: { newLevel: this.xpSvc.level() + 1, xpForNextLevel: 350 },
-      sourceEl,
-    });
-  }
-
-  protected triggerBadge(): void {
-    const sourceEl = (this.rewardBtn()?.nativeElement as HTMLElement | undefined) ?? null;
-    void this.orchestrator.grant({
-      kind: 'badgeUnlock',
-      canonical: { xp: 0, coins: 25 },
-      badgesUnlocked: [
-        {
-          id: 'streak-7',
-          name: 'Week Warrior',
-          icon: 'flame',
-          description: 'Held a 7-day learning streak.',
-        },
-      ],
-      sourceEl,
-    });
-  }
-
-  private applyTheme(theme: Theme): void {
-    const root = document.documentElement;
-    root.classList.remove('theme-light', 'theme-dark');
-    if (theme === 'light') root.classList.add('theme-light');
-    if (theme === 'dark') root.classList.add('theme-dark');
-  }
-
-  private readPersistedTheme(): Theme {
-    try {
-      const v = localStorage.getItem(THEME_STORAGE_KEY);
-      if (v === 'light' || v === 'dark' || v === 'system') return v;
-    } catch {
-      /* ignore */
-    }
-    return 'system';
-  }
+interface ContinueCard {
+  enrollment: MyEnrollment;
+  lessonId: string | null;
+  lessonTitle: string | null;
+  pct: number;
 }
 
 /** Map a server QuestView to the ui-ionic DailyQuest shape. */
-function toDailyQuest(q: QuestView): DailyQuest {
+export function toDailyQuest(q: QuestView): DailyQuest {
   return {
     id: q.id,
     title: q.title,
@@ -423,4 +96,338 @@ function toDailyQuest(q: QuestView): DailyQuest {
     kind: KIND_MAP[q.kind],
     completed: q.completed,
   };
+}
+
+/** The enrollment to resume: started but unfinished first, then newest. */
+export function pickContinue(
+  items: readonly MyEnrollment[],
+): MyEnrollment | null {
+  const open = items.filter(
+    (e) =>
+      e.progress.totalLessons === 0 ||
+      e.progress.completedLessons < e.progress.totalLessons,
+  );
+  if (open.length === 0) return null;
+  return [...open].sort((a, b) => {
+    const sa = a.progress.completedLessons > 0 ? 1 : 0;
+    const sb = b.progress.completedLessons > 0 ? 1 : 0;
+    return sb - sa || b.createdAt.localeCompare(a.createdAt);
+  })[0];
+}
+
+/** Should first-run onboarding show? New accounts with no XP and no courses. */
+export function needsOnboarding(opts: {
+  totalXp: number;
+  enrollments: number;
+  dismissed: boolean;
+}): boolean {
+  return !opts.dismissed && opts.totalXp === 0 && opts.enrollments === 0;
+}
+
+/**
+ * Today (docs/05 §3): greeting + streak / level / coins from the canonical
+ * gamification summary, "continue learning" from the learner's enrollments,
+ * today's quests, the league widget and course recommendations. First-run
+ * accounts get the onboarding flow. Everything is real data; failures show
+ * per-section states and a toast.
+ */
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    RouterLink,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    IonRefresher,
+    IonRefresherContent,
+    AppButton,
+    AppCard,
+    AppProgressBar,
+    AppSkeleton,
+    AvatarRenderer,
+    CoinBadge,
+    CoinTarget,
+    CourseCard,
+    DailyQuestList,
+    EmptyState,
+    Icon,
+    LevelBadge,
+    StreakChip,
+    XpBar,
+    OnboardingFlowComponent,
+    TranslatePipe,
+    ContentTranslatePipe,
+  ],
+  templateUrl: './today.page.html',
+  styleUrl: './today.page.scss',
+})
+export class TodayPage {
+  private readonly auth = inject(AuthService);
+  private readonly i18n = inject(I18nService);
+  private readonly router = inject(Router);
+  private readonly toast = inject(AppToastService);
+  private readonly orchestrator = inject(RewardOrchestrator);
+  private readonly gamification = inject(GamificationClient);
+  private readonly enrollments = inject(EnrollmentsClient);
+  private readonly courses = inject(CoursesClient);
+  private readonly categoriesClient = inject(CategoriesClient);
+  private readonly progress = inject(ProgressClient);
+  private readonly leagues = inject(LeaguesClient);
+  private readonly items = inject(ItemsClient);
+  private readonly growth = inject(GrowthLinksService);
+  protected readonly xpSvc = inject(XpService);
+  protected readonly coinSvc = inject(CoinService);
+  protected readonly streakSvc = inject(StreakService);
+
+  protected readonly displayName = computed(
+    () => this.auth.user()?.displayName ?? '',
+  );
+  protected readonly loadingSummary = signal(true);
+  protected readonly loadingLearning = signal(true);
+  protected readonly quests = signal<DailyQuest[] | null>(null);
+  protected readonly questsFailed = signal(false);
+  protected readonly continueCard = signal<ContinueCard | null>(null);
+  protected readonly enrollmentCount = signal(0);
+  protected readonly catalog = signal<CourseListItem[]>([]);
+  protected readonly categories = signal<Category[]>([]);
+  protected readonly league = signal<CurrentLeague | null>(null);
+  protected readonly avatar = signal<AvatarResponse | null>(null);
+  protected readonly onboarding = signal(false);
+  protected readonly now = signal(Date.now());
+  private enrolledCourseIds = new Set<string>();
+
+  protected readonly recommendations = computed(() =>
+    this.catalog()
+      .filter((c) => !this.enrolledCourseIds.has(c.id))
+      .slice(0, 3),
+  );
+
+  protected readonly equipped = computed<
+    Partial<Record<AvatarSlot, AvatarSprite>>
+  >(() => {
+    const out: Partial<Record<AvatarSlot, AvatarSprite>> = {};
+    for (const [slot, ref] of Object.entries(this.avatar()?.equipped ?? {})) {
+      if (ref)
+        out[slot as AvatarSlot] = {
+          spriteAssetId: ref.spriteAssetId,
+          name: ref.name,
+          rarity: ref.rarity,
+        };
+    }
+    return out;
+  });
+
+  protected readonly leagueReset = computed(() => {
+    const lg = this.league();
+    this.i18n.currentLocale();
+    return lg
+      ? formatCountdown(new Date(lg.resetAt).getTime() - this.now(), (k, p) =>
+          this.i18n.t(k, p),
+        )
+      : '';
+  });
+
+  protected readonly slides = computed<OnboardingSlide[]>(() => {
+    this.i18n.currentLocale();
+    const t = (k: string) => this.i18n.t(k);
+    return [
+      {
+        id: 'learn',
+        icon: 'school',
+        title: t('student.onboarding.slides.learn.title'),
+        body: t('student.onboarding.slides.learn.body'),
+      },
+      {
+        id: 'streak',
+        icon: 'flame',
+        title: t('student.onboarding.slides.streak.title'),
+        body: t('student.onboarding.slides.streak.body'),
+      },
+      {
+        id: 'rewards',
+        icon: 'gift',
+        title: t('student.onboarding.slides.rewards.title'),
+        body: t('student.onboarding.slides.rewards.body'),
+      },
+    ];
+  });
+
+  constructor() {
+    const timer = setInterval(() => this.now.set(Date.now()), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    void this.loadAll();
+    if (this.growth.hasPending()) void this.claimGrowth();
+  }
+
+  protected async onRefresh(ev: RefresherCustomEvent): Promise<void> {
+    await this.loadAll();
+    await ev.target.complete();
+  }
+
+  private async loadAll(): Promise<void> {
+    const [totalXp, enrollments] = await Promise.all([
+      this.loadSummary(),
+      this.loadLearning(),
+      this.loadLeague(),
+      this.loadAvatar(),
+    ]);
+    if (totalXp !== null && enrollments !== null)
+      this.maybeOnboard(totalXp, enrollments);
+  }
+
+  /** Canonical XP / coins / streak + today's quests. */
+  private async loadSummary(): Promise<number | null> {
+    try {
+      const [summary, quests] = await Promise.all([
+        this.gamification.summary(),
+        this.gamification.questsToday().catch(() => {
+          this.questsFailed.set(true);
+          return [] as QuestView[];
+        }),
+      ]);
+      this.orchestrator.reconcile({
+        totalXp: summary.totalXp,
+        coins: summary.coins,
+        streakDays: summary.streak.currentDays,
+        freezesAvailable: summary.streak.freezesAvailable,
+      });
+      this.quests.set(quests.map(toDailyQuest));
+      return summary.totalXp;
+    } catch (err) {
+      this.toast.error(err);
+      return null;
+    } finally {
+      this.loadingSummary.set(false);
+    }
+  }
+
+  /** Enrollments → continue card; catalog → recommendations + onboarding. */
+  private async loadLearning(): Promise<number | null> {
+    try {
+      const [mine, catalog, categories] = await Promise.all([
+        this.enrollments.mine(),
+        this.courses.list({ status: 'PUBLISHED', take: 24 }),
+        this.categoriesClient
+          .list({ take: 100 })
+          .then((r) => r.items)
+          .catch(() => []),
+      ]);
+      this.enrolledCourseIds = new Set(mine.map((e) => e.courseId));
+      this.enrollmentCount.set(mine.length);
+      this.catalog.set(catalog.items);
+      this.categories.set(categories);
+      const pick = pickContinue(mine);
+      this.continueCard.set(pick ? await this.resolveNextLesson(pick) : null);
+      return mine.length;
+    } catch (err) {
+      this.toast.error(err);
+      return null;
+    } finally {
+      this.loadingLearning.set(false);
+    }
+  }
+
+  /** First lesson of the course the learner hasn't completed yet. */
+  private async resolveNextLesson(e: MyEnrollment): Promise<ContinueCard> {
+    const pct = e.progress.totalLessons
+      ? Math.round(
+          (e.progress.completedLessons / e.progress.totalLessons) * 100,
+        )
+      : 0;
+    try {
+      const [detail, prog] = await Promise.all([
+        this.courses.detail(e.course.slug),
+        this.progress.forCourse(e.courseId),
+      ]);
+      const done = new Set(prog.items.map((i) => i.lessonId));
+      const next =
+        detail.modules.flatMap((m) => m.lessons).find((l) => !done.has(l.id)) ??
+        null;
+      return {
+        enrollment: e,
+        lessonId: next?.id ?? null,
+        lessonTitle: next?.title ?? null,
+        pct,
+      };
+    } catch {
+      return { enrollment: e, lessonId: null, lessonTitle: null, pct };
+    }
+  }
+
+  private async loadLeague(): Promise<void> {
+    try {
+      this.league.set(await this.leagues.currentLeague());
+    } catch {
+      // No cohort yet this week (404) or offline — the widget just hides.
+      this.league.set(null);
+    }
+  }
+
+  private async loadAvatar(): Promise<void> {
+    try {
+      this.avatar.set(await this.items.avatar());
+    } catch {
+      // Falls back to the initials avatar.
+      this.avatar.set(null);
+    }
+  }
+
+  private onboardingKey(): string | null {
+    const id = this.auth.user()?.id;
+    return id ? ONBOARDING_KEY + id : null;
+  }
+
+  private maybeOnboard(totalXp: number, enrollments: number): void {
+    const key = this.onboardingKey();
+    if (!key) return;
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(key) !== null;
+    } catch {
+      dismissed = true;
+    }
+    this.onboarding.set(needsOnboarding({ totalXp, enrollments, dismissed }));
+  }
+
+  protected async onOnboardingDone(ev: {
+    goal: OnboardingGoal | null;
+    course: CourseListItem | null;
+  }): Promise<void> {
+    this.onboarding.set(false);
+    const key = this.onboardingKey();
+    try {
+      if (key)
+        localStorage.setItem(
+          key,
+          JSON.stringify({ goal: ev.goal, at: new Date().toISOString() }),
+        );
+    } catch {
+      // Storage unavailable: onboarding may show again next visit.
+    }
+    if (!ev.course) return;
+    try {
+      await this.enrollments.enroll(ev.course.id);
+    } catch (err) {
+      this.toast.error(err);
+    }
+    void this.router.navigate(['/courses', ev.course.slug]);
+  }
+
+  private async claimGrowth(): Promise<void> {
+    const res = await this.growth.claimPending();
+    if (res.referral === 'claimed') {
+      this.toast.show({
+        message: 'student.growth.referral.claimed',
+        kind: 'success',
+      });
+    }
+    if (res.invite && res.invite.status === 'accepted') {
+      this.toast.show({
+        message: 'student.growth.invite.accepted',
+        kind: 'success',
+        params: { name: res.invite.friendName },
+      });
+    }
+  }
 }
