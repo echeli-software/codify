@@ -25,7 +25,10 @@ import type {
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(opts: { skip: number; take: number }): Promise<CategoryListResponse> {
+  async list(opts: {
+    skip: number;
+    take: number;
+  }): Promise<CategoryListResponse> {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.category.findMany({
         skip: opts.skip,
@@ -63,7 +66,10 @@ export class CategoriesService {
     return toResponse(created);
   }
 
-  async update(id: string, patch: UpdateCategoryDto): Promise<CategoryResponse> {
+  async update(
+    id: string,
+    patch: UpdateCategoryDto,
+  ): Promise<CategoryResponse> {
     const target = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
     });
@@ -74,9 +80,27 @@ export class CategoriesService {
       });
       if (dupe) throw new ConflictException('Slug already in use');
     }
-    const updated = await this.prisma.category.update({
-      where: { id },
-      data: { ...patch },
+    // Category name/description are the source-locale text; translations of
+    // a field that actually changed become outdated (docs/11 workspace).
+    const changed = (['name', 'description'] as const).filter(
+      (f) => patch[f] !== undefined && patch[f] !== target[f],
+    );
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.category.update({
+        where: { id },
+        data: { ...patch },
+      });
+      if (changed.length > 0) {
+        await tx.contentTranslation.updateMany({
+          where: {
+            entityType: 'CATEGORY',
+            entityId: id,
+            field: { in: [...changed] },
+          },
+          data: { outdated: true },
+        });
+      }
+      return row;
     });
     return toResponse(updated);
   }

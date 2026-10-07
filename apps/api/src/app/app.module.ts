@@ -27,6 +27,10 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
 import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { UsersModule } from './users/users.module.js';
+import { QuizzesModule } from './quizzes/quizzes.module.js';
+import { EnrollmentsModule } from './enrollments/enrollments.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { AssetsModule } from './assets/assets.module.js';
 import { ReferralsModule } from './referrals/referrals.module.js';
 import { TranslationsModule } from './translations/translations.module.js';
 
@@ -59,6 +63,10 @@ import { OpsModule } from './ops/ops.module.js';
     PlansModule,
     ProgressModule,
     ScenariosModule,
+    QuizzesModule,
+    EnrollmentsModule,
+    AnalyticsModule,
+    AssetsModule,
     ReferralsModule,
     TranslationsModule,
 

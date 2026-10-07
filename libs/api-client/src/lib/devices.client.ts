@@ -17,11 +17,19 @@ export class DevicesClient {
 
   register(token: string, platform: DevicePlatform): Promise<{ id: string }> {
     return firstValueFrom(
-      this.http.post<{ id: string }>(`${this.base}/devices`, { token, platform }, { context: withIdempotency() }),
+      this.http.post<{ id: string }>(
+        `${this.base}/devices`,
+        { token, platform },
+        { context: withIdempotency() },
+      ),
     );
   }
 
   unregister(token: string): Promise<{ removed: number }> {
-    return firstValueFrom(this.http.delete<{ removed: number }>(`${this.base}/devices/${encodeURIComponent(token)}`));
+    return firstValueFrom(
+      this.http.delete<{ removed: number }>(
+        `${this.base}/devices/${encodeURIComponent(token)}`,
+      ),
+    );
   }
 }

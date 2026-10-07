@@ -371,8 +371,8 @@ export class AiGradingService {
       const done = await this.progress.recordCompletion({
         userId,
         lessonId: lesson.id,
-        xpSource: 'AI_PROMPT_PASS',
-        coinSource: 'AI_PROMPT_PASS',
+        xpSource: capstone ? 'CAPSTONE_PASS' : 'AI_PROMPT_PASS',
+        coinSource: capstone ? 'CAPSTONE_PASS' : 'AI_PROMPT_PASS',
         refType: capstone ? 'capstone' : 'ai_prompt',
         refId: aiPromptId,
         questEvent: capstone ? 'capstone_pass' : 'ai_prompt_pass',

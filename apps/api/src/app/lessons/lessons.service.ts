@@ -228,6 +228,19 @@ export class LessonsService {
         await tx.lesson.update({ where: { id }, data });
       }
 
+      if (data.contentJson !== undefined) {
+        // The source body changed: every translated body is now stale.
+        await tx.contentTranslation.updateMany({
+          where: {
+            entityType: 'LESSON',
+            entityId: id,
+            field: 'contentJson',
+            locale: { not: target.module.course.sourceLocale },
+          },
+          data: { outdated: true },
+        });
+      }
+
       if (patch.title !== undefined) {
         await tx.contentTranslation.upsert({
           where: {

@@ -253,9 +253,8 @@ export class ReferralsService {
           userId: row.referrerId,
           baseXp: reward.xp,
           baseCoins: reward.coins,
-          // No dedicated REFERRAL source in the enums yet (schema change).
-          xpSource: 'ADMIN_GRANT',
-          coinSource: 'PROMO_CODE',
+          xpSource: 'REFERRAL',
+          coinSource: 'REFERRAL',
           refType: 'referral',
           refId: row.refereeId,
           idempotencyKey: referralRewardKey(row.refereeId),

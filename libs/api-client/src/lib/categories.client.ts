@@ -41,10 +41,14 @@ export class CategoriesClient {
   private readonly http = inject(HttpClient);
   private readonly config = inject(API_CLIENT_CONFIG);
 
-  list(opts: { skip?: number; take?: number } = {}): Promise<CategoryListResponse> {
+  list(
+    opts: { skip?: number; take?: number } = {},
+  ): Promise<CategoryListResponse> {
     let params = new HttpParams();
-    if (typeof opts.skip === 'number') params = params.set('skip', String(opts.skip));
-    if (typeof opts.take === 'number') params = params.set('take', String(opts.take));
+    if (typeof opts.skip === 'number')
+      params = params.set('skip', String(opts.skip));
+    if (typeof opts.take === 'number')
+      params = params.set('take', String(opts.take));
     return firstValueFrom(
       this.http.get<CategoryListResponse>(`${this.config.baseUrl}/categories`, {
         params,

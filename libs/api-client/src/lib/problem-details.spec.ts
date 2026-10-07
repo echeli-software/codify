@@ -20,7 +20,11 @@ describe('toProblemDetails', () => {
     const err = {
       status: 401,
       statusText: 'Unauthorized',
-      error: { statusCode: 401, message: 'Authentication required', error: 'Unauthorized' },
+      error: {
+        statusCode: 401,
+        message: 'Authentication required',
+        error: 'Unauthorized',
+      },
     };
     const p = toProblemDetails(err);
     expect(p.status).toBe(401);

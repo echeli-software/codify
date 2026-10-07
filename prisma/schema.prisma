@@ -402,6 +402,8 @@ enum XpSource {
   BADGE_UNLOCK
   LEAGUE_PROMOTION
   ADMIN_GRANT
+  CAPSTONE_PASS
+  REFERRAL
 }
 
 /// Immutable XP journal. The user's current XP is SUM(amount); we also keep
@@ -437,6 +439,8 @@ enum CoinSource {
   ADMIN_GRANT
   ITEM_PURCHASE
   CHEST_PURCHASE
+  CAPSTONE_PASS
+  REFERRAL
 }
 
 /// Coin ledger — source of truth for the balance. `balanceAfter` is a

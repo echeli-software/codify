@@ -15,19 +15,27 @@ export class UsersClient {
   private readonly config = inject(API_CLIENT_CONFIG);
 
   /** GET /api/users?skip=&take= */
-  list(opts: { skip?: number; take?: number } = {}): Promise<AdminUserListResponse> {
+  list(
+    opts: { skip?: number; take?: number } = {},
+  ): Promise<AdminUserListResponse> {
     let params = new HttpParams();
-    if (typeof opts.skip === 'number') params = params.set('skip', String(opts.skip));
-    if (typeof opts.take === 'number') params = params.set('take', String(opts.take));
+    if (typeof opts.skip === 'number')
+      params = params.set('skip', String(opts.skip));
+    if (typeof opts.take === 'number')
+      params = params.set('take', String(opts.take));
     return firstValueFrom(
-      this.http.get<AdminUserListResponse>(`${this.config.baseUrl}/users`, { params }),
+      this.http.get<AdminUserListResponse>(`${this.config.baseUrl}/users`, {
+        params,
+      }),
     );
   }
 
   /** GET /api/users/:id */
   detail(id: string): Promise<MeResponse> {
     return firstValueFrom(
-      this.http.get<MeResponse>(`${this.config.baseUrl}/users/${encodeURIComponent(id)}`),
+      this.http.get<MeResponse>(
+        `${this.config.baseUrl}/users/${encodeURIComponent(id)}`,
+      ),
     );
   }
 }

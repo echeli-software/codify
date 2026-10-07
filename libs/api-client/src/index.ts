@@ -226,3 +226,31 @@ export type {
   LessonVersion,
   LessonContentIssue,
 } from './lib/lessons.client.js';
+
+// Quizzes, enrollments, uploads, analytics.
+export {
+  QuizzesClient,
+  type QuizAttemptResult,
+  type QuizAttemptSummary,
+  type QuizQuestionFeedback,
+} from './lib/quizzes.client.js';
+export {
+  EnrollmentsClient,
+  type EnrollmentSource,
+  type EnrollmentView,
+  type MyEnrollment,
+  type GrantEnrollmentBody,
+} from './lib/enrollments.client.js';
+export {
+  AssetsClient,
+  type AssetKind,
+  type AssetView,
+  type AssetPage,
+  type PresignedUpload,
+} from './lib/assets.client.js';
+export {
+  AnalyticsClient,
+  type AnalyticsBatch,
+  type AnalyticsEventInput,
+  type AnalyticsSummaryRow,
+} from './lib/analytics.client.js';

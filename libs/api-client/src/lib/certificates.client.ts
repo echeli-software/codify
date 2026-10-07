@@ -31,18 +31,32 @@ export class CertificatesClient {
 
   // Student
   claim(courseId: string): Promise<CertificateView> {
-    return firstValueFrom(this.http.post<CertificateView>(`${this.base}/certificates/claim`, { courseId }, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.post<CertificateView>(
+        `${this.base}/certificates/claim`,
+        { courseId },
+        { context: withIdempotency() },
+      ),
+    );
   }
   listMine(): Promise<CertificateView[]> {
-    return firstValueFrom(this.http.get<CertificateView[]>(`${this.base}/me/certificates`));
+    return firstValueFrom(
+      this.http.get<CertificateView[]>(`${this.base}/me/certificates`),
+    );
   }
   referral(): Promise<ReferralView> {
-    return firstValueFrom(this.http.get<ReferralView>(`${this.base}/me/referral`));
+    return firstValueFrom(
+      this.http.get<ReferralView>(`${this.base}/me/referral`),
+    );
   }
 
   // Public
   verify(serial: string): Promise<VerifyResult> {
-    return firstValueFrom(this.http.get<VerifyResult>(`${this.base}/certificates/${encodeURIComponent(serial)}`));
+    return firstValueFrom(
+      this.http.get<VerifyResult>(
+        `${this.base}/certificates/${encodeURIComponent(serial)}`,
+      ),
+    );
   }
   imageUrl(serial: string): string {
     return `${this.base}/certificates/${encodeURIComponent(serial)}/image.svg`;

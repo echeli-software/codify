@@ -77,3 +77,6 @@ apps/student/fastlane/README.md
 *.jks
 *.p12
 *.mobileprovision
+
+# Dev asset storage (R2 stand-in)
+apps/api/uploads

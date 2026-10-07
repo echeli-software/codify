@@ -42,6 +42,9 @@ async function bootstrap() {
     bufferLogs: true,
   });
   app.useLogger(app.get(Logger));
+  // Lesson docs are validated up to 500 KB (lessons service → 413 above);
+  // Express's 100 KB default would reject them before validation runs.
+  app.useBodyParser('json', { limit: '1mb' });
   const config = app.get(AppConfigService);
 
   const globalPrefix = 'api';
