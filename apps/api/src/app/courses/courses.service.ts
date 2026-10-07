@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { ContentTranslation, Course, CourseStatus, Prisma } from '@prisma/client';
+import type {
+  ContentTranslation,
+  Course,
+  CourseStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
@@ -96,7 +101,9 @@ export class CoursesService {
           select: { id: true, courseId: true },
         })
       : [];
-    const moduleIdToCourseId = new Map(courseModules.map((m) => [m.id, m.courseId]));
+    const moduleIdToCourseId = new Map(
+      courseModules.map((m) => [m.id, m.courseId]),
+    );
     const lessonGroups = courseModules.length
       ? await this.prisma.lesson.groupBy({
           by: ['moduleId'],
@@ -111,7 +118,10 @@ export class CoursesService {
     for (const g of lessonGroups) {
       const cid = moduleIdToCourseId.get(g.moduleId);
       if (!cid) continue;
-      lessonCountByCourseId.set(cid, (lessonCountByCourseId.get(cid) ?? 0) + g._count._all);
+      lessonCountByCourseId.set(
+        cid,
+        (lessonCountByCourseId.get(cid) ?? 0) + g._count._all,
+      );
     }
 
     return {
@@ -127,7 +137,16 @@ export class CoursesService {
     };
   }
 
-  async getDetail(idOrSlug: string, locale: string): Promise<CourseDetail> {
+  /**
+   * Course detail. STUDENTs (and unauthenticated callers, if the route is
+   * ever made public) only see PUBLISHED courses — drafts and archived
+   * courses 404 exactly like a missing course.
+   */
+  async getDetail(
+    actor: ApiUser | undefined,
+    idOrSlug: string,
+    locale: string,
+  ): Promise<CourseDetail> {
     const where = isUuid(idOrSlug)
       ? { id: idOrSlug, deletedAt: null }
       : { slug: idOrSlug, deletedAt: null };
@@ -155,6 +174,12 @@ export class CoursesService {
       },
     });
     if (!course) throw new NotFoundException('Course not found');
+    const isStaff =
+      actor?.role === 'ADMIN' ||
+      actor?.role === 'TEACHER' ||
+      actor?.role === 'SUPPORT';
+    if (!isStaff && course.status !== 'PUBLISHED')
+      throw new NotFoundException('Course not found');
 
     const courseTranslations = await this.prisma.contentTranslation.findMany({
       where: { entityType: 'COURSE', entityId: course.id },
@@ -164,14 +189,21 @@ export class CoursesService {
     const childTranslations = await this.prisma.contentTranslation.findMany({
       where: {
         OR: [
-          moduleIds.length ? { entityType: 'MODULE', entityId: { in: moduleIds } } : undefined,
-          lessonIds.length ? { entityType: 'LESSON', entityId: { in: lessonIds } } : undefined,
+          moduleIds.length
+            ? { entityType: 'MODULE', entityId: { in: moduleIds } }
+            : undefined,
+          lessonIds.length
+            ? { entityType: 'LESSON', entityId: { in: lessonIds } }
+            : undefined,
         ].filter(Boolean) as Prisma.ContentTranslationWhereInput[],
         field: { in: ['title'] },
       },
     });
 
-    const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
+    const totalLessons = course.modules.reduce(
+      (sum, m) => sum + m.lessons.length,
+      0,
+    );
     const list = toListItem(
       {
         ...course,
@@ -185,8 +217,14 @@ export class CoursesService {
     const modules: CourseModuleSummary[] = course.modules.map((m) => ({
       id: m.id,
       order: m.order,
-      title: pickTitle(childTranslations, 'MODULE', m.id, locale, course.sourceLocale)
-        ?? `Module ${m.order + 1}`,
+      title:
+        pickTitle(
+          childTranslations,
+          'MODULE',
+          m.id,
+          locale,
+          course.sourceLocale,
+        ) ?? `Module ${m.order + 1}`,
       lessons: m.lessons.map((l) => ({
         id: l.id,
         order: l.order,
@@ -194,16 +232,26 @@ export class CoursesService {
         isFree: l.isFree,
         estimatedMinutes: l.estimatedMinutes,
         title:
-          pickTitle(childTranslations, 'LESSON', l.id, locale, course.sourceLocale) ??
-          `Lesson ${l.order + 1}`,
+          pickTitle(
+            childTranslations,
+            'LESSON',
+            l.id,
+            locale,
+            course.sourceLocale,
+          ) ?? `Lesson ${l.order + 1}`,
       })),
     }));
 
     return { ...list, modules };
   }
 
-  async create(actor: ApiUser, input: CreateCourseDto): Promise<CourseListItem> {
-    const existing = await this.prisma.course.findUnique({ where: { slug: input.slug } });
+  async create(
+    actor: ApiUser,
+    input: CreateCourseDto,
+  ): Promise<CourseListItem> {
+    const existing = await this.prisma.course.findUnique({
+      where: { slug: input.slug },
+    });
     if (existing) throw new ConflictException('Slug already in use');
 
     const sourceLocale = input.sourceLocale ?? 'pt-BR';
@@ -257,23 +305,29 @@ export class CoursesService {
     id: string,
     patch: UpdateCourseDto,
   ): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
       throw new ForbiddenException('Teachers can only edit their own courses');
     }
     if (patch.slug && patch.slug !== target.slug) {
-      const dupe = await this.prisma.course.findUnique({ where: { slug: patch.slug } });
+      const dupe = await this.prisma.course.findUnique({
+        where: { slug: patch.slug },
+      });
       if (dupe) throw new ConflictException('Slug already in use');
     }
 
     await this.prisma.$transaction(async (tx) => {
       const data: Prisma.CourseUpdateInput = {};
       if (patch.slug) data.slug = patch.slug;
-      if (typeof patch.difficulty === 'number') data.difficulty = patch.difficulty;
+      if (typeof patch.difficulty === 'number')
+        data.difficulty = patch.difficulty;
       if (typeof patch.estimatedMinutes === 'number')
         data.estimatedMinutes = patch.estimatedMinutes;
-      if (typeof patch.isCapstone === 'boolean') data.isCapstone = patch.isCapstone;
+      if (typeof patch.isCapstone === 'boolean')
+        data.isCapstone = patch.isCapstone;
 
       if (Object.keys(data).length > 0) {
         await tx.course.update({ where: { id }, data });
@@ -336,38 +390,59 @@ export class CoursesService {
   }
 
   async publish(actor: ApiUser, id: string): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only publish their own courses');
+      throw new ForbiddenException(
+        'Teachers can only publish their own courses',
+      );
     }
     if (target.status === 'PUBLISHED') {
       throw new BadRequestException('Already published');
     }
     await this.prisma.course.update({
       where: { id },
-      data: { status: 'PUBLISHED', publishedAt: target.publishedAt ?? new Date() },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: target.publishedAt ?? new Date(),
+      },
     });
     return this.getById(id, target.sourceLocale);
   }
 
   async archive(actor: ApiUser, id: string): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only archive their own courses');
+      throw new ForbiddenException(
+        'Teachers can only archive their own courses',
+      );
     }
-    await this.prisma.course.update({ where: { id }, data: { status: 'ARCHIVED' } });
+    await this.prisma.course.update({
+      where: { id },
+      data: { status: 'ARCHIVED' },
+    });
     return this.getById(id, target.sourceLocale);
   }
 
   async softDelete(actor: ApiUser, id: string): Promise<void> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only delete their own courses');
+      throw new ForbiddenException(
+        'Teachers can only delete their own courses',
+      );
     }
-    await this.prisma.course.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.course.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   private async getById(id: string, locale: string): Promise<CourseListItem> {
@@ -405,7 +480,11 @@ function toListItem(
   locale: string,
   lessonCount: number,
 ): CourseListItem {
-  const resolved = pickTitleAndDescription(translations, locale, c.sourceLocale);
+  const resolved = pickTitleAndDescription(
+    translations,
+    locale,
+    c.sourceLocale,
+  );
   return {
     id: c.id,
     slug: c.slug,
@@ -432,7 +511,9 @@ function pickTitleAndDescription(
   locale: string,
   sourceLocale: string,
 ): ResolvedTitle {
-  const titleAtLocale = translations.find((t) => t.field === 'title' && t.locale === locale);
+  const titleAtLocale = translations.find(
+    (t) => t.field === 'title' && t.locale === locale,
+  );
   const titleAtSource = translations.find(
     (t) => t.field === 'title' && t.locale === sourceLocale,
   );
@@ -459,7 +540,10 @@ function pickTitle(
   sourceLocale: string,
 ): string | null {
   const matching = translations.filter(
-    (t) => t.entityType === entityType && t.entityId === entityId && t.field === 'title',
+    (t) =>
+      t.entityType === entityType &&
+      t.entityId === entityId &&
+      t.field === 'title',
   );
   if (matching.length === 0) return null;
   const atLocale = matching.find((t) => t.locale === locale);
@@ -486,5 +570,7 @@ async function upsertTranslation(
 }
 
 function isUuid(s: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    s,
+  );
 }

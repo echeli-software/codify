@@ -1,19 +1,41 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+import type { TestCase } from '@codify/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
   ExercisesService,
+  type ExerciseInput,
   type RunResult,
   type StudentExerciseView,
-  type SubmitResult,
 } from './exercises.service.js';
-import { CodeDto, CreateExerciseDto, UpdateExerciseDto } from './exercises.dto.js';
-import type { TestCase } from '@codify/domain';
+import {
+  SubmissionsService,
+  type SubmissionView,
+} from './submissions.service.js';
+import {
+  CodeDto,
+  CreateExerciseDto,
+  UpdateExerciseDto,
+} from './exercises.dto.js';
+import { RetryAfterInterceptor } from './rate-limit.js';
 
-function toInput(dto: CreateExerciseDto | UpdateExerciseDto) {
+function toInput(
+  dto: CreateExerciseDto | UpdateExerciseDto,
+): Partial<ExerciseInput> {
   return {
     ...dto,
     visibleTests: dto.visibleTests as unknown as TestCase[] | undefined,
@@ -21,10 +43,29 @@ function toInput(dto: CreateExerciseDto | UpdateExerciseDto) {
   };
 }
 
+/**
+ * Coding exercises (docs/12).
+ *
+ * Admin (ADMIN, or a TEACHER on their own course):
+ *   POST  /lessons/:lessonId/exercise        create + attach
+ *   PATCH /exercises/:id                     update
+ *   GET   /exercises/:id                     full exercise incl. solution + hidden tests
+ *   GET   /lessons/:lessonId/exercise/admin  same, by lesson (null when none)
+ *   POST  /exercises/:id/verify              run the reference solution on all tests
+ *
+ * Student:
+ *   GET   /lessons/:lessonId/exercise        starter code + visible tests
+ *   POST  /exercises/:id/run                 visible tests only, synchronous
+ *   POST  /exercises/:id/submit              visible + hidden; honours Idempotency-Key;
+ *                                            201 + full result when graded within ~10 s,
+ *                                            else 202 { submissionId, status: 'PENDING' }
+ *   GET   /submissions/:id                   poll a submission
+ */
 @Controller()
 export class ExercisesController {
   constructor(
     private readonly exercises: ExercisesService,
+    private readonly submissions: SubmissionsService,
     private readonly audit: AuditService,
   ) {}
 
@@ -32,67 +73,128 @@ export class ExercisesController {
 
   @Roles('ADMIN', 'TEACHER')
   @Post('lessons/:lessonId/exercise')
-  async create(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string, @Body() body: CreateExerciseDto, @Req() req: Request) {
-    const created = await this.exercises.createForLesson(lessonId, toInput(body) as Parameters<ExercisesService['createForLesson']>[1]);
-    void this.audit.record(actor, { action: 'exercise.create', entity: 'Exercise', entityId: created.id, ip: req.ip ?? null });
+  async create(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+    @Body() body: CreateExerciseDto,
+    @Req() req: Request,
+  ) {
+    const created = await this.exercises.createForLesson(
+      actor,
+      lessonId,
+      toInput(body) as ExerciseInput,
+    );
+    void this.audit.record(actor, {
+      action: 'exercise.create',
+      entity: 'Exercise',
+      entityId: created.id,
+      ip: req.ip ?? null,
+    });
     return created;
   }
 
   @Roles('ADMIN', 'TEACHER')
   @Patch('exercises/:id')
-  update(@Param('id') id: string, @Body() body: UpdateExerciseDto) {
-    return this.exercises.update(id, toInput(body));
+  async update(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: UpdateExerciseDto,
+    @Req() req: Request,
+  ) {
+    const updated = await this.exercises.update(actor, id, toInput(body));
+    void this.audit.record(actor, {
+      action: 'exercise.update',
+      entity: 'Exercise',
+      entityId: id,
+      diff: { fields: Object.keys(body) },
+      ip: req.ip ?? null,
+    });
+    return updated;
   }
 
   @Roles('ADMIN', 'TEACHER')
   @Get('exercises/:id')
-  getAdmin(@Param('id') id: string) {
-    return this.exercises.getAdmin(id);
+  getAdmin(@CurrentUser() actor: ApiUser, @Param('id') id: string) {
+    return this.exercises.getAdmin(actor, id);
   }
 
   @Roles('ADMIN', 'TEACHER')
   @Get('lessons/:lessonId/exercise/admin')
-  getAdminByLesson(@Param('lessonId') lessonId: string) {
-    return this.exercises.getAdminByLesson(lessonId);
+  getAdminByLesson(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+  ) {
+    return this.exercises.getAdminByLesson(actor, lessonId);
   }
 
   @Roles('ADMIN', 'TEACHER')
   @Post('exercises/:id/verify')
-  verify(@Param('id') id: string) {
-    return this.exercises.verifyReference(id);
+  verify(@CurrentUser() actor: ApiUser, @Param('id') id: string) {
+    return this.exercises.verifyReference(actor, id);
   }
 
   // ─── Student ────────────────────────────────────────────────────────────
 
   @Roles('STUDENT')
   @Get('lessons/:lessonId/exercise')
-  forStudent(@CurrentUser() actor: ApiUser, @Param('lessonId') lessonId: string): Promise<StudentExerciseView> {
+  forStudent(
+    @CurrentUser() actor: ApiUser,
+    @Param('lessonId') lessonId: string,
+  ): Promise<StudentExerciseView> {
     return this.exercises.getForStudent(actor.userId, lessonId);
   }
 
   @Roles('STUDENT')
   @Post('exercises/:id/run')
-  run(@CurrentUser() actor: ApiUser, @Param('id') id: string, @Body() body: CodeDto): Promise<RunResult> {
+  run(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: CodeDto,
+  ): Promise<RunResult> {
     return this.exercises.run(actor.userId, id, body.code);
   }
 
   @Roles('STUDENT')
   @Post('exercises/:id/submit')
-  async submit(@CurrentUser() actor: ApiUser, @Param('id') id: string, @Body() body: CodeDto, @Req() req: Request): Promise<SubmitResult> {
-    const res = await this.exercises.submit(actor.userId, id, body.code);
+  @UseInterceptors(RetryAfterInterceptor)
+  async submit(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: CodeDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SubmissionView> {
+    const view = await this.submissions.submit(
+      actor.userId,
+      id,
+      body.code,
+      idempotencyKey,
+    );
+    const done = view.status === 'COMPLETE' || view.status === 'WORKER_LOST';
+    if (!done) res.status(202);
     void this.audit.record(actor, {
       action: 'exercise.submit',
       entity: 'Exercise',
       entityId: id,
-      diff: { verdict: res.verdict, scorePct: res.scorePct, firstReward: !!res.reward },
+      diff: {
+        submissionId: view.submissionId,
+        status: view.status,
+        verdict: view.verdict,
+        scorePct: view.scorePct,
+        firstReward: !!view.reward,
+      },
       ip: req.ip ?? null,
     });
-    return res;
+    return view;
   }
 
   @Roles('STUDENT')
   @Get('submissions/:id')
-  submission(@CurrentUser() actor: ApiUser, @Param('id') id: string) {
-    return this.exercises.getSubmission(actor.userId, id);
+  submission(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<SubmissionView> {
+    return this.submissions.get(actor.userId, id);
   }
 }

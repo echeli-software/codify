@@ -58,21 +58,20 @@ export class CoursesController {
     @Query() query: ListCoursesQueryDto,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<CourseListResponse> {
-    // Teachers default to seeing only their own courses unless they
-    // explicitly request broader (no scoping for staff above teacher).
+    // Teachers only ever list their own courses — a foreign authorId in
+    // the query is ignored. Staff above teacher may filter freely.
     const scopedQuery: ListCoursesQueryDto =
-      actor.role === 'TEACHER' && !query.authorId
-        ? { ...query, authorId: actor.userId }
-        : query;
+      actor.role === 'TEACHER' ? { ...query, authorId: actor.userId } : query;
     return this.courses.list(actor, scopedQuery, pickLocale(acceptLanguage));
   }
 
   @Get(':idOrSlug')
   detail(
+    @CurrentUser() actor: ApiUser,
     @Param('idOrSlug') idOrSlug: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<CourseDetail> {
-    return this.courses.getDetail(idOrSlug, pickLocale(acceptLanguage));
+    return this.courses.getDetail(actor, idOrSlug, pickLocale(acceptLanguage));
   }
 
   @Roles('ADMIN', 'TEACHER')

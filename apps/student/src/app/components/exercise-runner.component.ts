@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, type OnInit, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type OnInit,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   AppBadge,
@@ -28,64 +36,155 @@ import {
   imports: [FormsModule, AppBadge, AppButton, AppCard, AppSkeleton, Icon],
   template: `
     @if (loading()) {
-    <cdf-app-skeleton shape="rect" />
+      <cdf-app-skeleton shape="rect" />
     } @else if (exercise(); as ex) {
-    <div class="runner" data-testid="exercise-runner">
-      <p class="lang"><cdf-icon name="rocket" size="xs" /> {{ ex.language }} · function <code>{{ ex.entryFunction }}</code></p>
+      <div class="runner" data-testid="exercise-runner">
+        <p class="lang">
+          <cdf-icon name="rocket" size="xs" /> {{ ex.language }} · function
+          <code>{{ ex.entryFunction }}</code>
+        </p>
 
-      <textarea
-        class="editor"
-        spellcheck="false"
-        [(ngModel)]="code"
-        data-testid="code-editor"
-        rows="10"
-      ></textarea>
+        <textarea
+          class="editor"
+          spellcheck="false"
+          [(ngModel)]="code"
+          data-testid="code-editor"
+          rows="10"
+        ></textarea>
 
-      <div class="actions">
-        <cdf-app-button kind="secondary" size="sm" [loading]="running()" (buttonClick)="run()" data-testid="run-btn">Run</cdf-app-button>
-        <cdf-app-button kind="primary" size="sm" [loading]="submitting()" (buttonClick)="submit($event)" data-testid="submit-btn">Submit</cdf-app-button>
-        @if (verdict()) {
-        <cdf-app-badge [variant]="verdict() === 'PASS' ? 'success' : 'danger'" [subtle]="true" data-testid="verdict">
-          {{ verdict() }} · {{ scorePct() }}%
-        </cdf-app-badge>
+        <div class="actions">
+          <cdf-app-button
+            kind="secondary"
+            size="sm"
+            [loading]="running()"
+            (buttonClick)="run()"
+            data-testid="run-btn"
+            >Run</cdf-app-button
+          >
+          <cdf-app-button
+            kind="primary"
+            size="sm"
+            [loading]="submitting()"
+            (buttonClick)="submit($event)"
+            data-testid="submit-btn"
+            >Submit</cdf-app-button
+          >
+          @if (verdict()) {
+            <cdf-app-badge
+              [variant]="verdict() === 'PASS' ? 'success' : 'danger'"
+              [subtle]="true"
+              data-testid="verdict"
+            >
+              {{ verdict() }} · {{ scorePct() }}%
+            </cdf-app-badge>
+          }
+        </div>
+
+        @if (error(); as e) {
+          <p class="err" data-testid="exec-error">{{ e }}</p>
+        }
+
+        @if (results().length > 0) {
+          <ul class="tests" data-testid="test-results">
+            @for (r of results(); track r.id) {
+              <li [class.tests--fail]="!r.passed">
+                <cdf-icon
+                  [name]="r.passed ? 'check-circle' : 'close'"
+                  size="sm"
+                />
+                <span class="tests__name">{{ r.name }}</span>
+                @if (!r.passed && r.error) {
+                  <span class="tests__diff">{{ r.error }}</span>
+                } @else if (!r.passed) {
+                  <span class="tests__diff"
+                    >got {{ fmt(r.actual) }}, expected
+                    {{ fmt(r.expected) }}</span
+                  >
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        @if (passed()) {
+          <p class="done" data-testid="exercise-passed">
+            <cdf-icon name="trophy" size="sm" /> Solved! All tests pass.
+          </p>
         }
       </div>
-
-      @if (error(); as e) { <p class="err" data-testid="exec-error">{{ e }}</p> }
-
-      @if (results().length > 0) {
-      <ul class="tests" data-testid="test-results">
-        @for (r of results(); track r.id) {
-        <li [class.tests--fail]="!r.passed">
-          <cdf-icon [name]="r.passed ? 'check-circle' : 'close'" size="sm" />
-          <span class="tests__name">{{ r.name }}</span>
-          @if (!r.passed && r.error) { <span class="tests__diff">{{ r.error }}</span> }
-          @else if (!r.passed) { <span class="tests__diff">got {{ fmt(r.actual) }}, expected {{ fmt(r.expected) }}</span> }
-        </li>
-        }
-      </ul>
-      }
-
-      @if (passed()) {
-      <p class="done" data-testid="exercise-passed"><cdf-icon name="trophy" size="sm" /> Solved! All tests pass.</p>
-      }
-    </div>
     }
   `,
   styles: [
     `
-      .runner { display: flex; flex-direction: column; gap: var(--cdf-space-2); }
-      .lang { margin: 0; color: var(--cdf-color-text-muted); font-size: 13px; }
-      .lang code { background: var(--cdf-color-surface-2, #eef1f6); padding: 1px 5px; border-radius: 4px; }
-      .editor { width: 100%; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.5; padding: var(--cdf-space-2); border: 1px solid var(--cdf-color-border, #d0d5dd); border-radius: 8px; background: #1e1e2e; color: #e6e6f0; resize: vertical; }
-      .actions { display: flex; align-items: center; gap: var(--cdf-space-2); }
-      .err { color: var(--cdf-color-danger, #d0454c); font-size: 13px; margin: 0; }
-      .tests { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
-      .tests li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-      .tests--fail { color: var(--cdf-color-danger, #d0454c); }
-      .tests__name { font-weight: 600; }
-      .tests__diff { color: var(--cdf-color-text-muted); font-size: 12px; }
-      .done { color: var(--cdf-color-success, #2e9e5b); font-weight: 700; display: flex; align-items: center; gap: 6px; margin: var(--cdf-space-2) 0 0; }
+      .runner {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cdf-space-2);
+      }
+      .lang {
+        margin: 0;
+        color: var(--cdf-color-text-muted);
+        font-size: 13px;
+      }
+      .lang code {
+        background: var(--cdf-color-surface-2, #eef1f6);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .editor {
+        width: 100%;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        padding: var(--cdf-space-2);
+        border: 1px solid var(--cdf-color-border, #d0d5dd);
+        border-radius: 8px;
+        background: #1e1e2e;
+        color: #e6e6f0;
+        resize: vertical;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: var(--cdf-space-2);
+      }
+      .err {
+        color: var(--cdf-color-danger, #d0454c);
+        font-size: 13px;
+        margin: 0;
+      }
+      .tests {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .tests li {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .tests--fail {
+        color: var(--cdf-color-danger, #d0454c);
+      }
+      .tests__name {
+        font-weight: 600;
+      }
+      .tests__diff {
+        color: var(--cdf-color-text-muted);
+        font-size: 12px;
+      }
+      .done {
+        color: var(--cdf-color-success, #2e9e5b);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: var(--cdf-space-2) 0 0;
+      }
     `,
   ],
 })
@@ -148,17 +247,38 @@ export class ExerciseRunnerComponent implements OnInit {
     this.submitting.set(true);
     this.error.set(null);
     try {
-      const res = await this.client.submit(ex.id, this.code);
-      this.applyResults(res);
+      // Submissions are graded asynchronously; poll until final.
+      const res = await this.client.submitAndWait(ex.id, this.code);
+      this.applyResults({
+        results: res.results ?? [],
+        verdict: res.verdict ?? res.status,
+        scorePct: res.scorePct ?? 0,
+      });
+      if (res.message && !res.passed) this.error.set(res.message);
       if (res.passed) {
         this.passed.set(true);
         if (res.reward) {
           const src = (ev?.currentTarget as HTMLElement) ?? null;
           void this.orchestrator.grant({
             kind: 'exercisePass',
-            canonical: { xp: res.reward.xp, coins: res.reward.coins, multiplier: res.reward.multiplier, breakdown: res.reward.breakdown },
-            levelUp: res.reward.levelUp ? { newLevel: res.reward.levelUp.newLevel, xpForNextLevel: res.reward.levelUp.xpForNextLevel } : null,
-            badgesUnlocked: (res.badgesUnlocked ?? []).map((b) => ({ id: b.id, name: b.name, icon: b.icon, description: b.description })),
+            canonical: {
+              xp: res.reward.xp,
+              coins: res.reward.coins,
+              multiplier: res.reward.multiplier,
+              breakdown: res.reward.breakdown,
+            },
+            levelUp: res.reward.levelUp
+              ? {
+                  newLevel: res.reward.levelUp.newLevel,
+                  xpForNextLevel: res.reward.levelUp.xpForNextLevel,
+                }
+              : null,
+            badgesUnlocked: (res.badgesUnlocked ?? []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              icon: b.icon,
+              description: b.description,
+            })),
             sourceEl: src,
           });
         }
@@ -171,7 +291,11 @@ export class ExerciseRunnerComponent implements OnInit {
     }
   }
 
-  private applyResults(res: { results: ExerciseTestResult[]; verdict: string; scorePct: number }): void {
+  private applyResults(res: {
+    results: ExerciseTestResult[];
+    verdict: string;
+    scorePct: number;
+  }): void {
     this.results.set(res.results);
     this.verdict.set(res.verdict);
     this.scorePct.set(res.scorePct);
@@ -187,7 +311,8 @@ export class ExerciseRunnerComponent implements OnInit {
 
   private describe(err: unknown): string {
     if (err instanceof ProblemDetailsError) {
-      if (err.status === 429) return 'Slow down — one submission every few seconds.';
+      if (err.status === 429)
+        return 'Slow down — one submission every few seconds.';
       if (err.isForbidden) return 'This lesson needs a subscription.';
       if (err.message) return err.message;
     }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -13,7 +14,7 @@ import { GamificationService } from '../gamification/gamification.service.js';
 import { QuestsService } from '../gamification/quests.service.js';
 import { BadgesService } from '../gamification/badges.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import type { CoinSource, XpSource } from '@prisma/client';
+import type { CoinSource, LessonType, XpSource } from '@prisma/client';
 import type { QuestEventContext } from '../gamification/quests.service.js';
 import type {
   CompleteLessonResponse,
@@ -82,10 +83,12 @@ export class ProgressService {
   async complete(
     actor: ApiUser,
     lessonId: string,
+    opts: { clientTimestamp?: string | null } = {},
   ): Promise<CompleteLessonResponse> {
     if (actor.role !== 'STUDENT') {
       throw new ForbiddenException('Only students can complete lessons');
     }
+    const clientTimestamp = validateClientTimestamp(opts.clientTimestamp);
 
     // Phase 6: server-authoritative access. The same @codify/domain rule the
     // client uses for UI gating decides here, so they never drift. A paywall
@@ -107,6 +110,8 @@ export class ProgressService {
       );
     }
 
+    await this.assertDirectlyCompletable(lessonId);
+
     const out = await this.recordCompletion({
       userId: actor.userId,
       lessonId,
@@ -114,17 +119,48 @@ export class ProgressService {
       coinSource: 'LESSON_COMPLETE',
       refType: 'lesson',
       refId: lessonId,
+      clientTimestamp,
     });
     if (out.alreadyCompleted) {
       throw new ConflictException({
         message: 'Lesson already completed',
         statusCode: 409,
+        code: 'LESSON_ALREADY_COMPLETED',
         progress: out.progress,
         totals: out.totals,
       });
     }
     const { alreadyCompleted: _replay, ...response } = out;
     return response;
+  }
+
+  /**
+   * Lessons that are graded by their own flow cannot be completed by the
+   * bare "mark complete" endpoint — otherwise a client could skip the
+   * exercise / AI prompt / scenario / quiz and still collect the reward.
+   */
+  private async assertDirectlyCompletable(lessonId: string): Promise<void> {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, deletedAt: null },
+      select: { type: true, contentJson: true },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (SELF_GRADED_TYPES.has(lesson.type)) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'LESSON_COMPLETES_VIA_OWN_FLOW',
+        lessonType: lesson.type,
+        message: `${lesson.type} lessons are completed by passing them, not by marking them complete`,
+      });
+    }
+    if (lesson.type === 'QUIZ' && containsQuizBlock(lesson.contentJson)) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'QUIZ_REQUIRES_GRADING',
+        lessonType: lesson.type,
+        message: 'This quiz is completed by submitting answers',
+      });
+    }
   }
 
   /**
@@ -309,6 +345,63 @@ export class ProgressService {
       items: rows.map(toItem),
     };
   }
+}
+
+/** Lesson types completed through their own graded endpoint. */
+export const SELF_GRADED_TYPES: ReadonlySet<LessonType> = new Set<LessonType>([
+  'EXERCISE',
+  'AI_PROMPT',
+  'SCENARIO',
+  'CAPSTONE',
+]);
+
+/** Offline completions may be at most this old / this far in the future. */
+export const CLIENT_TIMESTAMP_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+export const CLIENT_TIMESTAMP_MAX_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * Validate an offline-queue `clientTimestamp` (docs/16 §8 "Streak
+ * attribution"). Rejects (400) times more than 5 min in the future or older
+ * than 72 h; returns the normalised ISO string, or null when absent.
+ */
+export function validateClientTimestamp(
+  value: string | null | undefined,
+  now = Date.now(),
+): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const t = Date.parse(value);
+  if (!Number.isFinite(t)) {
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'INVALID_CLIENT_TIMESTAMP',
+      message: 'clientTimestamp must be an ISO-8601 date-time',
+    });
+  }
+  if (t - now > CLIENT_TIMESTAMP_MAX_SKEW_MS) {
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'CLIENT_TIMESTAMP_IN_FUTURE',
+      message: 'clientTimestamp is in the future',
+    });
+  }
+  if (now - t > CLIENT_TIMESTAMP_MAX_AGE_MS) {
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'CLIENT_TIMESTAMP_TOO_OLD',
+      message: 'clientTimestamp is older than 72 hours',
+    });
+  }
+  return new Date(t).toISOString();
+}
+
+/** True when a Tiptap doc contains a graded `quiz` block anywhere. */
+export function containsQuizBlock(node: unknown, depth = 0): boolean {
+  if (!node || typeof node !== 'object' || depth > 50) return false;
+  if (Array.isArray(node))
+    return node.some((n) => containsQuizBlock(n, depth + 1));
+  const o = node as { type?: unknown; content?: unknown };
+  if (o.type === 'quiz') return true;
+  return containsQuizBlock(o.content, depth + 1);
 }
 
 function toItem(row: {
