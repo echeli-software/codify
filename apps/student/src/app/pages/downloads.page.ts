@@ -440,6 +440,18 @@ type PrefKey = 'wifiOnly' | 'autoUpdate' | 'autoDownloadEnrolled';
         font-size: 13px;
         margin: 8px 0 0;
       }
+      cdf-app-toggle {
+        display: flex;
+        width: 100%;
+        min-height: 44px;
+      }
+      :host ::ng-deep cdf-app-toggle ion-toggle {
+        width: 100%;
+      }
+      :host ::ng-deep cdf-app-toggle ion-toggle::part(label) {
+        white-space: normal;
+        flex: 1;
+      }
       .budget {
         display: flex;
         align-items: center;

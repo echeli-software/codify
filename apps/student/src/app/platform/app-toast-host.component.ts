@@ -35,7 +35,13 @@ const CLOSE =
           [attr.data-kind]="t.kind"
           data-testid="app-toast"
         >
-          <svg class="toast__icon" viewBox="0 0 24 24" aria-hidden="true">
+          <svg
+            class="toast__icon"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            aria-hidden="true"
+          >
             <path [attr.d]="icon(t)" />
           </svg>
           <span class="toast__msg">{{ t.message | translate: t.params }}</span>
@@ -102,6 +108,25 @@ const CLOSE =
       }
       .toast__msg {
         flex: 1;
+        min-width: 0;
+      }
+      .toast__icon {
+        width: 20px;
+        height: 20px;
+        flex: none;
+        fill: var(--cdf-color-primary, #2563eb);
+      }
+      .toast[data-kind='success'] .toast__icon {
+        fill: var(--cdf-color-success, #16a34a);
+      }
+      .toast[data-kind='warning'] .toast__icon {
+        fill: var(--cdf-color-warning, #d97706);
+      }
+      .toast[data-kind='error'] .toast__icon {
+        fill: var(--cdf-color-danger, #dc2626);
+      }
+      .toast__close svg {
+        fill: currentColor;
       }
       .toast__action,
       .toast__close {

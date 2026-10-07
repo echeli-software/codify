@@ -1021,7 +1021,9 @@ export class DownloadService {
           CONTENT_ASSET_CACHE,
         );
         const lesson = toDownloadedLesson(bundle, courseId, images.bytes);
-        await tx(STORE_DL_LESSONS, 'readwrite', (s) => s.put(lesson));
+        if (idbAvailable()) {
+          await tx(STORE_DL_LESSONS, 'readwrite', (s) => s.put(lesson));
+        }
         const rec = this.recordFor(courseId);
         if (rec && images.cached.length > 0) {
           const urls = new Set(rec.imageUrls ?? []);
@@ -1091,7 +1093,9 @@ export class DownloadService {
               entityId,
               fields: values,
             };
-            await tx(STORE_DL_TRANSLATIONS, 'readwrite', (s) => s.put(row));
+            if (idbAvailable()) {
+              await tx(STORE_DL_TRANSLATIONS, 'readwrite', (s) => s.put(row));
+            }
           }
         }
       }

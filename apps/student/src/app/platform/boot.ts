@@ -20,9 +20,7 @@ export function startPlatform(injector: Injector): void {
   injector.get(OfflineSyncService);
   injector.get(AppUpdateService).start();
   void injector.get(NativePlatformService).init();
-  injector
-    .get(TelemetryService)
-    .track('app_opened', {
-      online: typeof navigator === 'undefined' || navigator.onLine,
-    });
+  injector.get(TelemetryService).track('app_opened', {
+    online: typeof navigator === 'undefined' || navigator.onLine,
+  });
 }
