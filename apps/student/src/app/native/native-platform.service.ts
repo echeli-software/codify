@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, Injector, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Platform } from '@ionic/angular/standalone';
 import {
@@ -43,7 +43,7 @@ export class StoreProductMissingError extends Error {
 export class NativePlatformService {
   private readonly devices = inject(DevicesClient);
   private readonly router = inject(Router);
-  private readonly ionic = inject(Platform);
+  private readonly injector = inject(Injector);
   private readonly telemetry = inject(TelemetryService);
 
   private registeredToken: string | null = null;
@@ -88,7 +88,7 @@ export class NativePlatformService {
       });
       // Lowest priority: Ionic closes overlays / pops the nav stack first;
       // only at the root does the back button leave the app.
-      this.ionic.backButton.subscribeWithPriority(-1, () => {
+      this.injector.get(Platform).backButton.subscribeWithPriority(-1, () => {
         if (window.history.length > 1 && this.router.url !== '/today') {
           window.history.back();
         } else {

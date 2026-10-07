@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Codify</string>
+    <string name="title_activity_main">Codify</string>
+    <string name="package_name">app.codify.student</string>
+    <string name="custom_url_scheme">app.codify.student</string>
+</resources>

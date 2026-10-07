@@ -19,7 +19,6 @@ import {
 import { AuthService } from '@codify/auth';
 import { I18nService } from '@codify/i18n';
 import { RewardOrchestrator } from '@codify/gamification-engine';
-import { checkQuizAnswerHash } from '@codify/lesson-schema';
 import {
   AppToastService,
   errorMessageKey,
@@ -34,6 +33,7 @@ import {
   type QueuedQuizAttempt,
 } from './event-queue.js';
 import { IdentityCacheService } from './identity-cache.service.js';
+import { checkQuizAnswer } from './quiz-hash.js';
 import { NetworkStatusService } from './network-status.service.js';
 
 /** First retry delay; doubles per attempt up to the cap. */
@@ -747,7 +747,7 @@ export class OfflineSyncService {
       let correct = 0;
       for (const id of ids) {
         if (
-          await checkQuizAnswerHash(
+          await checkQuizAnswer(
             keys.hashes[id] ?? '',
             keys.salt,
             id,

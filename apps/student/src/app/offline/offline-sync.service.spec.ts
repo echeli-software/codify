@@ -9,7 +9,7 @@ import {
 import { AuthService } from '@codify/auth';
 import { RewardOrchestrator } from '@codify/gamification-engine';
 import { I18nService } from '@codify/i18n';
-import { buildQuizAnswerHashes } from '@codify/lesson-schema';
+import { quizAnswerHash } from './quiz-hash';
 import { AppToastService } from '../platform/app-toast.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { DownloadService } from './download.service';
@@ -400,24 +400,7 @@ describe('OfflineSyncService', () => {
     it('offline: checks locally against the bundle hashes, queues, and grades on sync', async () => {
       const svc = await setup();
       const salt = 'salt-1';
-      const doc = {
-        type: 'doc',
-        content: [
-          {
-            type: 'quiz',
-            attrs: {
-              id: 'q1',
-              question: 'Q?',
-              options: [
-                { id: 'a', text: 'A' },
-                { id: 'b', text: 'B' },
-              ],
-              correctOptionIds: ['b'],
-            },
-          },
-        ],
-      };
-      const hashes = await buildQuizAnswerHashes(doc as never, salt);
+      const hashes = { q1: await quizAnswerHash(salt, 'q1', ['b']) };
       bundle = { quizAnswerHashes: { algorithm: 'sha256', salt, hashes } };
       online.set(false);
       TestBed.tick();

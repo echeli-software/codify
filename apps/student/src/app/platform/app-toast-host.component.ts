@@ -1,18 +1,22 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslatePipe } from '@codify/i18n';
-import { Icon, type IconName } from '@codify/ui-ionic';
 import {
   AppToastService,
   type AppToast,
   type AppToastKind,
 } from './app-toast.service.js';
 
-const ICONS: Record<AppToastKind, IconName> = {
-  info: 'info-circle',
-  success: 'check-circle',
-  warning: 'warning',
-  error: 'x-circle',
+/** Inline SVG paths (24×24) — no icon library in the initial bundle. */
+const ICONS: Record<AppToastKind, string> = {
+  info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2Zm0-8h-2V7h2Z',
+  success:
+    'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1.5 14.5-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4Z',
+  warning: 'M1 21h22L12 2Zm12-3h-2v-2h2Zm0-4h-2v-4h2Z',
+  error:
+    'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.3 12.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9Z',
 };
+const CLOSE =
+  'M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7l-1.4-1.4L9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3Z';
 
 /**
  * Renders `AppToastService.toasts()` as a stack above the tab bar. Errors
@@ -21,7 +25,7 @@ const ICONS: Record<AppToastKind, IconName> = {
 @Component({
   selector: 'cdf-app-toast-host',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, TranslatePipe],
+  imports: [TranslatePipe],
   template: `
     <div class="toasts" aria-live="polite" data-testid="app-toasts">
       @for (t of toasts(); track t.id) {
@@ -31,7 +35,9 @@ const ICONS: Record<AppToastKind, IconName> = {
           [attr.data-kind]="t.kind"
           data-testid="app-toast"
         >
-          <cdf-icon [name]="icon(t)" size="sm" />
+          <svg class="toast__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path [attr.d]="icon(t)" />
+          </svg>
           <span class="toast__msg">{{ t.message | translate: t.params }}</span>
           @if (t.action; as action) {
             <button type="button" class="toast__action" (click)="run(t)">
@@ -44,7 +50,9 @@ const ICONS: Record<AppToastKind, IconName> = {
             [attr.aria-label]="'common.close' | translate"
             (click)="toast.dismiss(t.id)"
           >
-            <cdf-icon name="close" size="xs" />
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path [attr.d]="closePath" />
+            </svg>
           </button>
         </div>
       }
@@ -122,7 +130,9 @@ export class AppToastHost {
   protected readonly toast = inject(AppToastService);
   protected readonly toasts = this.toast.toasts;
 
-  protected icon(t: AppToast): IconName {
+  protected readonly closePath = CLOSE;
+
+  protected icon(t: AppToast): string {
     return ICONS[t.kind];
   }
 

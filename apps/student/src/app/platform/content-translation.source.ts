@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import {
-  MeClient,
   TranslationsClient,
   type ContentLocale,
   type TranslatableEntityType,
@@ -9,10 +8,7 @@ import type {
   ContentTranslationBatch,
   ContentTranslationRequest,
   ContentTranslationSource,
-  LocalePersistence,
-  Locale,
 } from '@codify/i18n';
-import { AuthService } from '@codify/auth';
 import { DownloadService } from '../offline/download.service.js';
 import { NetworkStatusService } from '../offline/network-status.service.js';
 
@@ -56,18 +52,5 @@ export class StudentContentTranslationSource implements ContentTranslationSource
       }
     }
     return this.downloads.getTranslations(req.entityType, req.ids, req.locale);
-  }
-}
-
-/** `LOCALE_PERSISTENCE`: PATCH /me { locale } when signed in. */
-@Injectable({ providedIn: 'root' })
-export class StudentLocalePersistence implements LocalePersistence {
-  private readonly me = inject(MeClient);
-  private readonly auth = inject(AuthService);
-
-  persist(locale: Locale): Promise<unknown> | void {
-    if (!this.auth.isAuthenticated()) return;
-    this.auth.updateProfile({ locale });
-    return this.me.update({ locale }).catch(() => undefined);
   }
 }
