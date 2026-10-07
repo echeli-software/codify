@@ -164,6 +164,9 @@
     border-bottom-width: 2px;
     border-radius: var(--cdf-radius-sm);
     background: var(--cdf-color-surface);
+    // Bootstrap's reboot inverts <kbd> (body-bg text on body-color fill);
+    // with the surface fill above the text must follow the theme too.
+    color: var(--cdf-color-text);
     white-space: nowrap;
   }
 
