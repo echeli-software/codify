@@ -46,37 +46,41 @@ model User {
   /// completions inside the same transaction that writes Progress, so
   /// these two are always in sync. Source of truth: User row; Progress
   /// rows are the immutable journal.
-  totalXp             Int       @default(0)
-  coins               Int       @default(0)
+  totalXp Int @default(0)
+  coins   Int @default(0)
 
   /// AvatarConfig JSON (base body, skin tone, hair). See 08-avatar-and-shop.md.
-  avatarConfig        Json?
+  avatarConfig Json?
 
-  auditedActions  AuditLog[]
-  authoredCourses Course[]   @relation("CourseAuthor")
-  progress        Progress[]
-  subscriptions   Subscription[]
-  xpEvents         XpEvent[]
-  coinTransactions CoinTransaction[]
-  streak           Streak?
-  deviceTokens     DeviceToken[]
-  userBadges       UserBadge[]
-  questAssignments QuestAssignment[]
-  items            UserItem[]
-  equipped         EquippedItem[]
-  leagueMemberships     LeagueMembership[]
-  sentFriendRequests    FriendRequest[]    @relation("Sender")
-  recvFriendRequests    FriendRequest[]    @relation("Receiver")
-  friendshipsA          Friendship[]       @relation("FriendA")
-  friendshipsB          Friendship[]       @relation("FriendB")
-  sentNudges            FriendNudge[]      @relation("NudgeSender")
-  recvNudges            FriendNudge[]      @relation("NudgeReceiver")
-  submissions           Submission[]
-  aiSubmissions         AiSubmission[]
-  scenarioRuns          ScenarioRun[]
-  certificates          Certificate[]
-  referredBy            User?              @relation("Referrals", fields: [referredById], references: [id])
-  referrals             User[]             @relation("Referrals")
+  auditedActions     AuditLog[]
+  authoredCourses    Course[]           @relation("CourseAuthor")
+  progress           Progress[]
+  subscriptions      Subscription[]
+  xpEvents           XpEvent[]
+  coinTransactions   CoinTransaction[]
+  streak             Streak?
+  deviceTokens       DeviceToken[]
+  userBadges         UserBadge[]
+  questAssignments   QuestAssignment[]
+  items              UserItem[]
+  equipped           EquippedItem[]
+  leagueMemberships  LeagueMembership[]
+  sentFriendRequests FriendRequest[]    @relation("Sender")
+  recvFriendRequests FriendRequest[]    @relation("Receiver")
+  friendshipsA       Friendship[]       @relation("FriendA")
+  friendshipsB       Friendship[]       @relation("FriendB")
+  sentNudges         FriendNudge[]      @relation("NudgeSender")
+  recvNudges         FriendNudge[]      @relation("NudgeReceiver")
+  submissions        Submission[]
+  aiSubmissions      AiSubmission[]
+  scenarioRuns       ScenarioRun[]
+  certificates       Certificate[]
+  enrollments        Enrollment[]
+  quizAttempts       QuizAttempt[]
+  uploadedAssets     Asset[]
+  analyticsEvents    AnalyticsEvent[]
+  referredBy         User?              @relation("Referrals", fields: [referredById], references: [id])
+  referrals          User[]             @relation("Referrals")
 
   @@index([role])
   @@index([lastSeenAt])
@@ -105,16 +109,16 @@ model AuditLog {
 /// polymorphic ContentTranslation table from /docs/02 §Translations
 /// joins in Phase 5c.
 model Category {
-  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
-  slug        String   @unique
+  id          String    @id @default(dbgenerated("uuid_generate_v7()"))
+  slug        String    @unique
   name        String
   description String?
   /// References ICON_NAMES in libs/ui-bootstrap/atoms/icon (e.g. "gear").
   iconName    String?
   /// Codify color token (e.g. "primary", "success") from libs/ui-tokens.
   colorToken  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   courses CourseCategory[]
@@ -154,6 +158,7 @@ model Course {
   deletedAt        DateTime?
 
   modules      Module[]
+  enrollments  Enrollment[]
   categories   CourseCategory[]
   multipliers  Multiplier[]
   certificates Certificate[]
@@ -181,6 +186,9 @@ enum LessonType {
   EXERCISE
   AI_PROMPT
   SCENARIO
+  /// Capstone project: a rubric-graded project submission (repo URL +
+  /// write-up). Reuses the AiPrompt rubric machinery. See docs/18-growth.
+  CAPSTONE
 }
 
 model Lesson {
@@ -200,22 +208,23 @@ model Lesson {
   deletedAt        DateTime?
 
   /// For EXERCISE lessons — the auto-graded coding exercise (1:1).
-  exerciseId  String?    @unique
-  exercise    Exercise?  @relation(fields: [exerciseId], references: [id])
+  exerciseId String?   @unique
+  exercise   Exercise? @relation(fields: [exerciseId], references: [id])
 
   /// For AI_PROMPT lessons — the rubric-graded prompt (1:1).
-  aiPromptId  String?    @unique
-  aiPrompt    AiPrompt?  @relation(fields: [aiPromptId], references: [id])
+  aiPromptId String?   @unique
+  aiPrompt   AiPrompt? @relation(fields: [aiPromptId], references: [id])
 
   /// For SCENARIO lessons — the branching dialogue (1:1).
-  scenarioId  String?    @unique
-  scenario    Scenario?  @relation(fields: [scenarioId], references: [id])
+  scenarioId String?   @unique
+  scenario   Scenario? @relation(fields: [scenarioId], references: [id])
+
+  progress     Progress[]
+  multipliers  Multiplier[]
+  quizAttempts QuizAttempt[]
 
   @@unique([moduleId, order])
   @@index([type])
-
-  progress    Progress[]
-  multipliers Multiplier[]
 }
 
 /// Per-user, per-lesson completion record. Acts as the immutable journal
@@ -263,25 +272,25 @@ enum BillingPeriod {
 /// Like Category, name/description are stored as direct single-locale columns
 /// for now; ContentTranslation joins later.
 model Plan {
-  id              String   @id @default(dbgenerated("uuid_generate_v7()"))
-  slug            String   @unique
-  name            String
-  description     String?
+  id                      String    @id @default(dbgenerated("uuid_generate_v7()"))
+  slug                    String    @unique
+  name                    String
+  description             String?
   /// One-line marketing tagline shown on the paywall sheet.
-  tagline         String?
-  stripeProductId String?  @unique
+  tagline                 String?
+  stripeProductId         String?   @unique
   /// RevenueCat entitlement identifier (e.g. "all_access") this plan grants.
   /// Store webhooks map an entitlement back to the plan via this. See /docs/17-mobile.md.
-  revenueCatEntitlementId String? @unique
+  revenueCatEntitlementId String?   @unique
   /// Bypasses the category check — grants every published course.
-  isAllAccess     Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  sortOrder       Int      @default(0)
+  isAllAccess             Boolean   @default(false)
+  isActive                Boolean   @default(true)
+  sortOrder               Int       @default(0)
   /// Free-trial length applied at Checkout. See /docs/09-billing.md §9.
-  trialDays       Int      @default(7)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  trialDays               Int       @default(7)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
 
   prices        PlanPrice[]
   categories    PlanCategory[]
@@ -295,6 +304,9 @@ model PlanPrice {
   planId          String
   plan            Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
   stripePriceId   String?       @unique
+  /// App Store / Play product identifier this price is sold as through
+  /// RevenueCat (e.g. "codify_all_access_monthly"). See docs/17-mobile.
+  storeProductId  String?       @unique
   /// ISO-4217, e.g. "BRL".
   currency        String
   amountCents     Int
@@ -362,6 +374,10 @@ model Subscription {
   cancelAtPeriodEnd    Boolean            @default(false)
   canceledAt           DateTime?
   trialEndsAt          DateTime?
+  /// Set when status first becomes PAST_DUE, cleared when it recovers.
+  /// The access grace window is measured from here, not from
+  /// currentPeriodEnd (which Stripe advances before the charge fails).
+  pastDueSince         DateTime?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -553,6 +569,8 @@ model QuestTemplate {
   title      String
   /// Difficulty band for the weighted daily picker (one of each per day).
   difficulty Int       @default(1) /// 1=easy, 2=medium, 3=hard
+  /// Relative weight inside its difficulty band for the daily picker.
+  weight     Int       @default(1)
   target     Int
   paramsJson Json?
   coinReward Int       @default(0)
@@ -717,9 +735,9 @@ model League {
 model LeagueMembership {
   leagueId   String
   userId     String
-  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weeklyXp   Int      @default(0)
+  league     League    @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyXp   Int       @default(0)
   finalRank  Int?
   promoted   Boolean?
   demoted    Boolean?
@@ -785,23 +803,23 @@ model FriendNudge {
 // ─────────────────────────────────────────────────────────────────────
 
 model Exercise {
-  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
-  language      String   /// "javascript" (dev executor) | "python" | …
+  id               String   @id @default(dbgenerated("uuid_generate_v7()"))
+  language         String /// "javascript" (dev executor) | "python" | …
   /// Function the tests call (data-driven harness: entryFunction(...args)).
-  entryFunction String   @default("solution")
-  starterCode   String
+  entryFunction    String   @default("solution")
+  starterCode      String
   /// Reference solution — never sent to the client.
-  solutionCode  String
+  solutionCode     String
   /// Optional custom harness; when empty the data-driven runner is used.
-  testHarness   String   @default("")
-  timeLimitMs   Int      @default(2000)
-  memoryLimitKb Int      @default(128000)
+  testHarness      String   @default("")
+  timeLimitMs      Int      @default(2000)
+  memoryLimitKb    Int      @default(128000)
   /// [{ id, name, args, expected }] — visible in the UI.
   visibleTestsJson Json
   /// Same shape — hidden until the student passes.
   hiddenTestsJson  Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   lesson      Lesson?
   submissions Submission[]
@@ -914,18 +932,18 @@ model Scenario {
 }
 
 model ScenarioRun {
-  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scenarioId  String
-  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  id         String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenarioId String
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
   /// Ordered choice ids the student took.
-  pathJson    Json
+  pathJson   Json
   /// Number of choices made (branch depth reached).
-  maxDepth    Int      @default(0)
-  completed   Boolean  @default(false)
-  outcome     String?
-  createdAt   DateTime @default(now())
+  maxDepth   Int      @default(0)
+  completed  Boolean  @default(false)
+  outcome    String?
+  createdAt  DateTime @default(now())
 
   @@index([userId, scenarioId])
   @@index([scenarioId])
@@ -1004,4 +1022,125 @@ model ContentTranslation {
 
   @@unique([entityType, entityId, locale, field])
   @@index([entityType, entityId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Enrollment — explicit course membership (docs/09-billing §3 step 3).
+// Drives "My courses", auto-download of enrolled courses (docs/16) and
+// PROMO / ADMIN_GRANT access that bypasses subscriptions.
+// ─────────────────────────────────────────────────────────────────────
+
+enum EnrollmentSource {
+  SELF
+  PROMO
+  ADMIN_GRANT
+}
+
+model Enrollment {
+  id          String           @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  source      EnrollmentSource @default(SELF)
+  /// PROMO / ADMIN_GRANT enrollments grant paid access until this time
+  /// (null = no expiry). SELF enrollments never grant paid access.
+  accessUntil DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Quiz attempts — graded server-side from the lesson's quiz blocks.
+// ─────────────────────────────────────────────────────────────────────
+
+model QuizAttempt {
+  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  /// { [quizBlockId]: selectedOptionIds[] }
+  answersJson Json
+  scorePct    Int
+  passed      Boolean
+  createdAt   DateTime @default(now())
+
+  @@index([userId, lessonId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Assets — uploaded media (R2 / S3-compatible). docs/06 §images, docs/08.
+// ─────────────────────────────────────────────────────────────────────
+
+enum AssetKind {
+  IMAGE
+  SPRITE
+  COVER
+  OTHER
+}
+
+model Asset {
+  id           String    @id @default(dbgenerated("uuid_generate_v7()"))
+  /// Object key in the bucket, e.g. "images/2026/10/<uuid>.png".
+  key          String    @unique
+  /// Public CDN URL the clients render.
+  url          String
+  mimeType     String
+  sizeBytes    Int
+  kind         AssetKind @default(IMAGE)
+  /// False until the client confirms the PUT to the presigned URL landed.
+  confirmed    Boolean   @default(false)
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+
+  @@index([kind, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// AI grading cache — identical responses to the same prompt are graded
+// once, across users (docs/17-ai-grading §caching).
+// ─────────────────────────────────────────────────────────────────────
+
+model AiGradeCache {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  aiPromptId    String
+  /// sha256 of the normalised response text.
+  responseHash  String
+  scorePct      Int
+  passed        Boolean
+  breakdownJson Json
+  gradedBy      GradedBy
+  /// Invalidate when the prompt's rubric changes.
+  rubricHash    String
+  createdAt     DateTime @default(now())
+
+  @@unique([aiPromptId, responseHash, rubricHash])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Product analytics — first-party event log (docs/10-engagement,
+// docs/14 §12 "we do our own analytics").
+// ─────────────────────────────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id          String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Stable per-install id for pre-login events.
+  anonymousId String?
+  /// snake_case event name, e.g. "lesson_completed", "download_started".
+  name        String
+  props       Json?
+  platform    String?
+  appVersion  String?
+  /// Client clock time of the event; createdAt is server receipt.
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([name, occurredAt])
+  @@index([userId, occurredAt])
 }

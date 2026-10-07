@@ -1,4 +1,9 @@
-import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiGradingModule } from './ai-grading/ai-grading.module.js';
@@ -25,6 +30,9 @@ import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
+    // Cron jobs (league rollover, streak reminders, quest assignment, drift
+    // check) register with @Cron in their own services.
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     AuditModule,

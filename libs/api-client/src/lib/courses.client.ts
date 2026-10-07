@@ -5,7 +5,13 @@ import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
 
 export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-export type LessonType = 'READING' | 'QUIZ' | 'EXERCISE' | 'AI_PROMPT' | 'SCENARIO';
+export type LessonType =
+  | 'READING'
+  | 'QUIZ'
+  | 'EXERCISE'
+  | 'AI_PROMPT'
+  | 'SCENARIO'
+  | 'CAPSTONE';
 
 export interface CourseListItem {
   id: string;
@@ -83,7 +89,9 @@ export class CoursesClient {
       if (v !== undefined && v !== null) params = params.set(k, String(v));
     }
     return firstValueFrom(
-      this.http.get<CourseListResponse>(`${this.config.baseUrl}/courses`, { params }),
+      this.http.get<CourseListResponse>(`${this.config.baseUrl}/courses`, {
+        params,
+      }),
     );
   }
 

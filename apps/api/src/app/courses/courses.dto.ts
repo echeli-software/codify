@@ -156,7 +156,7 @@ export interface CourseListItem {
 export interface CourseLessonSummary {
   id: string;
   order: number;
-  type: 'READING' | 'QUIZ' | 'EXERCISE' | 'AI_PROMPT' | 'SCENARIO';
+  type: 'READING' | 'QUIZ' | 'EXERCISE' | 'AI_PROMPT' | 'SCENARIO' | 'CAPSTONE';
   isFree: boolean;
   estimatedMinutes: number;
   title: string;

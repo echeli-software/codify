@@ -10,7 +10,14 @@ import {
   Min,
 } from 'class-validator';
 
-const LESSON_TYPES = ['READING', 'QUIZ', 'EXERCISE', 'AI_PROMPT', 'SCENARIO'] as const;
+const LESSON_TYPES = [
+  'READING',
+  'QUIZ',
+  'EXERCISE',
+  'AI_PROMPT',
+  'SCENARIO',
+  'CAPSTONE',
+] as const;
 
 /**
  * Body for POST /api/modules/:moduleId/lessons. `contentJson` defaults to

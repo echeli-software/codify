@@ -51,6 +51,7 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
   EXERCISE: 'exercise',
   AI_PROMPT: 'ai-prompt',
   SCENARIO: 'scenario',
+  CAPSTONE: 'capstone',
 };
 
 /**
@@ -96,157 +97,231 @@ const LESSON_TYPE_MAP: Record<LessonType, LessonItemType> = {
     </ion-header>
     <ion-content class="ion-padding">
       @if (loading()) {
-      <div class="course-skel">
-        <cdf-app-skeleton shape="rect" />
-        <cdf-app-skeleton shape="text" />
-        <cdf-app-skeleton shape="text" />
-      </div>
+        <div class="course-skel">
+          <cdf-app-skeleton shape="rect" />
+          <cdf-app-skeleton shape="text" />
+          <cdf-app-skeleton shape="text" />
+        </div>
       } @else if (notFound()) {
-      <cdf-empty-state
-        icon="school"
-        title="Course not found"
-        description="It might have been unpublished. Head back to the catalog."
-      />
+        <cdf-empty-state
+          icon="school"
+          title="Course not found"
+          description="It might have been unpublished. Head back to the catalog."
+        />
       } @else if (course(); as c) {
-      <cdf-app-card padding="normal" class="course-hero" data-testid="course-hero">
-        <h1 class="course-hero__title">{{ c.title }}</h1>
-        <p class="course-hero__meta">
-          <cdf-icon name="person-circle" size="xs" /> {{ c.authorDisplayName }}
-        </p>
-        @if (c.description) {
-        <p class="course-hero__desc">{{ c.description }}</p>
-        }
-        <div class="course-hero__stats">
-          <span class="stat">
-            <cdf-icon name="school" size="xs" />
-            {{ c.lessonCount }} {{ c.lessonCount === 1 ? 'lesson' : 'lessons' }}
-          </span>
-          <span class="stat">
-            <cdf-icon name="hourglass" size="xs" />
-            {{ formatDuration(c.estimatedMinutes) }}
-          </span>
-          <span class="stat">
-            <cdf-icon name="ribbon" size="xs" />
-            Lvl {{ c.difficulty }}
-          </span>
-        </div>
-        @if (freeCount() > 0) {
-        <cdf-app-badge variant="success" [subtle]="true">
-          <cdf-icon name="gift" size="xs" />
-          {{ freeCount() }} free
-        </cdf-app-badge>
-        }
-
-        <!-- Offline download -->
-        <div class="course-hero__download" data-testid="download-control">
-          @if (downloadProgress(); as p) {
-          <cdf-app-button kind="ghost" size="sm" (buttonClick)="cancelDownload()" data-testid="download-cancel">
-            <cdf-icon name="download" size="sm" /> Downloading {{ downloadPct(p) }}%
-          </cdf-app-button>
-          } @else if (isDownloaded()) {
-          <cdf-app-badge variant="success" [subtle]="true" data-testid="downloaded-badge">
-            <cdf-icon name="download" size="xs" /> Downloaded
-          </cdf-app-badge>
-          @if (updateAvailable()) {
-          <cdf-app-button kind="secondary" size="sm" (buttonClick)="download()" data-testid="download-update">
-            Update available
-          </cdf-app-button>
+        <cdf-app-card
+          padding="normal"
+          class="course-hero"
+          data-testid="course-hero"
+        >
+          <h1 class="course-hero__title">{{ c.title }}</h1>
+          <p class="course-hero__meta">
+            <cdf-icon name="person-circle" size="xs" />
+            {{ c.authorDisplayName }}
+          </p>
+          @if (c.description) {
+            <p class="course-hero__desc">{{ c.description }}</p>
           }
-          <cdf-app-button kind="ghost" size="sm" (buttonClick)="removeDownload()" data-testid="download-remove">Remove</cdf-app-button>
-          } @else {
-          <cdf-app-button kind="secondary" size="sm" (buttonClick)="download()" data-testid="download-btn">
-            <cdf-icon name="download" size="sm" /> Download for offline
-          </cdf-app-button>
-          }
-        </div>
-      </cdf-app-card>
-
-      <!-- Certificate: shown once every lesson is complete. -->
-      @if (allComplete()) {
-      <cdf-app-card padding="normal" class="cert-banner" data-testid="course-certificate">
-        @if (certificate(); as cert) {
-        <p class="cert-banner__done"><cdf-icon name="trophy-outline" size="sm" /> Certificate earned!</p>
-        <cdf-app-button kind="primary" size="sm" [routerLink]="['/verify', cert.serial]" data-testid="view-certificate">View certificate</cdf-app-button>
-        } @else {
-        <p><cdf-icon name="trophy-outline" size="sm" /> You finished this course.</p>
-        <cdf-app-button kind="primary" size="sm" [loading]="claiming()" (buttonClick)="claimCertificate()" data-testid="claim-certificate">Get your certificate</cdf-app-button>
-        }
-      </cdf-app-card>
-      }
-
-      <!-- Paywall: shown when this course has paid lessons the user can't
-           yet open. Lists the plans that include this course. -->
-      @if (showPaywall()) {
-      <cdf-app-card padding="normal" class="paywall-banner" data-testid="course-paywall">
-        <div class="paywall-banner__head">
-          <cdf-icon name="diamond" size="md" />
-          <div>
-            <h2>Subscribe to continue</h2>
-            <p class="muted">
-              {{ paidCount() }} {{ paidCount() === 1 ? 'lesson is' : 'lessons are' }}
-              premium. Any plan below unlocks this course.
-            </p>
+          <div class="course-hero__stats">
+            <span class="stat">
+              <cdf-icon name="school" size="xs" />
+              {{ c.lessonCount }}
+              {{ c.lessonCount === 1 ? 'lesson' : 'lessons' }}
+            </span>
+            <span class="stat">
+              <cdf-icon name="hourglass" size="xs" />
+              {{ formatDuration(c.estimatedMinutes) }}
+            </span>
+            <span class="stat">
+              <cdf-icon name="ribbon" size="xs" />
+              Lvl {{ c.difficulty }}
+            </span>
           </div>
-        </div>
-        <ul class="paywall-banner__plans" data-testid="plans-including-course">
-          @for (plan of plansForCourse(); track plan.id) {
-          <li [attr.data-plan-id]="plan.id">
-            <span class="plan-name">{{ plan.name }}</span>
-            <span class="muted">{{ planPriceSummary(plan) }}</span>
-          </li>
+          @if (freeCount() > 0) {
+            <cdf-app-badge variant="success" [subtle]="true">
+              <cdf-icon name="gift" size="xs" />
+              {{ freeCount() }} free
+            </cdf-app-badge>
           }
-        </ul>
-        <cdf-app-button kind="primary" [fullWidth]="true" (buttonClick)="paywallOpen.set(true)" data-testid="open-paywall-btn">
-          See plans
-        </cdf-app-button>
-      </cdf-app-card>
-      } @else if (hasAccessBadge()) {
-      <cdf-app-badge variant="success" [subtle]="true" data-testid="access-badge">
-        <cdf-icon name="shield-checkmark" size="xs" /> Included in your plan
-      </cdf-app-badge>
-      }
 
-      @if (c.modules.length === 0) {
-      <cdf-empty-state
-        icon="hourglass"
-        title="Curriculum coming soon"
-        description="The instructor hasn't published modules yet."
-      />
-      } @else {
-      <ion-list class="course-curriculum" data-testid="course-curriculum">
-        @for (m of c.modules; track m.id) {
-        <ion-item-group>
-          <ion-item-divider>
-            <ion-label>{{ moduleHeading($index, m.title) }}</ion-label>
-          </ion-item-divider>
-          @for (l of m.lessons; track l.id) {
-          <cdf-lesson-item
-            [title]="l.title"
-            [subtitle]="lessonSubtitle(l.order, m.lessons.length)"
-            [type]="lessonType(l.type)"
-            [status]="lessonStatus(l.id, l.isFree)"
-            [isFree]="l.isFree"
-            [estimateMinutes]="l.estimatedMinutes || null"
-            [routerLink]="lessonLink(l.id, l.isFree)"
-            [attr.data-lesson-id]="l.id"
-            [attr.data-lesson-free]="l.isFree"
-            [attr.data-lesson-completed]="completedIds().has(l.id)"
-            [attr.data-lesson-locked]="lessonStatus(l.id, l.isFree) === 'locked'"
-          />
-          }
-        </ion-item-group>
+          <!-- Offline download -->
+          <div class="course-hero__download" data-testid="download-control">
+            @if (downloadProgress(); as p) {
+              <cdf-app-button
+                kind="ghost"
+                size="sm"
+                (buttonClick)="cancelDownload()"
+                data-testid="download-cancel"
+              >
+                <cdf-icon name="download" size="sm" /> Downloading
+                {{ downloadPct(p) }}%
+              </cdf-app-button>
+            } @else if (isDownloaded()) {
+              <cdf-app-badge
+                variant="success"
+                [subtle]="true"
+                data-testid="downloaded-badge"
+              >
+                <cdf-icon name="download" size="xs" /> Downloaded
+              </cdf-app-badge>
+              @if (updateAvailable()) {
+                <cdf-app-button
+                  kind="secondary"
+                  size="sm"
+                  (buttonClick)="download()"
+                  data-testid="download-update"
+                >
+                  Update available
+                </cdf-app-button>
+              }
+              <cdf-app-button
+                kind="ghost"
+                size="sm"
+                (buttonClick)="removeDownload()"
+                data-testid="download-remove"
+                >Remove</cdf-app-button
+              >
+            } @else {
+              <cdf-app-button
+                kind="secondary"
+                size="sm"
+                (buttonClick)="download()"
+                data-testid="download-btn"
+              >
+                <cdf-icon name="download" size="sm" /> Download for offline
+              </cdf-app-button>
+            }
+          </div>
+        </cdf-app-card>
+
+        <!-- Certificate: shown once every lesson is complete. -->
+        @if (allComplete()) {
+          <cdf-app-card
+            padding="normal"
+            class="cert-banner"
+            data-testid="course-certificate"
+          >
+            @if (certificate(); as cert) {
+              <p class="cert-banner__done">
+                <cdf-icon name="trophy-outline" size="sm" /> Certificate earned!
+              </p>
+              <cdf-app-button
+                kind="primary"
+                size="sm"
+                [routerLink]="['/verify', cert.serial]"
+                data-testid="view-certificate"
+                >View certificate</cdf-app-button
+              >
+            } @else {
+              <p>
+                <cdf-icon name="trophy-outline" size="sm" /> You finished this
+                course.
+              </p>
+              <cdf-app-button
+                kind="primary"
+                size="sm"
+                [loading]="claiming()"
+                (buttonClick)="claimCertificate()"
+                data-testid="claim-certificate"
+                >Get your certificate</cdf-app-button
+              >
+            }
+          </cdf-app-card>
         }
-      </ion-list>
-      } }
+
+        <!-- Paywall: shown when this course has paid lessons the user can't
+           yet open. Lists the plans that include this course. -->
+        @if (showPaywall()) {
+          <cdf-app-card
+            padding="normal"
+            class="paywall-banner"
+            data-testid="course-paywall"
+          >
+            <div class="paywall-banner__head">
+              <cdf-icon name="diamond" size="md" />
+              <div>
+                <h2>Subscribe to continue</h2>
+                <p class="muted">
+                  {{ paidCount() }}
+                  {{ paidCount() === 1 ? 'lesson is' : 'lessons are' }}
+                  premium. Any plan below unlocks this course.
+                </p>
+              </div>
+            </div>
+            <ul
+              class="paywall-banner__plans"
+              data-testid="plans-including-course"
+            >
+              @for (plan of plansForCourse(); track plan.id) {
+                <li [attr.data-plan-id]="plan.id">
+                  <span class="plan-name">{{ plan.name }}</span>
+                  <span class="muted">{{ planPriceSummary(plan) }}</span>
+                </li>
+              }
+            </ul>
+            <cdf-app-button
+              kind="primary"
+              [fullWidth]="true"
+              (buttonClick)="paywallOpen.set(true)"
+              data-testid="open-paywall-btn"
+            >
+              See plans
+            </cdf-app-button>
+          </cdf-app-card>
+        } @else if (hasAccessBadge()) {
+          <cdf-app-badge
+            variant="success"
+            [subtle]="true"
+            data-testid="access-badge"
+          >
+            <cdf-icon name="shield-checkmark" size="xs" /> Included in your plan
+          </cdf-app-badge>
+        }
+
+        @if (c.modules.length === 0) {
+          <cdf-empty-state
+            icon="hourglass"
+            title="Curriculum coming soon"
+            description="The instructor hasn't published modules yet."
+          />
+        } @else {
+          <ion-list class="course-curriculum" data-testid="course-curriculum">
+            @for (m of c.modules; track m.id) {
+              <ion-item-group>
+                <ion-item-divider>
+                  <ion-label>{{ moduleHeading($index, m.title) }}</ion-label>
+                </ion-item-divider>
+                @for (l of m.lessons; track l.id) {
+                  <cdf-lesson-item
+                    [title]="l.title"
+                    [subtitle]="lessonSubtitle(l.order, m.lessons.length)"
+                    [type]="lessonType(l.type)"
+                    [status]="lessonStatus(l.id, l.isFree)"
+                    [isFree]="l.isFree"
+                    [estimateMinutes]="l.estimatedMinutes || null"
+                    [routerLink]="lessonLink(l.id, l.isFree)"
+                    [attr.data-lesson-id]="l.id"
+                    [attr.data-lesson-free]="l.isFree"
+                    [attr.data-lesson-completed]="completedIds().has(l.id)"
+                    [attr.data-lesson-locked]="
+                      lessonStatus(l.id, l.isFree) === 'locked'
+                    "
+                  />
+                }
+              </ion-item-group>
+            }
+          </ion-list>
+        }
+      }
 
       @if (paywallContent(); as pc) {
-      <cdf-paywall-sheet
-        reason="course-locked"
-        [open]="paywallOpen()"
-        [content]="pc"
-        (dismissed)="paywallOpen.set(false)"
-        (selected)="subscribe($event)"
-      />
+        <cdf-paywall-sheet
+          reason="course-locked"
+          [open]="paywallOpen()"
+          [content]="pc"
+          (dismissed)="paywallOpen.set(false)"
+          (selected)="subscribe($event)"
+        />
       }
     </ion-content>
   `,
@@ -345,7 +420,7 @@ export class CourseDetailPage {
   });
   protected readonly downloadProgress = computed(() => {
     const c = this.course();
-    return c ? this.downloads.progress()[c.id] ?? null : null;
+    return c ? (this.downloads.progress()[c.id] ?? null) : null;
   });
   protected readonly updateAvailable = computed(() => {
     const c = this.course();
@@ -390,12 +465,16 @@ export class CourseDetailPage {
 
   /** Show the paywall banner: paid lessons exist, no access yet, plans offered. */
   protected readonly showPaywall = computed(
-    () => this.paidCount() > 0 && !this.hasCourseAccess() && this.plansForCourse().length > 0,
+    () =>
+      this.paidCount() > 0 &&
+      !this.hasCourseAccess() &&
+      this.plansForCourse().length > 0,
   );
 
   /** Subtle "included in your plan" badge when access is via a subscription. */
   protected readonly hasAccessBadge = computed(
-    () => this.paidCount() > 0 && this.hasCourseAccess() && !this.allLessonsFree(),
+    () =>
+      this.paidCount() > 0 && this.hasCourseAccess() && !this.allLessonsFree(),
   );
 
   protected readonly paywallContent = computed<PaywallContent | null>(() => {
@@ -405,7 +484,9 @@ export class CourseDetailPage {
       plan.prices.map((price) => ({
         id: price.id,
         name: plan.name,
-        cadence: (price.period === 'ANNUAL' ? 'yearly' : 'monthly') as 'monthly' | 'yearly',
+        cadence: (price.period === 'ANNUAL' ? 'yearly' : 'monthly') as
+          | 'monthly'
+          | 'yearly',
         priceLabel: formatPrice(
           {
             currency: price.currency,
@@ -433,9 +514,14 @@ export class CourseDetailPage {
   protected readonly completedCount = computed(() => this.completedIds().size);
 
   /** Total lessons across the course's modules. */
-  protected readonly totalLessons = computed(() => (this.course()?.modules ?? []).reduce((n, m) => n + m.lessons.length, 0));
+  protected readonly totalLessons = computed(() =>
+    (this.course()?.modules ?? []).reduce((n, m) => n + m.lessons.length, 0),
+  );
   /** Every lesson finished → the course can issue a certificate. */
-  protected readonly allComplete = computed(() => this.totalLessons() > 0 && this.completedCount() >= this.totalLessons());
+  protected readonly allComplete = computed(
+    () =>
+      this.totalLessons() > 0 && this.completedCount() >= this.totalLessons(),
+  );
   protected readonly certificate = signal<{ serial: string } | null>(null);
   protected readonly claiming = signal(false);
 
@@ -493,11 +579,14 @@ export class CourseDetailPage {
       const [, plans, mine] = await Promise.allSettled([
         this.progressClient
           .forCourse(detail.id)
-          .then((cp) => this.completedIds.set(new Set(cp.items.map((i) => i.lessonId)))),
+          .then((cp) =>
+            this.completedIds.set(new Set(cp.items.map((i) => i.lessonId))),
+          ),
         this.plansClient.list({ courseId: detail.id }),
         this.billing.mySubscription(),
       ]);
-      if (plans.status === 'fulfilled') this.plansForCourse.set(plans.value.items);
+      if (plans.status === 'fulfilled')
+        this.plansForCourse.set(plans.value.items);
       if (mine.status === 'fulfilled') {
         this.activePlanIds.set(new Set(mine.value.activePlanIds));
       }
