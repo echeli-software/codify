@@ -15,7 +15,7 @@
   ],
   "references": [
     {
-      "path": "../../libs/billing/tsconfig.lib.json"
+      "path": "../../libs/domain/tsconfig.lib.json"
     },
     {
       "path": "../../libs/lesson-schema/tsconfig.lib.json"

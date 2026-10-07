@@ -12,28 +12,12 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormField, Icon, Input } from '@codify/ui-bootstrap';
+import { I18nService, TranslatePipe } from '@codify/i18n';
 import { AuthService, safeRedirect, type UserRole } from '@codify/auth';
 
-const ROLES: { role: UserRole; label: string; description: string }[] = [
-  { role: 'ADMIN', label: 'Admin', description: 'Full administrative access.' },
-  {
-    role: 'TEACHER',
-    label: 'Teacher',
-    description: 'Author + edit own courses.',
-  },
-  {
-    role: 'SUPPORT',
-    label: 'Support',
-    description: 'Read-only across the catalog.',
-  },
-  {
-    role: 'STUDENT',
-    label: 'Student',
-    description: 'Will be denied — admin app is staff-only.',
-  },
-];
+const ROLES: readonly UserRole[] = ['ADMIN', 'TEACHER', 'SUPPORT', 'STUDENT'];
 
-const DEFAULT_TARGET = '/playground';
+const DEFAULT_TARGET = '/dashboard';
 
 /**
  * Admin login. With Clerk configured (`provideAuth({ clerkPublishableKey })`)
@@ -47,15 +31,15 @@ const DEFAULT_TARGET = '/playground';
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, FormField, Icon, Input],
+  imports: [FormsModule, FormField, Icon, Input, TranslatePipe],
   template: `
     <div class="login-shell">
       <header class="login-shell__header">
         <cdf-icon name="gear" size="lg" />
         <div>
-          <h1>Codify · Admin</h1>
+          <h1>{{ 'admin.login.title' | translate }}</h1>
           <p class="text-muted mb-0">
-            Sign in to manage content and analytics.
+            {{ 'admin.login.subtitle' | translate }}
           </p>
         </div>
       </header>
@@ -70,16 +54,35 @@ const DEFAULT_TARGET = '/playground';
           <p class="text-danger mb-0" role="alert">{{ msg }}</p>
         }
       } @else {
-        <cdf-form-field label="Display name (optional)">
-          <cdf-input [(ngModel)]="displayName" placeholder="Maria Souza" />
+        <cdf-form-field
+          [label]="'admin.login.displayName' | translate"
+          controlId="login-display-name"
+        >
+          <cdf-input
+            inputId="login-display-name"
+            [(ngModel)]="displayName"
+            [placeholder]="'admin.login.displayNamePlaceholder' | translate"
+          />
         </cdf-form-field>
 
-        <ul class="role-list">
-          @for (r of roles; track r.role) {
+        <p class="muted small mb-0" id="dev-picker-label">
+          {{ 'admin.login.devPicker' | translate }}
+        </p>
+        <ul class="role-list" aria-labelledby="dev-picker-label">
+          @for (r of roles; track r) {
             <li>
-              <button type="button" class="role-btn" (click)="signIn(r.role)">
-                <span class="role-btn__name">{{ r.label }}</span>
-                <span class="role-btn__desc">{{ r.description }}</span>
+              <button
+                type="button"
+                class="role-btn"
+                [attr.data-role]="r"
+                (click)="signIn(r)"
+              >
+                <span class="role-btn__name">{{
+                  'admin.roles.' + r | translate
+                }}</span>
+                <span class="role-btn__desc">{{
+                  'admin.login.roleDesc.' + r | translate
+                }}</span>
               </button>
             </li>
           }
@@ -163,6 +166,7 @@ export class LoginPage implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(I18nService);
   protected readonly roles = ROLES;
   protected readonly clerkMode = this.auth.mode === 'clerk';
   protected readonly clerkError = signal<string | null>(null);
@@ -184,9 +188,7 @@ export class LoginPage implements OnDestroy {
       if (!node) return;
       this.mountedNode = node;
       this.auth.mountSignIn(node, { redirectUrl: this.target() }).catch(() => {
-        this.clerkError.set(
-          'Sign-in is unavailable right now. Please try again shortly.',
-        );
+        this.clerkError.set(this.i18n.t('admin.login.clerkUnavailable'));
       });
     });
   }

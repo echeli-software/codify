@@ -20,7 +20,9 @@ export default [
         'error',
         {
           type: 'element',
-          prefix: 'app',
+          // `cdf-` for app-local shared widgets that mirror the design-system
+          // naming (e.g. the lazy Monaco `cdf-code-editor`).
+          prefix: ['app', 'cdf'],
           style: 'kebab-case',
         },
       ],
