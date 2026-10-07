@@ -131,7 +131,7 @@ export const envSchema = z
     need(
       'REDIS_URL',
       !!env.REDIS_URL,
-      'is required in production (shared rate-limit buckets)',
+      'is required in production (shared rate-limit buckets, push caps and the BullMQ queues: submissions, billing webhooks, deferred pushes)',
     );
     need(
       'FIREBASE_SERVICE_ACCOUNT_JSON',

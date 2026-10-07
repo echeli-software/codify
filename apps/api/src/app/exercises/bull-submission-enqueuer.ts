@@ -1,20 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { queueReady, withTimeout } from '../common/queue-options.js';
 import {
   SUBMISSION_JOB,
   SUBMISSION_QUEUE,
   type SubmissionEnqueuer,
   type SubmissionJobData,
 } from './submission-queue.js';
-
-const withTimeout = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
-  Promise.race([
-    p,
-    new Promise<T>((resolve) =>
-      setTimeout(() => resolve(fallback), ms).unref?.(),
-    ),
-  ]);
 
 @Injectable()
 export class BullSubmissionEnqueuer implements SubmissionEnqueuer {
@@ -26,15 +19,7 @@ export class BullSubmissionEnqueuer implements SubmissionEnqueuer {
   ) {}
 
   async enqueue(submissionId: string): Promise<boolean> {
-    const ready = await withTimeout(
-      this.queue.waitUntilReady().then(
-        () => true,
-        () => false,
-      ),
-      750,
-      false,
-    );
-    if (!ready) return false;
+    if (!(await queueReady(this.queue))) return false;
     try {
       const job = await withTimeout(
         this.queue.add(

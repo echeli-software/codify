@@ -134,6 +134,8 @@ export interface RewardAmount {
 export interface GamificationConfigValues {
   'multiplier.cap': number;
   'billing.pastDueGraceDays': number;
+  'billing.firstPaymentBonusCoins': number;
+  'billing.refundWindowDays': number;
   'streak.freezeCap': number;
   'streak.milestones': Record<string, RewardAmount>;
   'league.promotionReward': RewardAmount & { freeze: number };

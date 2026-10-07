@@ -146,6 +146,39 @@ describe('GamificationService ledger', () => {
     expect(users.get('u1')!.coins).toBe(70);
   });
 
+  it('capAtBalance clawbacks take at most the balance and never go negative', async () => {
+    const { svc, users, coinTx } = setup({
+      users: [{ id: 'u1', coins: 120, totalXp: 0, timezone: 'UTC' }],
+    });
+    const res = await svc.spendCoins({
+      userId: 'u1',
+      amount: 300,
+      source: 'PURCHASE_REFUND',
+      idempotencyKey: 'billing_bonus_clawback:s1',
+      capAtBalance: true,
+    });
+    expect(res).toEqual({ coins: 0, spent: 120 });
+    expect(users.get('u1')?.coins).toBe(0);
+    expect(coinTx.at(-1)).toMatchObject({
+      delta: -120,
+      source: 'PURCHASE_REFUND',
+      balanceAfter: 0,
+    });
+    // Empty balance: nothing to take, no ledger row, no error.
+    await expect(
+      svc.spendCoins({
+        userId: 'u1',
+        amount: 300,
+        source: 'PURCHASE_REFUND',
+        capAtBalance: true,
+      }),
+    ).resolves.toEqual({ coins: 0, spent: 0 });
+    // Without the flag an over-balance spend still fails.
+    await expect(
+      svc.spendCoins({ userId: 'u1', amount: 1, source: 'ITEM_PURCHASE' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('coin-only reward replays are idempotent (coin journal key checked)', async () => {
     const { svc, users, coinTx } = setup({
       users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],

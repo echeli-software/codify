@@ -95,6 +95,7 @@ function stripeLikeProvider(): BillingProvider {
     createPortalSession: jest.fn(),
     constructWebhookEvent: jest.fn(),
     retrieveSubscription: jest.fn(),
+    resolveChargeContext: jest.fn(async () => null),
     setCancelAtPeriodEnd: jest.fn(async (id: string, cancel: boolean) => ({
       id,
       customerId: 'cus_1',

@@ -1,45 +1,35 @@
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from '../common/queue.module.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { DevicesService } from './devices.service.js';
-import { FcmPushProvider } from './fcm-push.provider.js';
 import { NotificationsController } from './notifications.controller.js';
 import { NotificationsScheduler } from './notifications.scheduler.js';
-import {
-  DevPushProvider,
-  PUSH_PROVIDER,
-  type PushProvider,
-} from './push.provider.js';
+import { PUSH_PROVIDER } from './push.provider.js';
+import { createPushProvider } from './push-provider.factory.js';
 import { PushService } from './push.service.js';
+import { PUSH_DEFERRED_QUEUE, PUSH_DEFERRER } from './push-deferral.js';
+import { BullPushDeferrer } from './bull-push-deferrer.js';
+import { PushDeferredProcessor } from './push-deferred.processor.js';
 import { StreakReminderService } from './streak-reminder.service.js';
 
 /**
- * Selects the push transport: FCM (firebase-admin) when
- * FIREBASE_SERVICE_ACCOUNT_JSON is set, the capturing DevPushProvider
- * otherwise. Production without FCM credentials fails at boot.
- */
-export function createPushProvider(config: AppConfigService): PushProvider {
-  const sa = config.get('FIREBASE_SERVICE_ACCOUNT_JSON');
-  if (sa) return FcmPushProvider.fromServiceAccount(sa);
-  if (config.isProduction) {
-    throw new Error(
-      'FIREBASE_SERVICE_ACCOUNT_JSON is required in production (FCM push delivery).',
-    );
-  }
-  new Logger('NotificationsModule').log(
-    'FIREBASE_SERVICE_ACCOUNT_JSON unset — using DevPushProvider',
-  );
-  return new DevPushProvider();
-}
-
-/**
  * Notifications: device-token registry, push delivery (`PushService` —
- * the API other modules use), streak reminders + their hourly cron.
+ * the API other modules use, with quiet-hours deferral on the
+ * `push-deferred` BullMQ queue and Redis-tracked caps), streak reminders +
+ * their hourly cron.
  */
 @Module({
+  imports: [
+    QueueModule,
+    BullModule.registerQueue({ name: PUSH_DEFERRED_QUEUE }),
+  ],
   controllers: [NotificationsController],
   providers: [
     DevicesService,
     PushService,
+    PushDeferredProcessor,
+    { provide: PUSH_DEFERRER, useClass: BullPushDeferrer },
     StreakReminderService,
     NotificationsScheduler,
     {

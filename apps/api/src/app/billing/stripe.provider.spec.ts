@@ -32,7 +32,14 @@ function mockStripe() {
           id: 'cs_1',
           url: 'https://checkout.stripe.com/c/cs_1',
         })),
+        list: jest.fn(async () => ({
+          data: [] as { id: string; mode: string }[],
+        })),
       },
+    },
+    invoices: { retrieve: jest.fn() },
+    invoicePayments: {
+      list: jest.fn(async () => ({ data: [] as { invoice: unknown }[] })),
     },
     billingPortal: {
       sessions: {
@@ -505,5 +512,60 @@ describe('createBillingProvider', () => {
       STRIPE_WEBHOOK_SECRET: 'whsec_x',
     });
     expect(p).toBeInstanceOf(StripeBillingProvider);
+  });
+});
+
+describe('StripeBillingProvider.resolveChargeContext (charge.refunded)', () => {
+  it('finds the invoice through the PaymentIntent (API ≥ 2025-03: no charge.invoice)', async () => {
+    const { stripe, provider } = mockStripe();
+    stripe.invoicePayments.list.mockResolvedValue({
+      data: [{ invoice: 'in_1' }],
+    });
+    stripe.invoices.retrieve.mockResolvedValue({
+      id: 'in_1',
+      parent: { subscription_details: { subscription: 'sub_1' } },
+    });
+    await expect(
+      provider.resolveChargeContext({ id: 'ch_1', payment_intent: 'pi_1' }),
+    ).resolves.toEqual({
+      invoiceId: 'in_1',
+      subscriptionId: 'sub_1',
+      checkoutSessionId: null,
+    });
+    expect(stripe.invoicePayments.list).toHaveBeenCalledWith({
+      payment: { type: 'payment_intent', payment_intent: 'pi_1' },
+      limit: 1,
+    });
+  });
+
+  it('uses charge.invoice when present (older API versions)', async () => {
+    const { stripe, provider } = mockStripe();
+    stripe.invoices.retrieve.mockResolvedValue({
+      id: 'in_9',
+      subscription: 'sub_9',
+      parent: null,
+    });
+    await expect(
+      provider.resolveChargeContext({ invoice: 'in_9', payment_intent: 'pi' }),
+    ).resolves.toMatchObject({ invoiceId: 'in_9', subscriptionId: 'sub_9' });
+    expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the payment-mode Checkout Session (PIX/Boleto prepay)', async () => {
+    const { stripe, provider } = mockStripe();
+    stripe.checkout.sessions.list.mockResolvedValue({
+      data: [{ id: 'cs_live_1', mode: 'payment' }],
+    });
+    await expect(
+      provider.resolveChargeContext({ payment_intent: 'pi_2' }),
+    ).resolves.toEqual({
+      invoiceId: null,
+      subscriptionId: null,
+      checkoutSessionId: 'cs_live_1',
+    });
+    expect(stripe.checkout.sessions.list).toHaveBeenCalledWith({
+      payment_intent: 'pi_2',
+      limit: 1,
+    });
   });
 });

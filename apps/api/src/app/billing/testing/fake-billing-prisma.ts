@@ -15,6 +15,9 @@ export interface FakeState {
   users: Row[];
   plans: Row[];
   planPrices: Row[];
+  /** Coin ledger rows (written by the fake GamificationService in specs). */
+  coinTransactions: Row[];
+  auditLogs: Row[];
 }
 
 type Where = Record<string, unknown>;
@@ -27,10 +30,17 @@ function matches(row: Row, where: Where, state: FakeState): boolean {
     }
     const v = row[k];
     if (cond && typeof cond === 'object' && !(cond instanceof Date)) {
-      const c = cond as { in?: unknown[]; not?: unknown; gt?: Date };
+      const c = cond as {
+        in?: unknown[];
+        not?: unknown;
+        gt?: Date;
+        startsWith?: string;
+      };
       if (c.in) return c.in.includes(v);
       if ('not' in c) return v !== c.not;
       if (c.gt) return v instanceof Date && v.getTime() > c.gt.getTime();
+      if (c.startsWith !== undefined)
+        return typeof v === 'string' && v.startsWith(c.startsWith);
     }
     if (cond === null) return v == null;
     return v === cond;
@@ -46,10 +56,14 @@ export class FakeBillingPrisma {
     users: [],
     plans: [],
     planPrices: [],
+    coinTransactions: [],
+    auditLogs: [],
   };
   /** Optional failure injection, e.g. to make the next subscription write throw. */
   failNext: { op: string; error: Error } | null = null;
   transactions = 0;
+  /** Timestamp for ledger rows written by the fake gamification (default: now). */
+  clock: Date | null = null;
 
   private maybeFail(op: string): void {
     if (this.failNext && this.failNext.op === op) {
@@ -82,6 +96,21 @@ export class FakeBillingPrisma {
       this.state.users.find((u) => u.id === where.id) ?? null,
   };
 
+  readonly coinTransaction = {
+    findUnique: async ({ where }: { where: { idempotencyKey: string } }) =>
+      this.state.coinTransactions.find(
+        (c) => c['idempotencyKey'] === where.idempotencyKey,
+      ) ?? null,
+  };
+
+  readonly auditLog = {
+    create: async ({ data }: { data: Record<string, unknown> }) => {
+      const row: Row = { id: `audit-${++seq}`, createdAt: new Date(), ...data };
+      this.state.auditLogs.push(row);
+      return row;
+    },
+  };
+
   readonly plan = {
     findUnique: async ({ where }: { where: { id: string } }) =>
       this.state.plans.find((p) => p.id === where.id) ?? null,
@@ -104,6 +133,10 @@ export class FakeBillingPrisma {
     findUnique: async ({ where }: { where: Where }) =>
       this.state.subscriptions.find((s) => matches(s, where, this.state)) ??
       null,
+    findFirst: async ({ where }: { where: Where }) =>
+      [...this.state.subscriptions]
+        .reverse()
+        .find((s) => matches(s, where, this.state)) ?? null,
     create: async ({ data }: { data: Record<string, unknown> }) => {
       this.maybeFail('subscription.create');
       for (const k of ['stripeSubscriptionId', 'storeTransactionId']) {

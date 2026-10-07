@@ -15,6 +15,13 @@ export interface GamificationConfigValues {
   'multiplier.cap': number;
   /** Days a PAST_DUE subscription keeps access (docs/09 §status table). */
   'billing.pastDueGraceDays': number;
+  /**
+   * Coins granted once per subscription on its first paid invoice (or a
+   * PIX/Boleto prepay) — docs/09 §5 step 7. 0 = off.
+   */
+  'billing.firstPaymentBonusCoins': number;
+  /** Days after the bonus during which a full refund claws it back (docs/09 §5, §12). */
+  'billing.refundWindowDays': number;
   /** Max streak freezes a user can bank (docs/07 §6). */
   'streak.freezeCap': number;
   /** One-time streak-day milestone payouts, keyed by day count (docs/07 §2). */
@@ -36,6 +43,8 @@ export type GamificationConfigKey = keyof GamificationConfigValues;
 export const GAMIFICATION_CONFIG_DEFAULTS: GamificationConfigValues = {
   'multiplier.cap': 30,
   'billing.pastDueGraceDays': 3,
+  'billing.firstPaymentBonusCoins': 0,
+  'billing.refundWindowDays': 7,
   'streak.freezeCap': 2,
   'streak.milestones': {
     '7': { xp: 0, coins: 50 },
@@ -98,6 +107,14 @@ export function validateConfigValue(
         : 'must be a number between 1 and 100';
     case 'billing.pastDueGraceDays':
       return isInt(value, 0, 30) ? null : 'must be an integer between 0 and 30';
+    case 'billing.firstPaymentBonusCoins':
+      return isInt(value, 0, MAX_REWARD)
+        ? null
+        : `must be an integer between 0 and ${MAX_REWARD}`;
+    case 'billing.refundWindowDays':
+      return isInt(value, 0, 365)
+        ? null
+        : 'must be an integer between 0 and 365';
     case 'streak.freezeCap':
       return isInt(value, 0, 10) ? null : 'must be an integer between 0 and 10';
     case 'quest.dailyCount':

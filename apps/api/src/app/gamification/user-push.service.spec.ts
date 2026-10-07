@@ -1,30 +1,5 @@
-import {
-  UserPushService,
-  inQuietHours,
-  localMinutes,
-} from './user-push.service.js';
-
-describe('quiet hours', () => {
-  it('default window 22:00–08:00 wraps midnight', () => {
-    expect(inQuietHours(23 * 60, null, null)).toBe(true);
-    expect(inQuietHours(3 * 60, null, null)).toBe(true);
-    expect(inQuietHours(8 * 60, null, null)).toBe(false);
-    expect(inQuietHours(12 * 60, null, null)).toBe(false);
-  });
-  it('custom non-wrapping window and disabled window', () => {
-    expect(inQuietHours(13 * 60, 12 * 60, 14 * 60)).toBe(true);
-    expect(inQuietHours(15 * 60, 12 * 60, 14 * 60)).toBe(false);
-    expect(inQuietHours(3 * 60, 0, 0)).toBe(false);
-  });
-  it('localMinutes converts to the user zone', () => {
-    expect(
-      localMinutes(new Date('2026-10-07T15:30:00Z'), 'America/Sao_Paulo'),
-    ).toBe(12 * 60 + 30);
-    expect(localMinutes(new Date('2026-10-07T15:30:00Z'), 'Not/AZone')).toBe(
-      15 * 60 + 30,
-    );
-  });
-});
+import { PushService } from '../notifications/push.service.js';
+import { UserPushService } from './user-push.service.js';
 
 describe('UserPushService.sendToUser', () => {
   const makeUser = (over: Record<string, unknown> = {}) => ({
@@ -49,7 +24,8 @@ describe('UserPushService.sendToUser', () => {
         invalidTokens: ['invalid-x'],
       })),
     };
-    return { svc: new UserPushService(prisma as never, push), prisma, push };
+    const pushService = new PushService(prisma as never, push);
+    return { svc: new UserPushService(pushService), prisma, push, pushService };
   };
   const noon = new Date('2026-10-07T12:00:00Z');
 
@@ -123,5 +99,73 @@ describe('UserPushService.sendToUser', () => {
     await expect(
       svc.sendToUser('u1', { kind: 'ITEM_DROP', title: 't', body: 'b' }, noon),
     ).resolves.toEqual({ sent: 0 });
+  });
+});
+
+describe('UserPushService → PushService delivery rules', () => {
+  const user = {
+    locale: 'pt-BR',
+    timezone: 'UTC',
+    quietHoursStart: null,
+    quietHoursEnd: null,
+    deletedAt: null,
+    deviceTokens: [{ token: 't1' }],
+  };
+  const noon = new Date('2026-10-07T12:00:00Z');
+
+  function withPushResult(result: Record<string, unknown>) {
+    const pushService = {
+      sendToUser: jest.fn(async () => result),
+    } as unknown as PushService;
+    return { svc: new UserPushService(pushService), pushService };
+  }
+
+  it('maps deferred / capped results to skipped reasons', async () => {
+    expect(
+      await withPushResult({
+        status: 'deferred',
+        deliverAt: '2026-10-08T08:00:00.000Z',
+      }).svc.sendToUser('u1', { kind: 'LEAGUE_RESULT', title: 't', body: 'b' }),
+    ).toEqual({ sent: 0, skipped: 'deferred' });
+    expect(
+      await withPushResult({
+        status: 'capped',
+        reason: 'daily',
+      }).svc.sendToUser('u1', { kind: 'ITEM_DROP', title: 't', body: 'b' }),
+    ).toEqual({ sent: 0, skipped: 'capped' });
+  });
+
+  it('passes the kind through so SYSTEM bypasses the rules, and stamps data.type', async () => {
+    const prisma = {
+      user: { findUnique: jest.fn(async () => user) },
+      deviceToken: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+    };
+    const provider = {
+      mode: 'dev' as const,
+      send: jest.fn(async (msgs: unknown[]) => ({
+        sent: msgs.length,
+        failed: 0,
+        invalidTokens: [],
+      })),
+    };
+    const pushService = new PushService(prisma as never, provider);
+    const spy = jest.spyOn(pushService, 'sendToUser');
+    const svc = new UserPushService(pushService);
+    await svc.sendToUser(
+      'u1',
+      ({ locale }) => ({ kind: 'SYSTEM', title: locale, body: 'b' }),
+      noon,
+    );
+    const content = spy.mock.calls[0][1] as (u: { locale: string }) => {
+      kind: string;
+      data: Record<string, string>;
+    };
+    expect(content({ locale: 'pt-BR' })).toMatchObject({
+      kind: 'SYSTEM',
+      data: { type: 'system' },
+    });
+    expect(provider.send).toHaveBeenCalledWith([
+      { token: 't1', title: 'pt-BR', body: 'b', data: { type: 'system' } },
+    ]);
   });
 });

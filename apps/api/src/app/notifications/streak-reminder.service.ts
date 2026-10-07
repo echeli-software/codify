@@ -13,13 +13,16 @@ export interface StreakReminderResult {
   skippedQuietHours?: number;
   /** Scheduled runs only: users already reminded for their local day. */
   alreadyReminded?: number;
+  /** Scheduled runs only: users over their push cap (docs/10 §3). */
+  capped?: number;
 }
 
 export interface StreakReminderOptions {
   /**
    * `manual` (admin endpoint, verification): every at-risk user, now.
    * `scheduled` (hourly cron): only users whose local time is inside the
-   * evening slot, outside their quiet hours, at most once per local day.
+   * evening slot, outside their quiet hours, at most once per local day,
+   * and within the per-user push caps (PushService.tryReserveCap).
    */
   mode?: 'manual' | 'scheduled';
   now?: Date;
@@ -76,6 +79,7 @@ export class StreakReminderService {
     let candidates = 0;
     let skippedQuietHours = 0;
     let alreadyReminded = 0;
+    let capped = 0;
 
     for (const s of streaks) {
       const today = localClock(now, s.user.timezone);
@@ -101,6 +105,11 @@ export class StreakReminderService {
           alreadyReminded += 1;
           continue;
         }
+        // Claimed first so a second hourly pass never burns a cap slot.
+        if (!(await this.push.tryReserveCap(s.user.id, s.user.timezone, now))) {
+          capped += 1;
+          continue;
+        }
       }
 
       candidates += 1;
@@ -124,7 +133,8 @@ export class StreakReminderService {
       pushed: result.sent,
       pruned: result.pruned,
     };
-    if (scheduled) Object.assign(out, { skippedQuietHours, alreadyReminded });
+    if (scheduled)
+      Object.assign(out, { skippedQuietHours, alreadyReminded, capped });
     return out;
   }
 

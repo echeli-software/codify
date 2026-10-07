@@ -55,6 +55,7 @@ function setup(rows: StreakRow[]) {
     },
   };
   const push = {
+    tryReserveCap: jest.fn(async () => true),
     deliver: jest.fn(async (msgs: unknown[]) => ({
       sent: msgs.length,
       failed: 0,
@@ -145,5 +146,29 @@ describe('StreakReminderService', () => {
     expect(second).toMatchObject({ candidates: 0, alreadyReminded: 1 });
     expect([...claimed]).toEqual(['streak_reminder:sp:2026-10-07']);
     expect(prisma.idempotencyRecord.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('scheduled mode skips users over their push cap (and never burns a slot on a repeat pass)', async () => {
+    const { svc, push } = setup([streak('sp', '2026-10-05')]);
+    push.tryReserveCap.mockResolvedValueOnce(false);
+    const res = await svc.run({ mode: 'scheduled', now: EVENING });
+    expect(res).toMatchObject({ candidates: 0, capped: 1, pushed: 0 });
+    expect(push.tryReserveCap).toHaveBeenCalledWith(
+      'sp',
+      'America/Sao_Paulo',
+      EVENING,
+    );
+    // Second hourly pass: already claimed → no cap reservation attempted.
+    await svc.run({
+      mode: 'scheduled',
+      now: new Date('2026-10-08T00:30:00Z'),
+    });
+    expect(push.tryReserveCap).toHaveBeenCalledTimes(1);
+  });
+
+  it('manual mode does not consult the caps', async () => {
+    const { svc, push } = setup([streak('risk', '2026-10-05')]);
+    await svc.run({ mode: 'manual', now: NOON });
+    expect(push.tryReserveCap).not.toHaveBeenCalled();
   });
 });

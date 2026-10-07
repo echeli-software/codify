@@ -1,8 +1,10 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import type Stripe from 'stripe';
 import {
+  idOf,
   snapshotFromStripeSubscription,
   type BillingProvider,
+  type ChargeContext,
   type CheckoutSessionInput,
   type CheckoutSessionResult,
   type PortalSessionInput,
@@ -23,6 +25,8 @@ export type StripeClientLike = Pick<
   | 'billingPortal'
   | 'subscriptions'
   | 'webhooks'
+  | 'invoices'
+  | 'invoicePayments'
 >;
 
 type CheckoutCreateParams = NonNullable<
@@ -237,6 +241,53 @@ export class StripeBillingProvider implements BillingProvider {
       if ((err as { code?: string }).code === 'resource_missing') return null;
       throw err;
     }
+  }
+
+  /**
+   * What a Charge paid for. Since API 2025-03-31 a Charge no longer carries
+   * `invoice`: the link is the InvoicePayment for its PaymentIntent. A
+   * payment-mode Checkout Session (PIX/Boleto prepay) is found by the same
+   * PaymentIntent.
+   */
+  async resolveChargeContext(
+    charge: Record<string, unknown>,
+  ): Promise<ChargeContext | null> {
+    const paymentIntent = idOf(charge['payment_intent']);
+    let invoiceId = idOf(charge['invoice']);
+    if (!invoiceId && paymentIntent) {
+      const payments = await this.stripe.invoicePayments.list({
+        payment: { type: 'payment_intent', payment_intent: paymentIntent },
+        limit: 1,
+      });
+      invoiceId = idOf(payments.data[0]?.invoice);
+    }
+    if (invoiceId) {
+      const invoice = await this.stripe.invoices.retrieve(invoiceId);
+      const legacy = (invoice as unknown as { subscription?: unknown })
+        .subscription;
+      return {
+        invoiceId,
+        subscriptionId:
+          idOf(invoice.parent?.subscription_details?.subscription) ??
+          idOf(legacy),
+        checkoutSessionId: null,
+      };
+    }
+    if (paymentIntent) {
+      const sessions = await this.stripe.checkout.sessions.list({
+        payment_intent: paymentIntent,
+        limit: 1,
+      });
+      const session = sessions.data[0];
+      if (session && session.mode === 'payment') {
+        return {
+          invoiceId: null,
+          subscriptionId: null,
+          checkoutSessionId: session.id,
+        };
+      }
+    }
+    return { invoiceId: null, subscriptionId: null, checkoutSessionId: null };
   }
 
   async setCancelAtPeriodEnd(

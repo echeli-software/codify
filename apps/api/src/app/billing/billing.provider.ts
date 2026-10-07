@@ -117,6 +117,20 @@ export interface SubscriptionSnapshot {
   /** Stripe Price ids on the subscription items (→ PlanPrice → Plan). */
   priceIds: string[];
   metadata: Record<string, string>;
+  /** The subscription's most recent invoice (refund handling). */
+  latestInvoiceId?: string | null;
+}
+
+/**
+ * What a refunded Charge paid for (docs/09 §5 "Refunds"). Exactly one of
+ * `invoiceId` (a subscription invoice) / `checkoutSessionId` (one-shot
+ * PIX/Boleto prepay) is normally set; both null = unresolvable.
+ */
+export interface ChargeContext {
+  invoiceId: string | null;
+  /** Stripe subscription (`sub_…`) the invoice belongs to, when known. */
+  subscriptionId: string | null;
+  checkoutSessionId: string | null;
 }
 
 export interface BillingProvider {
@@ -143,6 +157,14 @@ export interface BillingProvider {
    * handler falls back to the payload with a staleness guard.
    */
   retrieveSubscription(id: string): Promise<SubscriptionSnapshot | null>;
+  /**
+   * Resolve what a Charge paid for via the provider's API (Stripe mode:
+   * invoice payments / checkout sessions by payment intent). Dev returns
+   * null — the webhook falls back to the event payload.
+   */
+  resolveChargeContext(
+    charge: Record<string, unknown>,
+  ): Promise<ChargeContext | null>;
   /** Toggle auto-renew. Dev returns null (the caller just flips the flag). */
   setCancelAtPeriodEnd(
     id: string,
@@ -299,6 +321,10 @@ export class DevBillingProvider implements BillingProvider {
     return null;
   }
 
+  async resolveChargeContext(): Promise<ChargeContext | null> {
+    return null;
+  }
+
   async setCancelAtPeriodEnd(): Promise<SubscriptionSnapshot | null> {
     return null;
   }
@@ -386,6 +412,7 @@ export function snapshotFromStripeSubscription(
     endedAt: toDate(o['ended_at']),
     priceIds,
     metadata: stringRecord(o['metadata']),
+    latestInvoiceId: idOf(o['latest_invoice']),
   };
 }
 

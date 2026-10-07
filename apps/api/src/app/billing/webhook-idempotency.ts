@@ -11,13 +11,23 @@ export class DuplicateWebhookEvent extends Error {
 export interface WebhookResult {
   received: boolean;
   duplicate: boolean;
+  /** Applied (vs ignored). Only known when processed inline — false when queued. */
   handled: boolean;
+  /** Accepted onto the `billing-webhooks` queue; a worker applies it. */
+  queued?: boolean;
 }
 
 export const DUPLICATE_RESULT: WebhookResult = {
   received: true,
   duplicate: true,
   handled: false,
+};
+
+export const QUEUED_RESULT: WebhookResult = {
+  received: true,
+  duplicate: false,
+  handled: false,
+  queued: true,
 };
 
 /** Interactive-transaction budget for applying one webhook event. */
