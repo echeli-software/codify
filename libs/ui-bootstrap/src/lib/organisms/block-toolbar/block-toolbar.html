@@ -1,0 +1,44 @@
+@for (group of groups(); track group.name; let last = $last) {
+<div
+  class="cdf-block-toolbar__group"
+  role="group"
+  [attr.aria-label]="group.name + ' tools'"
+>
+  @for (item of group.items; track item.command) {
+  <button
+    type="button"
+    class="cdf-block-toolbar__btn"
+    data-toolbar-item
+    [attr.data-command]="item.command"
+    [class.cdf-block-toolbar__btn--active]="item.toggle && isActive(item.command)"
+    [attr.aria-label]="item.label"
+    [attr.title]="tooltip(item)"
+    [attr.aria-pressed]="item.toggle ? isActive(item.command) : null"
+    [attr.aria-keyshortcuts]="aria(item)"
+    [attr.aria-disabled]="isDisabled(item.command) || null"
+    [attr.tabindex]="tabIndexFor(item)"
+    (mousedown)="$event.preventDefault()"
+    (click)="run(item)"
+  >
+    <cdf-editor-icon [name]="item.icon" />
+  </button>
+  } @if (group.name === 'blocks' && state().calloutKind) {
+  <label class="cdf-block-toolbar__select">
+    <span class="cdf-visually-hidden">Callout style</span>
+    <select
+      [value]="state().calloutKind"
+      (change)="onCalloutKind($event)"
+      [disabled]="disabled()"
+    >
+      @for (k of calloutKinds; track k.kind) {
+      <option [value]="k.kind" [selected]="k.kind === state().calloutKind">
+        {{ k.label }}
+      </option>
+      }
+    </select>
+  </label>
+  }
+</div>
+@if (!last) {
+<span class="cdf-block-toolbar__sep" aria-hidden="true"></span>
+} }

@@ -79,7 +79,8 @@
     margin: 0;
   }
 
-  ul, ol {
+  ul,
+  ol {
     padding-left: var(--cdf-space-6);
   }
 
@@ -99,11 +100,21 @@
     border-left: 4px solid var(--cdf-color-info);
     background: var(--cdf-color-bg);
 
-    &[data-callout='info']    { border-left-color: var(--cdf-color-info); }
-    &[data-callout='tip']     { border-left-color: var(--cdf-color-success); }
-    &[data-callout='warn']    { border-left-color: var(--cdf-color-warning); }
-    &[data-callout='danger']  { border-left-color: var(--cdf-color-danger); }
-    &[data-callout='success'] { border-left-color: var(--cdf-color-success); }
+    &[data-callout='info'] {
+      border-left-color: var(--cdf-color-info);
+    }
+    &[data-callout='tip'] {
+      border-left-color: var(--cdf-color-success);
+    }
+    &[data-callout='warn'] {
+      border-left-color: var(--cdf-color-warning);
+    }
+    &[data-callout='danger'] {
+      border-left-color: var(--cdf-color-danger);
+    }
+    &[data-callout='success'] {
+      border-left-color: var(--cdf-color-success);
+    }
 
     > * + * {
       margin-top: var(--cdf-space-2);
@@ -117,5 +128,133 @@
     float: left;
     height: 0;
     pointer-events: none;
+  }
+
+  // ─── Lesson block model additions (shared by editor + renderer) ─────────
+
+  // Renderer: nested block lists are layout-transparent wrappers.
+  cdf-lesson-blocks {
+    display: contents;
+  }
+
+  cdf-lesson-blocks > * + * {
+    margin-top: var(--cdf-space-3);
+  }
+
+  cdf-lesson-quiz,
+  cdf-lesson-embed,
+  cdf-lesson-ref {
+    display: block;
+  }
+
+  mark,
+  .cdf-highlight {
+    background: color-mix(in srgb, var(--cdf-color-warning) 35%, transparent);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+
+  kbd,
+  .cdf-kbd {
+    font-family: var(--cdf-font-family-mono);
+    font-size: 0.85em;
+    padding: 1px 6px;
+    border: 1px solid var(--cdf-color-border);
+    border-bottom-width: 2px;
+    border-radius: var(--cdf-radius-sm);
+    background: var(--cdf-color-surface);
+    white-space: nowrap;
+  }
+
+  // Images
+  .cdf-figure {
+    margin: 0;
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--cdf-radius-md);
+    }
+
+    &[data-width='inline'] img {
+      max-width: min(100%, 360px);
+    }
+
+    &[data-width='wide'] {
+      margin-inline: calc(var(--cdf-space-6) * -1);
+    }
+
+    figcaption {
+      margin-top: var(--cdf-space-1);
+      font-size: var(--cdf-font-size-sm);
+      color: var(--cdf-color-text-muted);
+      text-align: center;
+    }
+  }
+
+  img.cdf-image {
+    max-width: 100%;
+  }
+
+  // Tables
+  .cdf-table-wrap {
+    overflow-x: auto;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--cdf-font-size-sm);
+
+    th,
+    td {
+      border: 1px solid var(--cdf-color-border);
+      padding: var(--cdf-space-2) var(--cdf-space-3);
+      vertical-align: top;
+      text-align: left;
+      position: relative;
+
+      > * + * {
+        margin-top: var(--cdf-space-2);
+      }
+    }
+
+    th {
+      background: var(--cdf-color-bg);
+      font-weight: var(--cdf-font-weight-semibold);
+    }
+
+    // prosemirror-tables cell selection
+    .selectedCell::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--cdf-color-primary-subtle);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+  }
+
+  // Editor: node-view selection ring + static fallbacks
+  .cdf-node-view.is-selected > * {
+    outline: 2px solid var(--cdf-color-primary);
+    outline-offset: 2px;
+    border-radius: var(--cdf-radius-md);
+  }
+
+  .cdf-quiz-placeholder,
+  .cdf-ref-placeholder,
+  .cdf-embed-placeholder {
+    padding: var(--cdf-space-3);
+    border: 1px dashed var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    color: var(--cdf-color-text-muted);
   }
 }

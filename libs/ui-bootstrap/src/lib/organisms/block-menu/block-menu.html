@@ -1,0 +1,53 @@
+<div class="cdf-block-menu" role="dialog" [attr.aria-label]="label()">
+  <input
+    #search
+    class="cdf-block-menu__search"
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    aria-expanded="true"
+    [attr.aria-controls]="id + '-list'"
+    [attr.aria-activedescendant]="activeId()"
+    [attr.aria-label]="label() + ' — type to filter'"
+    placeholder="Filter blocks…"
+    [value]="query()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+    (blur)="dismiss.emit()"
+  />
+  <ul
+    class="cdf-block-menu__list"
+    role="listbox"
+    [id]="id + '-list'"
+    [attr.aria-label]="label()"
+  >
+    @for (item of filtered(); track item.type; let i = $index) {
+    <li
+      role="option"
+      class="cdf-block-menu__option"
+      [id]="id + '-opt-' + item.type"
+      [class.cdf-block-menu__option--active]="i === active()"
+      [attr.aria-selected]="i === active()"
+      [attr.data-type]="item.type"
+      tabindex="-1"
+      (keydown.enter)="choose(item)"
+      (mousedown)="$event.preventDefault()"
+      (mouseenter)="active.set(i)"
+      (click)="choose(item)"
+    >
+      <span class="cdf-block-menu__icon"
+        ><cdf-editor-icon [name]="item.icon" size="20"
+      /></span>
+      <span class="cdf-block-menu__text">
+        <span class="cdf-block-menu__label">{{ item.label }}</span>
+        <span class="cdf-block-menu__desc">{{ item.description }}</span>
+      </span>
+    </li>
+    } @empty {
+    <li class="cdf-block-menu__empty" role="presentation">
+      No matching blocks
+    </li>
+    }
+  </ul>
+</div>

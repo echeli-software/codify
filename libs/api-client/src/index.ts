@@ -144,7 +144,11 @@ export {
 } from './lib/billing.client.js';
 
 // Idempotency helpers
-export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';
+export {
+  withIdempotency,
+  IDEMPOTENCY_TOKEN,
+  uuidV4,
+} from './lib/idempotency.js';
 
 // Error mapping
 export {
@@ -162,3 +166,11 @@ export type {
   AdminUserListResponse,
   HealthResponse,
 } from './lib/types.js';
+
+// Lesson content delivery: offline bundle + lesson versions.
+export type {
+  LessonMeta,
+  LessonOfflineBundle,
+  LessonVersion,
+  LessonContentIssue,
+} from './lib/lessons.client.js';
