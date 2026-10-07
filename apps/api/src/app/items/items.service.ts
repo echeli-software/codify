@@ -1,3 +1,4 @@
+import { Cron } from '@nestjs/schedule';
 import {
   BadRequestException,
   ConflictException,
@@ -10,15 +11,15 @@ import type { Item, ItemSlot, Prisma } from '@prisma/client';
 import {
   evaluatePurchase,
   isItemAvailable,
-  subscriptionGrantsAccess,
   validateDropWindow,
 } from '@codify/domain';
 import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AccessService } from '../billing/access.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { UserPushService } from '../gamification/user-push.service.js';
-import { jobsEnabled } from '../gamification/jobs.js';
+import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import type {
   AvatarResponse,
   CreateItemCategoryDto,
@@ -52,6 +53,7 @@ export class ItemsService {
     private readonly prisma: PrismaService,
     private readonly gamification: GamificationService,
     private readonly push: UserPushService,
+    private readonly access: AccessService,
   ) {}
 
   // ─── Categories (admin) ─────────────────────────────────────────────────
@@ -321,8 +323,6 @@ export class ItemsService {
    * {@link DROP_ANNOUNCE_LOOKBACK_MS} ago are never announced (no stale
    * pushes when the job is first deployed or was down).
    *
-   * Wire with `@Cron(ENGAGEMENT_CRONS.dropAnnouncements)` once
-   * @nestjs/schedule is available on this branch; {@link runScheduledDropAnnouncements}
    * is the job entry point.
    */
   async announceDrops(
@@ -377,6 +377,10 @@ export class ItemsService {
   }
 
   /** Job entry point (no-op under jest or with JOBS_ENABLED=false). */
+  @Cron(ENGAGEMENT_CRONS.dropAnnouncements, {
+    name: 'runScheduledDropAnnouncements',
+    timeZone: 'UTC',
+  })
   async runScheduledDropAnnouncements(): Promise<{
     drops: number;
     pushed: number;
@@ -487,27 +491,13 @@ export class ItemsService {
   private async userContext(
     userId: string,
   ): Promise<{ coins: number; level: number; isPremium: boolean }> {
-    const [user, subs] = await Promise.all([
+    const [user, isPremium] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: { coins: true, totalXp: true },
       }),
-      this.prisma.subscription.findMany({
-        where: { userId },
-        select: { status: true, currentPeriodEnd: true, planId: true },
-      }),
+      this.access.hasActiveSubscription(userId),
     ]);
-    const now = new Date();
-    const isPremium = subs.some((s) =>
-      subscriptionGrantsAccess(
-        {
-          planId: s.planId,
-          status: s.status,
-          currentPeriodEnd: s.currentPeriodEnd,
-        },
-        now,
-      ),
-    );
     return { coins: user.coins, level: levelFromXp(user.totalXp), isPremium };
   }
 

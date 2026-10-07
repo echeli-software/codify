@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import {
   canUserAccessLesson,
   normalizeGraceDays,
+  subscriptionGrantsAccess,
   PAST_DUE_GRACE_DAYS_CONFIG_KEY,
   plansIncludingCourse,
   type AccessResult,
@@ -18,6 +19,12 @@ import { PrismaService } from '../prisma/prisma.service.js';
  * the client uses for UI gating, so enforcement and presentation never
  * drift. See /docs/09-billing.md §3.
  */
+/** Anything that can read subscriptions + config: the client or a transaction. */
+type AccessDb = Pick<
+  Prisma.TransactionClient,
+  'subscription' | 'gamificationConfig'
+>;
+
 @Injectable()
 export class AccessService {
   constructor(private readonly prisma: PrismaService) {}
@@ -55,17 +62,37 @@ export class AccessService {
   }
 
   /** PAST_DUE grace window: GamificationConfig `billing.pastDueGraceDays`, default 3. */
-  async pastDueGraceDays(): Promise<number> {
-    const row = await this.prisma.gamificationConfig.findUnique({
+  async pastDueGraceDays(db: AccessDb = this.prisma): Promise<number> {
+    const row = await db.gamificationConfig.findUnique({
       where: { key: PAST_DUE_GRACE_DAYS_CONFIG_KEY },
     });
     return normalizeGraceDays(row?.value);
   }
 
+  /**
+   * Does the user hold any subscription that currently grants access
+   * (premium)? The same rule as lesson access — cancel-at-period-end,
+   * PAST_DUE grace from `pastDueSince`, prepay and admin-grant expiry — so
+   * premium perks (multiplier, premium-only items) never outlive access.
+   * Pass a transaction client to read inside an open transaction.
+   */
+  async hasActiveSubscription(
+    userId: string,
+    db: AccessDb = this.prisma,
+    now: Date = new Date(),
+  ): Promise<boolean> {
+    const [subs, graceDays] = await Promise.all([
+      this.loadUserSubscriptions(userId, db),
+      this.pastDueGraceDays(db),
+    ]);
+    return subs.some((s) => subscriptionGrantsAccess(s, now, graceDays));
+  }
+
   private async loadUserSubscriptions(
     userId: string,
+    db: AccessDb = this.prisma,
   ): Promise<SubscriptionLike[]> {
-    const subs = await this.prisma.subscription.findMany({
+    const subs = await db.subscription.findMany({
       where: { userId },
       select: {
         planId: true,

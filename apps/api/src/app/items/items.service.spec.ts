@@ -52,12 +52,14 @@ function setup() {
     spendCoins: jest.fn(async () => ({ coins: 50, spent: 50 })),
   };
   const push = { sendToUser: jest.fn(async () => ({ sent: 1 })) };
+  const access = { hasActiveSubscription: jest.fn(async () => false) };
   const svc = new ItemsService(
     prisma as never,
     gamification as never,
     push as never,
+    access as never,
   );
-  return { svc, prisma, tx, gamification, push };
+  return { svc, prisma, tx, gamification, push, access };
 }
 
 describe('ItemsService.purchase', () => {

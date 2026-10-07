@@ -1,3 +1,4 @@
+import { Cron } from '@nestjs/schedule';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { LeagueTier, Prisma } from '@prisma/client';
 import {
@@ -15,7 +16,7 @@ import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { GamificationConfigService } from '../gamification/gamification-config.service.js';
 import { UserPushService } from '../gamification/user-push.service.js';
-import { jobsEnabled } from '../gamification/jobs.js';
+import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import { LeagueAccumulatorService } from './league-accumulator.service.js';
 
 const WEEK_MS = 7 * 86_400_000;
@@ -183,9 +184,11 @@ export class LeaguesService {
    * that just ended). Idempotent — safe to re-run, and safe if several API
    * replicas fire it (each member is stamped in the same tx as its reward).
    *
-   * Wire with `@Cron(ENGAGEMENT_CRONS.leagueRollover, { timeZone: 'UTC' })`
-   * once @nestjs/schedule is available on this branch.
    */
+  @Cron(ENGAGEMENT_CRONS.leagueRollover, {
+    name: 'runScheduledRollover',
+    timeZone: 'UTC',
+  })
   async runScheduledRollover(
     now: Date = new Date(),
   ): Promise<RolloverSummary | null> {

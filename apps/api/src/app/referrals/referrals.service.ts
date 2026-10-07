@@ -1,3 +1,4 @@
+import { Cron } from '@nestjs/schedule';
 import {
   BadRequestException,
   ConflictException,
@@ -11,7 +12,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { GamificationConfigService } from '../gamification/gamification-config.service.js';
-import { jobsEnabled } from '../gamification/jobs.js';
+import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 
 /** Crockford base32 — no I/L/O/U, so codes survive being read aloud. */
 const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -219,8 +220,6 @@ export class ReferralsService {
    * been paid for yet. Idempotent per referee (`referral:<refereeId>`), so
    * overlapping runs and retries never double-pay.
    *
-   * Wire with `@Cron(ENGAGEMENT_CRONS.referralRewards)` once
-   * @nestjs/schedule is available on this branch; {@link runScheduledRewards}
    * is the job entry point.
    */
   async grantPendingRewards(): Promise<ReferralRewardRun> {
@@ -273,6 +272,10 @@ export class ReferralsService {
   }
 
   /** Job entry point (no-op under jest or with JOBS_ENABLED=false). */
+  @Cron(ENGAGEMENT_CRONS.referralRewards, {
+    name: 'runScheduledRewards',
+    timeZone: 'UTC',
+  })
   async runScheduledRewards(): Promise<ReferralRewardRun | null> {
     if (!jobsEnabled()) return null;
     const res = await this.grantPendingRewards();

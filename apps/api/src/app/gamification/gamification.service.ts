@@ -3,11 +3,11 @@ import { Prisma, type CoinSource } from '@prisma/client';
 import {
   applyMultiplier,
   resolveMultiplier,
-  subscriptionGrantsAccess,
   type MultiplierRule,
 } from '@codify/domain';
 import { levelFromXp, xpForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AccessService } from '../billing/access.service.js';
 import { LeagueAccumulatorService } from '../leagues/league-accumulator.service.js';
 import {
   GamificationConfigService,
@@ -54,6 +54,7 @@ export class GamificationService {
     private readonly prisma: PrismaService,
     private readonly leagues: LeagueAccumulatorService,
     private readonly config: GamificationConfigService,
+    private readonly access: AccessService,
   ) {}
 
   /** Read a user's gamification snapshot for the app header / reconcile. */
@@ -470,22 +471,8 @@ export class GamificationService {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
-  private async isPremium(tx: Tx, userId: string): Promise<boolean> {
-    const subs = await tx.subscription.findMany({
-      where: { userId },
-      select: { status: true, currentPeriodEnd: true, planId: true },
-    });
-    const now = new Date();
-    return subs.some((s) =>
-      subscriptionGrantsAccess(
-        {
-          planId: s.planId,
-          status: s.status,
-          currentPeriodEnd: s.currentPeriodEnd,
-        },
-        now,
-      ),
-    );
+  private isPremium(tx: Tx, userId: string): Promise<boolean> {
+    return this.access.hasActiveSubscription(userId, tx);
   }
 
   private async loadMultiplierRules(tx: Tx): Promise<MultiplierRule[]> {

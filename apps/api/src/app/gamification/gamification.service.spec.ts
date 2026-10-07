@@ -8,12 +8,16 @@ function setup(opts: Parameters<typeof makeFakeLedgerDb>[0]) {
   const fake = makeFakeLedgerDb(opts);
   const leagues = { accumulateXp: jest.fn(async () => undefined) };
   const config = new GamificationConfigService(fake.db as never);
+  // Premium resolution is AccessService's job (tested in billing); here
+  // every user is a free user.
+  const access = { hasActiveSubscription: jest.fn(async () => false) };
   const svc = new GamificationService(
     fake.db as never,
     leagues as never,
     config,
+    access as never,
   );
-  return { ...fake, svc, leagues };
+  return { ...fake, svc, leagues, access };
 }
 
 const lesson = (over: Partial<GrantRewardParams> = {}): GrantRewardParams => ({
@@ -110,7 +114,12 @@ describe('GamificationService ledger', () => {
         create: jest.fn(),
       },
     };
-    const svc = new GamificationService({} as never, {} as never, {} as never);
+    const svc = new GamificationService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
     await expect(
       svc.spendCoins(
         { userId: 'u1', amount: 60, source: 'ITEM_PURCHASE' },

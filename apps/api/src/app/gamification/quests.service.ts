@@ -1,3 +1,4 @@
+import { Cron } from '@nestjs/schedule';
 import {
   ConflictException,
   Injectable,
@@ -8,7 +9,7 @@ import type { Prisma, QuestKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GamificationService } from './gamification.service.js';
 import { GamificationConfigService } from './gamification-config.service.js';
-import { jobsEnabled } from './jobs.js';
+import { jobsEnabled, ENGAGEMENT_CRONS } from './jobs.js';
 import { pickDailyQuests, type PickableTemplate } from './quest-picker.js';
 
 type PickableQuestTemplate = PickableTemplate;
@@ -46,6 +47,7 @@ export interface QuestTemplateInput {
   kind: QuestKind;
   title: string;
   difficulty?: number;
+  weight?: number;
   target: number;
   paramsJson?: Record<string, unknown> | null;
   xpReward?: number;
@@ -112,6 +114,7 @@ export class QuestsService {
         kind: input.kind,
         title: input.title,
         difficulty: input.difficulty ?? 1,
+        weight: input.weight ?? 1,
         target: input.target,
         paramsJson: (input.paramsJson ?? undefined) as
           | Prisma.InputJsonValue
@@ -134,6 +137,7 @@ export class QuestsService {
         kind: patch.kind,
         title: patch.title,
         difficulty: patch.difficulty,
+        weight: patch.weight,
         target: patch.target,
         paramsJson: (patch.paramsJson ?? undefined) as
           | Prisma.InputJsonValue
@@ -235,8 +239,6 @@ export class QuestsService {
    * be announced) before the app is opened. Lazy assignment on first read
    * remains the fallback for everyone else.
    *
-   * Wire with `@Cron(ENGAGEMENT_CRONS.questPreassign)` once @nestjs/schedule
-   * is available on this branch; {@link runScheduledPreassign} is the entry.
    */
   async preassignForNewDay(
     now: Date = new Date(),
@@ -298,6 +300,10 @@ export class QuestsService {
   }
 
   /** Job entry point (no-op under jest or with JOBS_ENABLED=false). */
+  @Cron(ENGAGEMENT_CRONS.questPreassign, {
+    name: 'runScheduledPreassign',
+    timeZone: 'UTC',
+  })
   async runScheduledPreassign(): Promise<{
     timezones: number;
     users: number;

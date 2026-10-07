@@ -141,3 +141,81 @@ describe('AccessService', () => {
     );
   });
 });
+
+describe('AccessService.hasActiveSubscription (premium)', () => {
+  const now = new Date('2026-10-07T12:00:00Z');
+  const day = 86_400_000;
+  function svcWith(
+    subs: Array<Record<string, unknown>>,
+    graceDays?: number,
+  ): AccessService {
+    const db = {
+      subscription: { findMany: jest.fn(async () => subs) },
+      gamificationConfig: {
+        findUnique: jest.fn(async () =>
+          graceDays === undefined ? null : { value: graceDays },
+        ),
+      },
+    };
+    return new AccessService(db as never);
+  }
+  const base = {
+    planId: 'p1',
+    cancelAtPeriodEnd: false,
+    pastDueSince: null,
+  };
+
+  it('treats an expired admin grant / prepay (cancel-at-period-end) as not premium', async () => {
+    const svc = svcWith([
+      {
+        ...base,
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: new Date(now.getTime() - day),
+      },
+    ]);
+    await expect(svc.hasActiveSubscription('u1', undefined, now)).resolves.toBe(
+      false,
+    );
+  });
+
+  it('keeps a renewing ACTIVE subscription premium', async () => {
+    const svc = svcWith([
+      {
+        ...base,
+        status: 'ACTIVE',
+        currentPeriodEnd: new Date(now.getTime() + day),
+      },
+    ]);
+    await expect(svc.hasActiveSubscription('u1', undefined, now)).resolves.toBe(
+      true,
+    );
+  });
+
+  it('measures PAST_DUE grace from pastDueSince with the configured days', async () => {
+    const pastDue = {
+      ...base,
+      status: 'PAST_DUE',
+      currentPeriodEnd: new Date(now.getTime() + 25 * day),
+      pastDueSince: new Date(now.getTime() - 2 * day),
+    };
+    await expect(
+      svcWith([pastDue], 3).hasActiveSubscription('u1', undefined, now),
+    ).resolves.toBe(true);
+    await expect(
+      svcWith([pastDue], 1).hasActiveSubscription('u1', undefined, now),
+    ).resolves.toBe(false);
+  });
+
+  it('reads through a transaction client when given one', async () => {
+    const tx = {
+      subscription: { findMany: jest.fn(async () => []) },
+      gamificationConfig: { findUnique: jest.fn(async () => null) },
+    };
+    const svc = new AccessService({} as never);
+    await expect(
+      svc.hasActiveSubscription('u1', tx as never, now),
+    ).resolves.toBe(false);
+    expect(tx.subscription.findMany).toHaveBeenCalled();
+  });
+});
