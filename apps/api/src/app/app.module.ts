@@ -30,6 +30,10 @@ import { UsersModule } from './users/users.module.js';
 import { ReferralsModule } from './referrals/referrals.module.js';
 import { TranslationsModule } from './translations/translations.module.js';
 
+import { AppConfigModule } from './config/config.module.js';
+import { PlatformModule } from './common/platform.module.js';
+import { OpsModule } from './ops/ops.module.js';
+
 @Module({
   imports: [
     // Cron jobs (league rollover, streak reminders, quest assignment, drift
@@ -57,6 +61,10 @@ import { TranslationsModule } from './translations/translations.module.js';
     ScenariosModule,
     ReferralsModule,
     TranslationsModule,
+
+    AppConfigModule,
+    PlatformModule,
+    OpsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

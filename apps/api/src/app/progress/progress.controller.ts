@@ -18,6 +18,7 @@ import {
   type CompleteLessonResponse,
   type CourseProgressResponse,
 } from './progress.dto.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 
 /**
  * Lesson completions + per-course progress view.
@@ -44,6 +45,7 @@ export class ProgressController {
     private readonly audit: AuditService,
   ) {}
 
+  @RewardThrottle()
   @Roles('STUDENT')
   @Post('lessons/:id/complete')
   @HttpCode(201)

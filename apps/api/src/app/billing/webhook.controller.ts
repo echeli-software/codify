@@ -4,6 +4,7 @@ import { Public } from '../auth/public.decorator.js';
 import { WebhookService } from './webhook.service.js';
 import { RevenueCatWebhookService } from './revenuecat-webhook.service.js';
 import type { WebhookResult } from './webhook-idempotency.js';
+import { NoThrottle } from '../common/throttling/throttle.decorators.js';
 
 type RawRequest = Request & { rawBody?: Buffer };
 
@@ -22,6 +23,7 @@ export class WebhookController {
   ) {}
 
   @Public()
+  @NoThrottle()
   @Post('stripe')
   @HttpCode(200)
   stripe(
@@ -34,6 +36,7 @@ export class WebhookController {
   }
 
   @Public()
+  @NoThrottle()
   @Post('revenuecat')
   @HttpCode(200)
   revenuecatWebhook(

@@ -32,6 +32,7 @@ import {
   UpdateExerciseDto,
 } from './exercises.dto.js';
 import { RetryAfterInterceptor } from './rate-limit.js';
+import { CodeThrottle } from '../common/throttling/throttle.decorators.js';
 
 function toInput(
   dto: CreateExerciseDto | UpdateExerciseDto,
@@ -144,6 +145,7 @@ export class ExercisesController {
     return this.exercises.getForStudent(actor.userId, lessonId);
   }
 
+  @CodeThrottle()
   @Roles('STUDENT')
   @Post('exercises/:id/run')
   run(
@@ -154,6 +156,7 @@ export class ExercisesController {
     return this.exercises.run(actor.userId, id, body.code);
   }
 
+  @CodeThrottle()
   @Roles('STUDENT')
   @Post('exercises/:id/submit')
   @UseInterceptors(RetryAfterInterceptor)

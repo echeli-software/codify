@@ -6,7 +6,6 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -24,6 +23,7 @@ import {
   type CategoryListResponse,
   type CategoryResponse,
 } from './categories.dto.js';
+import { IntRangePipe } from '../common/int-range.pipe.js';
 
 /**
  * Categories CRUD. Reads are open to any authenticated user (so the
@@ -39,10 +39,11 @@ export class CategoriesController {
 
   @Get()
   list(
-    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-    @Query('take', new DefaultValuePipe(50), ParseIntPipe) take: number,
+    @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
+    @Query('take', new DefaultValuePipe(50), new IntRangePipe(1, 200))
+    take: number,
   ): Promise<CategoryListResponse> {
-    return this.categories.list({ skip, take: Math.min(take, 200) });
+    return this.categories.list({ skip, take });
   }
 
   @Get(':id')

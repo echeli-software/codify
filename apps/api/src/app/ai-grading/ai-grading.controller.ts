@@ -26,6 +26,7 @@ import {
   ResponseDto,
   UpdateAiPromptDto,
 } from './ai-grading.dto.js';
+import { AiThrottle } from '../common/throttling/throttle.decorators.js';
 
 function toInput(
   dto: CreateAiPromptDto | UpdateAiPromptDto,
@@ -130,6 +131,7 @@ export class AiGradingController {
     return this.ai.getForStudent(actor.userId, lessonId);
   }
 
+  @AiThrottle()
   @Roles('STUDENT')
   @Post('ai-prompts/:id/submit')
   @UseInterceptors(RetryAfterInterceptor)

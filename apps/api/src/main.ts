@@ -1,30 +1,74 @@
 /**
- * NestJS bootstrap. Loads .env (via dotenv), enables CORS for the student
- * and admin dev origins, and registers a global ValidationPipe so DTOs
- * with class-validator decorators reject malformed bodies before they
- * reach handlers.
+ * NestJS bootstrap.
+ *
+ *  1. Load .env (dotenv) and validate the environment (zod) — a bad config
+ *     exits with every invalid/missing variable listed.
+ *  2. Sentry (when SENTRY_DSN is set), pino structured logging.
+ *  3. Hardening: helmet, CORS allowlist (CORS_ORIGINS), `trust proxy` for
+ *     Cloudflare, raw body kept for webhook signature checks (Stripe +
+ *     Clerk read `req.rawBody`), graceful shutdown hooks.
+ *  4. Global ValidationPipe with structured (problem+json) 400s.
  */
 
 import 'reflect-metadata';
 import 'dotenv/config';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app/app.module';
+import { initSentry } from './app/common/sentry.js';
+import { validationExceptionFactory } from './app/common/validation.js';
+import { AppConfigService } from './app/config/app-config.service.js';
+import { EnvValidationError } from './app/config/env.schema.js';
+import { loadEnv } from './app/config/env.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  let env;
+  try {
+    env = loadEnv();
+  } catch (err) {
+    if (err instanceof EnvValidationError) {
+      console.error(err.message);
+      process.exit(1);
+    }
+    throw err;
+  }
+  initSentry(env);
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+    bufferLogs: true,
+  });
+  app.useLogger(app.get(Logger));
+  const config = app.get(AppConfigService);
+
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
 
-  // Allow the local dev origins of both apps + Storybook.
+  // Cloudflare (and Coolify's proxy) sit in front: trust their
+  // X-Forwarded-For so req.ip / rate-limit trackers see the real client.
+  app.set('trust proxy', config.trustProxy);
+  app.disable('x-powered-by');
+
+  // JSON API: no HTML is served, so a strict CSP costs nothing.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      },
+      // Bearer-token API (no cookies): let the Capacitor app (capacitor://
+      // localhost) and CDN-hosted apps load API-served resources.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
+
   app.enableCors({
-    origin: [
-      'http://localhost:4201',
-      'http://localhost:4202',
-      'http://localhost:4400',
-      'http://localhost:4401',
-    ],
+    origin: config.corsOrigins,
     credentials: true,
+    exposedHeaders: ['Retry-After', 'X-Request-Id'],
   });
 
   app.useGlobalPipes(
@@ -35,14 +79,20 @@ async function bootstrap() {
       // Query / path params arrive as strings; coerce them to the
       // declared TS types so @IsInt / @Min / @Max validate correctly.
       transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 
-  const port = process.env.API_PORT || process.env.PORT || 3000;
+  app.enableShutdownHooks();
+
+  const port = config.port;
   await app.listen(port);
-  Logger.log(
-    `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`,
-  );
+  app
+    .get(Logger)
+    .log(
+      `Application is running on: http://localhost:${port}/${globalPrefix}`,
+      'Bootstrap',
+    );
 }
 
 bootstrap();

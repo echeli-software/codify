@@ -1,11 +1,27 @@
-import { Body, Controller, Delete, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { DevicesService } from './devices.service.js';
-import { StreakReminderService, type StreakReminderResult } from './streak-reminder.service.js';
+import {
+  StreakReminderService,
+  type StreakReminderResult,
+} from './streak-reminder.service.js';
 import { RegisterDeviceDto } from './notifications.dto.js';
-import { PUSH_PROVIDER, type PushProvider, DevPushProvider } from './push.provider.js';
+import {
+  PUSH_PROVIDER,
+  type PushProvider,
+  DevPushProvider,
+} from './push.provider.js';
 
 @Controller()
 export class NotificationsController {
@@ -40,7 +56,7 @@ export class NotificationsController {
   @Roles('ADMIN')
   @Post('notifications/streak-reminder/run')
   runStreakReminders(): Promise<StreakReminderResult> {
-    return this.reminders.run();
+    return this.reminders.run({ mode: 'manual' });
   }
 
   /** Dev-only: inspect what the DevPushProvider captured (verification aid). */

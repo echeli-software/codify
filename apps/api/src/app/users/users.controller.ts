@@ -4,7 +4,6 @@ import {
   DefaultValuePipe,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Query,
   Req,
@@ -20,6 +19,7 @@ import {
   type AdminUserListItem,
   type MeResponse,
 } from './users.dto.js';
+import { IntRangePipe } from '../common/int-range.pipe.js';
 
 @Controller('users')
 export class UsersController {
@@ -29,10 +29,11 @@ export class UsersController {
   @Roles('ADMIN', 'SUPPORT')
   @Get()
   async list(
-    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
+    @Query('take', new DefaultValuePipe(20), new IntRangePipe(1, 100))
+    take: number,
   ): Promise<{ items: AdminUserListItem[]; total: number }> {
-    return this.users.listForAdmin({ skip, take: Math.min(take, 100) });
+    return this.users.listForAdmin({ skip, take });
   }
 
   /** Detail view — Admin/Support only. */

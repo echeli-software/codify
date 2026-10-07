@@ -21,6 +21,7 @@ import {
 } from './scenarios.service.js';
 import { CompleteScenarioDto, ScenarioGraphDto } from './scenarios.dto.js';
 import { RetryAfterInterceptor } from '../exercises/rate-limit.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 
 @Controller()
 export class ScenariosController {
@@ -101,6 +102,7 @@ export class ScenariosController {
     return this.scenarios.getForStudent(actor.userId, lessonId);
   }
 
+  @RewardThrottle()
   @Roles('STUDENT')
   @Post('scenarios/:id/complete')
   @UseInterceptors(RetryAfterInterceptor)

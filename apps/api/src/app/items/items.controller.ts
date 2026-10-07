@@ -31,6 +31,7 @@ import {
   type PurchaseResponse,
   type ShopItem,
 } from './items.dto.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 
 /**
  * Shop + inventory + avatar (student) and item/category management (admin).
@@ -53,6 +54,7 @@ export class ItemsController {
     return this.items.shop(actor.userId, query);
   }
 
+  @RewardThrottle()
   @Roles('STUDENT')
   @Post('shop/:id/purchase')
   @HttpCode(201)
