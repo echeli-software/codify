@@ -23,6 +23,7 @@
 @use './typography';
 @use './motion';
 @use './z';
+@use './breakpoints';
 
 // ─── Theme builders ──────────────────────────────────────────────────────
 // `theme-light` and `theme-dark` set every CSS custom property the design
@@ -38,6 +39,7 @@
   @include typography.emit-typography-vars;
   @include motion.emit-motion-vars;
   @include z.emit-z-vars;
+  @include breakpoints.emit-breakpoint-vars;
   color-scheme: light;
 }
 
@@ -50,5 +52,6 @@
   @include typography.emit-typography-vars;
   @include motion.emit-motion-vars;
   @include z.emit-z-vars;
+  @include breakpoints.emit-breakpoint-vars;
   color-scheme: dark;
 }

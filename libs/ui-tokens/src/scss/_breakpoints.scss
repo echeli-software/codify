@@ -1,19 +1,19 @@
 // Breakpoints. Aligned with Bootstrap 5 defaults so the bootstrap-map can
 // pass through cleanly for the admin app.
 
-$bp-xs:  0;
-$bp-sm:  480px;
-$bp-md:  768px;
-$bp-lg:  1024px;
-$bp-xl:  1280px;
+$bp-xs: 0;
+$bp-sm: 480px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+$bp-xl: 1280px;
 $bp-xxl: 1536px;
 
 $breakpoints: (
-  xs:  $bp-xs,
-  sm:  $bp-sm,
-  md:  $bp-md,
-  lg:  $bp-lg,
-  xl:  $bp-xl,
+  xs: $bp-xs,
+  sm: $bp-sm,
+  md: $bp-md,
+  lg: $bp-lg,
+  xl: $bp-xl,
   xxl: $bp-xxl,
 );
 
@@ -26,6 +26,14 @@ $breakpoints: (
   @if $value == 0 {
     @content;
   } @else {
-    @media (min-width: $value) { @content; }
+    @media (min-width: $value) {
+      @content;
+    }
+  }
+}
+
+@mixin emit-breakpoint-vars() {
+  @each $name, $value in $breakpoints {
+    --cdf-breakpoint-#{$name}: #{$value};
   }
 }

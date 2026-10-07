@@ -10,7 +10,7 @@
 
 // ─── Palette ─────────────────────────────────────────────────────────────
 // Brand: violet ("Codify purple")
-$palette-violet-50:  #f4f1ff;
+$palette-violet-50: #f4f1ff;
 $palette-violet-100: #ebe5ff;
 $palette-violet-200: #d9ceff;
 $palette-violet-300: #bca6ff;
@@ -23,7 +23,7 @@ $palette-violet-900: #3c1597;
 $palette-violet-950: #240a5e;
 
 // Accent: warm amber (energy, coins)
-$palette-amber-50:  #fffbeb;
+$palette-amber-50: #fffbeb;
 $palette-amber-100: #fef3c7;
 $palette-amber-200: #fde68a;
 $palette-amber-300: #fcd34d;
@@ -36,8 +36,8 @@ $palette-amber-900: #78350f;
 $palette-amber-950: #451a03;
 
 // Neutral
-$palette-gray-0:   #ffffff;
-$palette-gray-50:  #f9fafb;
+$palette-gray-0: #ffffff;
+$palette-gray-50: #f9fafb;
 $palette-gray-100: #f3f4f6;
 $palette-gray-200: #e5e7eb;
 $palette-gray-300: #d1d5db;
@@ -50,9 +50,9 @@ $palette-gray-900: #111827;
 $palette-gray-950: #030712;
 
 // State: success, warning, danger, info
-$palette-green-500:  #22c55e;
-$palette-green-600:  #16a34a;
-$palette-green-700:  #15803d;
+$palette-green-500: #22c55e;
+$palette-green-600: #16a34a;
+$palette-green-700: #15803d;
 
 $palette-yellow-400: #facc15;
 $palette-yellow-500: #eab308;
@@ -65,93 +65,163 @@ $palette-blue-500: #3b82f6;
 $palette-blue-600: #2563eb;
 
 // Gamification accents
-$palette-xp:       #4f46e5;  // indigo — XP / progress
-$palette-coin:     #f59e0b;  // amber — coins
-$palette-premium:  #d4af37;  // gold — premium
-$palette-flame:    #f97316;  // orange — streak
+$palette-xp: #4f46e5; // indigo — XP / progress
+$palette-coin: #f59e0b; // amber — coins
+$palette-premium: #d4af37; // gold — premium
+$palette-flame: #f97316; // orange — streak
 
 // ─── Semantic tokens (Sass) ──────────────────────────────────────────────
 // Components reference these, never the palette directly.
-$color-primary:           $palette-violet-600;
-$color-primary-hover:     $palette-violet-700;
-$color-primary-active:    $palette-violet-800;
-$color-primary-subtle:    $palette-violet-100;
-$color-primary-on:        $palette-gray-0;
+$color-primary: $palette-violet-600;
+$color-primary-hover: $palette-violet-700;
+$color-primary-active: $palette-violet-800;
+$color-primary-subtle: $palette-violet-100;
+$color-primary-on: $palette-gray-0;
 
-$color-accent:            $palette-amber-500;
-$color-accent-hover:      $palette-amber-600;
-$color-accent-on:         $palette-gray-900;
+$color-accent: $palette-amber-500;
+$color-accent-hover: $palette-amber-600;
+$color-accent-on: $palette-gray-900;
 
-$color-success:           $palette-green-600;
-$color-warning:           $palette-yellow-500;
-$color-danger:            $palette-red-600;
-$color-info:              $palette-blue-600;
+$color-success: $palette-green-700;
+$color-warning: $palette-yellow-500;
+$color-danger: $palette-red-600;
+$color-info: $palette-blue-600;
 
-$color-coin:              $palette-coin;
-$color-xp:                $palette-xp;
-$color-premium:           $palette-premium;
-$color-flame:             $palette-flame;
+$color-coin: $palette-coin;
+$color-xp: $palette-xp;
+$color-premium: $palette-premium;
+$color-flame: $palette-flame;
 
 // Light theme surface + text
-$color-bg-light:          $palette-gray-50;
-$color-surface-light:     $palette-gray-0;
+$color-bg-light: $palette-gray-50;
+$color-surface-light: $palette-gray-0;
 $color-surface-elev-light: $palette-gray-0;
-$color-border-light:      $palette-gray-200;
-$color-text-light:        $palette-gray-900;
-$color-text-muted-light:  $palette-gray-600;
-$color-text-subtle-light: $palette-gray-500;
+$color-border-light: $palette-gray-200;
+$color-text-light: $palette-gray-900;
+$color-text-muted-light: $palette-gray-600;
+$color-text-subtle-light: $palette-gray-600;
 
 // Dark theme surface + text
-$color-bg-dark:           $palette-gray-950;
-$color-surface-dark:      $palette-gray-900;
+$color-bg-dark: $palette-gray-950;
+$color-surface-dark: $palette-gray-900;
 $color-surface-elev-dark: $palette-gray-800;
-$color-border-dark:       $palette-gray-700;
-$color-text-dark:         $palette-gray-50;
-$color-text-muted-dark:   $palette-gray-400;
-$color-text-subtle-dark:  $palette-gray-500;
+$color-border-dark: $palette-gray-700;
+$color-text-dark: $palette-gray-50;
+$color-text-muted-dark: $palette-gray-400;
+$color-text-subtle-dark: $palette-gray-400;
+
+// "On" colours — text/icons placed ON a solid semantic fill (≥ 4.5:1).
+$color-success-on: $palette-gray-0;
+$color-warning-on: $palette-gray-900;
+$color-danger-on: $palette-gray-0;
+$color-info-on: $palette-gray-0;
+$color-coin-on: $palette-gray-900;
+$color-xp-on: $palette-gray-0;
+$color-premium-on: $palette-gray-900;
+$color-flame-on: $palette-gray-900;
+
+// "Text" colours — semantic hues safe as TEXT on bg/surface (≥ 4.5:1 in
+// their theme). Fills keep the brand hue; text uses these.
+$text-tones-light: (
+  primary: $palette-violet-600,
+  success: $palette-green-700,
+  warning: $palette-amber-700,
+  danger: $palette-red-700,
+  info: $palette-blue-600,
+  coin: $palette-amber-700,
+  xp: $palette-xp,
+  premium: #806300,
+  flame: #c2410c,
+);
+$text-tones-dark: (
+  primary: #a78bfa,
+  success: #4ade80,
+  warning: $palette-yellow-400,
+  danger: #f87171,
+  info: #60a5fa,
+  coin: $palette-amber-400,
+  xp: #a5b4fc,
+  premium: #e6c75a,
+  flame: #fb923c,
+);
+
+// Dark theme re-tones the brand primary so it works both as a fill (with
+// dark "on" text) and as text/links on dark surfaces.
+$color-primary-dark: #a78bfa;
+$color-primary-hover-dark: #c4b5fd;
+$color-primary-active-dark: #ddd6fe;
+$color-primary-subtle-dark: #2e1a6b;
+$color-primary-on-dark: $palette-gray-950;
 
 // ─── CSS variable definitions ────────────────────────────────────────────
 // These mixins emit the runtime CSS custom properties for a theme.
 // `theme-light` and `theme-dark` in index.scss compose these.
 
 @mixin emit-static-vars() {
-  --cdf-color-primary:        #{$color-primary};
-  --cdf-color-primary-hover:  #{$color-primary-hover};
+  --cdf-color-primary: #{$color-primary};
+  --cdf-color-primary-hover: #{$color-primary-hover};
   --cdf-color-primary-active: #{$color-primary-active};
   --cdf-color-primary-subtle: #{$color-primary-subtle};
-  --cdf-color-primary-on:     #{$color-primary-on};
+  --cdf-color-primary-on: #{$color-primary-on};
 
-  --cdf-color-accent:         #{$color-accent};
-  --cdf-color-accent-hover:   #{$color-accent-hover};
-  --cdf-color-accent-on:      #{$color-accent-on};
+  --cdf-color-accent: #{$color-accent};
+  --cdf-color-accent-hover: #{$color-accent-hover};
+  --cdf-color-accent-on: #{$color-accent-on};
 
-  --cdf-color-success:        #{$color-success};
-  --cdf-color-warning:        #{$color-warning};
-  --cdf-color-danger:         #{$color-danger};
-  --cdf-color-info:           #{$color-info};
+  --cdf-color-success: #{$color-success};
+  --cdf-color-warning: #{$color-warning};
+  --cdf-color-danger: #{$color-danger};
+  --cdf-color-info: #{$color-info};
 
-  --cdf-color-coin:           #{$color-coin};
-  --cdf-color-xp:             #{$color-xp};
-  --cdf-color-premium:        #{$color-premium};
-  --cdf-color-flame:          #{$color-flame};
+  --cdf-color-coin: #{$color-coin};
+  --cdf-color-xp: #{$color-xp};
+  --cdf-color-premium: #{$color-premium};
+  --cdf-color-flame: #{$color-flame};
+
+  --cdf-color-success-on: #{$color-success-on};
+  --cdf-color-warning-on: #{$color-warning-on};
+  --cdf-color-danger-on: #{$color-danger-on};
+  --cdf-color-info-on: #{$color-info-on};
+  --cdf-color-coin-on: #{$color-coin-on};
+  --cdf-color-xp-on: #{$color-xp-on};
+  --cdf-color-premium-on: #{$color-premium-on};
+  --cdf-color-flame-on: #{$color-flame-on};
+
+  // Fixed dark ink for text on light pastel fills (avatar initials, chips
+  // with generated hues) — does not flip with the theme.
+  --cdf-color-ink: #{$palette-gray-900};
+}
+
+@mixin emit-text-tones($tones) {
+  @each $name, $value in $tones {
+    --cdf-color-#{$name}-text: #{$value};
+  }
 }
 
 @mixin emit-light-vars() {
-  --cdf-color-bg:             #{$color-bg-light};
-  --cdf-color-surface:        #{$color-surface-light};
-  --cdf-color-surface-elev:   #{$color-surface-elev-light};
-  --cdf-color-border:         #{$color-border-light};
-  --cdf-color-text:           #{$color-text-light};
-  --cdf-color-text-muted:     #{$color-text-muted-light};
-  --cdf-color-text-subtle:    #{$color-text-subtle-light};
+  --cdf-color-bg: #{$color-bg-light};
+  --cdf-color-surface: #{$color-surface-light};
+  --cdf-color-surface-elev: #{$color-surface-elev-light};
+  --cdf-color-border: #{$color-border-light};
+  --cdf-color-text: #{$color-text-light};
+  --cdf-color-text-muted: #{$color-text-muted-light};
+  --cdf-color-text-subtle: #{$color-text-subtle-light};
+  @include emit-text-tones($text-tones-light);
 }
 
 @mixin emit-dark-vars() {
-  --cdf-color-bg:             #{$color-bg-dark};
-  --cdf-color-surface:        #{$color-surface-dark};
-  --cdf-color-surface-elev:   #{$color-surface-elev-dark};
-  --cdf-color-border:         #{$color-border-dark};
-  --cdf-color-text:           #{$color-text-dark};
-  --cdf-color-text-muted:     #{$color-text-muted-dark};
-  --cdf-color-text-subtle:    #{$color-text-subtle-dark};
+  --cdf-color-bg: #{$color-bg-dark};
+  --cdf-color-surface: #{$color-surface-dark};
+  --cdf-color-surface-elev: #{$color-surface-elev-dark};
+  --cdf-color-border: #{$color-border-dark};
+  --cdf-color-text: #{$color-text-dark};
+  --cdf-color-text-muted: #{$color-text-muted-dark};
+  --cdf-color-text-subtle: #{$color-text-subtle-dark};
+  @include emit-text-tones($text-tones-dark);
+
+  --cdf-color-primary: #{$color-primary-dark};
+  --cdf-color-primary-hover: #{$color-primary-hover-dark};
+  --cdf-color-primary-active: #{$color-primary-active-dark};
+  --cdf-color-primary-subtle: #{$color-primary-subtle-dark};
+  --cdf-color-primary-on: #{$color-primary-on-dark};
 }
