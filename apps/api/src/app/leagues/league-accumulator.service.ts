@@ -43,6 +43,17 @@ export class LeagueAccumulatorService {
     if (existing) return existing;
 
     const tier = await this.resolveTier(tx, userId, weekStart);
+    // Serialize cohort placement per (tier, week) for the rest of this
+    // transaction: two concurrent joins can no longer both see 29 members
+    // and both join (overfilling to 31), nor can one user's parallel
+    // requests place them in two cohorts. Re-check after acquiring the lock.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${cohortLockKey(tier, weekStart)}))`;
+    const raced = await tx.leagueMembership.findFirst({
+      where: { userId, league: { weekStart } },
+      select: { leagueId: true },
+    });
+    if (raced) return raced;
+
     const league = await this.findOrCreateCohort(tx, tier, weekStart);
     await tx.leagueMembership.create({
       data: { leagueId: league.id, userId, weeklyXp: 0 },
@@ -80,4 +91,9 @@ export class LeagueAccumulatorService {
       data: { tier, weekStart, cohortKey: randomUUID().slice(0, 8) },
     });
   }
+}
+
+/** Advisory-lock key for cohort placement in one tier for one week. */
+export function cohortLockKey(tier: LeagueTier, weekStart: Date): string {
+  return `league-cohort:${tier}:${weekStart.toISOString()}`;
 }

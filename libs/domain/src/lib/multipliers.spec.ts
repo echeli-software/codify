@@ -1,6 +1,8 @@
 import {
   applyMultiplier,
+  isMultiplierActiveAt,
   resolveMultiplier,
+  validateMultiplierDraft,
   type MultiplierRule,
 } from './multipliers.js';
 
@@ -16,7 +18,11 @@ const rule = (over: Partial<MultiplierRule>): MultiplierRule => ({
 
 describe('resolveMultiplier', () => {
   it('free user with no rules → 1x, no components', () => {
-    const r = resolveMultiplier({ multipliers: [], isPremium: false, now: NOW });
+    const r = resolveMultiplier({
+      multipliers: [],
+      isPremium: false,
+      now: NOW,
+    });
     expect(r.xp.effective).toBe(1);
     expect(r.coins.effective).toBe(1);
     expect(r.xp.components).toEqual([]);
@@ -42,10 +48,15 @@ describe('resolveMultiplier', () => {
     expect(r.xp.effective).toBe(24);
     expect(r.coins.effective).toBe(24);
     // 4 components: premium, streak, lesson promo, campaign (course promo excluded)
-    expect(r.xp.components.map((c) => c.kind).sort()).toEqual(
-      ['CAMPAIGN', 'LESSON_PROMO', 'PREMIUM_DEFAULT', 'STREAK_TIER'],
+    expect(r.xp.components.map((c) => c.kind).sort()).toEqual([
+      'CAMPAIGN',
+      'LESSON_PROMO',
+      'PREMIUM_DEFAULT',
+      'STREAK_TIER',
+    ]);
+    expect(r.xp.components.find((c) => c.kind === 'LESSON_PROMO')?.value).toBe(
+      4,
     );
-    expect(r.xp.components.find((c) => c.kind === 'LESSON_PROMO')?.value).toBe(4);
   });
 
   it('free user ignores PREMIUM_DEFAULT', () => {
@@ -82,7 +93,11 @@ describe('resolveMultiplier', () => {
     const r = resolveMultiplier({
       multipliers: [
         rule({ kind: 'CAMPAIGN', value: 5, startsAt: '2026-07-01T00:00:00Z' }), // future
-        rule({ kind: 'PREMIUM_DEFAULT', value: 2, endsAt: '2026-01-01T00:00:00Z' }), // past
+        rule({
+          kind: 'PREMIUM_DEFAULT',
+          value: 2,
+          endsAt: '2026-01-01T00:00:00Z',
+        }), // past
       ],
       isPremium: true,
       now: NOW,
@@ -125,5 +140,94 @@ describe('applyMultiplier', () => {
     expect(applyMultiplier(10, 2.5)).toBe(25);
     expect(applyMultiplier(5, 1.1)).toBe(6); // 5.5 → 6
     expect(applyMultiplier(8, 1)).toBe(8);
+  });
+});
+
+describe('isMultiplierActiveAt', () => {
+  it('honours open and closed window bounds', () => {
+    expect(isMultiplierActiveAt({}, NOW)).toBe(true);
+    expect(
+      isMultiplierActiveAt({ startsAt: '2026-06-22T00:00:00Z' }, NOW),
+    ).toBe(false);
+    expect(isMultiplierActiveAt({ endsAt: '2026-06-20T00:00:00Z' }, NOW)).toBe(
+      false,
+    );
+    expect(
+      isMultiplierActiveAt(
+        { startsAt: '2026-06-20T00:00:00Z', endsAt: '2026-06-22T00:00:00Z' },
+        NOW,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('validateMultiplierDraft', () => {
+  it('accepts a well-formed campaign', () => {
+    expect(
+      validateMultiplierDraft({
+        kind: 'CAMPAIGN',
+        value: 2,
+        startsAt: '2026-06-20T00:00:00Z',
+        endsAt: '2026-06-22T00:00:00Z',
+      }),
+    ).toEqual([]);
+  });
+  it('rejects value ≤ 0, too large, and NaN', () => {
+    expect(
+      validateMultiplierDraft({ kind: 'CAMPAIGN', value: 0 }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({ kind: 'CAMPAIGN', value: -1 }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({ kind: 'CAMPAIGN', value: Number.NaN }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({ kind: 'CAMPAIGN', value: 1000 }),
+    ).toHaveLength(1);
+  });
+  it('rejects endsAt ≤ startsAt and unparsable dates', () => {
+    expect(
+      validateMultiplierDraft({
+        kind: 'CAMPAIGN',
+        value: 2,
+        startsAt: '2026-06-22T00:00:00Z',
+        endsAt: '2026-06-22T00:00:00Z',
+      }),
+    ).toContain('endsAt must be after startsAt');
+    expect(
+      validateMultiplierDraft({ kind: 'CAMPAIGN', value: 2, startsAt: 'nope' }),
+    ).toContain('startsAt is not a valid date');
+  });
+  it('requires the kind-specific binding', () => {
+    expect(
+      validateMultiplierDraft({ kind: 'COURSE_PROMO', value: 2 }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({ kind: 'LESSON_PROMO', value: 2 }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({ kind: 'STREAK_TIER', value: 2 }),
+    ).toHaveLength(1);
+    expect(
+      validateMultiplierDraft({
+        kind: 'STREAK_TIER',
+        value: 1.1,
+        streakDaysMin: 7,
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('resolveMultiplier uncapped', () => {
+  it('reports the pre-cap product', () => {
+    const r = resolveMultiplier({
+      multipliers: [rule({ kind: 'CAMPAIGN', value: 50 })],
+      isPremium: false,
+      now: NOW,
+      cap: 10,
+    });
+    expect(r.xp.effective).toBe(10);
+    expect(r.xp.uncapped).toBe(50);
   });
 });

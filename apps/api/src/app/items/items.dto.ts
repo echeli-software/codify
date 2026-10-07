@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsObject,
@@ -33,6 +34,15 @@ export const RARITIES = [
   'LEGENDARY',
 ] as const;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
+/**
+ * A sprite/thumbnail reference: a placeholder token (`emoji:🎩`,
+ * `color:#88ccff`) or the URL of an uploaded Asset — an absolute https URL
+ * (R2 public URL) or the dev provider's `/api/assets/dev/<key>` path.
+ */
+export const SPRITE_REF =
+  /^(?:emoji:\S.*|color:#[0-9a-fA-F]{3,8}|https:\/\/\S+|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/\S+|\/api\/assets\/dev\/\S+)$/u;
+const SPRITE_REF_MESSAGE =
+  'must be an emoji:/color: placeholder or an uploaded asset URL (https://… or /api/assets/dev/…)';
 
 export class CreateItemCategoryDto {
   @IsString()
@@ -97,25 +107,35 @@ export class CreateItemDto {
   isLimitedDrop?: boolean;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dropStartsAt?: string | null;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dropEndsAt?: string | null;
 
+  /** Placeholder token (emoji:/color:) or an uploaded Asset's URL. */
   @IsString()
-  @Length(1, 200)
+  @Length(1, 500)
+  @Matches(SPRITE_REF, { message: SPRITE_REF_MESSAGE })
   spriteAssetId!: string;
 
   @IsOptional()
   @IsString()
-  @Length(0, 200)
+  @Length(0, 500)
+  @Matches(SPRITE_REF, { message: SPRITE_REF_MESSAGE })
   thumbnailAssetId?: string;
 
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+export class PurchaseDto {
+  /** Equip the item in its slot in the same transaction as the purchase. */
+  @IsOptional()
+  @IsBoolean()
+  equip?: boolean;
 }
 
 export class UpdateItemDto {
@@ -128,10 +148,18 @@ export class UpdateItemDto {
   @IsOptional() @IsInt() @Min(1) @Max(1000) requiredLevel?: number;
   @IsOptional() @IsBoolean() isPremiumOnly?: boolean;
   @IsOptional() @IsBoolean() isLimitedDrop?: boolean;
-  @IsOptional() @IsString() dropStartsAt?: string | null;
-  @IsOptional() @IsString() dropEndsAt?: string | null;
-  @IsOptional() @IsString() @Length(1, 200) spriteAssetId?: string;
-  @IsOptional() @IsString() @Length(0, 200) thumbnailAssetId?: string;
+  @IsOptional() @IsDateString() dropStartsAt?: string | null;
+  @IsOptional() @IsDateString() dropEndsAt?: string | null;
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  @Matches(SPRITE_REF, { message: SPRITE_REF_MESSAGE })
+  spriteAssetId?: string;
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  @Matches(SPRITE_REF, { message: SPRITE_REF_MESSAGE })
+  thumbnailAssetId?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
@@ -208,4 +236,6 @@ export interface AvatarResponse {
 export interface PurchaseResponse {
   item: ItemResponse;
   coins: number;
+  /** True when the purchase also equipped the item (`{ equip: true }`). */
+  equipped: boolean;
 }

@@ -42,7 +42,23 @@ labelled a **Capstone Certificate**. Settable via the admin course API
 
 Each user gets a lazily-generated `referralCode` and a share URL
 (`/r/:code`); `GET /me/referral` returns the code, link, and how many users
-joined with it (`User.referredById`).
+joined with it (`User.referredById`), plus `invited`, `converted` (referees
+who completed a lesson) and `rewards { count, xp, coins }`.
+
+- **Attribution:** `POST /me/referral/claim { code }` sets `referredById`
+  once — only within `referral.claimWindowDays` (default 14) of the
+  referee's signup, never your own code, never a cycle (A→B→A). Re-claiming
+  the same code is a no-op; a different one is 409.
+- **Reward:** once the referee completes their first lesson the referrer
+  earns `referral.reward` (default 50 XP + 200 coins, admin-editable), paid
+  by an hourly job with idempotency key `referral:<refereeId>` (admin can
+  trigger it: `POST /admin/referrals/rewards/run`).
+- **Friend invites** reuse the same code: `GET /friends/invite` →
+  `{ code, url }`; `POST /friends/invite/:code/accept` befriends the owner
+  (idempotent). The student app's `/r/:code` route can do both: claim the
+  referral for a new account and accept the friend invite.
+- Certificate serials are now `CDFY-XXXX-XXXX-XXXX-XXXX` (80 bits, Crockford
+  base32); legacy `CDFY-XXXX-XXXX` serials still verify.
 
 ## Verification
 
