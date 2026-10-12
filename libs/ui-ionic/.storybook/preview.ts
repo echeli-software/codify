@@ -43,7 +43,10 @@ const preview: Preview = {
     applicationConfig({
       providers: [
         provideRouter([{ path: '**', children: [] }], withHashLocation()),
-        provideIonicAngular({ mode: 'md' }),
+        // No enter/leave animations: overlays (modals, toasts) render in
+        // their final state, so the a11y check never measures contrast
+        // mid-fade against the page behind them.
+        provideIonicAngular({ mode: 'md', animated: false }),
         provideI18n(),
       ],
     }),
