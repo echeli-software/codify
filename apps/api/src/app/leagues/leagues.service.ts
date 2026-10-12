@@ -18,6 +18,7 @@ import { GamificationConfigService } from '../gamification/gamification-config.s
 import { UserPushService } from '../gamification/user-push.service.js';
 import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import { LeagueAccumulatorService } from './league-accumulator.service.js';
+import type { AvatarResponse, EquippedRef } from '../items/items.dto.js';
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -28,6 +29,8 @@ export interface LeagueMemberView {
   level: number;
   rank: number;
   isMe: boolean;
+  /** Avatar config + equipped items, so every row can render the avatar. */
+  avatar: AvatarResponse;
 }
 
 export interface CurrentLeagueView {
@@ -104,10 +107,36 @@ export class LeaguesService {
     const rows = await this.prisma.leagueMembership.findMany({
       where: { leagueId: membership.leagueId },
       include: {
-        user: { select: { id: true, displayName: true, totalXp: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            totalXp: true,
+            avatarConfig: true,
+          },
+        },
       },
       orderBy: [{ weeklyXp: 'desc' }, { userId: 'asc' }],
     });
+    // One query for the whole cohort's equipped items.
+    const equipped = await this.prisma.equippedItem.findMany({
+      where: { userId: { in: rows.map((r) => r.userId) } },
+      include: { item: true },
+    });
+    const equippedByUser = new Map<string, AvatarResponse['equipped']>();
+    for (const e of equipped) {
+      if (e.item.deletedAt) continue;
+      const map = equippedByUser.get(e.userId) ?? {};
+      map[e.slot] = {
+        itemId: e.itemId,
+        slug: e.item.slug,
+        name: e.item.name,
+        slot: e.slot,
+        rarity: e.item.rarity,
+        spriteAssetId: e.item.spriteAssetId,
+      } satisfies EquippedRef;
+      equippedByUser.set(e.userId, map);
+    }
 
     const members: LeagueMemberView[] = rows.map((r, i) => ({
       userId: r.userId,
@@ -116,6 +145,10 @@ export class LeaguesService {
       level: levelFromXp(r.user.totalXp),
       rank: i + 1,
       isMe: r.userId === userId,
+      avatar: {
+        config: (r.user.avatarConfig as Record<string, unknown> | null) ?? null,
+        equipped: equippedByUser.get(r.userId) ?? {},
+      },
     }));
     const me = members.find((m) => m.isMe);
     const tier = membership.league.tier;

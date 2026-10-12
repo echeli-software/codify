@@ -14,11 +14,21 @@ export class UsersClient {
   private readonly http = inject(HttpClient);
   private readonly config = inject(API_CLIENT_CONFIG);
 
-  /** GET /api/users?skip=&take= */
+  /**
+   * GET /api/users?skip=&take=&q=&role= — `q` matches email or display
+   * name (case-insensitive substring) or an exact user id.
+   */
   list(
-    opts: { skip?: number; take?: number } = {},
+    opts: {
+      skip?: number;
+      take?: number;
+      q?: string;
+      role?: 'STUDENT' | 'TEACHER' | 'SUPPORT' | 'ADMIN';
+    } = {},
   ): Promise<AdminUserListResponse> {
     let params = new HttpParams();
+    if (opts.q) params = params.set('q', opts.q);
+    if (opts.role) params = params.set('role', opts.role);
     if (typeof opts.skip === 'number')
       params = params.set('skip', String(opts.skip));
     if (typeof opts.take === 'number')

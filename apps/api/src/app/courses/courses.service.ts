@@ -124,6 +124,7 @@ export class CoursesService {
       );
     }
 
+    const covers = await this.coverUrls(rows.map((r) => r.coverAssetId));
     return {
       items: rows.map((r) =>
         toListItem(
@@ -131,6 +132,7 @@ export class CoursesService {
           translations.filter((t) => t.entityId === r.id),
           locale,
           lessonCountByCourseId.get(r.id) ?? 0,
+          covers,
         ),
       ),
       total,
@@ -212,6 +214,7 @@ export class CoursesService {
       courseTranslations,
       locale,
       totalLessons,
+      await this.coverUrls([course.coverAssetId]),
     );
 
     const modules: CourseModuleSummary[] = course.modules.map((m) => ({
@@ -253,6 +256,7 @@ export class CoursesService {
       where: { slug: input.slug },
     });
     if (existing) throw new ConflictException('Slug already in use');
+    if (input.coverAssetId) await this.assertCoverAsset(input.coverAssetId);
 
     const sourceLocale = input.sourceLocale ?? 'pt-BR';
     const created = await this.prisma.$transaction(async (tx) => {
@@ -264,6 +268,7 @@ export class CoursesService {
           status: 'DRAFT',
           difficulty: input.difficulty ?? 1,
           estimatedMinutes: input.estimatedMinutes ?? 60,
+          coverAssetId: input.coverAssetId ?? null,
         },
       });
       await tx.contentTranslation.create({
@@ -318,6 +323,7 @@ export class CoursesService {
       });
       if (dupe) throw new ConflictException('Slug already in use');
     }
+    if (patch.coverAssetId) await this.assertCoverAsset(patch.coverAssetId);
 
     await this.prisma.$transaction(async (tx) => {
       const data: Prisma.CourseUpdateInput = {};
@@ -328,6 +334,8 @@ export class CoursesService {
         data.estimatedMinutes = patch.estimatedMinutes;
       if (typeof patch.isCapstone === 'boolean')
         data.isCapstone = patch.isCapstone;
+      if (patch.coverAssetId !== undefined)
+        data.coverAssetId = patch.coverAssetId;
 
       if (Object.keys(data).length > 0) {
         await tx.course.update({ where: { id }, data });
@@ -464,7 +472,45 @@ export class CoursesService {
     const lessonCount = await this.prisma.lesson.count({
       where: { deletedAt: null, module: { courseId: id } },
     });
-    return toListItem(course as never, translations, locale, lessonCount);
+    return toListItem(
+      course as never,
+      translations,
+      locale,
+      lessonCount,
+      await this.coverUrls([course.coverAssetId]),
+    );
+  }
+
+  /** id → URL for the confirmed cover assets among `ids`. */
+  private async coverUrls(
+    ids: (string | null)[],
+  ): Promise<Map<string, string>> {
+    const wanted = [...new Set(ids.filter((v): v is string => !!v))];
+    if (!wanted.length) return new Map();
+    const assets = await this.prisma.asset.findMany({
+      where: { id: { in: wanted }, confirmed: true },
+      select: { id: true, url: true },
+    });
+    return new Map(assets.map((a) => [a.id, a.url]));
+  }
+
+  /** A cover must be an uploaded (confirmed) image or cover asset. */
+  private async assertCoverAsset(id: string): Promise<void> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id },
+      select: { confirmed: true, kind: true, mimeType: true },
+    });
+    if (
+      !asset ||
+      !asset.confirmed ||
+      !(asset.kind === 'IMAGE' || asset.kind === 'COVER') ||
+      !asset.mimeType.startsWith('image/')
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_COVER_ASSET',
+        message: 'coverAssetId must be a confirmed image asset',
+      });
+    }
   }
 }
 
@@ -479,6 +525,7 @@ function toListItem(
   translations: ContentTranslation[],
   locale: string,
   lessonCount: number,
+  covers: Map<string, string>,
 ): CourseListItem {
   const resolved = pickTitleAndDescription(
     translations,
@@ -492,6 +539,8 @@ function toListItem(
     difficulty: c.difficulty,
     estimatedMinutes: c.estimatedMinutes,
     isCapstone: c.isCapstone,
+    coverAssetId: c.coverAssetId ?? null,
+    coverUrl: (c.coverAssetId && covers.get(c.coverAssetId)) || null,
     sourceLocale: c.sourceLocale,
     publishedAt: c.publishedAt?.toISOString() ?? null,
     createdAt: c.createdAt.toISOString(),

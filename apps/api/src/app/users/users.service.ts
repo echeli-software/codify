@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { User } from '@prisma/client';
+import type { Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   AdminUserListItem,
@@ -38,23 +38,50 @@ export class UsersService {
   }
 
   async update(userId: string, patch: UpdateMeDto): Promise<MeResponse> {
+    const { onboarded, ...fields } = patch;
+    if (onboarded === true) {
+      // Only the first completion stamps the date.
+      await this.prisma.user.updateMany({
+        where: { id: userId, onboardedAt: null },
+        data: { onboardedAt: new Date() },
+      });
+    }
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: { ...patch },
+      data: { ...fields },
       select: ME_FIELDS,
     });
     return toMeResponse(user);
   }
 
-  async listForAdmin(opts: { skip: number; take: number }): Promise<{
+  async listForAdmin(opts: {
+    skip: number;
+    take: number;
+    q?: string;
+    role?: UserRole;
+  }): Promise<{
     items: AdminUserListItem[];
     total: number;
   }> {
+    const q = opts.q?.trim();
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      ...(opts.role ? { role: opts.role } : {}),
+      ...(q
+        ? {
+            OR: [
+              { email: { contains: q, mode: 'insensitive' } },
+              { displayName: { contains: q, mode: 'insensitive' } },
+              { id: q },
+            ],
+          }
+        : {}),
+    };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         skip: opts.skip,
         take: opts.take,
-        where: { deletedAt: null },
+        where,
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -66,7 +93,7 @@ export class UsersService {
           createdAt: true,
         },
       }),
-      this.prisma.user.count({ where: { deletedAt: null } }),
+      this.prisma.user.count({ where }),
     ]);
     return {
       items: items.map((u) => ({
@@ -92,9 +119,7 @@ export class UsersService {
   }
 }
 
-function toMeResponse(
-  u: Pick<User, keyof typeof ME_FIELDS>,
-): MeResponse {
+function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
   return {
     id: u.id,
     email: u.email,

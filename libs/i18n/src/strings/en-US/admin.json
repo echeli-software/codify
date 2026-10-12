@@ -109,7 +109,8 @@
         "LANGUAGE_NOT_SUPPORTED": "The code runner can't execute that language.",
         "RUNNER_UNAVAILABLE": "The code runner is unavailable right now.",
         "IDEMPOTENCY_KEY_REUSED": "This request was already sent with different data. Reload and retry.",
-        "conflict.unique": "Something with that slug or id already exists."
+        "conflict.unique": "Something with that slug or id already exists.",
+        "INVALID_COVER_ASSET": "Pick an uploaded image for the cover."
       }
     },
     "unsaved": {
@@ -763,7 +764,7 @@
       "searchPlaceholder": "Search by name, email or id",
       "role": "Role",
       "allRoles": "All roles",
-      "searchResults": "{count, plural, =0 {No matches} one {# match} other {# matches}} among {scanned} users loaded",
+      "searchResults": "{count, plural, =0 {No matches} one {# match} other {# matches}}",
       "emptyTitle": "No users found",
       "user": "User",
       "locale": "Locale",

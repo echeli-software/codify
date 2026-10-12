@@ -15,6 +15,7 @@ export const KNOWN_ERROR_CODES = [
   'ASSET_NOT_UPLOADED',
   'ASSET_CONTENT_MISMATCH',
   'ENROLLMENT_GRANTED',
+  'INVALID_COVER_ASSET',
   'INVALID_RUBRIC',
   'INVALID_SCENARIO',
   'INVALID_TESTS',
@@ -149,14 +150,14 @@ export function contentIssuesOf(err: unknown): ContentIssue[] {
 
 /**
  * Individual problems from an `INVALID_RUBRIC` / `INVALID_SCENARIO` /
- * `INVALID_TESTS` body. The API joins them in `detail` ("Invalid rubric: a;
- * b"); a structured `errors` array is used when present.
+ * `INVALID_TESTS` body: the API's `problems` list, falling back to the
+ * joined `detail` ("Invalid rubric: a; b").
  */
 export function validationProblemsOf(err: unknown, code: string): string[] {
   if (!err || typeof err !== 'object') return [];
   const p = toProblemDetails(err);
   if (p.code !== code) return [];
-  const structured = (p.errors as unknown) ?? p.data?.['errors'];
+  const structured = p.data?.['problems'] ?? (p.errors as unknown);
   if (Array.isArray(structured)) return structured.map(String);
   const detail = p.message ?? '';
   const colon = detail.indexOf(':');

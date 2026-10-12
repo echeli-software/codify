@@ -33,7 +33,6 @@ import {
   type LeaderboardRow,
 } from '@codify/ui-ionic';
 import {
-  ItemsClient,
   LeaguesClient,
   type AvatarResponse,
   ProblemDetailsError,
@@ -75,6 +74,11 @@ export function lastWeekSeen(
  * API's counts, and — once per week — a summary sheet of last week's
  * result (promoted / held / demoted, rewards).
  */
+/** An avatar worth rendering: a saved config or at least one equipped item. */
+export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
+  return !!a && (!!a.config || Object.values(a.equipped).some(Boolean));
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -205,10 +209,10 @@ export function lastWeekSeen(
                   "
                   [attr.data-user-id]="row.userId"
                 >
-                  @if (row.isMe && myAvatar()) {
+                  @if (sprites().get(row.userId); as av) {
                     <cdf-avatar-renderer
-                      [config]="myAvatar()?.config ?? null"
-                      [equipped]="mySprites()"
+                      [config]="av.config"
+                      [equipped]="av.equipped"
                       [size]="32"
                     />
                   } @else {
@@ -387,12 +391,24 @@ export function lastWeekSeen(
 })
 export class LeaguePage {
   private readonly client = inject(LeaguesClient);
-  private readonly items = inject(ItemsClient);
-  /** My avatar for my own row (cohort members carry no avatar data). */
-  protected readonly myAvatar = signal<AvatarResponse | null>(null);
-  protected readonly mySprites = computed(() =>
-    equippedSprites(this.myAvatar()),
-  );
+  /** userId → renderer inputs, for members who customised their avatar. */
+  protected readonly sprites = computed(() => {
+    const out = new Map<
+      string,
+      {
+        config: Record<string, unknown> | null;
+        equipped: ReturnType<typeof equippedSprites>;
+      }
+    >();
+    for (const m of this.league()?.members ?? []) {
+      if (!hasAvatar(m.avatar)) continue;
+      out.set(m.userId, {
+        config: m.avatar.config,
+        equipped: equippedSprites(m.avatar),
+      });
+    }
+    return out;
+  });
   private readonly i18n = inject(I18nService);
   private readonly telemetry = inject(TelemetryService);
 
@@ -426,10 +442,6 @@ export class LeaguePage {
 
   constructor() {
     void this.load();
-    this.items
-      .avatar()
-      .then((a) => this.myAvatar.set(a))
-      .catch(() => this.myAvatar.set(null));
     const t = setInterval(() => this.now.set(Date.now()), 30_000);
     inject(DestroyRef).onDestroy(() => clearInterval(t));
   }

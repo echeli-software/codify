@@ -139,6 +139,19 @@ describe('problem payload helpers', () => {
     ]);
     expect(validationProblemsOf(err, 'INVALID_RUBRIC')).toEqual([]);
   });
+
+  it('prefers the API problems list over the joined detail', () => {
+    const err = problem({
+      status: 400,
+      code: 'INVALID_RUBRIC',
+      detail: 'Invalid rubric: a; b; with a semicolon',
+      data: { problems: ['a', 'b; with a semicolon'] },
+    });
+    expect(validationProblemsOf(err, 'INVALID_RUBRIC')).toEqual([
+      'a',
+      'b; with a semicolon',
+    ]);
+  });
 });
 
 describe('AdminErrors', () => {

@@ -3,8 +3,8 @@ import codify from './tools/eslint-plugin-codify/index.mjs';
 
 /**
  * Shared options for `codify/no-raw-template-text` (docs/11 §11). Project
- * configs pick the severity: 'error' in libs/ui-bootstrap + libs/ui-ionic,
- * 'warn' in apps/admin + apps/student.
+ * configs enable it as 'error' (libs/ui-bootstrap, libs/ui-ionic,
+ * apps/admin, apps/student).
  */
 export const noRawTemplateTextOptions = {
   // Product / unit names that are never translated.

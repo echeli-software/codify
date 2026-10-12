@@ -56,6 +56,15 @@ function isTransient(err: unknown): boolean {
 
 export function referralOutcome(err: unknown): ReferralOutcome {
   if (!(err instanceof ProblemDetailsError)) return 'error';
+  // Codes first; status is the fallback for older API builds.
+  if (err.code === 'REFERRAL_NOT_FOUND') return 'invalid';
+  if (err.code === 'REFERRAL_ALREADY_CLAIMED') return 'conflict';
+  if (
+    err.code === 'REFERRAL_SELF' ||
+    err.code === 'REFERRAL_WINDOW_EXPIRED' ||
+    err.code === 'REFERRAL_CYCLE'
+  )
+    return 'ineligible';
   if (err.status === 404) return 'invalid';
   if (err.status === 409) return 'conflict';
   if (err.status === 400) return 'ineligible';
@@ -64,6 +73,8 @@ export function referralOutcome(err: unknown): ReferralOutcome {
 
 export function inviteOutcome(err: unknown): InviteOutcome {
   if (err instanceof ProblemDetailsError) {
+    if (err.code === 'INVITE_NOT_FOUND') return { status: 'invalid' };
+    if (err.code === 'FRIEND_SELF') return { status: 'self' };
     if (err.status === 404) return { status: 'invalid' };
     if (err.status === 400) return { status: 'self' };
   }

@@ -333,7 +333,7 @@ export class OfflineSyncService {
           clientTimestamp: new Date(clientTimestamp).toISOString(),
           idempotencyKey: attemptKey,
         });
-        this.telemetry.track('quiz_submitted', {
+        this.telemetry.track('quiz_submit', {
           lessonId,
           scorePct: result.scorePct,
           passed: result.passed,
@@ -372,7 +372,7 @@ export class OfflineSyncService {
     };
     await this.store.enqueue(ev);
     await this.refresh();
-    this.telemetry.track('quiz_submitted', {
+    this.telemetry.track('quiz_submit', {
       lessonId,
       offline: true,
       localAllCorrect: localCheck?.allCorrect ?? null,

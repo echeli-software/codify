@@ -19,6 +19,10 @@ export interface CourseListItem {
   status: CourseStatus;
   difficulty: number;
   estimatedMinutes: number;
+  isCapstone: boolean;
+  coverAssetId: string | null;
+  /** Public URL of the cover image, or null. */
+  coverUrl: string | null;
   sourceLocale: string;
   publishedAt: string | null;
   createdAt: string;
@@ -73,10 +77,18 @@ export interface CreateCourseBody {
   sourceLocale?: string;
   difficulty?: number;
   estimatedMinutes?: number;
+  /** Confirmed IMAGE/COVER asset id. */
+  coverAssetId?: string;
   categoryIds?: string[];
 }
 
-export type UpdateCourseBody = Partial<CreateCourseBody>;
+export type UpdateCourseBody = Partial<
+  Omit<CreateCourseBody, 'coverAssetId'>
+> & {
+  isCapstone?: boolean;
+  /** `null` removes the cover. */
+  coverAssetId?: string | null;
+};
 
 @Injectable({ providedIn: 'root' })
 export class CoursesClient {

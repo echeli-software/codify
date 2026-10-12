@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { API_CLIENT_CONFIG } from '@codify/api-client';
+import { API_CLIENT_CONFIG } from './api-config.js';
 
 /** Mirrors `LedgerDriftMismatch` in apps/api/src/app/ops. */
 export interface LedgerDriftMismatch {
@@ -23,10 +23,7 @@ export interface LedgerDriftReport {
   mismatches: LedgerDriftMismatch[];
 }
 
-/**
- * `/api/admin/ops/*` (ADMIN). Lives in the admin app because
- * @codify/api-client has no ops client yet — move it there when it does.
- */
+/** `/api/admin/ops/*` (ADMIN): operational checks such as ledger drift. */
 @Injectable({ providedIn: 'root' })
 export class OpsClient {
   private readonly http = inject(HttpClient);

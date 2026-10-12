@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
  * `detail` (string), `code`, `type`, `instance`, `errors` (field → messages).
  * Any extra fields an HttpException carried (e.g. `progress`/`totals` on the
  * lesson-complete 409, `requiredPlans`/`reason` on the 402 paywall) are kept
+ * (a flat string-array `errors` becomes `problems`)
  * at the top level — the client bundles them under `ProblemDetailsError.data`.
  */
 export interface ProblemBody {
@@ -133,6 +134,10 @@ export function buildProblem(
       if (typeof r['type'] === 'string') body.type = r['type'];
       const errors = asStringRecord(r['errors']);
       if (errors) body.errors = errors;
+      // A flat list (INVALID_RUBRIC / INVALID_SCENARIO / INVALID_TESTS) has
+      // no field keys; it travels as `problems` so clients can list each one.
+      else if (Array.isArray(r['errors']))
+        body['problems'] = r['errors'].map(String);
       for (const [k, v] of Object.entries(r)) {
         if (!MAPPED_KEYS.has(k)) body[k] = v;
       }

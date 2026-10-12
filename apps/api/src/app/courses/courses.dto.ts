@@ -11,6 +11,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
@@ -56,6 +57,12 @@ export class CreateCourseDto {
   @Max(10000)
   estimatedMinutes?: number;
 
+  /** Confirmed IMAGE/COVER asset id (POST /assets/presign → confirm). */
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  coverAssetId?: string;
+
   @IsOptional()
   @IsArray()
   @ArrayMinSize(0)
@@ -99,6 +106,12 @@ export class UpdateCourseDto {
   @IsBoolean()
   isCapstone?: boolean;
 
+  /** Confirmed IMAGE/COVER asset id; `null` removes the cover. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @Length(1, 64)
+  coverAssetId?: string | null;
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
@@ -138,6 +151,9 @@ export interface CourseListItem {
   difficulty: number;
   estimatedMinutes: number;
   isCapstone: boolean;
+  coverAssetId: string | null;
+  /** Public URL of the cover asset, or null when unset/unconfirmed. */
+  coverUrl: string | null;
   sourceLocale: string;
   publishedAt: string | null;
   createdAt: string;

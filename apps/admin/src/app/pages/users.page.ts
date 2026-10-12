@@ -27,24 +27,11 @@ import {
 import { AdminErrors } from '../core/errors';
 
 const PAGE_SIZE = 25;
-/** Upper bound of users loaded for a search (the API has no `q` filter yet). */
-export const SEARCH_SCAN_LIMIT = 500;
-
-export function matchesUser(u: AdminUserListItem, q: string): boolean {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return true;
-  return (
-    u.email.toLowerCase().includes(needle) ||
-    u.displayName.toLowerCase().includes(needle) ||
-    u.id.toLowerCase() === needle
-  );
-}
 
 /**
- * Users (docs/04): paginated list with search and role filter, linking to
- * the user detail (profile, subscriptions, enrollments). ADMIN + SUPPORT.
- * Search scans up to SEARCH_SCAN_LIMIT users client-side until the API
- * grows a query parameter.
+ * Users (docs/04): paginated list with server-side search (email, name or
+ * id) and role filter, linking to the user detail (profile, subscriptions,
+ * enrollments). ADMIN + SUPPORT.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -86,16 +73,13 @@ export function matchesUser(u: AdminUserListItem, q: string): boolean {
             inputId="users-role"
             [options]="roleOptions()"
             [ngModel]="role()"
-            (ngModelChange)="role.set($event ?? ''); page.set(1)"
+            (ngModelChange)="onRole($event ?? '')"
           />
         </cdf-form-field>
       </div>
       <p class="muted small" aria-live="polite">
         @if (query()) {
-          {{
-            'admin.users.searchResults'
-              | translate: { count: filtered().length, scanned: scanned() }
-          }}
+          {{ 'admin.users.searchResults' | translate: { count: total() } }}
         } @else {
           {{
             'admin.common.showing'
@@ -202,9 +186,6 @@ export class UsersPage {
   protected readonly page = signal(1);
   protected readonly query = signal('');
   protected readonly role = signal<ApiUserRole | ''>('');
-  /** Users loaded for search (null until a search runs). */
-  private readonly scan = signal<AdminUserListItem[] | null>(null);
-  protected readonly scanned = computed(() => this.scan()?.length ?? 0);
   private seq = 0;
 
   protected readonly roleOptions = computed<SelectOption<ApiUserRole | ''>[]>(
@@ -220,26 +201,9 @@ export class UsersPage {
     },
   );
 
-  /** Search results (client-side over the scan) or the current page. */
-  protected readonly filtered = computed(() => {
-    const role = this.role();
-    const source = this.query() ? (this.scan() ?? []) : this.pageRows();
-    return source.filter(
-      (u) => (!role || u.role === role) && matchesUser(u, this.query()),
-    );
-  });
-  protected readonly visible = computed(() => {
-    if (!this.query()) return this.filtered();
-    const start = (this.page() - 1) * PAGE_SIZE;
-    return this.filtered().slice(start, start + PAGE_SIZE);
-  });
+  protected readonly visible = this.pageRows.asReadonly();
   protected readonly totalPages = computed(() =>
-    Math.max(
-      1,
-      Math.ceil(
-        (this.query() ? this.filtered().length : this.total()) / PAGE_SIZE,
-      ),
-    ),
+    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
   );
 
   constructor() {
@@ -250,9 +214,12 @@ export class UsersPage {
     const seq = ++this.seq;
     this.loading.set(true);
     try {
+      const role = this.role();
       const res = await this.users.list({
         skip: (this.page() - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
+        ...(this.query() ? { q: this.query() } : {}),
+        ...(role ? { role } : {}),
       });
       if (seq !== this.seq) return;
       this.pageRows.set(res.items);
@@ -265,35 +232,20 @@ export class UsersPage {
     }
   }
 
-  private async loadScan(): Promise<void> {
-    if (this.scan()) return;
-    const seq = ++this.seq;
-    this.loading.set(true);
-    try {
-      const all: AdminUserListItem[] = [];
-      for (let skip = 0; skip < SEARCH_SCAN_LIMIT; skip += 100) {
-        const res = await this.users.list({ skip, take: 100 });
-        all.push(...res.items);
-        if (all.length >= res.total || res.items.length === 0) break;
-      }
-      if (seq === this.seq) this.scan.set(all);
-    } catch (err) {
-      if (seq === this.seq)
-        this.errorsSvc.toast(err, 'admin.errors.loadFailed');
-    } finally {
-      if (seq === this.seq) this.loading.set(false);
-    }
-  }
-
   protected onSearch(q: string): void {
     this.query.set(q.trim());
     this.page.set(1);
-    if (this.query()) void this.loadScan();
-    else void this.loadPage();
+    void this.loadPage();
+  }
+
+  protected onRole(role: ApiUserRole | ''): void {
+    this.role.set(role);
+    this.page.set(1);
+    void this.loadPage();
   }
 
   protected goTo(p: number): void {
     this.page.set(p);
-    if (!this.query()) void this.loadPage();
+    void this.loadPage();
   }
 }

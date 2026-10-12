@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -9,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
@@ -32,8 +34,26 @@ export class UsersController {
     @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
     @Query('take', new DefaultValuePipe(20), new IntRangePipe(1, 100))
     take: number,
+    @Query('q') q?: string,
+    @Query('role') role?: string,
   ): Promise<{ items: AdminUserListItem[]; total: number }> {
-    return this.users.listForAdmin({ skip, take });
+    if (q !== undefined && (typeof q !== 'string' || q.length > 120)) {
+      throw new BadRequestException('q must be at most 120 characters');
+    }
+    if (
+      role !== undefined &&
+      !(Object.values(UserRole) as string[]).includes(role)
+    ) {
+      throw new BadRequestException(
+        `role must be one of ${Object.values(UserRole).join(', ')}`,
+      );
+    }
+    return this.users.listForAdmin({
+      skip,
+      take,
+      q: q || undefined,
+      role: role as UserRole | undefined,
+    });
   }
 
   /** Detail view — Admin/Support only. */

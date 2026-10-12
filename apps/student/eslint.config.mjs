@@ -32,9 +32,12 @@ export default [
   },
   {
     files: ['**/*.html'],
+    // index.html is served before Angular boots (no translate pipe); its
+    // <noscript> fallback is deliberately bilingual.
+    ignores: ['**/src/index.html'],
     rules: {
-      // docs/11 §11 — warn while the app pages are being translated.
-      'codify/no-raw-template-text': ['warn', noRawTemplateTextOptions],
+      // docs/11 §11 — every app template string goes through i18n.
+      'codify/no-raw-template-text': ['error', noRawTemplateTextOptions],
     },
   },
 ];

@@ -109,7 +109,8 @@
         "LANGUAGE_NOT_SUPPORTED": "O executor de código não roda essa linguagem.",
         "RUNNER_UNAVAILABLE": "O executor de código está indisponível agora.",
         "IDEMPOTENCY_KEY_REUSED": "Esta requisição já foi enviada com outros dados. Recarregue e tente de novo.",
-        "conflict.unique": "Já existe algo com esse slug ou id."
+        "conflict.unique": "Já existe algo com esse slug ou id.",
+        "INVALID_COVER_ASSET": "Escolha uma imagem já enviada para a capa."
       }
     },
     "unsaved": {
@@ -763,7 +764,7 @@
       "searchPlaceholder": "Busque por nome, e-mail ou id",
       "role": "Papel",
       "allRoles": "Todos os papéis",
-      "searchResults": "{count, plural, =0 {Nenhum resultado} one {# resultado} other {# resultados}} entre {scanned} usuários carregados",
+      "searchResults": "{count, plural, =0 {Nenhum resultado} one {# resultado} other {# resultados}}",
       "emptyTitle": "Nenhum usuário encontrado",
       "user": "Usuário",
       "locale": "Localidade",

@@ -26,18 +26,19 @@ import {
   GamificationClient,
   ItemsClient,
   LeaguesClient,
+  OpsClient,
   ReferralsClient,
   toProblemDetails,
   type BadgeDef,
   type GamificationConfigEntry,
   type GamificationConfigKey,
   type GamificationConfigPatch,
+  type LedgerDriftReport,
   type QuestKind,
   type QuestTemplate,
   type RolloverSummary,
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
-import { OpsClient, type LedgerDriftReport } from '../core/ops.client';
 import { SLUG_PATTERN } from '../core/catalog';
 
 type Tab = 'defaults' | 'badges' | 'quests' | 'operations';
@@ -50,7 +51,7 @@ const QUEST_KINDS: readonly QuestKind[] = [
   'EXERCISE_PASS',
 ];
 
-type QuestTemplateRow = QuestTemplate & { weight?: number };
+type QuestTemplateRow = QuestTemplate;
 
 /** How a config value is edited: one number, a flat object of numbers, or JSON. */
 export type ConfigShape =

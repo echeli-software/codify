@@ -44,6 +44,8 @@ export interface QuestTemplate {
   xpReward: number;
   coinReward: number;
   isActive: boolean;
+  /** Relative draw weight within its difficulty band (daily picker). */
+  weight: number;
 }
 
 export interface BadgeView {
@@ -79,6 +81,8 @@ export interface CreateQuestTemplateBody {
   xpReward?: number;
   coinReward?: number;
   isActive?: boolean;
+  /** Relative draw weight within its difficulty band (1–100, default 1). */
+  weight?: number;
 }
 
 export interface CreateBadgeBody {

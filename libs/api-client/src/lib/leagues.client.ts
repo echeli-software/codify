@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
+import type { AvatarResponse } from './items.client.js';
 
 export interface LeagueMember {
   userId: string;
@@ -11,6 +12,8 @@ export interface LeagueMember {
   level: number;
   rank: number;
   isMe: boolean;
+  /** Avatar config + equipped items (same shape as GET /me/avatar). */
+  avatar: AvatarResponse;
 }
 
 export interface CurrentLeague {

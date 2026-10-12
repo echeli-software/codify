@@ -13,6 +13,7 @@ import {
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { PlansService } from './plans.service.js';
@@ -27,9 +28,10 @@ import {
 } from './plans.dto.js';
 
 /**
- * Plan catalog. Reads are open to any authenticated user (the student
- * paywall + course-detail chips list active plans, optionally filtered to
- * plans-including-a-course). All mutations + Stripe sync are ADMIN only.
+ * Plan catalog. Reads are public — the signed-out /pricing page, the
+ * student paywall and course-detail chips list active plans, optionally
+ * filtered to plans-including-a-course; staff callers may also see
+ * inactive ones. All mutations + Stripe sync are ADMIN only.
  */
 @Controller('plans')
 export class PlansController {
@@ -38,21 +40,21 @@ export class PlansController {
     private readonly audit: AuditService,
   ) {}
 
+  @Public()
   @Get()
   list(
-    @CurrentUser() actor: ApiUser,
+    @Req() req: Request,
     @Query() query: ListPlansQueryDto,
   ): Promise<PlanListResponse> {
-    const includeInactive = isStaff(actor) && query.includeInactive === 'true';
+    const includeInactive =
+      isStaff(req.user) && query.includeInactive === 'true';
     return this.plans.list(query, { includeInactive });
   }
 
+  @Public()
   @Get(':id')
-  detail(
-    @CurrentUser() actor: ApiUser,
-    @Param('id') id: string,
-  ): Promise<PlanResponse> {
-    return this.plans.getById(id, { includeInactive: isStaff(actor) });
+  detail(@Req() req: Request, @Param('id') id: string): Promise<PlanResponse> {
+    return this.plans.getById(id, { includeInactive: isStaff(req.user) });
   }
 
   @Roles('ADMIN')
@@ -168,11 +170,11 @@ export class PlansController {
   }
 }
 
-function isStaff(actor: ApiUser): boolean {
+function isStaff(actor: ApiUser | undefined): boolean {
   return (
-    actor.role === 'ADMIN' ||
-    actor.role === 'TEACHER' ||
-    actor.role === 'SUPPORT'
+    actor?.role === 'ADMIN' ||
+    actor?.role === 'TEACHER' ||
+    actor?.role === 'SUPPORT'
   );
 }
 

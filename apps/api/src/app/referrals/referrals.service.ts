@@ -158,24 +158,36 @@ export class ReferralsService {
         select: { id: true },
       }),
     ]);
-    if (!referrer) throw new NotFoundException('Referral code not found');
+    if (!referrer)
+      throw new NotFoundException({
+        code: 'REFERRAL_NOT_FOUND',
+        message: 'Referral code not found',
+      });
     if (referrer.id === userId)
-      throw new BadRequestException('You cannot refer yourself');
+      throw new BadRequestException({
+        code: 'REFERRAL_SELF',
+        message: 'You cannot refer yourself',
+      });
     if (me.referredById) {
       if (me.referredById === referrer.id) return { status: 'already_claimed' };
-      throw new ConflictException(
-        'A referral has already been claimed for this account',
-      );
+      throw new ConflictException({
+        code: 'REFERRAL_ALREADY_CLAIMED',
+        message: 'A referral has already been claimed for this account',
+      });
     }
 
     const windowDays = await this.config.get('referral.claimWindowDays');
     if (now.getTime() - me.createdAt.getTime() > windowDays * 86_400_000) {
-      throw new BadRequestException(
-        `Referral codes can only be claimed within ${windowDays} days of signing up`,
-      );
+      throw new BadRequestException({
+        code: 'REFERRAL_WINDOW_EXPIRED',
+        message: `Referral codes can only be claimed within ${windowDays} days of signing up`,
+      });
     }
     if (await this.wouldCycle(userId, referrer.id)) {
-      throw new BadRequestException('Circular referrals are not allowed');
+      throw new BadRequestException({
+        code: 'REFERRAL_CYCLE',
+        message: 'Circular referrals are not allowed',
+      });
     }
 
     // Conditional write: two concurrent claims can't both attribute.
@@ -190,9 +202,10 @@ export class ReferralsService {
       });
       if (after.referredById === referrer.id)
         return { status: 'already_claimed' };
-      throw new ConflictException(
-        'A referral has already been claimed for this account',
-      );
+      throw new ConflictException({
+        code: 'REFERRAL_ALREADY_CLAIMED',
+        message: 'A referral has already been claimed for this account',
+      });
     }
     return { status: 'claimed' };
   }

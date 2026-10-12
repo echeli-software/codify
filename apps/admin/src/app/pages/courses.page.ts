@@ -42,7 +42,7 @@ interface CreateForm {
   description: string;
 }
 
-type CourseRow = CourseListItem & { isCapstone?: boolean };
+type CourseRow = CourseListItem;
 
 const PAGE_SIZE = 25;
 const EMPTY_FORM: CreateForm = { slug: '', title: '', description: '' };

@@ -72,6 +72,14 @@ export class UpdateMeDto {
   @IsOptional()
   @IsBoolean()
   marketingEmailOptIn?: boolean;
+
+  /**
+   * `true` marks first-run onboarding as finished (sets `onboardedAt` once;
+   * later calls keep the first timestamp). It cannot be cleared.
+   */
+  @IsOptional()
+  @IsBoolean()
+  onboarded?: boolean;
 }
 
 /** Public shape returned by /api/me. Excludes deletedAt + clerkId. */

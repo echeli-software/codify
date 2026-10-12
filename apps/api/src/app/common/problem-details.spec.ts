@@ -88,6 +88,23 @@ describe('buildProblem', () => {
     expect(p.body.status).toBe(400);
   });
 
+  it('carries a flat errors list as problems', () => {
+    const p = buildProblem(
+      new BadRequestException({
+        code: 'INVALID_RUBRIC',
+        message: 'Invalid rubric: a; b',
+        errors: ['a', 'b'],
+      }),
+      opts,
+    );
+    expect(p.body).toMatchObject({
+      code: 'INVALID_RUBRIC',
+      detail: 'Invalid rubric: a; b',
+      problems: ['a', 'b'],
+    });
+    expect(p.body.errors).toBeUndefined();
+  });
+
   it('surfaces structured validation errors', () => {
     const ex = validationExceptionFactory([
       {

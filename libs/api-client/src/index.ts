@@ -254,3 +254,8 @@ export {
   type AnalyticsEventInput,
   type AnalyticsSummaryRow,
 } from './lib/analytics.client.js';
+export {
+  OpsClient,
+  type LedgerDriftMismatch,
+  type LedgerDriftReport,
+} from './lib/ops.client.js';

@@ -61,7 +61,10 @@ export class FriendsService {
       select: { email: true },
     });
     if (sender.email.toLowerCase() === normalized)
-      throw new BadRequestException('You cannot friend yourself');
+      throw new BadRequestException({
+        code: 'FRIEND_SELF',
+        message: 'You cannot friend yourself',
+      });
 
     const receiver = await this.prisma.user.findFirst({
       where: { email: normalized, deletedAt: null },
@@ -228,9 +231,16 @@ export class FriendsService {
       where: { referralCode: code.trim().toUpperCase(), deletedAt: null },
       select: { id: true, displayName: true },
     });
-    if (!owner) throw new NotFoundException('Invite not found');
+    if (!owner)
+      throw new NotFoundException({
+        code: 'INVITE_NOT_FOUND',
+        message: 'Invite not found',
+      });
     if (owner.id === userId)
-      throw new BadRequestException('You cannot friend yourself');
+      throw new BadRequestException({
+        code: 'FRIEND_SELF',
+        message: 'You cannot friend yourself',
+      });
 
     const key = pair(userId, owner.id);
     const existing = await this.prisma.friendship.findUnique({

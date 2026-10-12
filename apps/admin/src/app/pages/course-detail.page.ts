@@ -59,7 +59,7 @@ import {
 } from '../core/catalog';
 
 type Tab = 'overview' | 'curriculum' | 'promotions';
-type CourseView = CourseDetail & { isCapstone?: boolean };
+type CourseView = CourseDetail;
 
 interface OverviewForm {
   title: string;
@@ -755,6 +755,18 @@ export class CourseDetailPage {
       categoryIds: [...c.categoryIds],
       isCapstone: !!c.isCapstone,
     };
+    // The picker only needs id + url to show the current cover.
+    this.cover =
+      c.coverAssetId && c.coverUrl
+        ? {
+            id: c.coverAssetId,
+            url: c.coverUrl,
+            kind: 'COVER',
+            mimeType: 'image/*',
+            sizeBytes: 0,
+          }
+        : null;
+    this.initialCoverId = this.cover?.id ?? null;
   }
 
   private async loadSideData(courseId: string, seq: number): Promise<void> {
@@ -800,7 +812,7 @@ export class CourseDetailPage {
     this.errors.set(errs);
     if (Object.keys(errs).length) return;
 
-    const body: UpdateCourseBody & { isCapstone?: boolean } = {
+    const body: UpdateCourseBody = {
       title: this.form.title.trim(),
       slug: this.form.slug.trim(),
       description: this.form.description.trim(),
@@ -840,7 +852,7 @@ export class CourseDetailPage {
     try {
       await this.courses.update(c.id, {
         coverAssetId: this.cover?.id ?? null,
-      } as unknown as UpdateCourseBody);
+      });
       this.initialCoverId = this.cover?.id ?? null;
       this.toast.success(this.i18n.t('admin.course.coverSaved'));
     } catch (err) {

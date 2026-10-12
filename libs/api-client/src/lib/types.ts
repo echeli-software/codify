@@ -32,6 +32,8 @@ export interface UpdateMeBody {
   quietHoursStart?: number;
   quietHoursEnd?: number;
   marketingEmailOptIn?: boolean;
+  /** `true` marks first-run onboarding finished (sets `onboardedAt` once). */
+  onboarded?: boolean;
 }
 
 export interface AdminUserListItem {

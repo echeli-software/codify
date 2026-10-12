@@ -51,6 +51,7 @@ import {
   GamificationClient,
   ItemsClient,
   LeaguesClient,
+  MeClient,
   ProgressClient,
   type AvatarResponse,
   type Category,
@@ -175,6 +176,7 @@ export class TodayPage {
   private readonly categoriesClient = inject(CategoriesClient);
   private readonly progress = inject(ProgressClient);
   private readonly leagues = inject(LeaguesClient);
+  private readonly meClient = inject(MeClient);
   private readonly items = inject(ItemsClient);
   private readonly growth = inject(GrowthLinksService);
   private readonly downloads = inject(DownloadService);
@@ -275,7 +277,7 @@ export class TodayPage {
       this.loadAvatar(),
     ]);
     if (totalXp !== null && enrollments !== null)
-      this.maybeOnboard(totalXp, enrollments);
+      void this.maybeOnboard(totalXp, enrollments);
   }
 
   /** Canonical XP / coins / streak + today's quests. */
@@ -380,13 +382,28 @@ export class TodayPage {
     return id ? ONBOARDING_KEY + id : null;
   }
 
-  private maybeOnboard(totalXp: number, enrollments: number): void {
+  /**
+   * The server's `onboardedAt` is the source of truth (it follows the
+   * learner across devices); the local key only saves the /me round trip.
+   */
+  private async maybeOnboard(
+    totalXp: number,
+    enrollments: number,
+  ): Promise<void> {
     const key = this.onboardingKey();
     if (!key) return;
     let dismissed = false;
     try {
       dismissed = localStorage.getItem(key) !== null;
     } catch {
+      dismissed = false;
+    }
+    if (!needsOnboarding({ totalXp, enrollments, dismissed })) return;
+    try {
+      const me = await this.meClient.me();
+      dismissed = me.onboardedAt !== null;
+    } catch {
+      // Can't confirm (offline): don't interrupt with onboarding.
       dismissed = true;
     }
     this.onboarding.set(needsOnboarding({ totalXp, enrollments, dismissed }));
@@ -405,8 +422,11 @@ export class TodayPage {
           JSON.stringify({ goal: ev.goal, at: new Date().toISOString() }),
         );
     } catch {
-      // Storage unavailable: onboarding may show again next visit.
+      // Storage unavailable: the server flag below still applies.
     }
+    this.meClient.update({ onboarded: true }).catch(() => {
+      // Offline: the local key keeps it dismissed on this device.
+    });
     if (!ev.course) return;
     try {
       await this.enrollments.enroll(ev.course.id);
