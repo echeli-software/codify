@@ -109,7 +109,7 @@
         "LANGUAGE_NOT_SUPPORTED": "The code runner can't execute that language.",
         "RUNNER_UNAVAILABLE": "The code runner is unavailable right now.",
         "IDEMPOTENCY_KEY_REUSED": "This request was already sent with different data. Reload and retry.",
-        "conflict.unique": "Something with that slug or id already exists.",
+        "conflict_unique": "Something with that slug or id already exists.",
         "INVALID_COVER_ASSET": "Pick an uploaded image for the cover."
       }
     },
@@ -625,15 +625,15 @@
         "saved": "Defaults saved."
       },
       "config": {
-        "multiplier.cap": "Multiplier cap",
-        "billing.pastDueGraceDays": "Past-due grace (days)",
-        "streak.freezeCap": "Streak freezes cap",
-        "streak.milestones": "Streak milestone rewards",
-        "league.promotionReward": "League promotion reward",
-        "league.rank1Reward": "League 1st place reward",
-        "quest.dailyCount": "Daily quests per student",
-        "referral.reward": "Referral reward",
-        "referral.claimWindowDays": "Referral claim window (days)"
+        "multiplier_cap": "Multiplier cap",
+        "billing_pastDueGraceDays": "Past-due grace (days)",
+        "streak_freezeCap": "Streak freezes cap",
+        "streak_milestones": "Streak milestone rewards",
+        "league_promotionReward": "League promotion reward",
+        "league_rank1Reward": "League 1st place reward",
+        "quest_dailyCount": "Daily quests per student",
+        "referral_reward": "Referral reward",
+        "referral_claimWindowDays": "Referral claim window (days)"
       },
       "rewardFields": {
         "xp": "XP",

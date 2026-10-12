@@ -188,7 +188,7 @@ const DEFAULT_RULE = JSON.stringify(
                   <li class="config-row">
                     <div class="config-row__head">
                       <strong>{{
-                        'admin.gamification.config.' + row.entry.key | translate
+                        configLabelKey(row.entry.key) | translate
                       }}</strong>
                       <code class="muted">{{ row.entry.key }}</code>
                       @if (row.entry.isDefault) {
@@ -213,8 +213,7 @@ const DEFAULT_RULE = JSON.stringify(
                         <cdf-input
                           type="number"
                           [ariaLabel]="
-                            'admin.gamification.config.' + row.entry.key
-                              | translate
+                            configLabelKey(row.entry.key) | translate
                           "
                           [(ngModel)]="row.num"
                         />
@@ -243,8 +242,7 @@ const DEFAULT_RULE = JSON.stringify(
                           class="form-control mono"
                           rows="5"
                           [attr.aria-label]="
-                            'admin.gamification.config.' + row.entry.key
-                              | translate
+                            configLabelKey(row.entry.key) | translate
                           "
                           [(ngModel)]="row.json"
                         ></textarea>
@@ -903,6 +901,11 @@ export class GamificationPage {
   protected readonly config = signal<ConfigRow[] | null>(null);
   protected readonly badges = signal<BadgeDef[]>([]);
   protected readonly quests = signal<QuestTemplateRow[]>([]);
+
+  /** Translation keys can't contain dots: `multiplier.cap` → `multiplier_cap`. */
+  protected configLabelKey(key: string): string {
+    return `admin.gamification.config.${key.replace(/\./g, '_')}`;
+  }
   protected readonly rolloverResult = signal<RolloverSummary | null>(null);
   protected readonly referralResult = signal<{
     candidates: number;

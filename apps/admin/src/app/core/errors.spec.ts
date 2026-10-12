@@ -75,7 +75,7 @@ describe('resolveError', () => {
       error: { status: 409, code: 'conflict.unique', detail: 'dup' },
     });
     expect(resolveError(http, 'x').key).toBe(
-      'admin.errors.code.conflict.unique',
+      'admin.errors.code.conflict_unique',
     );
   });
 

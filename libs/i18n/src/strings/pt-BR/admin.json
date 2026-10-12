@@ -109,7 +109,7 @@
         "LANGUAGE_NOT_SUPPORTED": "O executor de código não roda essa linguagem.",
         "RUNNER_UNAVAILABLE": "O executor de código está indisponível agora.",
         "IDEMPOTENCY_KEY_REUSED": "Esta requisição já foi enviada com outros dados. Recarregue e tente de novo.",
-        "conflict.unique": "Já existe algo com esse slug ou id.",
+        "conflict_unique": "Já existe algo com esse slug ou id.",
         "INVALID_COVER_ASSET": "Escolha uma imagem já enviada para a capa."
       }
     },
@@ -625,15 +625,15 @@
         "saved": "Padrões salvos."
       },
       "config": {
-        "multiplier.cap": "Limite de multiplicador",
-        "billing.pastDueGraceDays": "Carência de pagamento atrasado (dias)",
-        "streak.freezeCap": "Limite de congelamentos de sequência",
-        "streak.milestones": "Recompensas por marcos de sequência",
-        "league.promotionReward": "Recompensa por promoção de liga",
-        "league.rank1Reward": "Recompensa do 1º lugar da liga",
-        "quest.dailyCount": "Missões diárias por aluno",
-        "referral.reward": "Recompensa por indicação",
-        "referral.claimWindowDays": "Prazo para resgatar indicação (dias)"
+        "multiplier_cap": "Limite de multiplicador",
+        "billing_pastDueGraceDays": "Carência de pagamento atrasado (dias)",
+        "streak_freezeCap": "Limite de congelamentos de sequência",
+        "streak_milestones": "Recompensas por marcos de sequência",
+        "league_promotionReward": "Recompensa por promoção de liga",
+        "league_rank1Reward": "Recompensa do 1º lugar da liga",
+        "quest_dailyCount": "Missões diárias por aluno",
+        "referral_reward": "Recompensa por indicação",
+        "referral_claimWindowDays": "Prazo para resgatar indicação (dias)"
       },
       "rewardFields": {
         "xp": "XP",

@@ -69,7 +69,8 @@ export function resolveError(err: unknown, fallbackKey: string): ResolvedError {
       code === 'INVALID_SCENARIO' ||
       code === 'INVALID_TESTS';
     return {
-      key: `admin.errors.code.${code}`,
+      // Translation keys can't contain dots: conflict.unique → conflict_unique.
+      key: `admin.errors.code.${code.replace(/\./g, '_')}`,
       detail: withDetail ? usefulDetail(p) : null,
       ...base,
     };
