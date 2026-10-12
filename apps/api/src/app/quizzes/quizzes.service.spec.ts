@@ -3,6 +3,7 @@ import {
   HttpException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { QuizzesService } from './quizzes.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 
@@ -30,6 +31,12 @@ const quiz = (id: string, correct: string[]) => ({
   },
 });
 
+const uniqueViolation = () =>
+  new Prisma.PrismaClientKnownRequestError('unique', {
+    code: 'P2002',
+    clientVersion: 'test',
+  });
+
 function docWith(...nodes: unknown[]) {
   return { type: 'doc', version: 1, content: nodes };
 }
@@ -40,9 +47,29 @@ function setup(
     status?: 'PUBLISHED' | 'DRAFT';
     granted?: boolean;
     recentMsAgo?: number | null;
+    /** Idempotency records already stored, key → attempt id. */
+    seenKeys?: Record<string, string>;
+    /** Stored attempts by id, for replays. */
+    attempts?: Record<string, { userId: string; answersJson: unknown }>;
   } = {},
 ) {
+  const keys = new Map(Object.entries(opts.seenKeys ?? {}));
   const prisma = {
+    // The transaction client is the mock itself.
+    $transaction: jest.fn(
+      async (fn: (tx: unknown) => unknown): Promise<unknown> => fn(prisma),
+    ),
+    idempotencyRecord: {
+      findUnique: jest.fn(async ({ where }: { where: { key: string } }) =>
+        keys.has(where.key) ? { responseHash: keys.get(where.key) } : null,
+      ),
+      create: jest.fn(
+        async ({ data }: { data: { key: string; responseHash: string } }) => {
+          keys.set(data.key, data.responseHash);
+          return data;
+        },
+      ),
+    },
     lesson: {
       findFirst: jest.fn(async () => ({
         contentJson:
@@ -61,6 +88,10 @@ function setup(
       ),
       create: jest.fn(async () => ({ id: 'att-1' })),
       findMany: jest.fn(async () => []),
+      findUnique: jest.fn(
+        async ({ where }: { where: { id: string } }) =>
+          opts.attempts?.[where.id] ?? null,
+      ),
     },
   };
   const access = {
@@ -213,5 +244,117 @@ describe('QuizzesService.submit', () => {
     await expect(
       svc.submit(actor, 'l1', { answers: {}, clientTimestamp: future }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('QuizzesService.submit with an Idempotency-Key', () => {
+  const recordKey = 'quiz_attempt:u1:l1:evt-12345678';
+
+  it('stores the key with the new attempt', async () => {
+    const { svc, prisma } = setup();
+    const res = await svc.submit(
+      actor,
+      'l1',
+      { answers: { q1: ['a'], q2: ['b', 'c'] } },
+      'evt-12345678',
+    );
+    expect(res.attemptId).toBe('att-1');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.idempotencyRecord.create).toHaveBeenCalledWith({
+      data: {
+        key: recordKey,
+        scope: 'quiz_attempt',
+        userId: 'u1',
+        responseHash: 'att-1',
+      },
+    });
+  });
+
+  it('a replayed key returns the original attempt, skips the cooldown and records nothing new', async () => {
+    const { svc, prisma, progress } = setup({
+      recentMsAgo: 100,
+      seenKeys: { [recordKey]: 'att-orig' },
+      attempts: {
+        'att-orig': { userId: 'u1', answersJson: { q1: ['a'], q2: ['b'] } },
+      },
+    });
+    // The replay body differs on purpose: the stored answers win.
+    const res = await svc.submit(
+      actor,
+      'l1',
+      { answers: { q1: ['a'], q2: ['b', 'c'] } },
+      'evt-12345678',
+    );
+    expect(res).toMatchObject({
+      attemptId: 'att-orig',
+      scorePct: 50,
+      passed: false,
+    });
+    expect(prisma.quizAttempt.findFirst).not.toHaveBeenCalled();
+    expect(prisma.quizAttempt.create).not.toHaveBeenCalled();
+    expect(progress.recordCompletion).not.toHaveBeenCalled();
+  });
+
+  it('a replay of a passing attempt re-runs the idempotent completion with the original ref', async () => {
+    const { svc, progress } = setup({
+      seenKeys: { [recordKey]: 'att-orig' },
+      attempts: {
+        'att-orig': {
+          userId: 'u1',
+          answersJson: { q1: ['a'], q2: ['b', 'c'] },
+        },
+      },
+    });
+    const res = await svc.submit(actor, 'l1', { answers: {} }, 'evt-12345678');
+    expect(res.passed).toBe(true);
+    expect(progress.recordCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'quiz', refId: 'att-orig' }),
+    );
+  });
+
+  it("a key pointing at another user's attempt 404s", async () => {
+    const { svc } = setup({
+      seenKeys: { [recordKey]: 'att-x' },
+      attempts: { 'att-x': { userId: 'someone-else', answersJson: {} } },
+    });
+    await expect(
+      svc.submit(actor, 'l1', { answers: {} }, 'evt-12345678'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('losing a concurrent race on the key replays the winner', async () => {
+    const { svc, prisma } = setup({
+      attempts: {
+        'att-winner': {
+          userId: 'u1',
+          answersJson: { q1: ['a'], q2: ['b', 'c'] },
+        },
+      },
+    });
+    // First lookup misses; the insert then hits the unique index because
+    // the other request committed in between.
+    prisma.$transaction.mockImplementationOnce(async () => {
+      await prisma.idempotencyRecord.create({
+        data: { key: recordKey, responseHash: 'att-winner' },
+      });
+      throw uniqueViolation();
+    });
+    const res = await svc.submit(
+      actor,
+      'l1',
+      { answers: { q1: ['a'], q2: ['b', 'c'] } },
+      'evt-12345678',
+    );
+    expect(res.attemptId).toBe('att-winner');
+  });
+
+  it('without a key, a unique violation from the insert propagates', async () => {
+    const { svc, prisma } = setup();
+    prisma.$transaction.mockImplementationOnce(async () => {
+      throw uniqueViolation();
+    });
+    await expect(svc.submit(actor, 'l1', { answers: {} })).rejects.toThrow(
+      'unique',
+    );
   });
 });

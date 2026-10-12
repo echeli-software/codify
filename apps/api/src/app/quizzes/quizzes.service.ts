@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import {
   DEFAULT_QUIZ_PASS_PCT,
   extractQuizzes,
@@ -48,9 +49,32 @@ export class QuizzesService {
     actor: ApiUser,
     lessonId: string,
     body: SubmitQuizAttemptDto,
+    idempotencyKey?: string,
   ): Promise<QuizAttemptResponse> {
     const clientTimestamp = validateClientTimestamp(body.clientTimestamp);
     const doc = await this.loadGradableDoc(actor, lessonId);
+
+    // A replayed key (offline-queue retry, flaky network) returns the
+    // original attempt instead of recording a new one — and skips the
+    // cooldown, since it is the same attempt.
+    const recordKey = idempotencyKey
+      ? `quiz_attempt:${actor.userId}:${lessonId}:${idempotencyKey}`
+      : null;
+    if (recordKey) {
+      const seen = await this.prisma.idempotencyRecord.findUnique({
+        where: { key: recordKey },
+        select: { responseHash: true },
+      });
+      if (seen?.responseHash) {
+        return this.replay(
+          actor,
+          lessonId,
+          doc,
+          seen.responseHash,
+          clientTimestamp,
+        );
+      }
+    }
 
     const recent = await this.prisma.quizAttempt.findFirst({
       where: { userId: actor.userId, lessonId },
@@ -76,19 +100,90 @@ export class QuizzesService {
       passThresholdPct: DEFAULT_QUIZ_PASS_PCT,
     });
 
-    const attempt = await this.prisma.quizAttempt.create({
-      data: {
-        userId: actor.userId,
-        lessonId,
-        answersJson: answers as Prisma.InputJsonValue,
-        scorePct: grade.scorePct,
-        passed: grade.passed,
-      },
-      select: { id: true },
-    });
+    let attempt: { id: string };
+    try {
+      attempt = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.quizAttempt.create({
+          data: {
+            userId: actor.userId,
+            lessonId,
+            answersJson: answers as Prisma.InputJsonValue,
+            scorePct: grade.scorePct,
+            passed: grade.passed,
+          },
+          select: { id: true },
+        });
+        if (recordKey) {
+          // Stored with the attempt so the key only "exists" once the
+          // attempt does; responseHash carries the attempt id for replays.
+          await tx.idempotencyRecord.create({
+            data: {
+              key: recordKey,
+              scope: 'quiz_attempt',
+              userId: actor.userId,
+              responseHash: created.id,
+            },
+          });
+        }
+        return created;
+      });
+    } catch (err) {
+      // A concurrent request with the same key won the race.
+      if (recordKey && isUniqueViolation(err)) {
+        const seen = await this.prisma.idempotencyRecord.findUnique({
+          where: { key: recordKey },
+          select: { responseHash: true },
+        });
+        if (seen?.responseHash) {
+          return this.replay(
+            actor,
+            lessonId,
+            doc,
+            seen.responseHash,
+            clientTimestamp,
+          );
+        }
+      }
+      throw err;
+    }
 
+    return this.respond(actor, lessonId, attempt.id, grade, clientTimestamp);
+  }
+
+  /** Rebuild the response for an already-recorded attempt (deterministic regrade). */
+  private async replay(
+    actor: ApiUser,
+    lessonId: string,
+    doc: LessonDoc,
+    attemptId: string,
+    clientTimestamp: string | null,
+  ): Promise<QuizAttemptResponse> {
+    const attempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+      select: { answersJson: true, userId: true },
+    });
+    if (!attempt || attempt.userId !== actor.userId) {
+      throw new NotFoundException('Quiz attempt not found');
+    }
+    const grade = gradeQuiz(
+      doc,
+      sanitizeQuizAnswers(doc, attempt.answersJson as Record<string, unknown>),
+      { passThresholdPct: DEFAULT_QUIZ_PASS_PCT },
+    );
+    // recordCompletion is idempotent: a replay reports alreadyCompleted, and
+    // completes the lesson now if the original request died before it did.
+    return this.respond(actor, lessonId, attemptId, grade, clientTimestamp);
+  }
+
+  private async respond(
+    actor: ApiUser,
+    lessonId: string,
+    attemptId: string,
+    grade: ReturnType<typeof gradeQuiz>,
+    clientTimestamp: string | null,
+  ): Promise<QuizAttemptResponse> {
     const response: QuizAttemptResponse = {
-      attemptId: attempt.id,
+      attemptId,
       scorePct: grade.scorePct,
       passed: grade.passed,
       correctCount: grade.correctCount,
@@ -114,7 +209,7 @@ export class QuizzesService {
         xpSource: perfect ? 'QUIZ_PERFECT' : 'LESSON_COMPLETE',
         coinSource: perfect ? 'QUIZ_PERFECT' : 'LESSON_COMPLETE',
         refType: 'quiz',
-        refId: attempt.id,
+        refId: attemptId,
         questEvent: 'quiz_pass',
         clientTimestamp,
       });

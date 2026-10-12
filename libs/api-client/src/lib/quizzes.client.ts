@@ -44,7 +44,7 @@ export class QuizzesClient {
   submit(
     lessonId: string,
     answers: Record<string, string[]>,
-    opts: { clientTimestamp?: string } = {},
+    opts: { clientTimestamp?: string; idempotencyKey?: string } = {},
   ): Promise<QuizAttemptResult> {
     return firstValueFrom(
       this.http.post<QuizAttemptResult>(
@@ -55,7 +55,7 @@ export class QuizzesClient {
             ? { clientTimestamp: opts.clientTimestamp }
             : {}),
         },
-        { context: withIdempotency() },
+        { context: withIdempotency(undefined, opts.idempotencyKey ?? null) },
       ),
     );
   }

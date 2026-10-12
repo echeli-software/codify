@@ -322,11 +322,16 @@ export class OfflineSyncService {
     if (!userId) throw new Error('Not signed in');
     await this.ready;
     const clientTimestamp = Date.now();
+    // One key for the live try and its queued fallback: if the live request
+    // landed but its response was lost, the queued replay returns that same
+    // attempt instead of recording a second one.
+    const attemptKey = newClientEventId();
 
     if (this.network.online() && !this._authBlocked()) {
       try {
         const result = await this.quizzes.submit(lessonId, answers, {
           clientTimestamp: new Date(clientTimestamp).toISOString(),
+          idempotencyKey: attemptKey,
         });
         this.telemetry.track('quiz_submitted', {
           lessonId,
@@ -357,7 +362,7 @@ export class OfflineSyncService {
     }
     const ev: QueuedQuizAttempt = {
       kind: 'quiz_attempt',
-      clientEventId: existing?.clientEventId ?? newClientEventId(),
+      clientEventId: existing?.clientEventId ?? attemptKey,
       clientTimestamp,
       userId,
       lessonId,
@@ -564,7 +569,10 @@ export class OfflineSyncService {
           outcome: { status: 'synced', response },
         };
       }
-      const result = await this.quizzes.submit(ev.lessonId, ev.answers, opts);
+      const result = await this.quizzes.submit(ev.lessonId, ev.answers, {
+        ...opts,
+        idempotencyKey: ev.clientEventId,
+      });
       await this.store.remove(ev.clientEventId);
       await this.refresh();
       this._quizReconciled.set({
