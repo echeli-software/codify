@@ -113,7 +113,13 @@ import { TranslatePipe } from '@codify/i18n';
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
       .pub {
+        flex: 1 1 auto;
         --background: #0f172a;
         --color: #e2e8f0;
         color: #e2e8f0;

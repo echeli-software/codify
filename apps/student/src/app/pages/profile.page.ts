@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -35,6 +35,7 @@ import {
   XpService,
 } from '@codify/gamification-engine';
 import { AppToastService } from '../platform/app-toast.service.js';
+import { AppSessionService } from '../platform/app-session.service.js';
 import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
 import { ReferralCardComponent } from '../components/referral-card.component.js';
 import { equippedSprites } from './shared/avatar.js';
@@ -335,12 +336,13 @@ const LINKS: NavLink[] = [
 })
 export class ProfilePage {
   protected readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly me = inject(MeClient);
   private readonly items = inject(ItemsClient);
   private readonly sound = inject(SoundService);
   private readonly motion = inject(MotionAndSoundService);
   private readonly toast = inject(AppToastService);
+  private readonly session = inject(AppSessionService);
+  protected readonly signingOut = this.session.signingOut;
   protected readonly xp = inject(XpService);
 
   protected readonly links = LINKS;
@@ -350,7 +352,6 @@ export class ProfilePage {
   protected readonly soundOn = this.sound.soundEnabled;
   protected readonly reducedMotion = this.motion.reducedMotion;
   protected readonly savingName = signal(false);
-  protected readonly signingOut = signal(false);
   protected displayName = this.auth.user()?.displayName ?? '';
 
   constructor() {
@@ -393,15 +394,16 @@ export class ProfilePage {
     this.motion.setMotionPref(on ? 'off' : 'system');
   }
 
+  /**
+   * Explicit sign-out goes through the session service: it asks first when
+   * progress is still unsynced, then clears this user's queue, identity
+   * cache and downloads before ending the auth session.
+   */
   protected async signOut(): Promise<void> {
-    this.signingOut.set(true);
     try {
-      await this.auth.signOut();
-      await this.router.navigateByUrl('/login');
+      await this.session.requestSignOut();
     } catch (err) {
       this.toast.error(err);
-    } finally {
-      this.signingOut.set(false);
     }
   }
 }

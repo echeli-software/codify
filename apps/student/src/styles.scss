@@ -49,3 +49,20 @@ body {
 * {
   box-sizing: border-box;
 }
+
+// Desktop shell: the AppShell pushes the tabs/outlet right of the 240px
+// sidebar with `inset-inline-start`, but Ionic gives ion-tabs `width: 100%`,
+// so every routed page overflowed the viewport by 240px (and fixed-position
+// sheets inside a page were cut off). Let left/right define the width.
+@media (min-width: 768px) {
+  cdf-app-shell ion-tabs.cdf-shell__tabs {
+    width: auto;
+  }
+}
+
+// Visible keyboard focus for plain links inside app pages.
+a:focus-visible {
+  outline: 2px solid var(--cdf-color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

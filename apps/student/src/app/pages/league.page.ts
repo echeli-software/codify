@@ -18,6 +18,7 @@ import {
 } from '@ionic/angular/standalone';
 import {
   AppAvatar,
+  AvatarRenderer,
   AppButton,
   AppCard,
   AppSkeleton,
@@ -32,7 +33,9 @@ import {
   type LeaderboardRow,
 } from '@codify/ui-ionic';
 import {
+  ItemsClient,
   LeaguesClient,
+  type AvatarResponse,
   ProblemDetailsError,
   type CurrentLeague,
   type LastWeekResult,
@@ -42,6 +45,7 @@ import { OfflineGate } from '../platform/offline-gate.component.js';
 import { errorMessageKey } from '../platform/app-toast.service.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { formatCountdown } from './shared/countdown.js';
+import { equippedSprites } from './shared/avatar.js';
 
 const SEEN_KEY = 'codify.league.lastWeekSeen';
 
@@ -82,6 +86,7 @@ export function lastWeekSeen(
     IonRefresher,
     IonRefresherContent,
     AppAvatar,
+    AvatarRenderer,
     AppButton,
     AppCard,
     AppSkeleton,
@@ -200,7 +205,15 @@ export function lastWeekSeen(
                   "
                   [attr.data-user-id]="row.userId"
                 >
-                  <cdf-app-avatar [name]="row.displayName" size="sm" />
+                  @if (row.isMe && myAvatar()) {
+                    <cdf-avatar-renderer
+                      [config]="myAvatar()?.config ?? null"
+                      [equipped]="mySprites()"
+                      [size]="32"
+                    />
+                  } @else {
+                    <cdf-app-avatar [name]="row.displayName" size="sm" />
+                  }
                 </a>
               </ng-template>
             </cdf-leaderboard-table>
@@ -374,6 +387,12 @@ export function lastWeekSeen(
 })
 export class LeaguePage {
   private readonly client = inject(LeaguesClient);
+  private readonly items = inject(ItemsClient);
+  /** My avatar for my own row (cohort members carry no avatar data). */
+  protected readonly myAvatar = signal<AvatarResponse | null>(null);
+  protected readonly mySprites = computed(() =>
+    equippedSprites(this.myAvatar()),
+  );
   private readonly i18n = inject(I18nService);
   private readonly telemetry = inject(TelemetryService);
 
@@ -407,6 +426,10 @@ export class LeaguePage {
 
   constructor() {
     void this.load();
+    this.items
+      .avatar()
+      .then((a) => this.myAvatar.set(a))
+      .catch(() => this.myAvatar.set(null));
     const t = setInterval(() => this.now.set(Date.now()), 30_000);
     inject(DestroyRef).onDestroy(() => clearInterval(t));
   }

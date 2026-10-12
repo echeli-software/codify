@@ -65,6 +65,7 @@ import {
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
 import { GrowthLinksService } from './shared/growth-links.service.js';
+import { DownloadService } from '../offline/download.service.js';
 import { formatCountdown } from './shared/countdown.js';
 
 const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
@@ -176,6 +177,7 @@ export class TodayPage {
   private readonly leagues = inject(LeaguesClient);
   private readonly items = inject(ItemsClient);
   private readonly growth = inject(GrowthLinksService);
+  private readonly downloads = inject(DownloadService);
   protected readonly xpSvc = inject(XpService);
   protected readonly coinSvc = inject(CoinService);
   protected readonly streakSvc = inject(StreakService);
@@ -408,6 +410,7 @@ export class TodayPage {
     if (!ev.course) return;
     try {
       await this.enrollments.enroll(ev.course.id);
+      this.downloads.onEnrolled(ev.course.id);
     } catch (err) {
       this.toast.error(err);
     }

@@ -714,6 +714,14 @@ export class LessonPage {
       untracked(() => this.applyQuizResult(r.result, null));
     });
 
+    // A background sync of a queued completion for this lesson hit 402.
+    effect(() => {
+      const pw = this.sync.paywall();
+      const l = untracked(() => this.lesson());
+      if (!pw || !l || pw.lessonId !== l.id) return;
+      untracked(() => this.showPaywall(l.id, null));
+    });
+
     inject(DestroyRef).onDestroy(() => this.trackAbandon());
   }
 
