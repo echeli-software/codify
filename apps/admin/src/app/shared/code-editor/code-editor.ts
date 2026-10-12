@@ -27,12 +27,35 @@ type StandaloneEditor = ReturnType<MonacoModule['monaco']['editor']['create']>;
 
 let monacoPromise: Promise<MonacoModule> | null = null;
 
+/**
+ * Monaco's stylesheet, copied to `monaco/` as a build asset (see
+ * project.json). Angular doesn't inject CSS imported from lazy JS chunks,
+ * so it is linked on demand, next to the dynamic import.
+ */
+export const MONACO_CSS_HREF = 'monaco/editor.main.css';
+
+function loadMonacoCss(): Promise<void> {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (document.querySelector(`link[data-monaco-css]`)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = MONACO_CSS_HREF;
+    link.dataset['monacoCss'] = '';
+    // A missing stylesheet shouldn't block the editor; it degrades visually.
+    link.onload = link.onerror = () => resolve();
+    document.head.appendChild(link);
+  });
+}
+
 /** Lazy-load Monaco once per page (dynamic import → separate chunk). */
 export function loadMonaco(): Promise<MonacoModule> {
-  monacoPromise ??= import('./monaco-setup').catch((err: unknown) => {
-    monacoPromise = null;
-    throw err;
-  });
+  monacoPromise ??= Promise.all([import('./monaco-setup'), loadMonacoCss()])
+    .then(([m]) => m)
+    .catch((err: unknown) => {
+      monacoPromise = null;
+      throw err;
+    });
   return monacoPromise;
 }
 

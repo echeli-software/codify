@@ -727,7 +727,10 @@ export class AiPromptEditorPage implements HasUnsavedChanges {
       this.promptText.trim() ? null : this.i18n.t('admin.common.required'),
     );
     const list = this.criteria();
-    if (this.promptError() || list.some((c) => draftProblems(c).length)) return;
+    if (this.promptError() || list.some((c) => draftProblems(c).length)) {
+      this.formError.set(this.i18n.t('admin.aiPrompt.fixFields'));
+      return;
+    }
 
     const body = {
       promptText: this.promptText.trim(),

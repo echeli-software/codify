@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { emptyLessonDoc, type LessonDoc } from '@codify/lesson-schema';
@@ -58,6 +58,7 @@ import {
   type RefKind,
 } from '../core/lesson-refs';
 import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
+import { EditorDocBinding } from '../core/editor-doc';
 
 interface MetaForm {
   title: string;
@@ -80,6 +81,7 @@ interface MetaForm {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    ReactiveFormsModule,
     RouterLink,
     Badge,
     BreadcrumbBar,
@@ -129,9 +131,7 @@ interface MetaForm {
               @for (m of modes; track m) {
                 <button
                   type="button"
-                  class="btn btn-sm"
-                  [class.btn-secondary]="mode() === m"
-                  [class.btn-outline-secondary]="mode() !== m"
+                  class="seg"
                   [attr.aria-pressed]="mode() === m"
                   (click)="mode.set(m)"
                 >
@@ -183,8 +183,7 @@ interface MetaForm {
             [attr.aria-label]="'admin.lesson.content' | translate"
           >
             <cdf-lesson-block-editor
-              [(ngModel)]="doc"
-              (ngModelChange)="markDirty()"
+              [formControl]="docBinding.control"
               [placeholder]="'admin.lesson.placeholder' | translate"
             />
           </section>
@@ -404,7 +403,26 @@ interface MetaForm {
       }
       .mode-switch {
         display: inline-flex;
-        gap: 2px;
+        border: 1px solid var(--cdf-color-border);
+        border-radius: var(--cdf-radius-sm);
+        overflow: hidden;
+      }
+      .seg {
+        border: 0;
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .seg[aria-pressed='true'] {
+        background: var(--cdf-color-primary);
+        color: var(--cdf-color-primary-on);
+      }
+      .seg:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: -2px;
       }
       .insert-ref {
         border-top: 1px dashed var(--cdf-color-border);
@@ -446,6 +464,16 @@ export class LessonsPage implements HasUnsavedChanges {
   protected readonly candidates = signal<RefCandidate[] | null>(null);
   /** Bumped on doc edits so `refs()` recomputes. */
   private readonly docVersion = signal(0);
+  protected readonly docBinding = new EditorDocBinding(
+    (doc) => {
+      this.doc = doc;
+      this.markDirty();
+    },
+    (doc) => {
+      this.doc = doc;
+      this.docVersion.update((v) => v + 1);
+    },
+  );
 
   protected doc: LessonDoc = emptyLessonDoc();
   protected meta: MetaForm = {
@@ -532,6 +560,7 @@ export class LessonsPage implements HasUnsavedChanges {
   private applyLesson(l: Lesson): void {
     this.lesson.set(l);
     this.doc = (l.contentJson as LessonDoc | null) ?? emptyLessonDoc();
+    this.docBinding.reset(this.doc);
     this.meta = {
       title: l.title,
       type: l.type,
@@ -587,12 +616,14 @@ export class LessonsPage implements HasUnsavedChanges {
   protected pointRef(index: number, id: string | null): void {
     if (!id) return;
     this.doc = setDocRef(this.doc, index, id);
+    this.docBinding.set(this.doc);
     this.markDirty();
   }
 
   protected insertRef(): void {
     if (!this.insertTarget) return;
     this.doc = appendDocRef(this.doc, this.insertKind, this.insertTarget);
+    this.docBinding.set(this.doc);
     this.insertTarget = null;
     this.markDirty();
   }

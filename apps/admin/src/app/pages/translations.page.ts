@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   ContentTranslationService,
   I18nService,
@@ -39,6 +39,7 @@ import {
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
+import { EditorDocBinding } from '../core/editor-doc';
 
 const PAGE_SIZE = 20;
 const ENTITY_TYPES: readonly TranslatableEntityType[] = [
@@ -102,6 +103,7 @@ export function buildUpserts(
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    ReactiveFormsModule,
     Badge,
     Button,
     EmptyState,
@@ -305,8 +307,7 @@ export function buildUpserts(
                         }}
                       </h3>
                       <cdf-lesson-block-editor
-                        [ngModel]="docFor(r)"
-                        (ngModelChange)="editDoc(r, $event)"
+                        [formControl]="docBinding.control"
                       />
                     </div>
                   </div>
@@ -320,7 +321,7 @@ export function buildUpserts(
                   <cdf-button
                     kind="secondary"
                     size="sm"
-                    (click)="openDoc.set(key(r))"
+                    (click)="openEditor(r)"
                   >
                     {{ 'admin.translations.editContent' | translate }}
                   </cdf-button>
@@ -444,6 +445,15 @@ export class TranslationsPage implements HasUnsavedChanges {
     null,
   );
   protected readonly openDoc = signal<string | null>(null);
+  private openRow: TranslationRow | null = null;
+  protected readonly docBinding = new EditorDocBinding(
+    (doc) => {
+      if (this.openRow) this.editDoc(this.openRow, doc);
+    },
+    (doc) => {
+      if (this.openRow) this.docCache.set(`tr|${rowKey(this.openRow)}`, doc);
+    },
+  );
   /** rowKey → edited value (kept across pages until saved). */
   private readonly edits = signal<Map<string, string>>(new Map());
   /** Rows seen with edits, so edits on other pages can still be saved. */
@@ -582,6 +592,13 @@ export class TranslationsPage implements HasUnsavedChanges {
       this.docCache.set(key, doc);
     }
     return doc;
+  }
+
+  /** Open the lesson-body editor for one row (one at a time). */
+  protected openEditor(r: TranslationRow): void {
+    this.openRow = r;
+    this.docBinding.reset(this.docFor(r));
+    this.openDoc.set(rowKey(r));
   }
 
   protected editDoc(r: TranslationRow, doc: LessonDoc): void {

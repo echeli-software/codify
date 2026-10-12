@@ -252,3 +252,12 @@ a {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+// Filter / toolbar rows: form fields keep a compact width instead of
+// stretching to the full row.
+.toolbar > cdf-form-field,
+.filters > cdf-form-field,
+.section-head cdf-form-field {
+  flex: 0 1 220px;
+  min-width: 160px;
+}

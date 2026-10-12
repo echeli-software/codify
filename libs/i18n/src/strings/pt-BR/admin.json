@@ -440,7 +440,8 @@
       "gradedBy": {
         "HEURISTIC": "Corrigido por heurísticas",
         "LLM": "Corrigido pelo modelo de IA"
-      }
+      },
+      "fixFields": "Corrija os campos destacados e salve de novo."
     },
     "scenario": {
       "title": "Editor de cenário",

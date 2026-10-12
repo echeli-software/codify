@@ -440,7 +440,8 @@
       "gradedBy": {
         "HEURISTIC": "Graded by heuristics",
         "LLM": "Graded by the AI model"
-      }
+      },
+      "fixFields": "Fix the highlighted fields, then save again."
     },
     "scenario": {
       "title": "Scenario editor",

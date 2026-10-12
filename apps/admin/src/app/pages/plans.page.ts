@@ -333,9 +333,7 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
                   <ul class="plain-list small">
                     @for (pr of s.prices; track pr.id) {
                       <li>
-                        {{
-                          pr.amountCents | locale: 'currency' : pr.currency
-                        }}
+                        {{ pr.amountCents | locale: 'currency' : pr.currency }}
                         · {{ 'admin.plans.periods.' + pr.period | translate }} →
                         <span class="mono">{{ pr.stripePriceId ?? '—' }}</span>
                       </li>
