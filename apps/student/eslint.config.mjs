@@ -6,6 +6,10 @@ export default [
   ...nx.configs['flat/angular-template'],
   ...baseConfig,
   {
+    // Capacitor native projects: `cap sync` copies the built web bundle in.
+    ignores: ['**/android/**', '**/ios/**'],
+  },
+  {
     files: ['**/*.ts'],
     rules: {
       '@angular-eslint/directive-selector': [

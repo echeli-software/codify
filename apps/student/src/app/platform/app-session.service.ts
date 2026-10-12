@@ -104,6 +104,15 @@ export class AppSessionService {
     this.telemetry.track('signed_in');
     const bundle = await this.refreshIdentity();
     if (this.auth.user()?.id !== id) return; // superseded
+    if (!this.network.online() && this.identity.isExpired(bundle)) {
+      // docs/16 §4: offline identity is valid for 30 days after the last
+      // refresh; past that, back to sign-in. Not destructive — the queue
+      // and downloads stay for when the same user signs in again.
+      this.telemetry.track('offline_identity_expired');
+      await this.auth.signOut();
+      await this.router.navigateByUrl('/login');
+      return;
+    }
     await this.native
       .onSignedIn(bundle?.serverUserId ?? id)
       .catch(() => undefined);
