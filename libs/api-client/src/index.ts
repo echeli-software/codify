@@ -6,7 +6,11 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 
 // Typed clients
 export { MeClient } from './lib/me.client.js';
-export { UsersClient } from './lib/users.client.js';
+export {
+  UsersClient,
+  type UserListQuery,
+  type UserSubscriptionFilter,
+} from './lib/users.client.js';
 export { DevicesClient, type DevicePlatform } from './lib/devices.client.js';
 export {
   CertificatesClient,
@@ -259,3 +263,29 @@ export {
   type LedgerDriftMismatch,
   type LedgerDriftReport,
 } from './lib/ops.client.js';
+export {
+  AdminOpsClient,
+  filenameFromDisposition,
+  type AuditEntry,
+  type CursorPage,
+  type AdminDashboard,
+  type AdminDashboardKpis,
+  type TeacherDashboardKpis,
+  type DashboardTopCourse,
+  type DashboardDropOffLesson,
+  type AdminSearchHit,
+  type AdminSearchHitType,
+  type AdminSearchResults,
+  type AuditQuery,
+  type AuditExport,
+  type AdminLeagueTier,
+  type LeagueSnapshot,
+  type LeagueDetail,
+  type UserInventoryEntry,
+  type GrantItemResult,
+  type LedgerType,
+  type LedgerEntry,
+  type LedgerPage,
+  type BadgeTestResult,
+  type ItemCategoryAdmin,
+} from './lib/admin-ops.client.js';
