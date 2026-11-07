@@ -91,12 +91,11 @@ jobs:
 
       - name: Run stories + axe
         if: steps.runner.outputs.available == 'true'
-        run: |
-          python3 -m http.server ${{ matrix.port }} --bind 127.0.0.1 \
-            --directory dist/storybook/${{ matrix.lib }} > /dev/null 2>&1 &
-          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:${{ matrix.port }}/index.json >/dev/null && break; sleep 1; done
-          pnpm exec test-storybook -c libs/${{ matrix.lib }}/.storybook \
-            --url http://127.0.0.1:${{ matrix.port }} --index-json --maxWorkers=2
+        # Same runner as `nx run <lib>:test-storybook` locally: a Node static
+        # server (HTTP/1.1) in front of the build. Python's http.server closes
+        # every HTTP/1.0 connection, which intermittently trips an assertion
+        # in Node's built-in HTTP client while it reads index.json.
+        run: node tools/scripts/test-storybook.mjs ${{ matrix.lib }} ${{ matrix.port }}
 
       - name: Upload Storybook artifact
         uses: actions/upload-artifact@v4
