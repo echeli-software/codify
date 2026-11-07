@@ -855,7 +855,7 @@ model ContentTranslation {
 /// Server-side feature flags. Read-mostly; changes audited.
 model FeatureFlag {
   key       String   @id /// e.g. "leagues.enabled", "shop.enabled"
-  value     Json     /// { enabled: bool, rolloutPct?: int, variants?: any }
+  value     Json     /// { enabled: bool, rolloutPct?: 0-100, holdoutPct?: 0-100, variants?: { key: weight }, surface?: string } — evaluation: docs/10 §9
   isActive  Boolean  @default(true)
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())

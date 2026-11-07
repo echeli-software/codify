@@ -144,7 +144,7 @@ Each lesson type has a dedicated runner:
 - Current plan card (or "Free" placeholder with primary CTA).
 - "Upgrade" → plan picker with comparison.
 - Manage payment method → Stripe Customer Portal in `<ion-modal>` with in-app browser fallback.
-- Billing history.
+- Billing history (`GET /billing/payments`): date, amount, method (card / PIX / boleto / store), status (paid / failed / refunded / partially refunded) and the receipt link, paged.
 - Cancel subscription (no dark patterns: single-screen confirm with "you'll keep access until [date]").
 
 ### Settings
@@ -153,7 +153,7 @@ Each lesson type has a dedicated runner:
 - Theme: system / light / dark.
 - Notifications: per-channel toggles, reminder time, "fewer like this" feedback per kind.
 - Reduced motion / reduced sound toggles.
-- Data & privacy (export, delete).
+- Data & privacy (`/settings/privacy`, linked from Profile): download a JSON export; delete the account from one confirm sheet that explains the 14-day restore window, the 30-day anonymisation, and that web auto-renewal stops while App Store / Google Play subscriptions must be cancelled in the store. A deleted (restorable) account lands on `/account/restore`; a suspended one on `/account/suspended` (docs/14 §13.1).
 - Help / support / about.
 
 ### Notifications inbox

@@ -134,7 +134,7 @@ Tabs:
   - **Inventory**: items owned; manual grant (with audit reason).
   - **Coin / XP ledger**: paged transactions with delta + balance after.
   - **Manual grant**: form (amount, source = `ADMIN_GRANT`, reason). Rate-limited per admin/day.
-  - **Suspend / unsuspend**: writes Clerk + sets `User.deletedAt` on hard delete.
+  - **Suspend / unsuspend**: sets `User.suspendedAt` + a staff-only reason (the API then refuses the account with `ACCOUNT_SUSPENDED`); ADMIN and SUPPORT, SUPPORT only for student/teacher accounts; audited. Shown with the account's deletion / purge state and its payments in `<cdf-user-account-panel>` (see docs/14 §13.1). Banning the user in Clerk is not wired yet.
   - **Audit**: actions performed on this user.
 
 ### Translations
@@ -156,8 +156,8 @@ Tabs:
 - Streak tier thresholds and bonuses.
 - Notification template defaults.
 - Locale enable/disable.
-- Stripe connection status; webhook URL display + signing secret rotation.
-- Feature flags (e.g. `leagues.enabled`, `shop.enabled`).
+- Stripe connection status; webhook URL display + signing secret rotation. (Implemented as a read-only card: whether `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `REVENUECAT_WEBHOOK_AUTH` are set, plus the webhook endpoint; rotation happens in the Stripe dashboard + deployment environment.)
+- Feature flags (e.g. `leagues.enabled`, `shop.enabled`): table + create/edit (enabled, active, rollout %, holdout %, weighted variants, surface, description) + delete with confirm; ADMIN only. See docs/10 §9.
 
 ## 4. Layout & responsive
 

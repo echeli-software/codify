@@ -240,6 +240,12 @@ We deliberately **do not** use:
 - Default policy: at most one engagement experiment per user at a time on the same surface.
 - Hold-out group (5–10%) carved out for long-term retention measurement.
 
+**Implementation** (`apps/api/src/app/flags/`): `FeatureFlag.value = { enabled, rolloutPct? (default 100), holdoutPct? (default 0), variants? { key: weight }, surface? }`.
+- `bucket(seed)` = first 4 bytes of `sha256(seed)` as an unsigned big-endian int, mod 10 000. Rollout/holdout use `bucket("<key>:<userId>")`; the variant uses `bucket("<key>:<userId>:variant")`.
+- Order: inactive or `enabled: false` → `{ enabled: false, variant: null }`; `b < holdoutPct·100` → `{ enabled: false, variant: "holdout" }`; the remaining buckets are the rollout population (raising `rolloutPct` only adds users; the holdout never moves); enabled users get a weighted variant (keys sorted by code point, zero weights skipped) or `null` without variants. Signed-out callers are never held out, see a flag only at 100 % rollout and get the first variant.
+- `GET /flags` → `{ flags: { [key]: { enabled, variant } } }` — every flag for a signed-in caller, only `surface: "public"` flags otherwise. Admin CRUD: `GET/POST /admin/feature-flags`, `PATCH/DELETE /admin/feature-flags/:key` (ADMIN, audited `feature_flag.create|update|delete`). Rows are cached in memory for 30 s; writes through the API invalidate the cache on that instance.
+- Built-in flags `leagues.enabled`, `friends.enabled`, `shop.enabled` are inserted on boot when missing (never overwritten) and can be turned off but not deleted. When off, `/league/current|last-week`, `/friends/*` and `/shop`, `/shop/:id/purchase` answer `404 { code: "FEATURE_DISABLED", feature }`, and the student app hides those tabs and route-guards them.
+
 ## 10. KPI dashboards
 
 All on Grafana. Key panels:

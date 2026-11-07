@@ -165,6 +165,16 @@ Steps:
 
 Failure handling: failed jobs retry with exponential backoff (BullMQ standard); after 5 fails, alert.
 
+**Payment ledger** (`Payment`, upsert on `externalId` inside the event's transaction):
+- `invoice.paid` → PAID (`externalId` = invoice id, `amount_paid`, currency, `method` card/pix/boleto read from the charge / expanded PaymentIntent when the event carries it, `receiptUrl` = `hosted_invoice_url`, `paidAt` = `status_transitions.paid_at`). $0 invoices (trial starts) are not logged. Owner = the mirrored subscription's user, else any subscription with the invoice's customer.
+- `invoice.payment_failed` → FAILED (`amount_due`); never downgrades an invoice already PAID.
+- `charge.refunded` → `refundedCents` = cumulative `amount_refunded` (only grows), status REFUNDED / PARTIALLY_REFUNDED; creates the row from the charge when the refund arrives first. PIX / Boleto prepay checkouts are logged under the Checkout Session id, and their refunds resolve to it.
+- RevenueCat `INITIAL_PURCHASE` / `RENEWAL` / `NON_RENEWING_PURCHASE` → PAID store payments (APPLE / GOOGLE, `externalId` = store `transaction_id`, `method` "store"); `CANCELLATION` with `cancel_reason: CUSTOMER_SUPPORT` marks that transaction REFUNDED. Web purchases relayed by RevenueCat are left to the Stripe webhook.
+
+**Ordering guard**: `Subscription.lastStripeEventAt` holds the `created` time of the newest event applied to the row. A subscription update from an older event is ignored (cancellation is terminal and always applies; refunds are definitive and also always apply). Payments are logged regardless of ordering.
+
+**Read endpoints**: `GET /billing/payments?skip&take` (own, newest first, `{ items, total }`), `GET /billing/admin/users/:userId/payments` (SUPPORT/ADMIN; adds `externalId`), `GET /billing/admin/stripe-status` (ADMIN; `{ mode, secretKeyConfigured, webhookSecretConfigured, revenueCatWebhookConfigured, webhookPath, revenueCatWebhookPath, webhookUrl }` — booleans and paths only, never secrets).
+
 ## 7. Customer Portal
 
 Stripe-hosted portal handles:
