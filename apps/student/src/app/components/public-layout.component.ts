@@ -107,6 +107,12 @@ import { TranslatePipe } from '@codify/i18n';
           <a routerLink="/verify">{{
             'student.public.nav.verify' | translate
           }}</a>
+          <a routerLink="/privacy" data-testid="footer-privacy">{{
+            'student.public.footer.privacy' | translate
+          }}</a>
+          <a routerLink="/terms" data-testid="footer-terms">{{
+            'student.public.footer.terms' | translate
+          }}</a>
         </nav>
       </footer>
     </ion-content>

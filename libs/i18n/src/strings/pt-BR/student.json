@@ -13,7 +13,9 @@
       },
       "footer": {
         "tagline": "Codify — aprenda, construa, publique.",
-        "label": "Rodapé"
+        "label": "Rodapé",
+        "privacy": "Política de Privacidade",
+        "terms": "Termos de Uso"
       }
     },
     "welcome": {
@@ -612,6 +614,14 @@
         "notifications": {
           "title": "Notificações",
           "body": "Push, email, lembretes e horário de silêncio"
+        },
+        "terms": {
+          "title": "Termos de Uso",
+          "body": "As regras para usar a Codify"
+        },
+        "privacyPolicy": {
+          "title": "Política de Privacidade",
+          "body": "Como tratamos seus dados pessoais"
         }
       },
       "account": "Conta",
@@ -841,6 +851,129 @@
     },
     "translationFallback": {
       "toast": "Este conteúdo ainda não foi traduzido para {locale, select, en-US {inglês} pt-BR {português} other {o seu idioma}}."
+    },
+    "legal": {
+      "contents": "Conteúdo",
+      "updated": "Última atualização: [data da aprovação jurídica]",
+      "draftNotice": "Rascunho em revisão jurídica — este texto ainda não está em vigor. Os itens entre colchetes serão preenchidos antes do lançamento.",
+      "privacy": {
+        "title": "Política de Privacidade",
+        "metaDescription": "Como a Codify coleta, usa e protege seus dados pessoais nos termos da LGPD.",
+        "intro": "Esta política explica quais dados pessoais a Codify coleta quando você usa o site e os apps, por quê, com quem os compartilhamos e os direitos que você tem pela Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).",
+        "sections": [
+          {
+            "title": "Quem somos",
+            "body": "A Codify é operada por [razão social], CNPJ [número], [endereço] (\"Codify\", \"nós\"). Somos a controladora dos dados pessoais descritos aqui. Nosso Encarregado de Proteção de Dados (DPO) pode ser contatado em [e-mail do DPO]."
+          },
+          {
+            "title": "Dados que coletamos",
+            "body": "Dados de conta (nome, e-mail, idioma, fuso horário) do cadastro; dados de aprendizado (matrículas, progresso nas aulas, respostas de quizzes, código enviado em exercícios, respostas a prompts corrigidos por IA, escolhas em cenários, certificados); dados de gamificação (XP, moedas, sequências, medalhas, missões, ligas, itens da loja, avatar); dados sociais (amigos, convites, cutucadas, códigos de indicação); dados de cobrança (plano, situação da assinatura e histórico de pagamentos — os dados do cartão são tratados pelo provedor de pagamento e nunca armazenados por nós); dados do dispositivo (tokens de notificação, plataforma e versão do app); preferências e histórico de notificações; e eventos de uso do produto. Não coletamos localização precisa."
+          },
+          {
+            "title": "Como usamos seus dados",
+            "body": "Para criar e proteger sua conta; oferecer os cursos, corrigir exercícios e prompts de IA, acompanhar seu progresso e emitir certificados; manter sequências, missões, ligas e a loja; processar assinaturas e pagamentos; enviar as notificações e e-mails que você não desativou (lembretes, avisos de cobrança, resumos semanais); manter o serviço estável e evitar abusos; e melhorar o produto com análises agregadas e experimentos."
+          },
+          {
+            "title": "Bases legais",
+            "body": "Tratamos dados para executar o contrato com você (art. 7º, V, da LGPD), cumprir obrigações legais e fiscais (art. 7º, II), com base no nosso legítimo interesse em manter o serviço seguro e melhorá-lo (art. 7º, IX) e com o seu consentimento quando exigido, como em e-mails de marketing (art. 7º, I). Você pode revogar o consentimento a qualquer momento."
+          },
+          {
+            "title": "Com quem compartilhamos",
+            "body": "Somente com prestadores de serviço que tratam dados em nosso nome: Clerk (login), Stripe (pagamentos por cartão, PIX e Boleto), Apple e Google por meio da RevenueCat (compras no app), Anthropic (correção de respostas a prompts de IA), Resend (envio de e-mails), Google Firebase (notificações push), DigitalOcean e Cloudflare (hospedagem, armazenamento e entrega de conteúdo) e Sentry (monitoramento de erros). O código que você envia é executado em servidores nossos. Não vendemos dados pessoais nem os compartilhamos para publicidade."
+          },
+          {
+            "title": "Transferências internacionais",
+            "body": "Alguns dos prestadores acima tratam dados fora do Brasil. Nesses casos usamos as salvaguardas previstas no art. 33 da LGPD, como cláusulas contratuais padrão, e escolhemos prestadores com compromissos de segurança adequados. [Jurídico deve confirmar o mecanismo de cada prestador.]"
+          },
+          {
+            "title": "Por quanto tempo guardamos",
+            "body": "Guardamos seus dados enquanto sua conta estiver ativa. Se você excluir a conta, pode restaurá-la em até 14 dias; após 30 dias ela é anonimizada e seus registros pessoais são apagados. Registros contábeis (pagamentos, extratos de moedas e XP) são mantidos de forma anonimizada pelo prazo exigido em lei. Logs de servidor são mantidos por [prazo]."
+          },
+          {
+            "title": "Seus direitos",
+            "body": "Pelo art. 18 da LGPD você pode confirmar a existência e acessar seus dados, corrigi-los, pedir anonimização, bloqueio ou eliminação, solicitar a portabilidade, saber com quem os compartilhamos e revogar o consentimento. Você mesmo pode baixar todos os seus dados e excluir sua conta em Configurações → Dados e privacidade, ou falar com nosso DPO. Você também pode reclamar à ANPD (Autoridade Nacional de Proteção de Dados)."
+          },
+          {
+            "title": "Crianças e adolescentes",
+            "body": "A Codify é destinada a pessoas com [idade mínima] anos ou mais. [Jurídico deve definir a idade mínima e, se aplicável, o processo de consentimento dos responsáveis exigido pelo art. 14 da LGPD.]"
+          },
+          {
+            "title": "Cookies e armazenamento local",
+            "body": "Usamos o armazenamento local do navegador e do dispositivo para manter você conectado, lembrar suas preferências e deixar aulas baixadas disponíveis offline. Não usamos cookies de publicidade de terceiros."
+          },
+          {
+            "title": "Segurança",
+            "body": "Os dados são criptografados em trânsito, o acesso é restrito a quem precisa e toda ação administrativa fica registrada em um log de auditoria. Nenhum sistema é totalmente seguro; se um incidente colocar seus dados em risco, avisaremos você e a ANPD conforme a lei."
+          },
+          {
+            "title": "Alterações e contato",
+            "body": "Se mudarmos esta política, atualizaremos a data acima e, em mudanças relevantes, avisaremos no app ou por e-mail. Dúvidas ou solicitações: [e-mail do DPO]."
+          }
+        ]
+      },
+      "terms": {
+        "title": "Termos de Uso",
+        "metaDescription": "Os termos que se aplicam ao uso do site e dos apps da Codify.",
+        "intro": "Estes termos regem o uso do site e dos apps da Codify. Ao criar uma conta ou usar a Codify, você concorda com eles.",
+        "sections": [
+          {
+            "title": "Acordo",
+            "body": "Estes Termos de Uso são um acordo entre você e [razão social], CNPJ [número] (\"Codify\"). Nossa Política de Privacidade explica como tratamos dados pessoais e faz parte destes termos."
+          },
+          {
+            "title": "Sua conta",
+            "body": "Você deve informar dados verdadeiros, manter seu acesso seguro e ter pelo menos [idade mínima] anos. Você é responsável pela atividade na sua conta. Uma conta por pessoa."
+          },
+          {
+            "title": "Planos gratuitos e pagos",
+            "body": "Parte do conteúdo é gratuita. Os planos pagos liberam cursos e recursos adicionais conforme descrito na página de preços no momento da compra. Os preços são em reais (BRL) e incluem os tributos aplicáveis, salvo indicação em contrário."
+          },
+          {
+            "title": "Pagamentos e renovação",
+            "body": "Assinaturas pela web são cobradas pela Stripe por cartão (inclusive parcelado, quando oferecido), PIX ou Boleto. Assinaturas no cartão renovam automaticamente ao fim de cada período até serem canceladas; planos por PIX e Boleto são pré-pagos pelo período e não renovam automaticamente. Compras feitas na App Store ou no Google Play são cobradas e gerenciadas pela Apple ou pelo Google, conforme os termos deles."
+          },
+          {
+            "title": "Cancelamento e reembolso",
+            "body": "Você pode cancelar uma assinatura web a qualquer momento pelo app e mantém o acesso até o fim do período pago. Você pode desistir de uma compra em até 7 dias e receber o reembolso integral, conforme o art. 49 do Código de Defesa do Consumidor. Reembolsos de compras na App Store e no Google Play são tratados pela Apple ou pelo Google. [Jurídico deve confirmar políticas adicionais de reembolso.]"
+          },
+          {
+            "title": "Moedas, XP e itens virtuais",
+            "body": "Moedas, XP, medalhas, itens de avatar e prêmios de liga fazem parte da experiência de aprendizado. Não têm valor monetário, não podem ser trocados por dinheiro e não podem ser transferidos nem vendidos. Podemos ajustar saldos para corrigir erros ou abusos."
+          },
+          {
+            "title": "Uso aceitável",
+            "body": "Não tente quebrar, sobrecarregar ou acessar o serviço sem autorização; não envie código malicioso nos exercícios nem use o executor de código para outra finalidade; não tente manipular a correção por IA, as ligas, as indicações ou as recompensas; não assedie outros usuários; e não compartilhe conteúdo pago fora da sua conta."
+          },
+          {
+            "title": "Seu conteúdo",
+            "body": "Você continua dono do código e das respostas que envia. Você concede à Codify licença para armazená-los, executá-los e corrigi-los, mostrá-los de volta a você e usá-los de forma anonimizada e agregada para melhorar o serviço."
+          },
+          {
+            "title": "Nosso conteúdo",
+            "body": "Cursos, aulas, exercícios, ilustrações e o software da Codify pertencem à Codify ou a seus licenciadores e são licenciados a você apenas para aprendizado pessoal e não comercial."
+          },
+          {
+            "title": "Certificados",
+            "body": "Os certificados de conclusão confirmam que uma conta concluiu um curso na Codify. Eles podem ser verificados publicamente pelo número de série. Não são diplomas acadêmicos formais, salvo indicação expressa."
+          },
+          {
+            "title": "Suspensão e encerramento",
+            "body": "Podemos suspender ou encerrar contas que violem estes termos, com aviso prévio quando razoável. Você pode excluir sua conta a qualquer momento em Configurações → Dados e privacidade."
+          },
+          {
+            "title": "Disponibilidade e responsabilidade",
+            "body": "Trabalhamos para manter a Codify disponível e correta, mas não garantimos serviço ininterrupto. Na medida permitida por lei, a Codify não responde por danos indiretos. Nada nestes termos limita seus direitos como consumidor pela legislação brasileira."
+          },
+          {
+            "title": "Alterações destes termos",
+            "body": "Podemos atualizar estes termos. Em mudanças relevantes avisaremos com antecedência no app ou por e-mail; continuar usando a Codify após a mudança significa aceitar os novos termos."
+          },
+          {
+            "title": "Lei aplicável e contato",
+            "body": "Estes termos são regidos pelas leis do Brasil. Disputas serão resolvidas no foro de [cidade/UF], sem prejuízo do seu direito, como consumidor, de propor ação no seu domicílio. Contato: [e-mail de suporte]."
+          }
+        ]
+      }
     }
   }
 }

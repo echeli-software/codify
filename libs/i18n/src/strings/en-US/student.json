@@ -13,7 +13,9 @@
       },
       "footer": {
         "tagline": "Codify — learn, build, ship.",
-        "label": "Footer"
+        "label": "Footer",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Use"
       }
     },
     "welcome": {
@@ -612,6 +614,14 @@
         "notifications": {
           "title": "Notifications",
           "body": "Push, email, reminders and quiet hours"
+        },
+        "terms": {
+          "title": "Terms of Use",
+          "body": "The rules for using Codify"
+        },
+        "privacyPolicy": {
+          "title": "Privacy Policy",
+          "body": "How we handle your personal data"
         }
       },
       "account": "Account",
@@ -841,6 +851,129 @@
     },
     "translationFallback": {
       "toast": "This content hasn't been translated to {locale, select, en-US {English} pt-BR {Portuguese} other {your language}} yet."
+    },
+    "legal": {
+      "contents": "Contents",
+      "updated": "Last updated: [date of legal approval]",
+      "draftNotice": "Draft pending legal review — this text is not yet in force. Bracketed items will be filled in before launch.",
+      "privacy": {
+        "title": "Privacy Policy",
+        "metaDescription": "How Codify collects, uses and protects your personal data under Brazil's LGPD.",
+        "intro": "This policy explains what personal data Codify collects when you use the website and apps, why, who we share it with and the rights you have under Brazil's General Data Protection Law (LGPD, Law 13.709/2018).",
+        "sections": [
+          {
+            "title": "Who we are",
+            "body": "Codify is operated by [company legal name], CNPJ [number], [registered address] (\"Codify\", \"we\"). We are the controller of the personal data described here. Our Data Protection Officer (DPO) can be reached at [dpo e-mail]."
+          },
+          {
+            "title": "Data we collect",
+            "body": "Account data (name, e-mail address, language, time zone) from sign-up; learning data (enrollments, lesson progress, quiz answers, code you submit to exercises, answers to AI-graded prompts, scenario choices, certificates); gamification data (XP, coins, streaks, badges, quests, league standings, shop items, avatar); social data (friends, friend requests, nudges, referral codes); billing data (plan, subscription status and payment history — card details are handled by the payment provider and never stored by us); device data (push notification tokens, app platform and version); notification settings and delivery history; and product analytics events about how the app is used. We do not collect precise location."
+          },
+          {
+            "title": "How we use your data",
+            "body": "To create and secure your account; to deliver courses, grade exercises and AI prompts, track progress and issue certificates; to run streaks, quests, leagues and the shop; to process subscriptions and payments; to send the notifications and e-mails you have not turned off (reminders, billing notices, weekly recaps); to keep the service reliable and prevent abuse; and to improve the product using aggregated analytics and experiments."
+          },
+          {
+            "title": "Legal bases",
+            "body": "We process data to perform our contract with you (LGPD art. 7, V), to comply with legal and tax obligations (art. 7, II), on our legitimate interest in keeping the service secure and improving it (art. 7, IX), and on your consent where required, such as marketing e-mails (art. 7, I). You can withdraw consent at any time."
+          },
+          {
+            "title": "Who we share data with",
+            "body": "Only service providers that process data on our behalf: Clerk (sign-in), Stripe (card, PIX and Boleto payments), Apple and Google through RevenueCat (in-app purchases), Anthropic (grading answers to AI-graded prompts), Resend (e-mail delivery), Google Firebase (push notifications), DigitalOcean and Cloudflare (hosting, storage and content delivery) and Sentry (error monitoring). Code you submit runs on our own servers. We do not sell personal data or share it for advertising."
+          },
+          {
+            "title": "International transfers",
+            "body": "Some providers above process data outside Brazil. When that happens we rely on the safeguards allowed by LGPD art. 33, such as standard contractual clauses, and we choose providers with adequate security commitments. [Legal to confirm the mechanism for each provider.]"
+          },
+          {
+            "title": "How long we keep data",
+            "body": "We keep your data while your account is active. If you delete your account, you can restore it for 14 days; after 30 days we anonymise it and delete your personal records. Accounting records (payments, coin and XP ledgers) are kept in anonymised form for as long as the law requires. Server logs are kept for [retention period]."
+          },
+          {
+            "title": "Your rights",
+            "body": "Under LGPD art. 18 you may confirm and access your data, correct it, request anonymisation, blocking or deletion, port it, learn who we share it with, and withdraw consent. You can download all your data and delete your account yourself in Settings → Data & privacy, or contact our DPO. You may also lodge a complaint with the ANPD (National Data Protection Authority)."
+          },
+          {
+            "title": "Children and teenagers",
+            "body": "Codify is intended for users aged [minimum age] or older. [Legal to define the minimum age and, where applicable, the parental consent process required by LGPD art. 14.]"
+          },
+          {
+            "title": "Cookies and local storage",
+            "body": "We use the browser's local storage and the app's device storage to keep you signed in, remember your preferences and make downloaded lessons available offline. We do not use third-party advertising cookies."
+          },
+          {
+            "title": "Security",
+            "body": "Data is encrypted in transit, access is restricted to staff who need it and every administrative action is recorded in an audit log. No system is completely secure; if an incident puts your data at risk we will notify you and the ANPD as required by law."
+          },
+          {
+            "title": "Changes and contact",
+            "body": "If we change this policy we will update the date above and, for material changes, notify you in the app or by e-mail. Questions or requests: [dpo e-mail]."
+          }
+        ]
+      },
+      "terms": {
+        "title": "Terms of Use",
+        "metaDescription": "The terms that apply when you use Codify's website and apps.",
+        "intro": "These terms govern your use of Codify's website and apps. By creating an account or using Codify you agree to them.",
+        "sections": [
+          {
+            "title": "Agreement",
+            "body": "These Terms of Use form an agreement between you and [company legal name], CNPJ [number] (\"Codify\"). Our Privacy Policy explains how we handle personal data and is part of these terms."
+          },
+          {
+            "title": "Your account",
+            "body": "You must give accurate information, keep your sign-in secure and be at least [minimum age] years old. You are responsible for activity on your account. One person per account."
+          },
+          {
+            "title": "Free and paid plans",
+            "body": "Part of the content is free. Paid plans unlock additional courses and features as described on the pricing page at the time of purchase. Prices are shown in Brazilian reais (BRL) and include applicable taxes unless stated otherwise."
+          },
+          {
+            "title": "Payments and renewal",
+            "body": "Web subscriptions are billed by Stripe by card (including installments where offered), PIX or Boleto. Card subscriptions renew automatically at the end of each period until cancelled; PIX and Boleto plans are prepaid for their period and do not renew automatically. Purchases made in the App Store or Google Play are billed and managed by Apple or Google under their terms."
+          },
+          {
+            "title": "Cancellation and refunds",
+            "body": "You can cancel a web subscription at any time in the app; you keep access until the end of the paid period. You may withdraw from a purchase within 7 days and receive a full refund, as provided by the Consumer Defense Code (art. 49). Refunds for App Store and Google Play purchases are handled by Apple or Google. [Legal to confirm any additional refund policy.]"
+          },
+          {
+            "title": "Coins, XP and virtual items",
+            "body": "Coins, XP, badges, avatar items and league rewards are part of the learning experience. They have no monetary value, cannot be exchanged for money and cannot be transferred or sold. We may adjust balances to correct errors or abuse."
+          },
+          {
+            "title": "Acceptable use",
+            "body": "Do not attempt to break, overload or gain unauthorised access to the service; do not submit malicious code to exercises or use the code runner for anything other than the exercise; do not try to manipulate AI grading, leagues, referrals or rewards; do not harass other users; and do not share paid content outside your account."
+          },
+          {
+            "title": "Your content",
+            "body": "You keep ownership of the code and answers you submit. You grant Codify a licence to store, run and grade them, show them back to you and use them in anonymised, aggregated form to improve the service."
+          },
+          {
+            "title": "Our content",
+            "body": "Courses, lessons, exercises, illustrations and the Codify software are owned by Codify or its licensors and are licensed to you for personal, non-commercial learning only."
+          },
+          {
+            "title": "Certificates",
+            "body": "Certificates of completion confirm that an account completed a course on Codify. They can be verified publicly by their serial number. They are not formal academic qualifications unless expressly stated."
+          },
+          {
+            "title": "Suspension and termination",
+            "body": "We may suspend or close accounts that breach these terms, after notice where reasonable. You can delete your account at any time in Settings → Data & privacy."
+          },
+          {
+            "title": "Service availability and liability",
+            "body": "We work to keep Codify available and accurate but cannot guarantee uninterrupted service. To the extent permitted by law, Codify is not liable for indirect damages. Nothing in these terms limits your rights as a consumer under Brazilian law."
+          },
+          {
+            "title": "Changes to these terms",
+            "body": "We may update these terms. For material changes we will notify you in advance in the app or by e-mail; continuing to use Codify after the change means you accept the new terms."
+          },
+          {
+            "title": "Governing law and contact",
+            "body": "These terms are governed by the laws of Brazil. Disputes will be resolved in the courts of [city/state], without prejudice to your right as a consumer to file in your own domicile. Contact: [support e-mail]."
+          }
+        ]
+      }
     }
   }
 }

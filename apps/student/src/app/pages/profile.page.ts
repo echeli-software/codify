@@ -80,6 +80,13 @@ const LINKS: NavLink[] = [
     key: 'notifications',
     testId: 'notifications-settings-link',
   },
+  {
+    path: '/privacy',
+    icon: 'shield-checkmark',
+    key: 'privacyPolicy',
+    testId: 'privacy-policy-link',
+  },
+  { path: '/terms', icon: 'info-circle', key: 'terms', testId: 'terms-link' },
 ];
 
 /**

@@ -48,6 +48,18 @@ export const appRoutes: Route[] = [
         (m) => m.CertificateVerifyPage,
       ),
   },
+  // Legal (docs/14 §Privacy): public, linked from sign-in, Settings and the
+  // public footer.
+  {
+    path: 'privacy',
+    data: { doc: 'privacy' },
+    loadComponent: () => import('./pages/legal.page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'terms',
+    data: { doc: 'terms' },
+    loadComponent: () => import('./pages/legal.page').then((m) => m.LegalPage),
+  },
   {
     path: 'forbidden',
     loadComponent: () =>

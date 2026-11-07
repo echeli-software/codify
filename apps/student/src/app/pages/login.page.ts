@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   IonContent,
   IonHeader,
@@ -59,6 +59,7 @@ const DEFAULT_TARGET = '/today';
     AppInput,
     FormField,
     Icon,
+    RouterLink,
     TranslatePipe,
   ],
   template: `
@@ -138,6 +139,20 @@ const DEFAULT_TARGET = '/today';
           @if (errorKey(); as key) {
             <p class="error" role="alert">{{ key | translate }}</p>
           }
+
+          <!-- docs/14: the Terms and Privacy Policy are linked from sign-up
+               (Clerk's sign-in widget is also the sign-up entry point). -->
+          <p class="legal" data-testid="login-legal">
+            {{ 'studentPlatform.login.legal.prefix' | translate }}
+            <a routerLink="/terms">{{
+              'studentPlatform.login.legal.terms' | translate
+            }}</a>
+            {{ 'studentPlatform.login.legal.and' | translate }}
+            <a routerLink="/privacy">{{
+              'studentPlatform.login.legal.privacy' | translate
+            }}</a
+            >{{ 'studentPlatform.login.legal.suffix' | translate }}
+          </p>
         </cdf-app-card>
       </div>
     </ion-content>
@@ -221,6 +236,15 @@ const DEFAULT_TARGET = '/today';
         color: var(--cdf-color-danger);
         font-size: 13px;
         margin-top: 12px;
+      }
+      .legal {
+        margin: 16px 0 0;
+        color: var(--cdf-color-text-muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .legal a {
+        color: var(--cdf-color-primary);
       }
     `,
   ],

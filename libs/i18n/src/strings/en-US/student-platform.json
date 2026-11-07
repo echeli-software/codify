@@ -150,6 +150,13 @@
           "name": "Admin",
           "description": "Full administrative access."
         }
+      },
+      "legal": {
+        "prefix": "By continuing, you agree to the",
+        "terms": "Terms of Use",
+        "and": "and acknowledge the",
+        "privacy": "Privacy Policy",
+        "suffix": "."
       }
     },
     "capability": {
