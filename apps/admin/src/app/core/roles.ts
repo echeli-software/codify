@@ -17,7 +17,10 @@ export type AdminSection =
   | 'translations'
   | 'media'
   | 'analytics'
-  | 'profile';
+  | 'profile'
+  | 'audit'
+  | 'leagues'
+  | 'itemCategories';
 
 /**
  * Who may open each section — UI gating only, the API enforces the real
@@ -39,6 +42,10 @@ export const SECTION_ROLES: Record<AdminSection, readonly UserRole[]> = {
   media: ['ADMIN', 'TEACHER'],
   analytics: ['ADMIN'],
   profile: ['ADMIN', 'TEACHER', 'SUPPORT'],
+  // docs/04 §1: SUPPORT views the log, TEACHER sees only own actions.
+  audit: ['ADMIN', 'TEACHER', 'SUPPORT'],
+  leagues: ['ADMIN'],
+  itemCategories: ['ADMIN'],
 };
 
 export function canAccess(
@@ -142,10 +149,22 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         link: '/items',
       },
       {
+        section: 'itemCategories',
+        labelKey: 'admin.nav.itemCategories',
+        icon: 'folder-open',
+        link: '/item-categories',
+      },
+      {
         section: 'gamification',
         labelKey: 'admin.nav.gamification',
         icon: 'trophy',
         link: '/gamification',
+      },
+      {
+        section: 'leagues',
+        labelKey: 'admin.nav.leagues',
+        icon: 'star',
+        link: '/leagues',
       },
       {
         section: 'users',
@@ -169,6 +188,12 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         labelKey: 'admin.nav.analytics',
         icon: 'eye',
         link: '/analytics',
+      },
+      {
+        section: 'audit',
+        labelKey: 'admin.nav.audit',
+        icon: 'file',
+        link: '/audit',
       },
     ],
   },

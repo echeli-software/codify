@@ -1,8 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { I18nService, TranslatePipe } from '@codify/i18n';
@@ -10,11 +12,25 @@ import {
   AppShell,
   Avatar,
   Button,
+  Icon,
+  Kbd,
   type NavSection,
   ToastHost,
 } from '@codify/ui-bootstrap';
 import { AuthService } from '@codify/auth';
 import { navForRole } from '../core/roles';
+import { SearchPalette } from '../core/search-palette';
+import { AdminTelemetry } from '../core/telemetry';
+
+/** Cmd-K on Apple platforms, Ctrl-K elsewhere (both work everywhere). */
+export function isPaletteShortcut(ev: KeyboardEvent): boolean {
+  return (
+    (ev.metaKey || ev.ctrlKey) &&
+    !ev.altKey &&
+    !ev.shiftKey &&
+    ev.key.toLowerCase() === 'k'
+  );
+}
 
 /**
  * Routing host for the admin app shell. Builds the role-aware sidebar
@@ -23,13 +39,44 @@ import { navForRole } from '../core/roles';
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterModule, AppShell, Avatar, Button, ToastHost, TranslatePipe],
+  imports: [
+    RouterModule,
+    AppShell,
+    Avatar,
+    Button,
+    Icon,
+    Kbd,
+    SearchPalette,
+    ToastHost,
+    TranslatePipe,
+  ],
+  host: { '(document:keydown)': 'onGlobalKeydown($event)' },
   template: `
     <cdf-app-shell
       [brand]="'admin.shell.brand' | translate"
       brandIcon="gear"
       [nav]="nav()"
     >
+      <ng-container appShellTopbarLeft>
+        <button
+          type="button"
+          class="topbar-search"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="searchOpen()"
+          [attr.aria-keyshortcuts]="'Control+K Meta+K'"
+          (click)="searchOpen.set(true)"
+          data-testid="open-search"
+        >
+          <cdf-icon name="search" size="sm" />
+          <span class="topbar-search__label">{{
+            'admin.search.open' | translate
+          }}</span>
+          <cdf-kbd class="topbar-search__kbd">{{
+            (isMac ? 'admin.search.shortcutMac' : 'admin.search.shortcut')
+              | translate
+          }}</cdf-kbd>
+        </button>
+      </ng-container>
       <ng-container appShellTopbarRight>
         @if (user(); as u) {
           <span class="topbar-user">
@@ -50,6 +97,10 @@ import { navForRole } from '../core/roles';
       <router-outlet />
     </cdf-app-shell>
 
+    <cdf-admin-search-palette
+      [open]="searchOpen()"
+      (closed)="searchOpen.set(false)"
+    />
     <cdf-toast-host />
   `,
   styles: [
@@ -74,9 +125,33 @@ import { navForRole } from '../core/roles';
         text-transform: uppercase;
         letter-spacing: 0.06em;
       }
+      .topbar-search {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--cdf-space-2);
+        min-width: 220px;
+        padding: 4px 10px;
+        border: 1px solid var(--cdf-color-border);
+        border-radius: var(--cdf-radius-md);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text-muted);
+        font-size: var(--cdf-font-size-sm);
+      }
+      .topbar-search:hover {
+        border-color: var(--cdf-color-primary);
+      }
+      .topbar-search__label {
+        flex: 1;
+        text-align: start;
+      }
       @media (max-width: 640px) {
-        .topbar-user__meta {
+        .topbar-user__meta,
+        .topbar-search__label,
+        .topbar-search__kbd {
           display: none;
+        }
+        .topbar-search {
+          min-width: 0;
         }
       }
     `,
@@ -87,6 +162,21 @@ export class ShellPage {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
   protected readonly user = computed(() => this.auth.user());
+  protected readonly searchOpen = signal(false);
+  protected readonly isMac =
+    typeof navigator !== 'undefined' &&
+    /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
+
+  constructor() {
+    // docs/04 §8: page views (route + role + locale), batched.
+    inject(AdminTelemetry).trackPageViews(this.router, inject(DestroyRef));
+  }
+
+  protected onGlobalKeydown(ev: KeyboardEvent): void {
+    if (!isPaletteShortcut(ev)) return;
+    ev.preventDefault();
+    this.searchOpen.update((open) => !open);
+  }
 
   protected readonly nav = computed<NavSection[]>(() => {
     this.i18n.currentLocale(); // re-label on locale switch

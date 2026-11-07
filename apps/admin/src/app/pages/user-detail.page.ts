@@ -26,16 +26,23 @@ import {
   Input,
   Select,
   type SelectOption,
+  Pagination,
   Skeleton,
   ToastService,
+  type CursorPageEvent,
 } from '@codify/ui-bootstrap';
 import {
+  AdminOpsClient,
   BillingClient,
   CoursesClient,
   EnrollmentsClient,
+  ItemsClient,
   PlansClient,
   ProblemDetailsError,
   UsersClient,
+  type LedgerPage,
+  type LedgerType,
+  type UserInventoryEntry,
   type AdminSubscriptionView,
   type EnrollmentView,
   type MeResponse,
@@ -44,8 +51,10 @@ import {
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { localToIso } from '../core/catalog';
+import { CursorPager } from '../core/cursor-pager';
+import { LoadError } from '../shared/load-error';
 
-type Tab = 'profile' | 'subscriptions' | 'enrollments';
+type Tab = 'profile' | 'subscriptions' | 'enrollments' | 'inventory' | 'ledger';
 
 /** docs/14 §2: SUPPORT grants are capped at ~1 month. */
 export const SUPPORT_MAX_GRANT_DAYS = 31;
@@ -89,6 +98,8 @@ export function daysUntil(
     Input,
     Select,
     Skeleton,
+    LoadError,
+    Pagination,
     TranslatePipe,
     LocalePipe,
   ],
@@ -118,13 +129,17 @@ export function daysUntil(
               [id]="'utab-' + t"
               [attr.aria-selected]="tab() === t"
               [attr.aria-controls]="'upanel-' + t"
-              (click)="tab.set(t)"
+              (click)="openTab(t)"
             >
               {{ 'admin.users.tabs.' + t | translate }}
             </button>
           }
         </div>
 
+        <!--
+          Account panel slot (suspend / delete / manual coin grant): add an
+          'account' entry to Tab + tabs and an @case ('account') below.
+        -->
         @switch (tab()) {
           @case ('profile') {
             <section
@@ -551,6 +566,241 @@ export function daysUntil(
               </div>
             </section>
           }
+          @case ('inventory') {
+            <section
+              id="upanel-inventory"
+              role="tabpanel"
+              aria-labelledby="utab-inventory"
+            >
+              <div class="admin-card">
+                <h2>{{ 'admin.users.inv.title' | translate }}</h2>
+                @if (invError(); as e) {
+                  <cdf-load-error [message]="e" (retry)="loadInventory()" />
+                } @else if (inventory() === null) {
+                  <cdf-skeleton shape="rect" height="80px" />
+                } @else if (inventory()!.length === 0) {
+                  <p class="muted small">
+                    {{ 'admin.users.inv.none' | translate }}
+                  </p>
+                } @else {
+                  <div class="table-scroll">
+                    <table class="admin-table" data-testid="user-inventory">
+                      <thead>
+                        <tr>
+                          <th scope="col">
+                            {{ 'admin.users.inv.item' | translate }}
+                          </th>
+                          <th scope="col">
+                            {{ 'admin.users.inv.slot' | translate }}
+                          </th>
+                          <th scope="col">
+                            {{ 'admin.users.inv.source' | translate }}
+                          </th>
+                          <th scope="col">
+                            {{ 'admin.users.inv.acquired' | translate }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (i of inventory(); track i.itemId) {
+                          <tr>
+                            <td>
+                              <strong>{{ i.name }}</strong>
+                              <div class="mono muted">{{ i.slug }}</div>
+                              @if (i.equipped) {
+                                <cdf-badge variant="success" [subtle]="true">{{
+                                  'admin.users.inv.equipped' | translate
+                                }}</cdf-badge>
+                              }
+                            </td>
+                            <td>
+                              {{ 'admin.items.slots.' + i.slot | translate }}
+                              <div class="muted small">
+                                {{
+                                  'admin.items.rarities.' + i.rarity | translate
+                                }}
+                              </div>
+                            </td>
+                            <td>
+                              <cdf-badge variant="neutral" [subtle]="true">{{
+                                'admin.users.inv.sources.' + i.source
+                                  | translate
+                              }}</cdf-badge>
+                            </td>
+                            <td class="small">
+                              {{ i.acquiredAt | locale: 'datetime' }}
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
+              @if (isAdmin()) {
+                <div class="admin-card" aria-labelledby="grant-item-title">
+                  <h2 id="grant-item-title">
+                    {{ 'admin.users.inv.grant' | translate }}
+                  </h2>
+                  <div class="form-grid">
+                    <cdf-form-field
+                      class="span-2"
+                      [label]="'admin.users.inv.item' | translate"
+                      controlId="grant-item"
+                      [error]="itemErrors()['item'] ?? null"
+                    >
+                      <cdf-combobox
+                        inputId="grant-item"
+                        [options]="itemOptions()"
+                        [placeholder]="'admin.users.inv.searchItem' | translate"
+                        [(ngModel)]="itemGrant.itemId"
+                      />
+                    </cdf-form-field>
+                    <cdf-form-field
+                      class="span-all"
+                      [label]="'admin.users.inv.reason' | translate"
+                      [help]="'admin.common.reasonHelp' | translate"
+                      controlId="grant-item-reason"
+                      [error]="itemErrors()['reason'] ?? null"
+                    >
+                      <cdf-input
+                        inputId="grant-item-reason"
+                        [(ngModel)]="itemGrant.reason"
+                      />
+                    </cdf-form-field>
+                  </div>
+                  <div class="form-actions">
+                    <cdf-button
+                      kind="primary"
+                      [loading]="busy() === 'item'"
+                      (click)="grantItem()"
+                      data-testid="grant-item"
+                    >
+                      {{ 'admin.users.inv.grantButton' | translate }}
+                    </cdf-button>
+                  </div>
+                  @if (itemError(); as e) {
+                    <p class="form-error" role="alert">{{ e }}</p>
+                  }
+                </div>
+              }
+            </section>
+          }
+          @case ('ledger') {
+            <section
+              id="upanel-ledger"
+              role="tabpanel"
+              aria-labelledby="utab-ledger"
+            >
+              <div class="admin-card">
+                <header class="section-head">
+                  <h2>{{ 'admin.users.ledger.title' | translate }}</h2>
+                  <div
+                    class="seg"
+                    role="group"
+                    [attr.aria-label]="'admin.users.ledger.type' | translate"
+                  >
+                    @for (lt of ledgerTypes; track lt) {
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        [class.btn-primary]="ledgerType() === lt"
+                        [class.btn-outline-primary]="ledgerType() !== lt"
+                        [attr.aria-pressed]="ledgerType() === lt"
+                        [attr.data-ledger-type]="lt"
+                        (click)="setLedgerType(lt)"
+                      >
+                        {{ 'admin.users.ledger.types.' + lt | translate }}
+                      </button>
+                    }
+                  </div>
+                </header>
+                @if (ledgerError(); as e) {
+                  <cdf-load-error [message]="e" (retry)="reloadLedger()" />
+                } @else if (ledger() === null) {
+                  <cdf-skeleton shape="rect" height="120px" />
+                } @else {
+                  <p class="small" aria-live="polite">
+                    {{
+                      'admin.users.ledger.balance.' + ledger()!.type
+                        | translate: { value: ledger()!.balance }
+                    }}
+                  </p>
+                  @if (ledger()!.items.length === 0) {
+                    <p class="muted small">
+                      {{ 'admin.users.ledger.none' | translate }}
+                    </p>
+                  } @else {
+                    <div class="table-scroll">
+                      <table class="admin-table" data-testid="user-ledger">
+                        <thead>
+                          <tr>
+                            <th scope="col">
+                              {{ 'admin.users.ledger.when' | translate }}
+                            </th>
+                            <th scope="col">
+                              {{ 'admin.users.ledger.source' | translate }}
+                            </th>
+                            <th scope="col" class="num">
+                              {{ 'admin.users.ledger.delta' | translate }}
+                            </th>
+                            <th scope="col" class="num">
+                              {{
+                                'admin.users.ledger.balanceAfter' | translate
+                              }}
+                            </th>
+                            <th scope="col">
+                              {{ 'admin.users.ledger.ref' | translate }}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (r of ledger()!.items; track r.id) {
+                            <tr>
+                              <td class="small">
+                                {{ r.createdAt | locale: 'datetime' }}
+                              </td>
+                              <td class="mono">{{ r.source }}</td>
+                              <td
+                                class="num"
+                                [class.pos]="r.delta > 0"
+                                [class.neg]="r.delta < 0"
+                              >
+                                {{ r.delta > 0 ? '+' : ''
+                                }}{{ r.delta | locale: 'integer' }}
+                                @if (r.multiplier && r.multiplier !== '1') {
+                                  <span class="muted small"
+                                    >×{{ r.multiplier }}</span
+                                  >
+                                }
+                              </td>
+                              <td class="num">
+                                {{ r.balanceAfter | locale: 'integer' }}
+                              </td>
+                              <td class="mono muted">
+                                {{ r.refType }} {{ r.refId }}
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    <cdf-pagination
+                      mode="cursor"
+                      [prevCursor]="null"
+                      [canGoBack]="ledgerPager.canGoBack"
+                      [nextCursor]="ledger()!.nextCursor"
+                      [pageLabel]="
+                        'admin.audit.page' | translate: { page: ledgerPage() }
+                      "
+                      (cursorChange)="onLedgerPage($event)"
+                    />
+                  }
+                }
+              </div>
+            </section>
+          }
         }
       } @else if (notFound()) {
         <cdf-empty-state
@@ -604,6 +854,16 @@ export function daysUntil(
       .warn {
         color: var(--cdf-color-warning);
       }
+      .seg {
+        display: inline-flex;
+        gap: 4px;
+      }
+      .pos {
+        color: var(--cdf-color-success);
+      }
+      .neg {
+        color: var(--cdf-color-danger);
+      }
     `,
   ],
 })
@@ -619,12 +879,42 @@ export class UserDetailPage {
   private readonly errorsSvc = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
+  private readonly adminOps = inject(AdminOpsClient);
+  private readonly itemsClient = inject(ItemsClient);
 
   protected readonly tabs: readonly Tab[] = [
     'profile',
     'subscriptions',
     'enrollments',
+    'inventory',
+    'ledger',
   ];
+  protected readonly isAdmin = computed(() => this.auth.role() === 'ADMIN');
+  protected readonly inventory = signal<UserInventoryEntry[] | null>(null);
+  protected readonly invError = signal<string | null>(null);
+  protected readonly items = signal<
+    { id: string; name: string; slug: string }[]
+  >([]);
+  protected readonly itemOptions = computed<ComboboxOption<string>[]>(() =>
+    this.items().map((i) => ({
+      value: i.id,
+      label: i.name,
+      description: i.slug,
+    })),
+  );
+  protected itemGrant = { itemId: null as string | null, reason: '' };
+  protected readonly itemErrors = signal<Record<string, string | undefined>>(
+    {},
+  );
+  protected readonly itemError = signal<string | null>(null);
+  protected readonly ledgerTypes: readonly LedgerType[] = ['coins', 'xp'];
+  protected readonly ledgerType = signal<LedgerType>('coins');
+  protected readonly ledger = signal<LedgerPage | null>(null);
+  protected readonly ledgerError = signal<string | null>(null);
+  protected readonly ledgerPage = signal(1);
+  protected readonly ledgerPager = new CursorPager();
+  private ledgerSeq = 0;
+  private readonly loadedTabs = new Set<Tab>();
   protected readonly tab = signal<Tab>('profile');
   protected readonly maxDays = SUPPORT_MAX_GRANT_DAYS;
   protected readonly isSupport = computed(() => this.auth.role() === 'SUPPORT');
@@ -711,6 +1001,10 @@ export class UserDetailPage {
   private async load(id: string): Promise<void> {
     this.user.set(null);
     this.notFound.set(false);
+    this.loadedTabs.clear();
+    this.inventory.set(null);
+    this.ledger.set(null);
+    this.ledgerPager.reset();
     try {
       this.user.set(await this.usersClient.detail(id));
     } catch (err) {
@@ -721,6 +1015,121 @@ export class UserDetailPage {
     }
     void this.loadSubs();
     void this.loadEnrollments();
+    this.openTab(this.tab());
+  }
+
+  /** Select a tab; inventory and ledger load on first open. */
+  protected openTab(t: Tab): void {
+    this.tab.set(t);
+    if (!this.user() || this.loadedTabs.has(t)) return;
+    if (t === 'inventory') {
+      this.loadedTabs.add(t);
+      void this.loadInventory();
+      if (this.isAdmin() && this.items().length === 0) void this.loadItems();
+    } else if (t === 'ledger') {
+      this.loadedTabs.add(t);
+      void this.loadLedger(undefined);
+    }
+  }
+
+  protected async loadInventory(): Promise<void> {
+    this.invError.set(null);
+    this.inventory.set(null);
+    try {
+      this.inventory.set(await this.adminOps.userItems(this.userId()));
+    } catch (err) {
+      this.invError.set(this.errorsSvc.message(err, 'admin.errors.loadFailed'));
+    }
+  }
+
+  private async loadItems(): Promise<void> {
+    try {
+      const all = await this.itemsClient.listItems();
+      this.items.set(
+        all.map((i) => ({ id: i.id, name: i.name, slug: i.slug })),
+      );
+    } catch (err) {
+      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+    }
+  }
+
+  protected async grantItem(): Promise<void> {
+    const errs: Record<string, string> = {};
+    const itemId = this.itemGrant.itemId;
+    const reason = this.itemGrant.reason.trim();
+    if (!itemId) errs['item'] = this.i18n.t('admin.common.required');
+    if (reason.length < 3)
+      errs['reason'] = this.i18n.t('admin.users.inv.reasonRequired');
+    this.itemErrors.set(errs);
+    if (!itemId || Object.keys(errs).length) return;
+    this.busy.set('item');
+    this.itemError.set(null);
+    try {
+      const res = await this.adminOps.grantItem(this.userId(), {
+        itemId,
+        reason,
+      });
+      if (res.alreadyOwned) {
+        this.toast.info(
+          this.i18n.t('admin.users.inv.alreadyOwned', { item: res.entry.name }),
+        );
+      } else {
+        this.inventory.update((list) => [
+          res.entry,
+          ...(list ?? []).filter((i) => i.itemId !== res.entry.itemId),
+        ]);
+        this.toast.success(
+          this.i18n.t('admin.users.inv.granted', { item: res.entry.name }),
+        );
+      }
+      this.itemGrant = { itemId: null, reason: '' };
+    } catch (err) {
+      this.itemError.set(
+        this.errorsSvc.message(err, 'admin.errors.saveFailed'),
+      );
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
+  protected setLedgerType(t: LedgerType): void {
+    if (this.ledgerType() === t) return;
+    this.ledgerType.set(t);
+    this.ledgerPager.reset();
+    void this.loadLedger(undefined);
+  }
+
+  protected reloadLedger(): void {
+    void this.loadLedger(this.ledgerPager.current);
+  }
+
+  protected onLedgerPage(ev: CursorPageEvent): void {
+    const cursor =
+      ev.direction === 'next' && ev.cursor
+        ? this.ledgerPager.forward(ev.cursor)
+        : this.ledgerPager.back();
+    void this.loadLedger(cursor);
+  }
+
+  private async loadLedger(cursor: string | undefined): Promise<void> {
+    const seq = ++this.ledgerSeq;
+    this.ledgerError.set(null);
+    this.ledger.set(null);
+    try {
+      const page = await this.adminOps.ledger(this.userId(), {
+        type: this.ledgerType(),
+        ...(cursor ? { cursor } : {}),
+        limit: 25,
+      });
+      if (seq !== this.ledgerSeq) return;
+      this.ledger.set(page);
+      this.ledgerPage.set(this.ledgerPager.page);
+    } catch (err) {
+      if (seq === this.ledgerSeq)
+        this.ledgerError.set(
+          this.errorsSvc.message(err, 'admin.errors.loadFailed'),
+        );
+    }
   }
 
   private async loadLookups(): Promise<void> {

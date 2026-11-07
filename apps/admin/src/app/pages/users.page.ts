@@ -23,15 +23,54 @@ import {
   UsersClient,
   type AdminUserListItem,
   type ApiUserRole,
+  type UserListQuery,
+  type UserSubscriptionFilter,
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 
 const PAGE_SIZE = 25;
 
+/** "Last seen" filter presets. */
+export const LAST_SEEN_PRESETS = ['any', '1d', '7d', '30d', 'over30d'] as const;
+export type LastSeenPreset = (typeof LAST_SEEN_PRESETS)[number];
+
+export const SUBSCRIPTION_FILTERS: readonly UserSubscriptionFilter[] = [
+  'ACTIVE',
+  'TRIALING',
+  'PAST_DUE',
+  'CANCELED',
+  'UNPAID',
+  'PAUSED',
+  'NONE',
+];
+
+const DAY_MS = 86_400_000;
+
+/** `lastSeenFrom` / `lastSeenTo` (ISO) for a "last seen" preset. */
+export function lastSeenRange(
+  preset: LastSeenPreset,
+  now = new Date(),
+): Pick<UserListQuery, 'lastSeenFrom' | 'lastSeenTo'> {
+  const ago = (days: number) =>
+    new Date(now.getTime() - days * DAY_MS).toISOString();
+  switch (preset) {
+    case '1d':
+      return { lastSeenFrom: ago(1) };
+    case '7d':
+      return { lastSeenFrom: ago(7) };
+    case '30d':
+      return { lastSeenFrom: ago(30) };
+    case 'over30d':
+      return { lastSeenTo: ago(30) };
+    default:
+      return {};
+  }
+}
+
 /**
  * Users (docs/04): paginated list with server-side search (email, name or
- * id) and role filter, linking to the user detail (profile, subscriptions,
- * enrollments). ADMIN + SUPPORT.
+ * id) and role, locale, last-seen and subscription-status filters, linking
+ * to the user detail. ADMIN + SUPPORT.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -76,9 +115,42 @@ const PAGE_SIZE = 25;
             (ngModelChange)="onRole($event ?? '')"
           />
         </cdf-form-field>
+        <cdf-form-field
+          [label]="'admin.users.locale' | translate"
+          controlId="users-locale"
+        >
+          <cdf-select
+            inputId="users-locale"
+            [options]="localeOptions()"
+            [ngModel]="locale()"
+            (ngModelChange)="onFilter(locale, $event ?? '')"
+          />
+        </cdf-form-field>
+        <cdf-form-field
+          [label]="'admin.users.lastSeen' | translate"
+          controlId="users-last-seen"
+        >
+          <cdf-select
+            inputId="users-last-seen"
+            [options]="lastSeenOptions()"
+            [ngModel]="lastSeen()"
+            (ngModelChange)="onFilter(lastSeen, $event ?? 'any')"
+          />
+        </cdf-form-field>
+        <cdf-form-field
+          [label]="'admin.users.subscription' | translate"
+          controlId="users-sub"
+        >
+          <cdf-select
+            inputId="users-sub"
+            [options]="subscriptionOptions()"
+            [ngModel]="subscription()"
+            (ngModelChange)="onFilter(subscription, $event ?? '')"
+          />
+        </cdf-form-field>
       </div>
       <p class="muted small" aria-live="polite">
-        @if (query()) {
+        @if (query() || filtered()) {
           {{ 'admin.users.searchResults' | translate: { count: total() } }}
         } @else {
           {{
@@ -186,7 +258,45 @@ export class UsersPage {
   protected readonly page = signal(1);
   protected readonly query = signal('');
   protected readonly role = signal<ApiUserRole | ''>('');
+  protected readonly locale = signal('');
+  protected readonly lastSeen = signal<LastSeenPreset>('any');
+  protected readonly subscription = signal<UserSubscriptionFilter | ''>('');
   private seq = 0;
+
+  protected readonly localeOptions = computed<SelectOption<string>[]>(() => {
+    this.i18n.currentLocale();
+    return [
+      { value: '', label: this.i18n.t('admin.users.allLocales') },
+      ...this.i18n.availableLocales.map((l) => ({
+        value: l.code as string,
+        label: l.nativeName,
+      })),
+    ];
+  });
+  protected readonly lastSeenOptions = computed<SelectOption<LastSeenPreset>[]>(
+    () => {
+      this.i18n.currentLocale();
+      return LAST_SEEN_PRESETS.map((p) => ({
+        value: p,
+        label: this.i18n.t(`admin.users.lastSeenPresets.${p}`),
+      }));
+    },
+  );
+  protected readonly subscriptionOptions = computed<
+    SelectOption<UserSubscriptionFilter | ''>[]
+  >(() => {
+    this.i18n.currentLocale();
+    return [
+      { value: '', label: this.i18n.t('admin.users.anySubscription') },
+      ...SUBSCRIPTION_FILTERS.map((s) => ({
+        value: s,
+        label:
+          s === 'NONE'
+            ? this.i18n.t('admin.users.noSubscription')
+            : this.i18n.t(`admin.users.subs.status.${s}`),
+      })),
+    ];
+  });
 
   protected readonly roleOptions = computed<SelectOption<ApiUserRole | ''>[]>(
     () => {
@@ -202,6 +312,13 @@ export class UsersPage {
   );
 
   protected readonly visible = this.pageRows.asReadonly();
+  protected readonly filtered = computed(
+    () =>
+      !!this.role() ||
+      !!this.locale() ||
+      this.lastSeen() !== 'any' ||
+      !!this.subscription(),
+  );
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
   );
@@ -215,11 +332,15 @@ export class UsersPage {
     this.loading.set(true);
     try {
       const role = this.role();
+      const sub = this.subscription();
       const res = await this.users.list({
         skip: (this.page() - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
         ...(this.query() ? { q: this.query() } : {}),
         ...(role ? { role } : {}),
+        ...(this.locale() ? { locale: this.locale() } : {}),
+        ...lastSeenRange(this.lastSeen()),
+        ...(sub ? { subscriptionStatus: sub } : {}),
       });
       if (seq !== this.seq) return;
       this.pageRows.set(res.items);
@@ -240,6 +361,12 @@ export class UsersPage {
 
   protected onRole(role: ApiUserRole | ''): void {
     this.role.set(role);
+    this.page.set(1);
+    void this.loadPage();
+  }
+
+  protected onFilter<T>(target: { set(v: T): void }, value: T): void {
+    target.set(value);
     this.page.set(1);
     void this.loadPage();
   }

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   inject,
   signal,
@@ -59,6 +60,7 @@ import {
 } from '../core/lesson-refs';
 import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
 import { EditorDocBinding } from '../core/editor-doc';
+import { Autosave, formatClockTime } from '../core/autosave';
 
 interface MetaForm {
   title: string;
@@ -115,11 +117,28 @@ interface MetaForm {
                   'admin.course.free' | translate
                 }}</cdf-badge>
               }
-              @if (dirty()) {
-                <span role="status">{{
-                  'admin.lesson.unsaved' | translate
-                }}</span>
-              }
+              <span role="status" class="save-status" data-testid="save-status">
+                @switch (saveStatus()) {
+                  @case ('saving') {
+                    {{ 'admin.lesson.autosave.saving' | translate }}
+                  }
+                  @case ('paused') {
+                    {{ 'admin.lesson.autosave.paused' | translate }}
+                  }
+                  @case ('failed') {
+                    {{ 'admin.lesson.autosave.failed' | translate }}
+                  }
+                  @case ('unsaved') {
+                    {{ 'admin.lesson.unsaved' | translate }}
+                  }
+                  @case ('saved') {
+                    {{
+                      'admin.lesson.autosave.savedAt'
+                        | translate: { time: savedAtLabel() }
+                    }}
+                  }
+                }
+              </span>
             </p>
           </div>
           <div class="page-head__actions">
@@ -458,6 +477,17 @@ export class LessonsPage implements HasUnsavedChanges {
   protected readonly notFound = signal(false);
   protected readonly saving = signal(false);
   protected readonly dirty = signal(false);
+  /** When the last save (manual or auto) succeeded. */
+  protected readonly savedAt = signal<Date | null>(null);
+  protected readonly autosaveFailed = signal(false);
+  /** Autosave revision at which the API last rejected the content. */
+  private issuesRev = -1;
+  /** docs/04 §5: autosave 5 s after the last change, only while valid. */
+  private readonly autosave = new Autosave({
+    canSave: () => this.canAutosave(),
+    isSaving: () => this.saving(),
+    save: () => this.save(true),
+  });
   protected readonly titleError = signal<string | null>(null);
   protected readonly issues = signal<ContentIssue[]>([]);
   /** null while loading the course's interactive lessons. */
@@ -521,6 +551,7 @@ export class LessonsPage implements HasUnsavedChanges {
 
   constructor() {
     warnOnUnload(() => this.dirty());
+    inject(DestroyRef).onDestroy(() => this.autosave.cancel());
     this.route.paramMap
       .pipe(
         map((p) => p.get('id')),
@@ -537,6 +568,9 @@ export class LessonsPage implements HasUnsavedChanges {
 
   private async load(id: string): Promise<void> {
     const seq = ++this.loadSeq;
+    this.autosave.cancel();
+    this.savedAt.set(null);
+    this.autosaveFailed.set(false);
     this.notFound.set(false);
     this.lesson.set(null);
     this.issues.set([]);
@@ -611,6 +645,40 @@ export class LessonsPage implements HasUnsavedChanges {
   protected markDirty(): void {
     this.dirty.set(true);
     this.docVersion.update((v) => v + 1);
+    this.autosave.changed();
+  }
+
+  /** Valid enough to autosave: a title, and not the content just rejected. */
+  private canAutosave(): boolean {
+    if (!this.lesson() || !this.dirty()) return false;
+    if (!this.meta.title.trim()) return false;
+    return !(
+      this.issues().length > 0 && this.autosave.isCurrent(this.issuesRev)
+    );
+  }
+
+  /** Header status line (role="status"). */
+  protected saveStatus():
+    | 'saving'
+    | 'paused'
+    | 'failed'
+    | 'unsaved'
+    | 'saved'
+    | null {
+    if (this.saving()) return 'saving';
+    if (this.dirty()) {
+      const rejected =
+        this.issues().length > 0 && this.autosave.isCurrent(this.issuesRev);
+      if (!this.meta.title.trim() || rejected) return 'paused';
+      if (this.autosaveFailed()) return 'failed';
+      return 'unsaved';
+    }
+    return this.savedAt() ? 'saved' : null;
+  }
+
+  protected savedAtLabel(): string {
+    const d = this.savedAt();
+    return d ? formatClockTime(d, this.i18n.currentLocale()) : '';
   }
 
   protected pointRef(index: number, id: string | null): void {
@@ -628,16 +696,18 @@ export class LessonsPage implements HasUnsavedChanges {
     this.markDirty();
   }
 
-  protected async save(): Promise<void> {
+  protected async save(auto = false): Promise<void> {
     const l = this.lesson();
-    if (!l) return;
+    if (!l || this.saving()) return;
     if (!this.meta.title.trim()) {
       this.titleError.set(this.i18n.t('admin.common.required'));
       return;
     }
+    if (!auto) this.autosave.cancel();
     this.titleError.set(null);
     this.issues.set([]);
     this.saving.set(true);
+    const rev = this.autosave.revision;
     try {
       const updated = await this.lessons.update(l.id, {
         title: this.meta.title.trim(),
@@ -652,14 +722,22 @@ export class LessonsPage implements HasUnsavedChanges {
         contentJson: this.doc,
       });
       this.lesson.set(updated);
-      this.dirty.set(false);
-      this.toast.success(
-        this.i18n.t('admin.lesson.saved', { title: updated.title }),
-      );
+      this.savedAt.set(new Date());
+      this.autosaveFailed.set(false);
+      // Edits made while the request was in flight stay dirty and get
+      // their own autosave.
+      if (this.autosave.isCurrent(rev)) this.dirty.set(false);
+      else this.autosave.restart();
+      if (!auto)
+        this.toast.success(
+          this.i18n.t('admin.lesson.saved', { title: updated.title }),
+        );
     } catch (err) {
       const issues = contentIssuesOf(err);
       this.issues.set(issues);
-      if (issues.length === 0)
+      this.issuesRev = rev;
+      if (auto) this.autosaveFailed.set(issues.length === 0);
+      else if (issues.length === 0)
         this.errorsSvc.toast(err, 'admin.errors.saveFailed');
     } finally {
       this.saving.set(false);
@@ -678,6 +756,7 @@ export class LessonsPage implements HasUnsavedChanges {
     });
     if (!ok) return;
     try {
+      this.autosave.cancel();
       await this.lessons.remove(l.id);
       this.dirty.set(false);
       this.toast.success(

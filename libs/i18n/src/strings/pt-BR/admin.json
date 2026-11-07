@@ -22,7 +22,10 @@
       "users": "Usuários",
       "translations": "Traduções",
       "analytics": "Analytics",
-      "profile": "Perfil"
+      "profile": "Perfil",
+      "audit": "Auditoria",
+      "leagues": "Ligas",
+      "itemCategories": "Categorias de itens"
     },
     "roles": {
       "ADMIN": "Admin",
@@ -170,7 +173,35 @@
         "translations": "Textos de conteúdo faltando ou desatualizados.",
         "analytics": "Contagem de eventos por dia.",
         "profile": "Seu nome, idioma e tema."
-      }
+      },
+      "updated": "Atualizado às {time}",
+      "kpis": "Indicadores",
+      "wau": "Usuários ativos (7 dias)",
+      "mau": "Usuários ativos (30 dias)",
+      "conversions": "Conversões pagas na semana",
+      "activeSubs": "Assinaturas ativas",
+      "trialing": "{count, plural, one {+ # em teste} other {+ # em teste}}",
+      "mrr": "MRR (BRL)",
+      "mrrExcluded": "{count, plural, one {# assinatura sem preço em BRL excluída} other {# assinaturas sem preço em BRL excluídas}}",
+      "topCourses": "Cursos mais concluídos",
+      "noCourses": "Nenhum curso publicado ainda.",
+      "completionOf": "Conclusão de {title}",
+      "completed": "{completed} de {enrolled} concluíram",
+      "enrollmentsToday": "Matrículas hoje",
+      "pendingTranslations": "Traduções pendentes",
+      "openTranslations": "Abrir traduções",
+      "dropOff": "Aulas com mais abandono",
+      "dropOffHelp": "Alunos que abriram a aula nos últimos 30 dias e ainda não a concluíram.",
+      "noDropOff": "Nenhuma atividade nas aulas nos últimos 30 dias.",
+      "lesson": "Aula",
+      "started": "Iniciaram",
+      "finished": "Concluíram",
+      "dropRate": "Abandono",
+      "enrollmentsByCourse": "Matrículas de hoje por curso",
+      "noEnrollmentsToday": "Nenhuma matrícula nos seus cursos hoje.",
+      "activity": "Atividade recente",
+      "viewAudit": "Ver auditoria",
+      "noActivity": "Nenhuma ação registrada ainda."
     },
     "profile": {
       "title": "Perfil",
@@ -324,7 +355,13 @@
       "deleted": "Aula “{title}” excluída.",
       "deleteMessage": "A aula será removida do currículo.",
       "notFound": "Aula não encontrada",
-      "notFoundHelp": "O endereço não corresponde a uma aula que você possa editar."
+      "notFoundHelp": "O endereço não corresponde a uma aula que você possa editar.",
+      "autosave": {
+        "saving": "Salvando…",
+        "savedAt": "Salvo às {time}",
+        "paused": "Não salvo — salvamento automático pausado até corrigir os erros",
+        "failed": "Falha no salvamento automático — salve manualmente"
+      }
     },
     "exercise": {
       "title": "Editor de exercício",
@@ -654,7 +691,28 @@
         "icon": "Ícone",
         "empty": "Nenhuma medalha ainda.",
         "saved": "Medalha “{name}” salva.",
-        "ruleHelp": "Um de \"all\" / \"any\" com uma lista de cláusulas; cada cláusula indica um \"event\" e um predicado \"count\" (gte, lte, gt, lt ou eq)."
+        "ruleHelp": "Um de \"all\" / \"any\" com uma lista de cláusulas; cada cláusula indica um \"event\" e um predicado \"count\" (gte, lte, gt, lt ou eq).",
+        "test": "Testar",
+        "testTitle": "Testar “{name}”",
+        "testHelp": "Avalia a regra com o progresso atual de um usuário. Nada é concedido.",
+        "testUser": "Usuário",
+        "testUserPlaceholder": "Busque por nome ou e-mail",
+        "testRun": "Executar teste",
+        "testWould": "Seria desbloqueada agora",
+        "testWouldNot": "Ainda não seria desbloqueada",
+        "testEarned": "Já conquistada",
+        "testInactive": "Medalha inativa",
+        "testManual": "Esta regra não tem condições — a medalha é concedida manualmente.",
+        "testMode": {
+          "all": "Todas as condições precisam ser atendidas.",
+          "any": "Basta uma condição ser atendida.",
+          "none": "A regra não tem lista all/any."
+        },
+        "testClause": "Condição",
+        "testValue": "Valor do usuário",
+        "testNeeds": "Exige",
+        "testPass": "Atende",
+        "testFail": "Ainda não"
       },
       "quests": {
         "title": "Modelos de missão",
@@ -774,7 +832,9 @@
       "tabs": {
         "profile": "Perfil",
         "subscriptions": "Assinaturas",
-        "enrollments": "Matrículas"
+        "enrollments": "Matrículas",
+        "inventory": "Inventário",
+        "ledger": "Extrato de moedas / XP"
       },
       "xp": "XP total",
       "coins": "Moedas",
@@ -851,6 +911,59 @@
           "PROMO": "Promoção",
           "ADMIN_GRANT": "Concessão da equipe"
         }
+      },
+      "allLocales": "Todos os idiomas",
+      "subscription": "Assinatura",
+      "anySubscription": "Qualquer assinatura",
+      "noSubscription": "Nunca assinou",
+      "lastSeenPresets": {
+        "any": "Qualquer data",
+        "1d": "Últimas 24 horas",
+        "7d": "Últimos 7 dias",
+        "30d": "Últimos 30 dias",
+        "over30d": "Há mais de 30 dias"
+      },
+      "inv": {
+        "title": "Itens do usuário",
+        "none": "Nenhum item ainda.",
+        "item": "Item",
+        "slot": "Posição",
+        "source": "Origem",
+        "acquired": "Obtido em",
+        "equipped": "Equipado",
+        "grant": "Conceder item",
+        "searchItem": "Buscar itens",
+        "reason": "Motivo (auditoria)",
+        "reasonRequired": "Informe um motivo com pelo menos 3 caracteres.",
+        "grantButton": "Conceder item",
+        "granted": "“{item}” concedido.",
+        "alreadyOwned": "O usuário já tem “{item}” — nada foi alterado.",
+        "sources": {
+          "PURCHASE": "Compra",
+          "CHEST": "Baú",
+          "ADMIN_GRANT": "Concessão manual",
+          "PROMO": "Promoção",
+          "ONBOARDING": "Boas-vindas",
+          "REFUND_RESTORE": "Restituição"
+        }
+      },
+      "ledger": {
+        "title": "Extrato",
+        "type": "Tipo de extrato",
+        "types": {
+          "coins": "Moedas",
+          "xp": "XP"
+        },
+        "balance": {
+          "coins": "Saldo atual: {value} moedas",
+          "xp": "XP total: {value}"
+        },
+        "none": "Nenhuma transação ainda.",
+        "when": "Quando",
+        "source": "Origem",
+        "delta": "Variação",
+        "balanceAfter": "Saldo após",
+        "ref": "Referência"
       }
     },
     "translations": {
@@ -933,6 +1046,131 @@
         "last7": "Últimos 7 dias",
         "last30": "Últimos 30 dias"
       }
+    },
+    "audit": {
+      "title": "Auditoria",
+      "subtitle": "Todas as ações administrativas e de conta, das mais recentes às mais antigas.",
+      "subtitleOwn": "Suas próprias ações, das mais recentes às mais antigas.",
+      "export": "Exportar CSV",
+      "exported": "{rows, plural, one {# linha exportada.} other {# linhas exportadas.}}",
+      "truncated": "Exportação limitada a {rows} linhas — refine os filtros para obter o restante.",
+      "exportFailed": "Não foi possível exportar a auditoria.",
+      "actor": "Autor",
+      "actorHelp": "Id do usuário que executou a ação.",
+      "action": "Ação",
+      "actionHelp": "Busca por prefixo, ex.: “user.”",
+      "entityType": "Tipo de entidade",
+      "entityId": "Id da entidade",
+      "entity": "Entidade",
+      "from": "De",
+      "to": "Até",
+      "apply": "Aplicar filtros",
+      "clear": "Limpar filtros",
+      "emptyTitle": "Nenhum registro de auditoria",
+      "when": "Quando",
+      "diff": "Alterações",
+      "showDiff": "Ver alterações",
+      "hideDiff": "Ocultar alterações",
+      "diffCaption": "Alterações registradas em {action}",
+      "field": "Campo",
+      "before": "Antes",
+      "after": "Depois",
+      "origin": "IP {ip} · {agent}",
+      "system": "Sistema",
+      "page": "Página {page}"
+    },
+    "search": {
+      "title": "Busca",
+      "open": "Buscar…",
+      "label": "Buscar cursos, aulas, usuários, itens e medalhas",
+      "placeholder": "Busque por nome, título, slug ou id",
+      "close": "Fechar busca",
+      "results": "Resultados da busca",
+      "hint": "Digite pelo menos {min} caracteres.",
+      "empty": "Nenhum resultado para “{q}”.",
+      "count": "{count, plural, one {# resultado} other {# resultados}}",
+      "failed": "A busca falhou.",
+      "keysMove": "para navegar",
+      "keysOpen": "para abrir",
+      "keysClose": "para fechar",
+      "keyEsc": "Esc",
+      "shortcut": "Ctrl K",
+      "shortcutMac": "⌘K",
+      "groups": {
+        "course": "Cursos",
+        "lesson": "Aulas",
+        "user": "Usuários",
+        "item": "Itens da loja",
+        "badge": "Medalhas"
+      }
+    },
+    "leagues": {
+      "title": "Ligas",
+      "subtitle": "Grupos da semana por divisão, distribuição de XP semanal e regras de promoção.",
+      "prevWeek": "Semana anterior",
+      "nextWeek": "Próxima semana",
+      "weekOf": "Semana de {date}",
+      "snapshot": "Resumo por divisão",
+      "tier": "Divisão",
+      "leagues": "Ligas",
+      "members": "Membros",
+      "p50": "XP semanal p50",
+      "p95": "XP semanal p95",
+      "cohorts": "Grupos",
+      "cohort": "Grupo",
+      "topXp": "Maior XP",
+      "view": "Ver membros",
+      "emptyTitle": "Nenhuma liga nesta semana",
+      "emptyDescription": "Os alunos entram em uma liga ao ganhar o primeiro XP da semana.",
+      "rules": "Regras de promoção",
+      "cohortCapacity": "Tamanho do grupo",
+      "promotion": "Promoção",
+      "promotionRule": "Os {count} primeiros de {capacity} (proporcional em grupos menores; nunca no Diamante)",
+      "relegation": "Rebaixamento",
+      "relegationRule": "Os {count} últimos de {capacity} quando o grupo tem {min}+ membros (nunca no Bronze)",
+      "promotionReward": "Recompensa de promoção",
+      "rank1Reward": "Bônus do 1º lugar",
+      "rewardFreeze": "{xp} XP · {coins} moedas · {freeze} congelamento de sequência",
+      "rulesHelp": "O tamanho das zonas é fixo no código; as recompensas são configurações de gamificação.",
+      "editRewards": "Editar recompensas",
+      "detailTitle": "{tier} · {cohort}",
+      "detailLoading": "Liga",
+      "zones": "Zona de promoção: {promote} primeiros. Zona de rebaixamento: {demote} últimos.",
+      "rank": "Posição",
+      "member": "Membro",
+      "weeklyXp": "XP semanal",
+      "zone": "Zona",
+      "zoneNames": {
+        "promote": "Zona de promoção",
+        "demote": "Zona de rebaixamento",
+        "stay": "Permanece",
+        "promoted": "Promovido",
+        "demoted": "Rebaixado",
+        "stayed": "Permaneceu"
+      },
+      "tiers": {
+        "BRONZE": "Bronze",
+        "SILVER": "Prata",
+        "GOLD": "Ouro",
+        "PLATINUM": "Platina",
+        "DIAMOND": "Diamante"
+      }
+    },
+    "itemCategories": {
+      "title": "Categorias de itens",
+      "subtitle": "Grupos que filtram a loja do aluno. Por enquanto o nome aparece igual em todos os idiomas.",
+      "new": "Nova categoria",
+      "editTitle": "Editar “{slug}”",
+      "slugFixed": "Os itens usam o slug como referência, por isso ele não pode mudar.",
+      "sortOrder": "Ordem",
+      "items": "Itens",
+      "emptyTitle": "Nenhuma categoria de item",
+      "emptyDescription": "Crie uma categoria antes de adicionar itens à loja.",
+      "saved": "“{name}” salva.",
+      "deleted": "“{name}” excluída.",
+      "deleteMessage": "Só é possível excluir categorias sem itens.",
+      "deleteAria": "Excluir {name}",
+      "inUse": "{name} é usada por {count} itens e não pode ser excluída"
     }
   }
 }

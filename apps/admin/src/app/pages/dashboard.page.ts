@@ -8,22 +8,37 @@ import {
 import { RouterLink } from '@angular/router';
 import { LocalePipe, TranslatePipe } from '@codify/i18n';
 import { AuthService } from '@codify/auth';
-import { Icon, ProgressBar, Skeleton } from '@codify/ui-bootstrap';
 import {
-  AnalyticsClient,
-  TranslationsClient,
-  type TranslationCompleteness,
-} from '@codify/api-client';
+  Badge,
+  Button,
+  Icon,
+  ProgressBar,
+  Skeleton,
+} from '@codify/ui-bootstrap';
+import { AdminOpsClient, type AdminDashboard } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
-import { canAccess, navForRole } from '../core/roles';
+import { canAccess } from '../core/roles';
+import { LoadError } from '../shared/load-error';
 
 /**
- * Landing page: role-aware shortcuts into every section the user can open,
- * translation completeness per locale and (ADMIN) last-7-days event totals.
+ * Dashboard (docs/04 "Dashboard"). ADMIN/SUPPORT: WAU, MAU, paid
+ * conversions this week, active subscriptions, MRR (BRL), top courses by
+ * completion. TEACHER: own enrollments today, lessons by drop-off, pending
+ * translations. Everyone: the last 20 audit actions (teachers: their own).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Icon, ProgressBar, Skeleton, TranslatePipe, LocalePipe],
+  imports: [
+    RouterLink,
+    Badge,
+    Button,
+    Icon,
+    LoadError,
+    ProgressBar,
+    Skeleton,
+    TranslatePipe,
+    LocalePipe,
+  ],
   template: `
     <div class="admin-page">
       <header class="page-head">
@@ -33,171 +48,348 @@ import { canAccess, navForRole } from '../core/roles';
             {{ 'admin.dashboard.subtitle' | translate: { name: name() } }}
           </p>
         </div>
+        <div class="page-head__actions">
+          @if (data(); as d) {
+            <span class="muted small">{{
+              'admin.dashboard.updated'
+                | translate: { time: (d.generatedAt | locale: 'time') }
+            }}</span>
+          }
+          <cdf-button
+            kind="ghost"
+            size="sm"
+            [loading]="loading()"
+            (click)="load()"
+          >
+            <cdf-icon name="arrow-clockwise" size="sm" />
+            {{ 'admin.common.refresh' | translate }}
+          </cdf-button>
+        </div>
       </header>
 
-      @if (showAnalytics()) {
-        <section class="stat-grid" aria-live="polite">
-          <div class="stat">
-            <div class="stat__label">
-              {{ 'admin.dashboard.events7d' | translate }}
+      @if (error(); as e) {
+        <cdf-load-error [message]="e" (retry)="load()" />
+      } @else if (!data()) {
+        <section class="stat-grid" [attr.aria-busy]="true">
+          @for (i of skeletons; track i) {
+            <div class="stat">
+              <cdf-skeleton shape="text" width="60%" />
+              <cdf-skeleton shape="rect" height="32px" />
             </div>
-            <div class="stat__value">
-              @if (eventTotal() === null) {
-                <cdf-skeleton shape="text" />
-              } @else {
-                {{ eventTotal() | locale: 'number' }}
+          }
+        </section>
+        <cdf-skeleton shape="rect" height="220px" />
+      } @else {
+        @if (data()!.admin; as a) {
+          <section
+            class="stat-grid"
+            aria-labelledby="kpi-title"
+            data-testid="admin-kpis"
+          >
+            <h2 id="kpi-title" class="visually-hidden">
+              {{ 'admin.dashboard.kpis' | translate }}
+            </h2>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.wau' | translate }}
+              </div>
+              <div class="stat__value">{{ a.wau | locale: 'integer' }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.mau' | translate }}
+              </div>
+              <div class="stat__value">{{ a.mau | locale: 'integer' }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.conversions' | translate }}
+              </div>
+              <div class="stat__value">
+                {{ a.paidConversionsThisWeek | locale: 'integer' }}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.activeSubs' | translate }}
+              </div>
+              <div class="stat__value">
+                {{ a.activeSubscriptions | locale: 'integer' }}
+              </div>
+              @if (a.trialingSubscriptions > 0) {
+                <div class="muted small">
+                  {{
+                    'admin.dashboard.trialing'
+                      | translate: { count: a.trialingSubscriptions }
+                  }}
+                </div>
               }
             </div>
-          </div>
-          @for (e of topEvents(); track e.name) {
             <div class="stat">
-              <div class="stat__label mono">{{ e.name }}</div>
-              <div class="stat__value">{{ e.count | locale: 'number' }}</div>
+              <div class="stat__label">
+                {{ 'admin.dashboard.mrr' | translate }}
+              </div>
+              <div class="stat__value">
+                {{ a.mrr.amountCents | locale: 'currency' : 'BRL' }}
+              </div>
+              @if (a.mrr.excludedSubscriptions > 0) {
+                <div class="muted small">
+                  {{
+                    'admin.dashboard.mrrExcluded'
+                      | translate: { count: a.mrr.excludedSubscriptions }
+                  }}
+                </div>
+              }
             </div>
-          }
-        </section>
-      }
+          </section>
 
-      @if (completeness(); as c) {
-        <section class="admin-card">
-          <h2>{{ 'admin.dashboard.translations' | translate }}</h2>
-          <ul class="plain-list completeness">
-            @for (loc of locales(c); track loc.locale) {
-              <li>
-                <span>{{ loc.locale }}</span>
-                <cdf-progress-bar
-                  [value]="loc.pct"
-                  [label]="
-                    'admin.dashboard.completeness'
-                      | translate: { locale: loc.locale }
-                  "
-                />
-                <span class="mono">{{
-                  loc.pct / 100 | locale: 'percent'
-                }}</span>
-              </li>
+          <section class="admin-card" aria-labelledby="top-courses-title">
+            <h2 id="top-courses-title">
+              {{ 'admin.dashboard.topCourses' | translate }}
+            </h2>
+            @if (a.topCourses.length === 0) {
+              <p class="muted small">
+                {{ 'admin.dashboard.noCourses' | translate }}
+              </p>
+            } @else {
+              <ol class="plain-list ranked">
+                @for (c of a.topCourses; track c.courseId) {
+                  <li>
+                    <a [routerLink]="['/courses', c.slug]">{{ c.title }}</a>
+                    <cdf-progress-bar
+                      [value]="c.completionRate * 100"
+                      [label]="
+                        'admin.dashboard.completionOf'
+                          | translate: { title: c.title }
+                      "
+                    />
+                    <span class="small muted nowrap">{{
+                      'admin.dashboard.completed'
+                        | translate
+                          : { completed: c.completed, enrolled: c.enrolled }
+                    }}</span>
+                  </li>
+                }
+              </ol>
             }
-          </ul>
+          </section>
+        }
+
+        @if (data()!.teacher; as t) {
+          <section
+            class="stat-grid"
+            aria-labelledby="tkpi-title"
+            data-testid="teacher-kpis"
+          >
+            <h2 id="tkpi-title" class="visually-hidden">
+              {{ 'admin.dashboard.kpis' | translate }}
+            </h2>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.enrollmentsToday' | translate }}
+              </div>
+              <div class="stat__value">
+                {{ t.enrollmentsToday | locale: 'integer' }}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">
+                {{ 'admin.dashboard.pendingTranslations' | translate }}
+              </div>
+              <div class="stat__value">
+                {{ t.pendingTranslations | locale: 'integer' }}
+              </div>
+              @if (t.pendingTranslations > 0) {
+                <a class="small" routerLink="/translations">{{
+                  'admin.dashboard.openTranslations' | translate
+                }}</a>
+              }
+            </div>
+          </section>
+
+          <div class="split">
+            <section class="admin-card" aria-labelledby="dropoff-title">
+              <h2 id="dropoff-title">
+                {{ 'admin.dashboard.dropOff' | translate }}
+              </h2>
+              <p class="muted small">
+                {{ 'admin.dashboard.dropOffHelp' | translate }}
+              </p>
+              @if (t.topDropOffLessons.length === 0) {
+                <p class="muted small">
+                  {{ 'admin.dashboard.noDropOff' | translate }}
+                </p>
+              } @else {
+                <div class="table-scroll">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">
+                          {{ 'admin.dashboard.lesson' | translate }}
+                        </th>
+                        <th scope="col" class="num">
+                          {{ 'admin.dashboard.started' | translate }}
+                        </th>
+                        <th scope="col" class="num">
+                          {{ 'admin.dashboard.finished' | translate }}
+                        </th>
+                        <th scope="col" class="num">
+                          {{ 'admin.dashboard.dropRate' | translate }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (l of t.topDropOffLessons; track l.lessonId) {
+                        <tr>
+                          <td>
+                            <a [routerLink]="['/lessons', l.lessonId]">{{
+                              l.title
+                            }}</a>
+                            <div class="mono muted">{{ l.courseSlug }}</div>
+                          </td>
+                          <td class="num">
+                            {{ l.started | locale: 'integer' }}
+                          </td>
+                          <td class="num">
+                            {{ l.completed | locale: 'integer' }}
+                          </td>
+                          <td class="num">
+                            {{ l.dropOffRate | locale: 'percent' }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </section>
+            <section class="admin-card" aria-labelledby="enr-today-title">
+              <h2 id="enr-today-title">
+                {{ 'admin.dashboard.enrollmentsByCourse' | translate }}
+              </h2>
+              @if (t.enrollmentsTodayByCourse.length === 0) {
+                <p class="muted small">
+                  {{ 'admin.dashboard.noEnrollmentsToday' | translate }}
+                </p>
+              } @else {
+                <ul class="plain-list">
+                  @for (c of t.enrollmentsTodayByCourse; track c.courseId) {
+                    <li class="kv-row">
+                      <span>{{ c.title }}</span>
+                      <strong>{{ c.count | locale: 'integer' }}</strong>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          </div>
+        }
+
+        <section class="admin-card" aria-labelledby="activity-title">
+          <header class="section-head">
+            <h2 id="activity-title">
+              {{ 'admin.dashboard.activity' | translate }}
+            </h2>
+            @if (canAudit()) {
+              <a routerLink="/audit" class="small">{{
+                'admin.dashboard.viewAudit' | translate
+              }}</a>
+            }
+          </header>
+          @if (data()!.recentActivity.length === 0) {
+            <p class="muted small">
+              {{ 'admin.dashboard.noActivity' | translate }}
+            </p>
+          } @else {
+            <ul class="plain-list activity" data-testid="recent-activity">
+              @for (e of data()!.recentActivity; track e.id) {
+                <li>
+                  <cdf-badge variant="neutral" [subtle]="true">
+                    <span class="mono">{{ e.action }}</span>
+                  </cdf-badge>
+                  <span class="activity__who">
+                    {{ e.actorName ?? ('admin.audit.system' | translate) }}
+                    @if (e.entity) {
+                      <span class="muted small"
+                        >· {{ e.entity }}
+                        <span class="mono">{{ e.entityId }}</span></span
+                      >
+                    }
+                  </span>
+                  <time
+                    class="muted small nowrap"
+                    [attr.datetime]="e.createdAt"
+                    >{{ e.createdAt | locale: 'relative' }}</time
+                  >
+                </li>
+              }
+            </ul>
+          }
         </section>
       }
-
-      <section aria-labelledby="dash-sections">
-        <h2 id="dash-sections" class="visually-hidden">
-          {{ 'admin.dashboard.sections' | translate }}
-        </h2>
-        <ul class="plain-list tiles">
-          @for (item of shortcuts(); track item.link) {
-            <li>
-              <a class="tile" [routerLink]="item.link">
-                <cdf-icon [name]="item.icon" size="lg" />
-                <span class="tile__label">{{ item.labelKey | translate }}</span>
-                <span class="tile__hint muted small">{{
-                  'admin.dashboard.hint.' + item.section | translate
-                }}</span>
-              </a>
-            </li>
-          }
-        </ul>
-      </section>
     </div>
   `,
   styles: [
     `
-      .tiles {
+      .ranked li {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: var(--cdf-space-3);
-      }
-      .tile {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        height: 100%;
-        padding: var(--cdf-space-4);
-        border: 1px solid var(--cdf-color-border);
-        border-radius: var(--cdf-radius-md);
-        background: var(--cdf-color-surface);
-        color: var(--cdf-color-text);
-      }
-      .tile:hover {
-        border-color: var(--cdf-color-primary);
-      }
-      .tile__label {
-        font-weight: 600;
-      }
-      .completeness li {
-        display: grid;
-        grid-template-columns: 64px 1fr 56px;
+        grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) auto;
         align-items: center;
         gap: var(--cdf-space-2);
         margin-bottom: 8px;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .kv-row {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--cdf-space-2);
+        padding: 4px 0;
+      }
+      .activity li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--cdf-space-2);
+        padding: 6px 0;
+        border-bottom: 1px solid var(--cdf-color-border);
+      }
+      .activity__who {
+        flex: 1 1 200px;
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
     `,
   ],
 })
 export class DashboardPage {
   private readonly auth = inject(AuthService);
-  private readonly analytics = inject(AnalyticsClient);
-  private readonly translations = inject(TranslationsClient);
+  private readonly client = inject(AdminOpsClient);
   private readonly errors = inject(AdminErrors);
 
+  protected readonly skeletons = [1, 2, 3, 4, 5];
   protected readonly name = computed(() => this.auth.user()?.displayName ?? '');
-  protected readonly showAnalytics = computed(() =>
-    canAccess('analytics', this.auth.role()),
+  protected readonly canAudit = computed(() =>
+    canAccess('audit', this.auth.role()),
   );
-  protected readonly shortcuts = computed(() =>
-    navForRole(this.auth.role())
-      .flatMap((g) => g.items)
-      .filter((i) => i.section !== 'dashboard'),
-  );
-  protected readonly eventTotal = signal<number | null>(null);
-  protected readonly topEvents = signal<{ name: string; count: number }[]>([]);
-  protected readonly completeness = signal<TranslationCompleteness | null>(
-    null,
-  );
+  protected readonly data = signal<AdminDashboard | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly error = signal<string | null>(null);
 
   constructor() {
-    if (this.showAnalytics()) void this.loadAnalytics();
-    void this.loadCompleteness();
+    void this.load();
   }
 
-  protected locales(c: TranslationCompleteness) {
-    return Object.entries(c.locales).map(([locale, byType]) => ({
-      locale,
-      pct: Math.round(byType.ALL?.pct ?? 0),
-    }));
-  }
-
-  private async loadAnalytics(): Promise<void> {
-    const to = new Date();
-    const from = new Date(to.getTime() - 6 * 86_400_000);
+  protected async load(): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
     try {
-      const rows = await this.analytics.summary(
-        from.toISOString().slice(0, 10),
-        to.toISOString().slice(0, 10),
-      );
-      const byName = new Map<string, number>();
-      for (const r of rows)
-        byName.set(r.name, (byName.get(r.name) ?? 0) + r.count);
-      this.eventTotal.set([...byName.values()].reduce((a, b) => a + b, 0));
-      this.topEvents.set(
-        [...byName.entries()]
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 3),
-      );
+      this.data.set(await this.client.dashboard());
     } catch (err) {
-      this.eventTotal.set(0);
-      this.errors.toast(err, 'admin.errors.loadFailed');
-    }
-  }
-
-  private async loadCompleteness(): Promise<void> {
-    try {
-      this.completeness.set(await this.translations.completeness());
-    } catch {
-      // Optional panel — the translations page surfaces errors in full.
-      this.completeness.set(null);
+      this.error.set(this.errors.message(err, 'admin.errors.loadFailed'));
+    } finally {
+      this.loading.set(false);
     }
   }
 }

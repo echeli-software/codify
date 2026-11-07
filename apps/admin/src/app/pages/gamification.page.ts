@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
 import {
   Badge,
@@ -40,6 +41,7 @@ import {
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { SLUG_PATTERN } from '../core/catalog';
+import { BadgeTestPanel } from '../shared/badge-test-panel';
 
 type Tab = 'defaults' | 'badges' | 'quests' | 'operations';
 const TABS: readonly Tab[] = ['defaults', 'badges', 'quests', 'operations'];
@@ -126,6 +128,7 @@ const DEFAULT_RULE = JSON.stringify(
     FormsModule,
     Badge,
     Button,
+    BadgeTestPanel,
     Drawer,
     FormField,
     Icon,
@@ -325,6 +328,15 @@ const DEFAULT_RULE = JSON.stringify(
                       </td>
                       <td>
                         <div class="row-actions">
+                          <cdf-button
+                            kind="ghost"
+                            size="sm"
+                            (click)="openBadgeTest(b)"
+                            [attr.data-testid]="'test-badge-' + b.slug"
+                            >{{
+                              'admin.gamification.badges.test' | translate
+                            }}</cdf-button
+                          >
                           <cdf-button
                             kind="ghost"
                             size="sm"
@@ -726,6 +738,18 @@ const DEFAULT_RULE = JSON.stringify(
     </cdf-drawer>
 
     <cdf-drawer
+      [(open)]="testOpen"
+      [title]="
+        'admin.gamification.badges.testTitle'
+          | translate: { name: testBadge()?.name ?? '' }
+      "
+    >
+      @if (testBadge(); as tb) {
+        <cdf-badge-test-panel [badgeId]="tb.id" />
+      }
+    </cdf-drawer>
+
+    <cdf-drawer
       [(open)]="questOpen"
       [title]="
         (questForm.id
@@ -926,6 +950,9 @@ export class GamificationPage {
   protected readonly ruleErrors = signal<string[]>([]);
   protected readonly badgeError = signal<string | null>(null);
 
+  protected readonly testOpen = signal(false);
+  protected readonly testBadge = signal<BadgeDef | null>(null);
+
   protected readonly questOpen = signal(false);
   protected questForm: QuestForm = emptyQuest();
   protected readonly questErrors = signal<Record<string, string | undefined>>(
@@ -953,6 +980,9 @@ export class GamificationPage {
   );
 
   constructor() {
+    // Deep link from the global search: /gamification?tab=badges.
+    const t = inject(ActivatedRoute).snapshot.queryParamMap.get('tab');
+    if (t && (TABS as readonly string[]).includes(t)) this.tab.set(t as Tab);
     void this.loadConfig();
     void this.loadLists();
     void this.loadDrift();
@@ -1066,6 +1096,12 @@ export class GamificationPage {
     } catch (err) {
       this.errorsSvc.toast(err, 'admin.errors.loadFailed');
     }
+  }
+
+  /** Badge "Test" (docs/04): simulate the rule for a picked user. */
+  protected openBadgeTest(b: BadgeDef): void {
+    this.testBadge.set(b);
+    this.testOpen.set(true);
   }
 
   protected editBadge(b: BadgeDef | null): void {

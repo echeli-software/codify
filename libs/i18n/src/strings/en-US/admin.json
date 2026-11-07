@@ -22,7 +22,10 @@
       "users": "Users",
       "translations": "Translations",
       "analytics": "Analytics",
-      "profile": "Profile"
+      "profile": "Profile",
+      "audit": "Audit log",
+      "leagues": "Leagues",
+      "itemCategories": "Item categories"
     },
     "roles": {
       "ADMIN": "Admin",
@@ -170,7 +173,35 @@
         "translations": "Missing and outdated content strings.",
         "analytics": "Event counts per day.",
         "profile": "Your name, language and theme."
-      }
+      },
+      "updated": "Updated {time}",
+      "kpis": "Key metrics",
+      "wau": "Weekly active users",
+      "mau": "Monthly active users",
+      "conversions": "Paid conversions this week",
+      "activeSubs": "Active subscriptions",
+      "trialing": "{count, plural, one {+ # in trial} other {+ # in trial}}",
+      "mrr": "MRR (BRL)",
+      "mrrExcluded": "{count, plural, one {# subscription without a BRL price excluded} other {# subscriptions without a BRL price excluded}}",
+      "topCourses": "Top courses by completion",
+      "noCourses": "No published courses yet.",
+      "completionOf": "Completion of {title}",
+      "completed": "{completed} of {enrolled} completed",
+      "enrollmentsToday": "Enrollments today",
+      "pendingTranslations": "Pending translations",
+      "openTranslations": "Open translations",
+      "dropOff": "Lessons with the most drop-off",
+      "dropOffHelp": "Learners who opened a lesson in the last 30 days but have not completed it.",
+      "noDropOff": "No lesson activity in the last 30 days.",
+      "lesson": "Lesson",
+      "started": "Started",
+      "finished": "Completed",
+      "dropRate": "Drop-off",
+      "enrollmentsByCourse": "Enrollments today by course",
+      "noEnrollmentsToday": "No enrollments in your courses today.",
+      "activity": "Recent activity",
+      "viewAudit": "View audit log",
+      "noActivity": "No recorded actions yet."
     },
     "profile": {
       "title": "Profile",
@@ -324,7 +355,13 @@
       "deleted": "Lesson “{title}” deleted.",
       "deleteMessage": "The lesson will be removed from the curriculum.",
       "notFound": "Lesson not found",
-      "notFoundHelp": "The address doesn't match a lesson you can edit."
+      "notFoundHelp": "The address doesn't match a lesson you can edit.",
+      "autosave": {
+        "saving": "Saving…",
+        "savedAt": "Saved at {time}",
+        "paused": "Unsaved — autosave paused until the errors are fixed",
+        "failed": "Autosave failed — save manually"
+      }
     },
     "exercise": {
       "title": "Exercise editor",
@@ -654,7 +691,28 @@
         "icon": "Icon",
         "empty": "No badges yet.",
         "saved": "Badge “{name}” saved.",
-        "ruleHelp": "One of \"all\" / \"any\" holding a list of clauses; each clause names an \"event\" and a \"count\" predicate (gte, lte, gt, lt or eq)."
+        "ruleHelp": "One of \"all\" / \"any\" holding a list of clauses; each clause names an \"event\" and a \"count\" predicate (gte, lte, gt, lt or eq).",
+        "test": "Test",
+        "testTitle": "Test “{name}”",
+        "testHelp": "Evaluates the rule against a user’s current progress. Nothing is awarded.",
+        "testUser": "User",
+        "testUserPlaceholder": "Search by name or email",
+        "testRun": "Run test",
+        "testWould": "Would unlock now",
+        "testWouldNot": "Would not unlock yet",
+        "testEarned": "Already earned",
+        "testInactive": "Badge is inactive",
+        "testManual": "This rule has no clauses — the badge is awarded manually.",
+        "testMode": {
+          "all": "Every condition must pass.",
+          "any": "Any one condition is enough.",
+          "none": "The rule has no all/any list."
+        },
+        "testClause": "Condition",
+        "testValue": "User value",
+        "testNeeds": "Needs",
+        "testPass": "Pass",
+        "testFail": "Not yet"
       },
       "quests": {
         "title": "Quest templates",
@@ -774,7 +832,9 @@
       "tabs": {
         "profile": "Profile",
         "subscriptions": "Subscriptions",
-        "enrollments": "Enrollments"
+        "enrollments": "Enrollments",
+        "inventory": "Inventory",
+        "ledger": "Coin / XP ledger"
       },
       "xp": "Total XP",
       "coins": "Coins",
@@ -851,6 +911,59 @@
           "PROMO": "Promotion",
           "ADMIN_GRANT": "Staff grant"
         }
+      },
+      "allLocales": "All languages",
+      "subscription": "Subscription",
+      "anySubscription": "Any subscription",
+      "noSubscription": "Never subscribed",
+      "lastSeenPresets": {
+        "any": "Any time",
+        "1d": "Last 24 hours",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "over30d": "Over 30 days ago"
+      },
+      "inv": {
+        "title": "Items owned",
+        "none": "No items yet.",
+        "item": "Item",
+        "slot": "Slot",
+        "source": "Source",
+        "acquired": "Acquired",
+        "equipped": "Equipped",
+        "grant": "Grant an item",
+        "searchItem": "Search items",
+        "reason": "Reason (audit log)",
+        "reasonRequired": "Give a reason of at least 3 characters.",
+        "grantButton": "Grant item",
+        "granted": "Granted “{item}”.",
+        "alreadyOwned": "The user already owns “{item}” — nothing changed.",
+        "sources": {
+          "PURCHASE": "Purchase",
+          "CHEST": "Chest",
+          "ADMIN_GRANT": "Admin grant",
+          "PROMO": "Promo",
+          "ONBOARDING": "Onboarding",
+          "REFUND_RESTORE": "Refund restore"
+        }
+      },
+      "ledger": {
+        "title": "Ledger",
+        "type": "Ledger type",
+        "types": {
+          "coins": "Coins",
+          "xp": "XP"
+        },
+        "balance": {
+          "coins": "Current balance: {value} coins",
+          "xp": "Total XP: {value}"
+        },
+        "none": "No transactions yet.",
+        "when": "When",
+        "source": "Source",
+        "delta": "Change",
+        "balanceAfter": "Balance after",
+        "ref": "Reference"
       }
     },
     "translations": {
@@ -933,6 +1046,131 @@
         "last7": "Last 7 days",
         "last30": "Last 30 days"
       }
+    },
+    "audit": {
+      "title": "Audit log",
+      "subtitle": "Every admin and account action, newest first.",
+      "subtitleOwn": "Your own actions, newest first.",
+      "export": "Export CSV",
+      "exported": "{rows, plural, one {Exported # row.} other {Exported # rows.}}",
+      "truncated": "Export capped at {rows} rows — narrow the filters to get the rest.",
+      "exportFailed": "Could not export the audit log.",
+      "actor": "Actor",
+      "actorHelp": "User id of who acted.",
+      "action": "Action",
+      "actionHelp": "Prefix match, e.g. “user.”",
+      "entityType": "Entity type",
+      "entityId": "Entity id",
+      "entity": "Entity",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply filters",
+      "clear": "Clear filters",
+      "emptyTitle": "No audit entries",
+      "when": "When",
+      "diff": "Changes",
+      "showDiff": "Show changes",
+      "hideDiff": "Hide changes",
+      "diffCaption": "Changes recorded for {action}",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "origin": "IP {ip} · {agent}",
+      "system": "System",
+      "page": "Page {page}"
+    },
+    "search": {
+      "title": "Search",
+      "open": "Search…",
+      "label": "Search courses, lessons, users, items and badges",
+      "placeholder": "Search by name, title, slug or id",
+      "close": "Close search",
+      "results": "Search results",
+      "hint": "Type at least {min} characters.",
+      "empty": "No results for “{q}”.",
+      "count": "{count, plural, one {# result} other {# results}}",
+      "failed": "Search failed.",
+      "keysMove": "to move",
+      "keysOpen": "to open",
+      "keysClose": "to close",
+      "keyEsc": "Esc",
+      "shortcut": "Ctrl K",
+      "shortcutMac": "⌘K",
+      "groups": {
+        "course": "Courses",
+        "lesson": "Lessons",
+        "user": "Users",
+        "item": "Shop items",
+        "badge": "Badges"
+      }
+    },
+    "leagues": {
+      "title": "Leagues",
+      "subtitle": "This week’s cohorts per tier, weekly XP distribution and promotion rules.",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "weekOf": "Week of {date}",
+      "snapshot": "Snapshot by tier",
+      "tier": "Tier",
+      "leagues": "Leagues",
+      "members": "Members",
+      "p50": "Weekly XP p50",
+      "p95": "Weekly XP p95",
+      "cohorts": "Cohorts",
+      "cohort": "Cohort",
+      "topXp": "Top XP",
+      "view": "View members",
+      "emptyTitle": "No leagues this week",
+      "emptyDescription": "Learners join a league when they earn their first XP of the week.",
+      "rules": "Promotion rules",
+      "cohortCapacity": "Cohort size",
+      "promotion": "Promotion",
+      "promotionRule": "Top {count} of {capacity} (scaled to smaller cohorts; never from Diamond)",
+      "relegation": "Relegation",
+      "relegationRule": "Bottom {count} of {capacity} once a cohort has {min}+ members (never from Bronze)",
+      "promotionReward": "Promotion reward",
+      "rank1Reward": "First-place bonus",
+      "rewardFreeze": "{xp} XP · {coins} coins · {freeze} streak freeze",
+      "rulesHelp": "Zone sizes are fixed in code; reward amounts are gamification settings.",
+      "editRewards": "Edit rewards",
+      "detailTitle": "{tier} · {cohort}",
+      "detailLoading": "League",
+      "zones": "Promotion zone: top {promote}. Relegation zone: bottom {demote}.",
+      "rank": "Rank",
+      "member": "Member",
+      "weeklyXp": "Weekly XP",
+      "zone": "Zone",
+      "zoneNames": {
+        "promote": "Promotion zone",
+        "demote": "Relegation zone",
+        "stay": "Stays",
+        "promoted": "Promoted",
+        "demoted": "Relegated",
+        "stayed": "Stayed"
+      },
+      "tiers": {
+        "BRONZE": "Bronze",
+        "SILVER": "Silver",
+        "GOLD": "Gold",
+        "PLATINUM": "Platinum",
+        "DIAMOND": "Diamond"
+      }
+    },
+    "itemCategories": {
+      "title": "Item categories",
+      "subtitle": "Groups that filter the student shop. Names are shown in every language for now.",
+      "new": "New category",
+      "editTitle": "Edit “{slug}”",
+      "slugFixed": "Items reference the slug, so it can’t change.",
+      "sortOrder": "Sort order",
+      "items": "Items",
+      "emptyTitle": "No item categories",
+      "emptyDescription": "Create a category before adding shop items.",
+      "saved": "Saved “{name}”.",
+      "deleted": "Deleted “{name}”.",
+      "deleteMessage": "Only categories without items can be deleted.",
+      "deleteAria": "Delete {name}",
+      "inUse": "{name} is used by {count} items and can’t be deleted"
     }
   }
 }

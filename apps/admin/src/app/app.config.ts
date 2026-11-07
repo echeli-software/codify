@@ -9,6 +9,7 @@ import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
 import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
 import { appRoutes } from './app.routes';
+import { adminTelemetryInterceptor } from './core/telemetry';
 import {
   ApiContentTranslationSource,
   MeLocalePersistence,
@@ -19,7 +20,11 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes, withComponentInputBinding()),
     provideHttpClient(
-      withInterceptors([authInterceptor(), ...apiClientInterceptors()]),
+      withInterceptors([
+        authInterceptor(),
+        ...apiClientInterceptors(),
+        adminTelemetryInterceptor,
+      ]),
     ),
     provideAuth({
       apiBaseUrl: API_BASE_URL,
