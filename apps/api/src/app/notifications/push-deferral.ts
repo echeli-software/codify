@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { NotificationKind } from '@prisma/client';
 
 /**
  * Durable quiet-hours deferral (docs/10 §3: "a non-SYSTEM push inside the
@@ -9,16 +10,8 @@ import { createHash } from 'node:crypto';
 export const PUSH_DEFERRED_QUEUE = 'push-deferred';
 export const PUSH_DEFERRED_JOB = 'push.deliver';
 
-/** docs/10 §3 kinds. Only SYSTEM bypasses quiet hours and caps. */
-export type PushKind =
-  | 'STREAK_REMINDER'
-  | 'DAILY_QUEST'
-  | 'FRIEND_NUDGE'
-  | 'LEAGUE_RESULT'
-  | 'ITEM_DROP'
-  | 'PROMO'
-  | 'BILLING'
-  | 'SYSTEM';
+/** docs/10 §3 kinds (+ WELCOME / WEEKLY_RECAP / REACTIVATION). Only SYSTEM bypasses quiet hours and caps. */
+export type PushKind = NotificationKind;
 
 export interface DeferredPushJobData {
   userId: string;
@@ -30,6 +23,8 @@ export interface DeferredPushJobData {
   };
   /** ISO time the job was scheduled for (diagnostics). */
   deliverAt: string;
+  /** The PUSH delivery-log row (`scheduledFor` set) to stamp on delivery. */
+  notificationId?: string;
 }
 
 export const PUSH_DEFERRER = Symbol('PUSH_DEFERRER');

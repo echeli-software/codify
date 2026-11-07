@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import type { PushService } from './push.service.js';
+import type { NotificationService } from './notification.service.js';
 import { StreakReminderService } from './streak-reminder.service.js';
 
 interface StreakRow {
@@ -54,22 +54,20 @@ function setup(rows: StreakRow[]) {
       }),
     },
   };
-  const push = {
-    tryReserveCap: jest.fn(async () => true),
-    deliver: jest.fn(async (msgs: unknown[]) => ({
-      sent: msgs.length,
-      failed: 0,
-      invalidTokens: [],
-      pruned: 0,
-    })),
+  const notifications = {
+    notify: jest.fn(
+      async (): Promise<{ push: Record<string, unknown> }> => ({
+        push: { status: 'sent', sent: 1, failed: 0, pruned: 0 },
+      }),
+    ),
   };
   return {
     prisma,
-    push,
+    notifications,
     claimed,
     svc: new StreakReminderService(
       prisma as never,
-      push as unknown as PushService,
+      notifications as unknown as NotificationService,
     ),
   };
 }
@@ -81,22 +79,31 @@ const NOON = new Date('2026-10-07T15:00:00Z');
 
 describe('StreakReminderService', () => {
   it('manual mode reminds every at-risk user regardless of the time', async () => {
-    const { svc, push } = setup([
+    const { svc, notifications } = setup([
       streak('risk', '2026-10-05'),
       streak('ok', '2026-10-07'),
     ]);
     const res = await svc.run({ mode: 'manual', now: NOON });
-    expect(res).toEqual({ candidates: 1, pushed: 1, pruned: 0 });
-    const msgs = push.deliver.mock.calls[0][0] as {
-      token: string;
-      data: Record<string, string>;
-      body: string;
-    }[];
-    expect(msgs[0]).toMatchObject({
-      token: 'tok-risk',
+    expect(res).toEqual({ candidates: 1, pushed: 1, pruned: 0, capped: 0 });
+    const [userId, build, opts] = notifications.notify.mock
+      .calls[0] as unknown as [
+      string,
+      (u: { locale: string }) => {
+        kind: string;
+        body: string;
+        data: Record<string, string>;
+      },
+      { respectQuietHours: boolean },
+    ];
+    expect(userId).toBe('risk');
+    expect(opts.respectQuietHours).toBe(false);
+    const msg = build({ locale: 'pt-BR' });
+    expect(msg).toMatchObject({
+      kind: 'STREAK_REMINDER',
       data: { type: 'streak_reminder', streakDays: '5' },
     });
-    expect(msgs[0].body).toMatch(/dias seguidos/);
+    expect(msg.body).toMatch(/dias seguidos/);
+    expect(build({ locale: 'en-US' }).body).toMatch(/5-day streak/);
   });
 
   it('treats a streak advanced today (UTC-midnight date) as safe in a UTC-3 zone', async () => {
@@ -148,27 +155,27 @@ describe('StreakReminderService', () => {
     expect(prisma.idempotencyRecord.create).toHaveBeenCalledTimes(2);
   });
 
-  it('scheduled mode skips users over their push cap (and never burns a slot on a repeat pass)', async () => {
-    const { svc, push } = setup([streak('sp', '2026-10-05')]);
-    push.tryReserveCap.mockResolvedValueOnce(false);
-    const res = await svc.run({ mode: 'scheduled', now: EVENING });
-    expect(res).toMatchObject({ candidates: 0, capped: 1, pushed: 0 });
-    expect(push.tryReserveCap).toHaveBeenCalledWith(
-      'sp',
-      'America/Sao_Paulo',
-      EVENING,
-    );
-    // Second hourly pass: already claimed → no cap reservation attempted.
-    await svc.run({
-      mode: 'scheduled',
-      now: new Date('2026-10-08T00:30:00Z'),
+  it('counts users whose push was capped (the inbox row is still written)', async () => {
+    const { svc, notifications } = setup([streak('sp', '2026-10-05')]);
+    notifications.notify.mockResolvedValueOnce({
+      push: { status: 'capped', reason: 'daily' },
     });
-    expect(push.tryReserveCap).toHaveBeenCalledTimes(1);
+    const res = await svc.run({ mode: 'scheduled', now: EVENING });
+    expect(res).toMatchObject({ candidates: 1, capped: 1, pushed: 0 });
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
   });
 
-  it('manual mode does not consult the caps', async () => {
-    const { svc, push } = setup([streak('risk', '2026-10-05')]);
+  it('only queries users who did not turn STREAK_REMINDER push off', async () => {
+    const { svc, prisma } = setup([]);
     await svc.run({ mode: 'manual', now: NOON });
-    expect(push.tryReserveCap).not.toHaveBeenCalled();
+    const where = (
+      prisma.streak.findMany.mock.calls[0] as unknown as [
+        { where: { user: Record<string, unknown> } },
+      ]
+    )[0].where.user;
+    expect(where['notificationPrefs']).toEqual({
+      none: { kind: 'STREAK_REMINDER', pushEnabled: false },
+    });
+    expect(where['dormantAt']).toBeNull();
   });
 });

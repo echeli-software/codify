@@ -22,6 +22,7 @@ import { LeaguesModule } from './leagues/leagues.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { EngagementModule } from './engagement/engagement.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
@@ -63,6 +64,7 @@ import { FlagsModule } from './flags/flags.module.js';
     ModulesModule,
     LessonsModule,
     NotificationsModule,
+    EngagementModule,
     PlansModule,
     ProgressModule,
     ScenariosModule,

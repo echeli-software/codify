@@ -3,7 +3,7 @@ import { AppConfigService } from '../config/app-config.service.js';
 import { parseEnv } from '../config/env.schema.js';
 import { createPushProvider } from './push-provider.factory.js';
 import { DevPushProvider, type PushProvider } from './push.provider.js';
-import { PushService } from './push.service.js';
+import { PushService, localWeekStart } from './push.service.js';
 
 // @nestjs/schedule ships ESM-only; this jest config doesn't transform it.
 jest.mock('@nestjs/schedule', () => ({
@@ -11,12 +11,114 @@ jest.mock('@nestjs/schedule', () => ({
   CronExpression: { EVERY_HOUR: '0 0-23/1 * * *' },
 }));
 
+interface LogRow {
+  id: string;
+  userId: string;
+  channel: string;
+  kind: string;
+  payload: unknown;
+  sentAt: Date | null;
+  scheduledFor: Date | null;
+}
+
+/** In-memory Notification table (PUSH log) + analytics sink. */
+function fakeLog() {
+  const rows: LogRow[] = [];
+  const events: { name: string; props: Record<string, unknown> }[] = [];
+  let seq = 0;
+  type Where = {
+    id?: string;
+    userId?: string;
+    channel?: string;
+    kind?: string | { not: string };
+    sentAt?: null | { gte: Date };
+  };
+  const match = (r: LogRow, w: Where) =>
+    (w.id === undefined || r.id === w.id) &&
+    (w.userId === undefined || r.userId === w.userId) &&
+    (w.channel === undefined || r.channel === w.channel) &&
+    (w.kind === undefined ||
+      (typeof w.kind === 'string'
+        ? r.kind === w.kind
+        : r.kind !== w.kind.not)) &&
+    (w.sentAt === undefined ||
+      (w.sentAt === null
+        ? r.sentAt === null
+        : r.sentAt !== null && r.sentAt >= w.sentAt.gte));
+  return {
+    rows,
+    events,
+    notification: {
+      create: jest.fn(async ({ data }: { data: Partial<LogRow> }) => {
+        const row = {
+          sentAt: null,
+          scheduledFor: null,
+          ...data,
+          id: `n${++seq}`,
+        } as LogRow;
+        rows.push(row);
+        return row;
+      }),
+      update: jest.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Partial<LogRow>;
+        }) => {
+          const row = rows.find((r) => r.id === where.id);
+          if (!row) throw new Error('not found');
+          Object.assign(row, data);
+          return row;
+        },
+      ),
+      updateMany: jest.fn(
+        async ({ where, data }: { where: Where; data: Partial<LogRow> }) => {
+          const hit = rows.filter((r) => match(r, where));
+          hit.forEach((r) => Object.assign(r, data));
+          return { count: hit.length };
+        },
+      ),
+      deleteMany: jest.fn(async ({ where }: { where: Where }) => {
+        const keep = rows.filter((r) => !match(r, where));
+        const count = rows.length - keep.length;
+        rows.splice(0, rows.length, ...keep);
+        return { count };
+      }),
+      findFirst: jest.fn(
+        async ({ where }: { where: Where }) =>
+          rows.find((r) => match(r, where)) ?? null,
+      ),
+      count: jest.fn(
+        async ({ where }: { where: Where }) =>
+          rows.filter((r) => match(r, where)).length,
+      ),
+    },
+    analyticsEvent: {
+      create: jest.fn(
+        async ({
+          data,
+        }: {
+          data: { name: string; props: Record<string, unknown> };
+        }) => {
+          events.push({ name: data.name, props: data.props });
+          return data;
+        },
+      ),
+    },
+  };
+}
+
 function setup(user: Record<string, unknown> | null, invalid: string[] = []) {
+  const log = fakeLog();
   const prisma = {
     user: { findUnique: jest.fn().mockResolvedValue(user) },
     deviceToken: {
       deleteMany: jest.fn().mockResolvedValue({ count: invalid.length }),
     },
+    notification: log.notification,
+    analyticsEvent: log.analyticsEvent,
   };
   const provider: PushProvider = {
     mode: 'dev',
@@ -26,7 +128,12 @@ function setup(user: Record<string, unknown> | null, invalid: string[] = []) {
       invalidTokens: invalid,
     })),
   };
-  return { prisma, provider, svc: new PushService(prisma as never, provider) };
+  return {
+    prisma,
+    provider,
+    log,
+    svc: new PushService(prisma as never, provider),
+  };
 }
 
 const baseUser = {
@@ -181,7 +288,7 @@ function setupRules(
   user: Record<string, unknown> = baseUser,
   opts: { redis?: FakeRedis | null; deferOk?: boolean | null } = {},
 ) {
-  const { prisma, provider } = setup(user);
+  const { prisma, provider, log } = setup(user);
   const deferrer =
     opts.deferOk === null
       ? null
@@ -193,7 +300,7 @@ function setupRules(
     deferrer,
     redis as never,
   );
-  return { svc, provider, deferrer, redis };
+  return { svc, provider, deferrer, redis, log, prisma };
 }
 
 describe('PushService.sendToUser — quiet-hours deferral (docs/10 §3)', () => {
@@ -216,6 +323,7 @@ describe('PushService.sendToUser — quiet-hours deferral (docs/10 §3)', () => 
         kind: 'LEAGUE_RESULT',
         message: { title: 'T-pt-BR', body: 'B' },
         deliverAt: '2026-10-08T11:00:00.000Z',
+        notificationId: expect.any(String),
       },
       new Date('2026-10-08T11:00:00.000Z'),
     );
@@ -351,5 +459,225 @@ describe('PushService.sendToUser — caps (docs/10 §3)', () => {
       status: 'capped',
       reason: 'spacing',
     });
+  });
+});
+
+describe('PushService.sendToUser — per-user rules (docs/10 §3)', () => {
+  const DAY = 24 * 60 * 60_000;
+  const withPrefs = (
+    prefs: { kind: string; pushEnabled: boolean; fewerLevel: number }[],
+    extra: Record<string, unknown> = {},
+  ) => ({ ...baseUser, notificationPrefs: prefs, ...extra });
+
+  it('skips a kind whose push is off (PROMO by default) and records push_skipped', async () => {
+    const { svc, provider, log } = setupRules();
+    expect(
+      await svc.sendToUser('u1', msg, { now: NOON, kind: 'PROMO' }),
+    ).toEqual({ status: 'disabled' });
+    const off = setupRules(
+      withPrefs([{ kind: 'ITEM_DROP', pushEnabled: false, fewerLevel: 0 }]),
+    );
+    expect(
+      (await off.svc.sendToUser('u1', msg, { now: NOON, kind: 'ITEM_DROP' }))
+        .status,
+    ).toBe('disabled');
+    expect(provider.send).not.toHaveBeenCalled();
+    expect(log.events).toEqual([
+      { name: 'push_skipped', props: { kind: 'PROMO', reason: 'disabled' } },
+    ]);
+  });
+
+  it('SYSTEM and BILLING push can never be disabled', async () => {
+    const { svc } = setupRules(
+      withPrefs([
+        { kind: 'SYSTEM', pushEnabled: false, fewerLevel: 2 },
+        { kind: 'BILLING', pushEnabled: false, fewerLevel: 0 },
+      ]),
+    );
+    expect(
+      (await svc.sendToUser('u1', msg, { now: NOON, kind: 'BILLING' })).status,
+    ).toBe('sent');
+    expect(
+      (await svc.sendToUser('u1', msg, { now: NOON, kind: 'SYSTEM' })).status,
+    ).toBe('sent');
+  });
+
+  it('logs a PUSH row with sentAt and a push_sent event', async () => {
+    const { svc, log } = setupRules();
+    await svc.sendToUser('u1', msg, {
+      now: NOON,
+      kind: 'LEAGUE_RESULT',
+      logPayload: { title: 'T', inAppId: 'i1' },
+    });
+    expect(log.rows).toEqual([
+      expect.objectContaining({
+        userId: 'u1',
+        channel: 'PUSH',
+        kind: 'LEAGUE_RESULT',
+        payload: { title: 'T', inAppId: 'i1' },
+        sentAt: NOON,
+      }),
+    ]);
+    expect(log.events).toEqual([
+      { name: 'push_sent', props: { kind: 'LEAGUE_RESULT', devices: 2 } },
+    ]);
+  });
+
+  it('fewer level 1 → one push of the kind per 2 days; level 2 → per 7 days', async () => {
+    for (const [level, windowDays] of [
+      [1, 2],
+      [2, 7],
+    ] as const) {
+      const { svc, redis } = setupRules(
+        withPrefs([
+          { kind: 'ITEM_DROP', pushEnabled: true, fewerLevel: level },
+        ]),
+      );
+      const t0 = NOON.getTime();
+      if (redis) redis.clock = () => t0;
+      const send = async (ms: number, kind: 'ITEM_DROP' | 'LEAGUE_RESULT') => {
+        if (redis) redis.clock = () => ms;
+        return svc.sendToUser('u1', msg, { now: new Date(ms), kind });
+      };
+      expect((await send(t0, 'ITEM_DROP')).status).toBe('sent');
+      expect(await send(t0 + DAY, 'ITEM_DROP')).toEqual({
+        status: 'capped',
+        reason: 'fewer',
+      });
+      // Other kinds are unaffected.
+      expect((await send(t0 + DAY + 1, 'LEAGUE_RESULT')).status).toBe('sent');
+      expect(
+        (await send(t0 + (windowDays - 1) * DAY + 3600_000, 'ITEM_DROP'))
+          .status,
+      ).toBe('capped');
+      expect((await send(t0 + windowDays * DAY + 1, 'ITEM_DROP')).status).toBe(
+        'sent',
+      );
+    }
+  });
+
+  it('caps non-SYSTEM pushes at 14 per local ISO week unless opted in', async () => {
+    const seed = (
+      log: ReturnType<typeof fakeLog>,
+      n: number,
+      kind = 'ITEM_DROP',
+    ) => {
+      for (let i = 0; i < n; i++) {
+        log.rows.push({
+          id: `seed${kind}${i}`,
+          userId: 'u1',
+          channel: 'PUSH',
+          kind,
+          payload: {},
+          sentAt: new Date(NOON.getTime() - 60 * 60_000),
+          scheduledFor: null,
+        });
+      }
+    };
+    const capped = setupRules();
+    seed(capped.log, 14);
+    expect(
+      await capped.svc.sendToUser('u1', msg, { now: NOON, kind: 'ITEM_DROP' }),
+    ).toEqual({ status: 'capped', reason: 'weekly' });
+    expect(capped.log.events.at(-1)).toEqual({
+      name: 'push_skipped',
+      props: { kind: 'ITEM_DROP', reason: 'cap' },
+    });
+
+    const systemOnly = setupRules();
+    seed(systemOnly.log, 20, 'SYSTEM');
+    expect(
+      (
+        await systemOnly.svc.sendToUser('u1', msg, {
+          now: NOON,
+          kind: 'ITEM_DROP',
+        })
+      ).status,
+    ).toBe('sent');
+
+    const optedIn = setupRules({ ...baseUser, pushWeeklyOptIn: true });
+    seed(optedIn.log, 14);
+    expect(
+      (
+        await optedIn.svc.sendToUser('u1', msg, {
+          now: NOON,
+          kind: 'ITEM_DROP',
+        })
+      ).status,
+    ).toBe('sent');
+  });
+
+  it("honours the user's daily cap: 0 = none, 3 = three", async () => {
+    const none = setupRules({ ...baseUser, pushDailyCap: 0 });
+    expect(
+      await none.svc.sendToUser('u1', msg, { now: NOON, kind: 'ITEM_DROP' }),
+    ).toEqual({ status: 'capped', reason: 'daily' });
+    expect(
+      (await none.svc.sendToUser('u1', msg, { now: NOON, kind: 'SYSTEM' }))
+        .status,
+    ).toBe('sent');
+
+    const redis = new FakeRedis();
+    let now = new Date('2026-10-07T12:00:00Z').getTime();
+    redis.clock = () => now;
+    const three = setupRules({ ...baseUser, pushDailyCap: 3 }, { redis });
+    const results: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      results.push(
+        (await three.svc.sendToUser('u1', msg, { now: new Date(now) })).status,
+      );
+      now += 31 * 60_000;
+    }
+    expect(results).toEqual(['sent', 'sent', 'sent', 'capped']);
+  });
+
+  it('a deferred push keeps one PUSH row: scheduledFor, then sentAt on delivery', async () => {
+    const { svc, log, deferrer } = setupRules();
+    const res = await svc.sendToUser('u1', msg, {
+      now: MIDNIGHT,
+      kind: 'LEAGUE_RESULT',
+    });
+    expect(res.status).toBe('deferred');
+    expect(log.rows).toHaveLength(1);
+    expect(log.rows[0].scheduledFor).toEqual(new Date('2026-10-08T11:00:00Z'));
+    const job = (deferrer?.defer as jest.Mock).mock.calls[0][0] as {
+      notificationId: string;
+    };
+    const later = new Date('2026-10-08T11:00:00Z');
+    await svc.sendToUser('u1', msg, {
+      now: later,
+      kind: 'LEAGUE_RESULT',
+      notificationId: job.notificationId,
+    });
+    expect(log.rows).toHaveLength(1);
+    expect(log.rows[0].sentAt).toEqual(later);
+  });
+
+  it('a deferred push that is skipped at delivery leaves no log row', async () => {
+    const { svc, log, deferrer } = setupRules({ ...baseUser, pushDailyCap: 0 });
+    await svc.sendToUser('u1', msg, { now: MIDNIGHT, kind: 'ITEM_DROP' });
+    const job = (deferrer?.defer as jest.Mock).mock.calls[0][0] as {
+      notificationId: string;
+    };
+    expect(
+      await svc.sendToUser('u1', msg, {
+        now: new Date('2026-10-08T11:00:00Z'),
+        kind: 'ITEM_DROP',
+        notificationId: job.notificationId,
+      }),
+    ).toEqual({ status: 'capped', reason: 'daily' });
+    expect(log.rows).toHaveLength(0);
+  });
+
+  it('localWeekStart is Monday 00:00 user-local', () => {
+    // Wed 2026-10-07 12:00 São Paulo (UTC-3) → Mon 2026-10-05 00:00 local = 03:00Z.
+    expect(
+      localWeekStart(NOON, { date: '2026-10-07', minutes: 12 * 60 }),
+    ).toEqual(new Date('2026-10-05T03:00:00Z'));
+    // A Monday is its own week start.
+    const mon = new Date('2026-10-05T15:00:00Z');
+    expect(
+      localWeekStart(mon, { date: '2026-10-05', minutes: 12 * 60 }),
+    ).toEqual(new Date('2026-10-05T03:00:00Z'));
   });
 });

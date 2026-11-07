@@ -23,9 +23,10 @@ export class PushDeferredProcessor extends WorkerHost {
   }
 
   async process(job: Job<DeferredPushJobData>): Promise<SendToUserResult> {
-    const { userId, kind, message } = job.data;
+    const { userId, kind, message, notificationId } = job.data;
     const res = await this.push.sendToUser(userId, message, {
       kind: kind ?? undefined,
+      ...(notificationId ? { notificationId } : {}),
     });
     if (res.status !== 'sent') {
       this.log.log(`deferred push for ${userId} → ${res.status}`);

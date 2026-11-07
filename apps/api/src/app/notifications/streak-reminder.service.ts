@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { streakReminderCopy } from '../email/copy.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { PushMessage } from './push.provider.js';
-import { PushService } from './push.service.js';
+import { NotificationService } from './notification.service.js';
 import { isWithinQuietHours, localClock, quietWindow } from './quiet-hours.js';
 
 export interface StreakReminderResult {
@@ -13,16 +13,17 @@ export interface StreakReminderResult {
   skippedQuietHours?: number;
   /** Scheduled runs only: users already reminded for their local day. */
   alreadyReminded?: number;
-  /** Scheduled runs only: users over their push cap (docs/10 §3). */
+  /** Users over a push cap (docs/10 §3) — no push this time. */
   capped?: number;
 }
 
 export interface StreakReminderOptions {
   /**
-   * `manual` (admin endpoint, verification): every at-risk user, now.
-   * `scheduled` (hourly cron): only users whose local time is inside the
-   * evening slot, outside their quiet hours, at most once per local day,
-   * and within the per-user push caps (PushService.tryReserveCap).
+   * `manual` (admin endpoint, verification): every at-risk user, now (the
+   * evening slot and quiet hours are ignored; caps and preferences still
+   * apply). `scheduled` (hourly cron): only users whose local time is
+   * inside the evening slot, outside their quiet hours, at most once per
+   * local day.
    */
   mode?: 'manual' | 'scheduled';
   now?: Date;
@@ -40,9 +41,12 @@ export const EVENING_SLOT = { start: 20 * 60, end: 22 * 60 };
 const IDEMPOTENCY_SCOPE = 'streak_reminder';
 
 /**
- * "Keep your streak alive" pushes to users with an active streak who
- * haven't done a streak-satisfying action *today* in their own timezone.
- * See /docs/17-mobile.md §Push and /docs/10-engagement.md §3.
+ * "Keep your streak alive" notifications to users with an active streak
+ * who haven't done a streak-satisfying action *today* in their own
+ * timezone, through NotificationService (inbox row + push with the
+ * PushService delivery rules). Users who turned STREAK_REMINDER push off
+ * are skipped entirely. See /docs/17-mobile.md §Push and
+ * /docs/10-engagement.md §3.
  */
 @Injectable()
 export class StreakReminderService {
@@ -50,7 +54,7 @@ export class StreakReminderService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly push: PushService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async run(opts: StreakReminderOptions = {}): Promise<StreakReminderResult> {
@@ -59,7 +63,14 @@ export class StreakReminderService {
     const streaks = await this.prisma.streak.findMany({
       where: {
         currentDays: { gte: 1 },
-        user: { deletedAt: null, deviceTokens: { some: {} } },
+        user: {
+          deletedAt: null,
+          dormantAt: null,
+          deviceTokens: { some: {} },
+          notificationPrefs: {
+            none: { kind: 'STREAK_REMINDER', pushEnabled: false },
+          },
+        },
       },
       include: {
         user: {
@@ -75,8 +86,9 @@ export class StreakReminderService {
       },
     });
 
-    const messages: PushMessage[] = [];
     let candidates = 0;
+    let pushed = 0;
+    let pruned = 0;
     let skippedQuietHours = 0;
     let alreadyReminded = 0;
     let capped = 0;
@@ -105,36 +117,32 @@ export class StreakReminderService {
           alreadyReminded += 1;
           continue;
         }
-        // Claimed first so a second hourly pass never burns a cap slot.
-        if (!(await this.push.tryReserveCap(s.user.id, s.user.timezone, now))) {
-          capped += 1;
-          continue;
-        }
       }
 
       candidates += 1;
-      const { title, body } = reminderCopy(s.currentDays, s.user.locale);
-      for (const dt of s.user.deviceTokens) {
-        messages.push({
-          token: dt.token,
-          title,
-          body,
-          data: { type: 'streak_reminder', streakDays: String(s.currentDays) },
-        });
+      const days = s.currentDays;
+      const res = await this.notifications.notify(
+        s.user.id,
+        ({ locale }) => ({
+          kind: 'STREAK_REMINDER',
+          ...streakReminderCopy(locale, days),
+          data: { type: 'streak_reminder', streakDays: String(days) },
+        }),
+        { now, respectQuietHours: scheduled },
+      );
+      if (res.push.status === 'sent') {
+        pushed += res.push.sent;
+        pruned += res.push.pruned;
+      } else if (res.push.status === 'capped') {
+        capped += 1;
       }
     }
 
-    const result = await this.push.deliver(messages);
     this.logger.log(
-      `streak reminders (${scheduled ? 'scheduled' : 'manual'}): ${candidates} candidates, ${result.sent} pushed, ${result.pruned} stale tokens pruned`,
+      `streak reminders (${scheduled ? 'scheduled' : 'manual'}): ${candidates} candidates, ${pushed} pushed, ${pruned} stale tokens pruned`,
     );
-    const out: StreakReminderResult = {
-      candidates,
-      pushed: result.sent,
-      pruned: result.pruned,
-    };
-    if (scheduled)
-      Object.assign(out, { skippedQuietHours, alreadyReminded, capped });
+    const out: StreakReminderResult = { candidates, pushed, pruned, capped };
+    if (scheduled) Object.assign(out, { skippedQuietHours, alreadyReminded });
     return out;
   }
 
@@ -154,20 +162,4 @@ export class StreakReminderService {
       throw err;
     }
   }
-}
-
-function reminderCopy(
-  days: number,
-  locale: string,
-): { title: string; body: string } {
-  if (locale.startsWith('pt')) {
-    return {
-      title: '🔥 Mantenha sua sequência!',
-      body: `Você está há ${days} ${days === 1 ? 'dia' : 'dias'} seguidos. Faça uma lição hoje para não perder.`,
-    };
-  }
-  return {
-    title: '🔥 Keep your streak alive!',
-    body: `You're on a ${days}-day streak. Do a lesson today so you don't lose it.`,
-  };
 }

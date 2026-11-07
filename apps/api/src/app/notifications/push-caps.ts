@@ -1,7 +1,10 @@
 import { Logger } from '@nestjs/common';
 import type { RedisClient } from '../common/redis.module.js';
 
-/** docs/10 §3 "Default cap": ≤ 2 non-SYSTEM pushes per user per local day. */
+/**
+ * docs/10 §3 "Default cap": ≤ 2 non-SYSTEM pushes per user per local day
+ * (each user may move it 0..6 in Settings → Notifications).
+ */
 export const PUSH_DAILY_CAP = 2;
 /** docs/10 §3 "Anti-spam": never 2 pushes within 30 minutes. */
 export const PUSH_MIN_SPACING_MS = 30 * 60 * 1000;
@@ -46,10 +49,15 @@ export class PushCapStore {
     };
   }
 
-  /** Claim a slot. `null` reservation = caps unavailable (allowed). */
+  /**
+   * Claim a slot. `null` reservation = caps unavailable (allowed).
+   * `dailyCap` is the user's own cap (User.pushDailyCap ?? 2); 0 is
+   * handled by the caller (no non-SYSTEM push at all).
+   */
   async reserve(
     userId: string,
     localDate: string,
+    dailyCap: number = PUSH_DAILY_CAP,
   ): Promise<{ decision: CapDecision; reservation: CapReservation | null }> {
     const redis = this.redis;
     if (!redis || (redis.status && redis.status !== 'ready')) {
@@ -64,7 +72,7 @@ export class PushCapStore {
     try {
       const count = await redis.incr(keys.dayKey);
       if (count === 1) await redis.pexpire(keys.dayKey, DAY_KEY_TTL_MS);
-      if (count > PUSH_DAILY_CAP) {
+      if (count > dailyCap) {
         await redis.decr(keys.dayKey);
         return { decision: 'daily', reservation: null };
       }

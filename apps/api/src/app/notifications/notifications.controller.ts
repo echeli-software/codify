@@ -22,6 +22,11 @@ import {
   type PushProvider,
   DevPushProvider,
 } from './push.provider.js';
+import {
+  DevEmailProvider,
+  EMAIL_PROVIDER,
+  type EmailProvider,
+} from '../email/email.provider.js';
 
 @Controller()
 export class NotificationsController {
@@ -29,6 +34,7 @@ export class NotificationsController {
     private readonly devices: DevicesService,
     private readonly reminders: StreakReminderService,
     @Inject(PUSH_PROVIDER) private readonly push: PushProvider,
+    @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
   ) {}
 
   // ─── Device tokens (student app registers on login) ──────────────────────
@@ -67,5 +73,15 @@ export class NotificationsController {
       return { mode: 'dev', messages: this.push.recent(token) };
     }
     return { mode: this.push.mode, messages: [] };
+  }
+
+  /** Dev-only: inspect what the DevEmailProvider captured (verification aid). */
+  @Roles('ADMIN')
+  @Get('notifications/dev/emails')
+  devEmails(@Query('to') to?: string) {
+    if (this.email instanceof DevEmailProvider) {
+      return { mode: 'dev', emails: this.email.recent(to) };
+    }
+    return { mode: this.email.mode, emails: [] };
   }
 }

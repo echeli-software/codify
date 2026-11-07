@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueModule } from '../common/queue.module.js';
 import { AppConfigService } from '../config/app-config.service.js';
+import { EmailModule } from '../email/email.module.js';
 import { DevicesService } from './devices.service.js';
+import { InboxController } from './inbox.controller.js';
+import { InboxService } from './inbox.service.js';
+import { NotificationService } from './notification.service.js';
 import { NotificationsController } from './notifications.controller.js';
 import { NotificationsScheduler } from './notifications.scheduler.js';
 import { PUSH_PROVIDER } from './push.provider.js';
@@ -14,20 +18,24 @@ import { PushDeferredProcessor } from './push-deferred.processor.js';
 import { StreakReminderService } from './streak-reminder.service.js';
 
 /**
- * Notifications: device-token registry, push delivery (`PushService` —
- * the API other modules use, with quiet-hours deferral on the
- * `push-deferred` BullMQ queue and Redis-tracked caps), streak reminders +
- * their hourly cron.
+ * Notifications: `NotificationService.notify` (the entry point — inbox row
+ * + push + email), the student inbox / preferences API, device-token
+ * registry, push delivery (`PushService` — delivery rules, quiet-hours
+ * deferral on the `push-deferred` BullMQ queue, Redis-tracked caps),
+ * streak reminders + their hourly cron.
  */
 @Module({
   imports: [
     QueueModule,
+    EmailModule,
     BullModule.registerQueue({ name: PUSH_DEFERRED_QUEUE }),
   ],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, InboxController],
   providers: [
     DevicesService,
     PushService,
+    NotificationService,
+    InboxService,
     PushDeferredProcessor,
     { provide: PUSH_DEFERRER, useClass: BullPushDeferrer },
     StreakReminderService,
@@ -38,6 +46,13 @@ import { StreakReminderService } from './streak-reminder.service.js';
       useFactory: createPushProvider,
     },
   ],
-  exports: [DevicesService, PushService, StreakReminderService, PUSH_PROVIDER],
+  exports: [
+    DevicesService,
+    PushService,
+    NotificationService,
+    StreakReminderService,
+    PUSH_PROVIDER,
+    EmailModule,
+  ],
 })
 export class NotificationsModule {}
