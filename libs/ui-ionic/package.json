@@ -5,6 +5,10 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "sideEffects": [
+    "./src/lib/atoms/icon/icon.ts",
+    "./src/lib/atoms/app-tag/app-tag.ts"
+  ],
   "exports": {
     ".": {
       "@codify/source": "./src/index.ts",

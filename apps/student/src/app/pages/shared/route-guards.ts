@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
 import { AuthService, authGuard } from '@codify/auth';
-import { NativePlatformService } from '../../native/native-platform.service.js';
+import { isNativeRuntime } from '../../platform/runtime.js';
 import {
   GrowthLinksService,
   type GrowthLinkKind,
@@ -15,10 +15,9 @@ import {
 export const rootRedirectGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  const native = inject(NativePlatformService);
   await auth.whenReady();
   if (auth.isAuthenticated()) return router.parseUrl('/today');
-  return router.parseUrl(native.isNative ? '/login' : '/welcome');
+  return router.parseUrl(isNativeRuntime() ? '/login' : '/welcome');
 };
 
 /**

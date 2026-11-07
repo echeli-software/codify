@@ -163,9 +163,14 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
     z-index: calc(var(--cdf-z-drawer) - 1);
+  }
 
-    @media (min-width: 768px) {
-      display: none;
+  // Desktop: no drawer backdrop / hamburger (one rule keeps the compiled
+  // component CSS inside the 4 kB style budget).
+  @media (min-width: 768px) {
+    &__mobile-backdrop,
+    &__mobile-menu {
+      display: none !important;
     }
   }
 
@@ -186,12 +191,6 @@
     min-height: 56px;
     flex-shrink: 0;
     z-index: var(--cdf-z-sticky);
-  }
-
-  &__mobile-menu {
-    @media (min-width: 768px) {
-      display: none !important;
-    }
   }
 
   &__topbar-left {

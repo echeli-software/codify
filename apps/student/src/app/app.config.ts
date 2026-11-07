@@ -6,7 +6,6 @@ import {
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
-import { provideIonicAngular } from '@ionic/angular/standalone';
 import { LOCALE_PERSISTENCE, provideI18n } from '@codify/i18n';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
@@ -15,6 +14,7 @@ import { appRoutes } from './app.routes';
 import { provideLazyContentTranslationSource } from './platform/lazy-providers';
 import { StudentLocalePersistence } from './platform/locale-persistence';
 import { isNativeRuntime } from './platform/runtime';
+import { accountStateInterceptor } from './pages/account/account-state';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,13 +24,17 @@ export const appConfig: ApplicationConfig = {
       // Order matters: auth first attaches the Bearer token, then the
       // api-client wrapper interceptors layer locale + idempotency +
       // problem-details remapping.
-      withInterceptors([authInterceptor(), ...apiClientInterceptors()]),
+      // accountStateInterceptor routes 403 ACCOUNT_DELETED / _SUSPENDED to
+      // the restore / suspended screens (docs/14 §13).
+      withInterceptors([
+        authInterceptor(),
+        ...apiClientInterceptors(),
+        accountStateInterceptor,
+      ]),
     ),
-    provideIonicAngular({
-      // Material mode everywhere — closest to the "native feel" target per
-      // docs/05-student-app §1 without per-platform visual drift.
-      mode: 'md',
-    }),
+    // Ionic (mode 'md') is configured by the lazily-loaded IonicRoot
+    // (platform/ionic-root.component.ts), not here — keeps @ionic/* out of
+    // the initial bundle.
     provideAuth({
       apiBaseUrl: API_BASE_URL,
       clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
