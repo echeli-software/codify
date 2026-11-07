@@ -11,6 +11,7 @@ function setup(
     rows?: Record<string, unknown>[];
     renewedFor?: string[];
     pushStatus?: string;
+    emailSent?: boolean;
   } = {},
 ) {
   const claimed = new Set<string>();
@@ -42,13 +43,19 @@ function setup(
   };
   const access = { pastDueGraceDays: jest.fn(async () => 3) };
   const push = {
-    sendToUser: jest.fn(async () =>
-      opts.pushStatus === 'capped'
-        ? { status: 'capped', reason: 'daily' }
-        : opts.pushStatus === 'deferred'
-          ? { status: 'deferred', deliverAt: NOW.toISOString() }
-          : { status: 'sent', sent: 1, failed: 0, pruned: 0 },
-    ),
+    notify: jest.fn(async () => ({
+      status: 'ok',
+      inAppId: 'n1',
+      push:
+        opts.pushStatus === 'capped'
+          ? { status: 'capped', reason: 'daily' }
+          : opts.pushStatus === 'deferred'
+            ? { status: 'deferred', deliverAt: NOW.toISOString() }
+            : { status: 'sent', sent: 1, failed: 0, pruned: 0 },
+      email: opts.emailSent
+        ? { status: 'sent', id: 'e1' }
+        : { status: 'no_address' },
+    })),
   };
   const svc = new BillingJobsService(
     prisma as never,
@@ -131,14 +138,14 @@ describe('BillingJobsService.sendRenewalReminders', () => {
       alreadyReminded: 0,
       retryLater: 0,
     });
-    const [userId, content, opts] = push.sendToUser.mock
-      .calls[0] as unknown as [
+    const [userId, content, opts] = push.notify.mock.calls[0] as unknown as [
       string,
-      (u: { locale: string }) => { title: string; body: string },
+      (u: { locale: string }) => { kind: string; title: string; body: string },
       unknown,
     ];
     expect(userId).toBe('user-1');
-    expect(opts).toEqual({ kind: 'BILLING', now: NOW });
+    expect(opts).toEqual({ now: NOW });
+    expect(content({ locale: 'pt-BR' }).kind).toBe('BILLING');
     expect(content({ locale: 'pt-BR' }).body).toMatch(/Renove com PIX/);
     expect(content({ locale: 'pt-BR' }).body).toMatch(/12 de outubro/);
     expect(content({ locale: 'en-US' }).body).toMatch(/Renew with PIX/);
@@ -147,7 +154,7 @@ describe('BillingJobsService.sendRenewalReminders', () => {
     expect(
       await svc.sendRenewalReminders(new Date(NOW.getTime() + DAY_MS)),
     ).toMatchObject({ notified: 0, alreadyReminded: 1 });
-    expect(push.sendToUser).toHaveBeenCalledTimes(1);
+    expect(push.notify).toHaveBeenCalledTimes(1);
     expect([...claimed]).toEqual([
       `billing_renewal_reminder:sub-row-1:${prepayRow().currentPeriodEnd.toISOString()}`,
     ]);
@@ -165,16 +172,29 @@ describe('BillingJobsService.sendRenewalReminders', () => {
       }),
     ]);
     await svc.sendRenewalReminders(NOW);
-    expect(push.sendToUser).toHaveBeenCalledTimes(2);
+    expect(push.notify).toHaveBeenCalledTimes(2);
   });
 
-  it('a capped push releases the claim so tomorrow retries; deferred counts as notified', async () => {
+  it('retries tomorrow only when nothing went out; deferred counts as notified', async () => {
     const capped = setup({ rows: [prepayRow()], pushStatus: 'capped' });
     expect(await capped.svc.sendRenewalReminders(NOW)).toMatchObject({
       notified: 0,
       retryLater: 1,
     });
     expect(capped.claimed.size).toBe(0);
+
+    // A capped push whose email went out is done — a retry would repeat
+    // the inbox row and the email.
+    const emailed = setup({
+      rows: [prepayRow()],
+      pushStatus: 'capped',
+      emailSent: true,
+    });
+    expect(await emailed.svc.sendRenewalReminders(NOW)).toMatchObject({
+      notified: 1,
+      retryLater: 0,
+    });
+    expect(emailed.claimed.size).toBe(1);
 
     const deferred = setup({ rows: [prepayRow()], pushStatus: 'deferred' });
     expect(await deferred.svc.sendRenewalReminders(NOW)).toMatchObject({
@@ -191,6 +211,6 @@ describe('BillingJobsService.sendRenewalReminders', () => {
     expect(await svc.sendRenewalReminders(NOW)).toMatchObject({
       candidates: 0,
     });
-    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(push.notify).not.toHaveBeenCalled();
   });
 });

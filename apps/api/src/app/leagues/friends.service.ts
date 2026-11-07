@@ -148,7 +148,13 @@ export class FriendsService {
 
   async list(userId: string): Promise<FriendView[]> {
     const rows = await this.prisma.friendship.findMany({
-      where: { OR: [{ userAId: userId }, { userBId: userId }] },
+      // Friends whose account is deleted (pending purge) are hidden.
+      where: {
+        OR: [
+          { userAId: userId, userB: { deletedAt: null } },
+          { userBId: userId, userA: { deletedAt: null } },
+        ],
+      },
       include: {
         userA: { select: { id: true, displayName: true, totalXp: true } },
         userB: { select: { id: true, displayName: true, totalXp: true } },

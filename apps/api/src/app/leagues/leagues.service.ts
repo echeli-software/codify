@@ -22,6 +22,8 @@ import type { AvatarResponse, EquippedRef } from '../items/items.dto.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
 
 const WEEK_MS = 7 * 86_400_000;
+/** Accounts that take part in leagues: not deleted, not suspended. */
+const ACTIVE_USER = { deletedAt: null, suspendedAt: null } as const;
 
 export interface LeagueMemberView {
   userId: string;
@@ -106,7 +108,10 @@ export class LeaguesService {
     if (!membership) throw new NotFoundException('No league membership');
 
     const rows = await this.prisma.leagueMembership.findMany({
-      where: { leagueId: membership.leagueId },
+      // Deleted (pending purge) and suspended accounts drop out of the
+      // standings, and out of the rollover ranking below, so the rank shown
+      // is the rank paid.
+      where: { leagueId: membership.leagueId, user: ACTIVE_USER },
       include: {
         user: {
           select: {
@@ -257,7 +262,7 @@ export class LeaguesService {
       : previousWeekStart();
     const leagues = await this.prisma.league.findMany({
       where: { weekStart },
-      include: { members: true },
+      include: { members: { where: { user: ACTIVE_USER } } },
     });
     const rewards = await this.config.getMany([
       'league.promotionReward',

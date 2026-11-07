@@ -70,6 +70,7 @@ import { NotificationBell } from '../components/notification-bell.component.js';
 import { GrowthLinksService } from './shared/growth-links.service.js';
 import { DownloadService } from '../offline/download.service.js';
 import { formatCountdown } from './shared/countdown.js';
+import { FeatureFlagsService } from '../platform/feature-flags.service.js';
 
 const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
   LESSON_COUNT: 'lesson-count',
@@ -184,6 +185,8 @@ export class TodayPage {
   private readonly items = inject(ItemsClient);
   private readonly growth = inject(GrowthLinksService);
   private readonly downloads = inject(DownloadService);
+  /** Hides the shop link while `shop.enabled` is off. */
+  protected readonly flags = inject(FeatureFlagsService);
   protected readonly xpSvc = inject(XpService);
   protected readonly coinSvc = inject(CoinService);
   protected readonly streakSvc = inject(StreakService);

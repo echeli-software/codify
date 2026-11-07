@@ -19,10 +19,15 @@ export interface SweepResult {
 
 export interface RenewalReminderResult {
   candidates: number;
-  /** Pushes sent now or deferred past the user's quiet hours. */
+  /**
+   * Reminders that reached the user on some channel: push sent or deferred
+   * past quiet hours, or the email went out (the inbox row is always
+   * written). A capped push alone does not make it a retry — retrying would
+   * repeat the inbox row and email.
+   */
   notified: number;
   alreadyReminded: number;
-  /** Over the push cap / quiet hours with no queue: claim released, retried tomorrow. */
+  /** Neither push nor email went out: claim released, retried tomorrow. */
   retryLater: number;
 }
 
@@ -149,9 +154,10 @@ export class BillingJobsService {
         continue;
       }
       try {
-        const res = await this.push.sendToUser(
+        const res = await this.push.notify(
           row.userId,
           ({ locale }) => ({
+            kind: 'BILLING',
             ...pixRenewalCopy(
               locale,
               row.plan.name,
@@ -163,12 +169,15 @@ export class BillingJobsService {
               subscriptionId: row.id,
             },
           }),
-          { kind: 'BILLING', now },
+          { now },
         );
-        if (res.status === 'sent' || res.status === 'deferred') {
+        const pushed =
+          res.push.status === 'sent' || res.push.status === 'deferred';
+        const emailed = res.email.status === 'sent';
+        if (pushed || emailed) {
           result.notified += 1;
-        } else if (res.status === 'capped' || res.status === 'quiet_hours') {
-          // Not delivered and not queued: let tomorrow's run try again.
+        } else if (res.status === 'ok') {
+          // Nothing went out (push capped and no email): try again tomorrow.
           await this.unclaim(key);
           result.retryLater += 1;
         }

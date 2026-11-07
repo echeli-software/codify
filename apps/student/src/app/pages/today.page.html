@@ -57,9 +57,11 @@
           [showLabel]="true"
           data-testid="today-coins"
         />
+        @if (flags.shopEnabled()) {
         <a routerLink="/shop" class="link"
           >{{ 'student.today.openShop' | translate }}</a
         >
+        }
       </div>
       }
     </cdf-app-card>

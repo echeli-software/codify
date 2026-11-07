@@ -53,8 +53,15 @@ import { AdminErrors } from '../core/errors';
 import { localToIso } from '../core/catalog';
 import { CursorPager } from '../core/cursor-pager';
 import { LoadError } from '../shared/load-error';
+import { UserAccountPanelComponent } from './user-account-panel.component';
 
-type Tab = 'profile' | 'subscriptions' | 'enrollments' | 'inventory' | 'ledger';
+type Tab =
+  | 'profile'
+  | 'subscriptions'
+  | 'enrollments'
+  | 'inventory'
+  | 'ledger'
+  | 'account';
 
 /** docs/14 §2: SUPPORT grants are capped at ~1 month. */
 export const SUPPORT_MAX_GRANT_DAYS = 31;
@@ -87,6 +94,7 @@ export function daysUntil(
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    UserAccountPanelComponent,
     RouterLink,
     Avatar,
     Badge,
@@ -136,10 +144,6 @@ export function daysUntil(
           }
         </div>
 
-        <!--
-          Account panel slot (suspend / delete / manual coin grant): add an
-          'account' entry to Tab + tabs and an @case ('account') below.
-        -->
         @switch (tab()) {
           @case ('profile') {
             <section
@@ -801,6 +805,15 @@ export function daysUntil(
               </div>
             </section>
           }
+          @case ('account') {
+            <section
+              id="upanel-account"
+              role="tabpanel"
+              aria-labelledby="utab-account"
+            >
+              <cdf-user-account-panel [userId]="userId()" />
+            </section>
+          }
         }
       } @else if (notFound()) {
         <cdf-empty-state
@@ -888,6 +901,7 @@ export class UserDetailPage {
     'enrollments',
     'inventory',
     'ledger',
+    'account',
   ];
   protected readonly isAdmin = computed(() => this.auth.role() === 'ADMIN');
   protected readonly inventory = signal<UserInventoryEntry[] | null>(null);

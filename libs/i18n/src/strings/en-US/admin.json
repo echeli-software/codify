@@ -834,7 +834,8 @@
         "subscriptions": "Subscriptions",
         "enrollments": "Enrollments",
         "inventory": "Inventory",
-        "ledger": "Coin / XP ledger"
+        "ledger": "Coin / XP ledger",
+        "account": "Account"
       },
       "xp": "Total XP",
       "coins": "Coins",

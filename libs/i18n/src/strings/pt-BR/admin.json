@@ -834,7 +834,8 @@
         "subscriptions": "Assinaturas",
         "enrollments": "Matrículas",
         "inventory": "Inventário",
-        "ledger": "Extrato de moedas / XP"
+        "ledger": "Extrato de moedas / XP",
+        "account": "Conta"
       },
       "xp": "XP total",
       "coins": "Moedas",
