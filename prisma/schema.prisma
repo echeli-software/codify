@@ -65,6 +65,15 @@ model User {
   reactivationStage Int       @default(0)
   dormantAt         DateTime?
 
+  /// Staff UI preference (docs/04 §7): light | dark | system | high-contrast.
+  theme             String?
+  /// Name of the starter pet given during onboarding (docs/10 §2, docs/08).
+  petName           String?
+  /// Opt-in: friends may see this user's learning activity (docs/05 Today).
+  activityFeedOptIn Boolean   @default(false)
+  /// Last-write-wins clock for avatarConfig (docs/16 §8).
+  avatarUpdatedAt   DateTime?
+
   /// Running gamification totals — single-row updates from Progress
   /// completions inside the same transaction that writes Progress, so
   /// these two are always in sync. Source of truth: User row; Progress
@@ -107,6 +116,9 @@ model User {
   notifications      Notification[]
   notificationPrefs  NotificationPreference[]
   payments           Payment[]
+  promoRedemptions   PromoCodeRedemption[]
+  coinBonusPools     CoinBonusPool[]
+  multipliers        Multiplier[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -144,6 +156,8 @@ model Category {
   iconName    String?
   /// Codify color token (e.g. "primary", "success") from libs/ui-tokens.
   colorToken  String?
+  /// Catalog ordering (docs/04 Catalog → Categories, drag to reorder).
+  sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -195,12 +209,14 @@ model Course {
 }
 
 model Module {
-  id        String   @id @default(dbgenerated("uuid_generate_v7()"))
+  id        String    @id @default(dbgenerated("uuid_generate_v7()"))
   courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   order     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete (docs/02 Conventions): lessons and student progress are kept.
+  deletedAt DateTime?
 
   lessons Lesson[]
 
@@ -270,7 +286,7 @@ model Progress {
   coinsAwarded Int
 
   @@unique([userId, lessonId])
-  @@index([userId, completedAt])
+  @@index([userId, completedAt(sort: Desc)])
 }
 
 model CourseCategory {
@@ -435,6 +451,10 @@ enum XpSource {
   ADMIN_GRANT
   CAPSTONE_PASS
   REFERRAL
+  /// Exercise / AI-prompt re-pass, at most once per lesson per day (docs/07 §2).
+  RETAKE
+  /// A newly reached scenario ending (docs/07 §2).
+  SCENARIO_BRANCH
 }
 
 /// Immutable XP journal. The user's current XP is SUM(amount); we also keep
@@ -451,7 +471,7 @@ model XpEvent {
   idempotencyKey String?  @unique
   createdAt      DateTime @default(now())
 
-  @@index([userId, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 enum CoinSource {
@@ -472,6 +492,10 @@ enum CoinSource {
   CHEST_PURCHASE
   CAPSTONE_PASS
   REFERRAL
+  RETAKE
+  SCENARIO_BRANCH
+  /// Payout of coins held back by the daily per-source caps (docs/07 §5).
+  WEEKLY_BONUS
 }
 
 /// Coin ledger — source of truth for the balance. `balanceAfter` is a
@@ -490,7 +514,7 @@ model CoinTransaction {
   idempotencyKey String?    @unique
   createdAt      DateTime   @default(now())
 
-  @@index([userId, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 enum DevicePlatform {
@@ -528,6 +552,8 @@ model Streak {
 
 enum MultiplierKind {
   PREMIUM_DEFAULT
+  /// Per-user, short-lived ("next 15 minutes 2x XP", docs/10 §6).
+  SURPRISE_BOOST
   COURSE_PROMO
   LESSON_PROMO
   STREAK_TIER
@@ -552,12 +578,16 @@ model Multiplier {
   lessonId      String?
   lesson        Lesson?          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   streakDaysMin Int?
+  /// Per-user multipliers (SURPRISE_BOOST, docs/10 §6).
+  userId        String?
+  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   description   String?
   isActive      Boolean          @default(true)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
   @@index([kind, startsAt, endsAt])
+  @@index([userId, endsAt])
 }
 
 model Badge {
@@ -566,6 +596,8 @@ model Badge {
   name        String
   description String?
   iconName    String?
+  /// Uploaded icon (docs/02); iconName stays the fallback.
+  iconAssetId String?
   /// BadgeRule DSL — see /docs/07-gamification.md §7.
   rule        Json
   xpReward    Int      @default(0)
@@ -729,11 +761,13 @@ model UserItem {
 }
 
 model EquippedItem {
-  userId String
-  slot   ItemSlot
-  itemId String
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item   Item     @relation(fields: [itemId], references: [id])
+  userId    String
+  slot      ItemSlot
+  itemId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item      Item     @relation(fields: [itemId], references: [id])
+  /// Last-write-wins clock for offline equips (docs/16 §8).
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@id([userId, slot])
   @@index([userId])
@@ -782,6 +816,7 @@ model LeagueMembership {
 
   @@id([leagueId, userId])
   @@index([userId])
+  @@index([leagueId, weeklyXp(sort: Desc)])
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1134,6 +1169,10 @@ model Asset {
   url          String
   mimeType     String
   sizeBytes    Int
+  /// Content hash (dedupe + integrity, docs/02).
+  sha256       String?   @unique
+  width        Int?
+  height       Int?
   kind         AssetKind @default(IMAGE)
   /// False until the client confirms the PUT to the presigned URL landed.
   confirmed    Boolean   @default(false)
@@ -1232,6 +1271,7 @@ model Notification {
   @@index([userId, channel, createdAt])
   @@index([userId, readAt])
   @@index([scheduledFor])
+  @@index([userId, scheduledFor])
 }
 
 /// Per-kind delivery settings. No row = defaults (push + email on, except
@@ -1306,4 +1346,51 @@ model FeatureFlag {
   isActive    Boolean  @default(true)
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Coin promo codes + weekly bonus pool — docs/08 §12, docs/07 §5
+// ─────────────────────────────────────────────────────────────────────
+
+/// Campaign codes that grant coins once per user (CoinSource.PROMO_CODE).
+model PromoCode {
+  id             String                @id @default(dbgenerated("uuid_generate_v7()"))
+  /// Stored upper-case; redeemed case-insensitively.
+  code           String                @unique
+  coins          Int
+  maxRedemptions Int?
+  redemptions    Int                   @default(0)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  isActive       Boolean               @default(true)
+  description    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  redeemedBy     PromoCodeRedemption[]
+}
+
+model PromoCodeRedemption {
+  promoCodeId String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([promoCodeId, userId])
+  @@index([userId])
+}
+
+/// Coins over a daily per-source cap accrue here for the user's week
+/// (capped by config) and are paid as CoinSource.WEEKLY_BONUS when the week
+/// closes (docs/07 §5).
+model CoinBonusPool {
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime
+  coins     Int       @default(0)
+  paidAt    DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@id([userId, weekStart])
+  @@index([weekStart, paidAt])
 }

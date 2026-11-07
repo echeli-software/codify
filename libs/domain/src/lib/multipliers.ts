@@ -18,7 +18,9 @@ export type MultiplierKind =
   | 'COURSE_PROMO'
   | 'LESSON_PROMO'
   | 'STREAK_TIER'
-  | 'CAMPAIGN';
+  | 'CAMPAIGN'
+  /** Per-user short boost ("next 15 minutes 2x XP", docs/10 §6). */
+  | 'SURPRISE_BOOST';
 
 export type MultiplierTarget = 'XP' | 'COINS' | 'BOTH';
 
