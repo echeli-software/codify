@@ -12,10 +12,28 @@ export interface PublicProfile {
   totalXp: number;
   avatar: {
     config: Record<string, unknown> | null;
-    equipped: Record<string, { slug: string; name: string; spriteAssetId: string; spriteUrl: string | null }>;
+    equipped: Record<
+      string,
+      {
+        slug: string;
+        name: string;
+        spriteAssetId: string;
+        spriteUrl: string | null;
+      }
+    >;
   };
-  badges: { slug: string; name: string; iconName: string | null; awardedAt: string }[];
-  stats: { lessonsCompleted: number; streakDays: number; longestStreak: number; friends: number };
+  badges: {
+    slug: string;
+    name: string;
+    iconName: string | null;
+    awardedAt: string;
+  }[];
+  stats: {
+    lessonsCompleted: number;
+    streakDays: number;
+    longestStreak: number;
+    friends: number;
+  };
 }
 
 /** Read-only public profile (docs/15 Phase 9) — avatar, badges, level, stats. */
@@ -29,20 +47,36 @@ export class ProfileService {
   async get(userId: string): Promise<PublicProfile> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
-      select: { id: true, displayName: true, totalXp: true, avatarConfig: true },
+      select: {
+        id: true,
+        displayName: true,
+        totalXp: true,
+        avatarConfig: true,
+      },
     });
     if (!user) throw new NotFoundException('User not found');
 
-    const [equipped, userBadges, lessonsCompleted, streak, friendsA, friendsB] = await Promise.all([
-      this.prisma.equippedItem.findMany({ where: { userId }, include: { item: true } }),
-      this.prisma.userBadge.findMany({ where: { userId }, include: { badge: true }, orderBy: { awardedAt: 'desc' } }),
-      this.prisma.progress.count({ where: { userId } }),
-      this.prisma.streak.findUnique({ where: { userId } }),
-      this.prisma.friendship.count({ where: { userAId: userId } }),
-      this.prisma.friendship.count({ where: { userBId: userId } }),
-    ]);
+    const [equipped, userBadges, lessonsCompleted, streak, friendsA, friendsB] =
+      await Promise.all([
+        this.prisma.equippedItem.findMany({
+          where: { userId },
+          include: { item: true },
+        }),
+        this.prisma.userBadge.findMany({
+          where: { userId },
+          include: { badge: true },
+          orderBy: { awardedAt: 'desc' },
+        }),
+        this.prisma.progress.count({ where: { userId } }),
+        this.prisma.streak.findUnique({ where: { userId } }),
+        this.prisma.friendship.count({ where: { userAId: userId } }),
+        this.prisma.friendship.count({ where: { userBId: userId } }),
+      ]);
 
-    const spriteUrls = await loadSpriteUrls(this.prisma, equipped.map((e) => e.item.spriteAssetId));
+    const spriteUrls = await loadSpriteUrls(
+      this.prisma,
+      equipped.map((e) => e.item.spriteAssetId),
+    );
     const equippedMap: PublicProfile['avatar']['equipped'] = {};
     for (const e of equipped) {
       if (e.item.deletedAt) continue;
@@ -83,7 +117,10 @@ export class ProfileService {
       level,
       tier: tierForLevel(level),
       totalXp: user.totalXp,
-      avatar: { config: (user.avatarConfig as Record<string, unknown> | null) ?? null, equipped: equippedMap },
+      avatar: {
+        config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
+        equipped: equippedMap,
+      },
       badges: shownBadges.map((ub) => ({
         slug: ub.badge.slug,
         name:

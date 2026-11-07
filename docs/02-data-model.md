@@ -909,29 +909,37 @@ model IdempotencyRecord {
 ## Notes on contentious decisions
 
 ### `ContentTranslation` polymorphism
+
 Prisma doesn't model polymorphic associations natively. We accept the awkward "many nullable FKs" approach because we want cascade deletes when an entity disappears. Day-to-day reads use `(entityType, entityId, locale)` queries that bypass the relations entirely. We could go to a fully unstructured `(entityType, entityId)` with no FK, but cascade cleanup would then need a periodic job — worse trade-off.
 
 ### Denormalized `CoinTransaction.balanceAfter`
+
 The ledger is the source of truth. `balanceAfter` is a write-side denormalization so reading the current balance is `SELECT balanceAfter FROM CoinTransaction WHERE userId = ? ORDER BY createdAt DESC LIMIT 1` instead of `SUM(delta)`. Recompute jobs verify drift nightly and emit an alert if mismatched.
 
 ### Why not store XP balance similarly?
+
 We do — implicitly. The student's current XP is `SUM(amount) FROM XpEvent`. If this becomes hot, we add `User.xpTotal` and update transactionally. Premature for now.
 
 ### `Streak.lastActivityDate` is in the user's local TZ
+
 Streaks reset based on the user's perceived "day". Storing in UTC means a São Paulo user who learns at 23:30 BRT and 00:30 BRT the next day would lose their streak across UTC-day boundaries. We normalize to the user's TZ at write time.
 
 ### `Multiplier` table
+
 Configurable multipliers live as rows. The multiplier resolver (see [07-gamification.md](./07-gamification.md)) is the single place that combines them for any reward event. This is what enables "4x coins on this specific lesson" without code changes.
 
 ### `IdempotencyRecord` table vs Redis-only
+
 Postgres is authoritative; Redis is a hot-path cache. On a write: Postgres unique constraint on `key` is the source of truth — duplicate keys fail there. Redis is populated optimistically for fast lookups but a Redis miss falls back to Postgres. If Redis-write succeeds and Postgres-write fails, the request fails (caller retries with same key); if Postgres succeeds and Redis fails, a background tickle re-populates Redis. The unique constraint guarantees no double-execution regardless of cache state.
 
 ### `Asset` model
+
 Every catalog entity (`Course.coverAssetId`, lesson images via `LessonDoc`, `Item.spriteAssetId`/`thumbnailAssetId`, `Badge.iconAssetId`) references asset IDs. Centralizing them in `Asset` lets us enforce existence on save, dedupe by `sha256`, run R2 cleanup on delete, and store SVG-sanitization metadata in one place.
 
 ## Indexing strategy
 
 Beyond the indexes declared inline:
+
 - `XpEvent (userId, createdAt DESC)` — feed query for "your recent activity".
 - `CoinTransaction (userId, createdAt DESC)` — same.
 - `Progress (userId, completedAt DESC) WHERE completedAt IS NOT NULL` — partial index, used for streak calculation and "today's lessons".

@@ -58,16 +58,16 @@ Lives in shared visuals (framework-agnostic Angular standalone) — used by admi
 
 ```ts
 interface AvatarRendererProps {
-  config: AvatarConfig;            // base body, skin tone, base hair color
+  config: AvatarConfig; // base body, skin tone, base hair color
   equipped?: { [slot in ItemSlot]?: ItemRef };
-  size?: number;                    // pixel size; default 256
+  size?: number; // pixel size; default 256
   pose?: 'idle' | 'wave' | 'cheer' | 'study';
-  frame?: ItemRef;                  // shortcut; same as equipped[FRAME]
-  showLevelRing?: boolean;          // ring with level number; uses tier color
+  frame?: ItemRef; // shortcut; same as equipped[FRAME]
+  showLevelRing?: boolean; // ring with level number; uses tier color
   level?: number;
   background?: ItemRef;
   pet?: ItemRef;
-  animatePose?: boolean;            // tiny idle breathing animation
+  animatePose?: boolean; // tiny idle breathing animation
 }
 ```
 
@@ -78,13 +78,28 @@ interface AvatarRendererProps {
 ## 5. AvatarConfig (schema fragment)
 
 ```ts
-type SkinTone = 'porcelain' | 'fair' | 'light' | 'tan' | 'olive' | 'brown' | 'dark' | 'deep';
-type BaseHairStyle = 'short' | 'medium' | 'long' | 'curly' | 'coily' | 'bald' | 'covered';
-type BaseHairColor = string;       // hex from a curated palette
-type EyeColor = string;            // hex from a curated palette
+type SkinTone =
+  | 'porcelain'
+  | 'fair'
+  | 'light'
+  | 'tan'
+  | 'olive'
+  | 'brown'
+  | 'dark'
+  | 'deep';
+type BaseHairStyle =
+  | 'short'
+  | 'medium'
+  | 'long'
+  | 'curly'
+  | 'coily'
+  | 'bald'
+  | 'covered';
+type BaseHairColor = string; // hex from a curated palette
+type EyeColor = string; // hex from a curated palette
 
 type AvatarConfig = {
-  baseBodyId: string;               // base body SVG asset
+  baseBodyId: string; // base body SVG asset
   skinTone: SkinTone;
   baseHairStyle: BaseHairStyle;
   baseHairColor: BaseHairColor;
@@ -111,17 +126,20 @@ Stored as JSON on `User.avatarConfig`. Customizable in the dressing room without
 Prices are tunable in admin; shop balance is reviewed weekly (see [07-gamification.md §13](./07-gamification.md)).
 
 ### Premium-only items
+
 - Flagged via `Item.isPremiumOnly`. Cannot be purchased without an active subscription, even with sufficient coins.
 - Visible to free users with a "premium" badge — drives FOMO without being predatory.
-- Roughly 20% of new releases should be premium-only; the rest available to everyone with enough coins. The premium *advantage* is mostly the coin multiplier, not exclusive content.
+- Roughly 20% of new releases should be premium-only; the rest available to everyone with enough coins. The premium _advantage_ is mostly the coin multiplier, not exclusive content.
 
 ### Limited drops
+
 - `isLimitedDrop = true` with a `dropStartsAt` / `dropEndsAt` window.
 - Pinned at top of shop during the window.
 - Push notification on drop start (opt-out per-kind).
 - After window closes, item leaves shop. May return in a future "throwback" event.
 
 ### Required level
+
 - `Item.requiredLevel` — visible to all users; shows lock until reached. Reasonable progression incentive without paywalling.
 
 ## 7. Shop UX
@@ -163,17 +181,17 @@ See [05-student-app.md §3 → Shop](./05-student-app.md). Highlights:
 
 ## 12. Earning rules summary
 
-| Action | Coins source |
-|---|---|
-| Daily learning | `LESSON_COMPLETE`, `EXERCISE_PASS`, `QUIZ_PERFECT` |
-| Daily quests | `DAILY_QUEST` |
-| Streak milestones | `STREAK_MILESTONE` |
-| League promotion | `WEEKLY_LEAGUE` |
-| Badges | `BADGE_UNLOCK` |
-| Mystery chests (rarely) | `CHEST_OPEN` |
-| Promo codes (campaigns) | `PROMO_CODE` |
-| Manual admin grant | `ADMIN_GRANT` |
-| Refund | `PURCHASE_REFUND` |
+| Action                  | Coins source                                       |
+| ----------------------- | -------------------------------------------------- |
+| Daily learning          | `LESSON_COMPLETE`, `EXERCISE_PASS`, `QUIZ_PERFECT` |
+| Daily quests            | `DAILY_QUEST`                                      |
+| Streak milestones       | `STREAK_MILESTONE`                                 |
+| League promotion        | `WEEKLY_LEAGUE`                                    |
+| Badges                  | `BADGE_UNLOCK`                                     |
+| Mystery chests (rarely) | `CHEST_OPEN`                                       |
+| Promo codes (campaigns) | `PROMO_CODE`                                       |
+| Manual admin grant      | `ADMIN_GRANT`                                      |
+| Refund                  | `PURCHASE_REFUND`                                  |
 
 Spending:
 | Action | Source |

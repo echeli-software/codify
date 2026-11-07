@@ -34,6 +34,7 @@ Judge0 is self-contained. We isolate it on its own VPS with no inbound from the 
 ## 3. Sandboxing
 
 Judge0 uses **isolate** (the same sandbox used by competitive-programming judges). Each submission runs in:
+
 - Fresh chroot.
 - Dedicated cgroup with CPU and memory caps.
 - No network (we explicitly disable; runtime tests don't need it).
@@ -42,6 +43,7 @@ Judge0 uses **isolate** (the same sandbox used by competitive-programming judges
 - Process count capped.
 
 Defaults per submission:
+
 - CPU time: 2s (configurable per `Exercise.timeLimitMs`).
 - Memory: 128MB (configurable per `Exercise.memoryLimitKb`).
 - Wall time: 5s.
@@ -60,6 +62,7 @@ Defaults per submission:
 Adding a language = adding a Judge0 image with the runtime + writing a test harness template.
 
 ### Browser-side exercises (HTML/CSS/JS)
+
 - Run in the browser, not Judge0.
 - Use `<iframe>` with `sandbox="allow-scripts"` (no same-origin) and CSP headers.
 - Test harness: a small framework that exposes a postMessage API; tests verify DOM state, computed styles, console output.
@@ -67,6 +70,7 @@ Adding a language = adding a Judge0 image with the runtime + writing a test harn
 ## 5. Exercise definition
 
 `Exercise` row contains:
+
 - `language`: string, e.g. `"javascript"`.
 - `starterCode`: shown to the student initially.
 - `solutionCode`: reference solution; never sent to client; used by admin "verify exercise" tool.
@@ -80,22 +84,42 @@ Adding a language = adding a Judge0 image with the runtime + writing a test harn
 A test runner script is concatenated with user code at submission time. Output is structured JSON to stdout:
 
 ```json
-{ "tests": [
-  { "id": "t1", "name": "returns sum", "passed": true, "runtimeMs": 12 },
-  { "id": "t2", "name": "handles empty", "passed": false, "actual": "...", "expected": "...", "runtimeMs": 8 }
-] }
+{
+  "tests": [
+    { "id": "t1", "name": "returns sum", "passed": true, "runtimeMs": 12 },
+    {
+      "id": "t2",
+      "name": "handles empty",
+      "passed": false,
+      "actual": "...",
+      "expected": "...",
+      "runtimeMs": 8
+    }
+  ]
+}
 ```
 
 Sample JS test harness:
+
 ```js
 // User code lives above this line.
 const __tests = [
-  { id: 't1', name: 'returns sum', fn: () => assert(sum(1,2) === 3) },
+  { id: 't1', name: 'returns sum', fn: () => assert(sum(1, 2) === 3) },
   // ...
 ];
-const results = __tests.map(t => {
-  try { const start = performance.now(); t.fn(); return { id: t.id, name: t.name, passed: true, runtimeMs: performance.now() - start }; }
-  catch (e) { return { id: t.id, name: t.name, passed: false, error: String(e) }; }
+const results = __tests.map((t) => {
+  try {
+    const start = performance.now();
+    t.fn();
+    return {
+      id: t.id,
+      name: t.name,
+      passed: true,
+      runtimeMs: performance.now() - start,
+    };
+  } catch (e) {
+    return { id: t.id, name: t.name, passed: false, error: String(e) };
+  }
 });
 console.log(JSON.stringify({ tests: results }));
 ```
@@ -124,9 +148,10 @@ Authoring is in admin's exercise editor (Monaco). Test fields are JSON; validati
 6. Client receives final state and either celebrates or shows test failure UI.
 
 ### Stored results (as built)
+
 - On completion the worker stores the per-test results **exactly as returned to
   the student** in `Submission.resultJson` — `{ v: 1, passed, results,
-  hiddenRevealed }`, hidden tests anonymised (`hidden-N`, no args / values /
+hiddenRevealed }`, hidden tests anonymised (`hidden-N`, no args / values /
   errors) unless the submission passed. The raw outcome (with hidden-test
   details and staff diagnostics) stays in `Submission.output` and never
   reaches students.
@@ -137,11 +162,13 @@ Authoring is in admin's exercise editor (Monaco). Test fields are JSON; validati
   caller's latest graded submission, or null) so the runner can re-show it.
 
 ### Visible vs hidden tests
+
 - "Run" only executes visible tests (no scoring).
 - "Submit" executes visible + hidden tests (scoring + reward).
 - Hidden test names + outputs are revealed only on pass (so failed students don't get hints from hidden tests).
 
 ### Failure UI
+
 - Shows which visible tests failed with diff.
 - For runtime/timeout/memory errors, friendly message + link to docs (e.g. "Your function exceeded 2 seconds — consider...").
 
@@ -168,7 +195,7 @@ Authoring is in admin's exercise editor (Monaco). Test fields are JSON; validati
 - We never `eval` user code in our own process. Always Judge0.
 - Memory leak / fork bomb: contained by isolate's process count and memory caps.
 - DOS: per-VPS concurrent submission cap (e.g. 8); excess queue.
-- **Hidden-test count leak**: a determined student can brute-force hidden tests by varying code and observing the pass count returned per submission. We accept this as a tradeoff (mitigated by per-exercise rate limit + the fact that exercises grade *behavior* not memorization). If it becomes a real problem, switch the post-submit UI to "passed / failed" only (no count) until full pass.
+- **Hidden-test count leak**: a determined student can brute-force hidden tests by varying code and observing the pass count returned per submission. We accept this as a tradeoff (mitigated by per-exercise rate limit + the fact that exercises grade _behavior_ not memorization). If it becomes a real problem, switch the post-submit UI to "passed / failed" only (no count) until full pass.
 
 ## 10. Performance
 

@@ -1,6 +1,7 @@
 # 05 — Student App
 
 Single Ionic + Capacitor + Angular codebase. Three deploy targets:
+
 - **iOS** (App Store)
 - **Android** (Play Store)
 - **Web/PWA** at `codify.app` (Cloudflare Pages)
@@ -18,16 +19,18 @@ Ionic is mobile-optimized by default. To make the web experience comfortable on 
 We **do not** build a separate web layout. Same components, responsive directives, breakpoint-aware containers from `ui-ionic`.
 
 ### Breakpoints (from `ui-tokens`)
+
 | Token | Min width |
-|---|---|
-| `xs` | 0 |
-| `sm` | 480px |
-| `md` | 768px |
-| `lg` | 1024px |
-| `xl` | 1280px |
-| `xxl` | 1536px |
+| ----- | --------- |
+| `xs`  | 0         |
+| `sm`  | 480px     |
+| `md`  | 768px     |
+| `lg`  | 1024px    |
+| `xl`  | 1280px    |
+| `xxl` | 1536px    |
 
 ### Specific responsive treatments
+
 - **Bottom tabs → side rail**: `<ion-tab-bar slot="bottom">` shown `< md`; sidebar nav shown `≥ md`. Implemented with a single `AppShell` organism that swaps internally.
 - **Lesson player**: side rail with module outline appears `≥ lg`; on smaller screens, outline lives behind a hamburger button.
 - **Bottom sheets → side panels**: `BottomSheet` molecule renders as `<ion-modal>` on mobile, as a side `Drawer` (right-edge) on `≥ md`.
@@ -59,6 +62,7 @@ Notifications bell (top-right on desktop, `Today` header on mobile) opens an in-
 ## 3. Screens
 
 ### Onboarding (first launch only)
+
 1. **Welcome carousel** (3 slides, swipeable; auto-advance on tap).
 2. **Goal picker**: "Why are you here?" — career change / new tech / AI tooling / soft skills. Recorded; influences first-recommended courses.
 3. **Track picker**: top-3 recommended courses based on goal. Pick one to start (others suggested later).
@@ -69,6 +73,7 @@ Notifications bell (top-right on desktop, `Today` header on mobile) opens an in-
 Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed at any step except sign-in.
 
 ### Today
+
 - Greeting with user's display name, current streak chip (with freezes), level + XP bar.
 - "Continue learning" card — last lesson resume button.
 - Daily quests (3 cards with progress bars).
@@ -78,12 +83,14 @@ Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed
 - Friends activity feed (opt-in; small).
 
 ### Learn → Catalog
+
 - Search bar (debounced; queries courses + categories).
 - Filter chips (categories, difficulty, free-trial-available, premium-only, language).
 - Sort: recommended, newest, most popular, shortest.
 - Course cards with cover, title, category chips, lesson count, duration, "free preview available" badge, "included in [Plan]" mini chip.
 
 ### Learn → Course detail
+
 - Hero: cover, title, author, difficulty, duration, total lessons.
 - Action: "Continue" (if enrolled) or "Start free preview" (if free lessons exist) or "Subscribe to start" (paywalled).
 - "Plans that include this course" chips (each a tappable detail).
@@ -92,6 +99,7 @@ Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed
 - Related courses.
 
 ### Learn → Lesson player
+
 - Header: progress in module, "Exit" (with confirm if unsaved), settings (text size, audio toggle).
 - Body: `LessonBlockRenderer` rendering the `LessonDoc` JSON.
 - For interactive blocks: inline within the flow.
@@ -99,13 +107,16 @@ Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed
 - On complete: optimistic UI + reward orchestration → navigate to next lesson or course summary.
 
 ### Learn → Quiz / Exercise / Scenario
+
 Each lesson type has a dedicated runner:
+
 - **Quiz**: question, options (radio/checkbox/match), immediate feedback per question. Score stored as `Progress.scorePct`.
 - **Exercise** (`ExerciseRunner`): Monaco editor (themed), visible tests panel, "Run" (visible only) and "Submit" (all tests). Verdict UI animates in. Hidden tests reveal after pass.
 - **AI prompt** (`AiPromptPlayground`): user composes a prompt, submits. Server runs against a graded rubric (deterministic checks first; LLM-judged later). Rubric items light up green as criteria are met.
 - **Scenario** (`ScenarioRunner`): branching dialogue with choices; outcome scored on a rubric; can replay with different choices.
 
 ### Avatar (dressing room)
+
 - Live-rendered avatar in center.
 - Slot picker on the left (`md+`) or top tabs (mobile): pet, hair, top, bottom, shoes, hat, glasses, accessory, frame, background, emote.
 - Item grid on the right (`md+`) or below (mobile): owned items per slot. Tap to preview, swipe to revert.
@@ -113,6 +124,7 @@ Each lesson type has a dedicated runner:
 - "Browse shop for [slot]" link.
 
 ### Shop
+
 - Tabs / chip filters by item category.
 - Filter by rarity, affordability, premium-only, limited-drop.
 - Item card: thumbnail, name, rarity glow, cost (with affordability check), required level if any.
@@ -121,26 +133,31 @@ Each lesson type has a dedicated runner:
 - After buy: coin debit animation + unlock toast + offer to equip immediately.
 
 ### Inventory
+
 - Grouped by slot, then by acquisition date.
 - Equip / unequip per item; multi-select bulk equip set.
 
 ### League
+
 - Current tier badge, week countdown.
 - Leaderboard table (virtualized, current user pinned to bottom or own row highlighted).
 - Promotion / relegation thresholds visualized.
 - Past weeks history.
 
 ### Friends
+
 - Friends list with quick "nudge" (sends `FRIEND_NUDGE` notification) and "compare" (mini side-by-side stats).
 - Add by email / by share link (`?ref=<userId>`).
 - Friend requests inbox.
 
 ### Profile
+
 - Public profile preview (what others see).
 - Stats: total XP, level, longest streak, courses completed, badges, items owned.
 - Achievements / badges grid.
 
 ### Subscription
+
 - Current plan card (or "Free" placeholder with primary CTA).
 - "Upgrade" → plan picker with comparison.
 - Manage payment method → Stripe Customer Portal in `<ion-modal>` with in-app browser fallback.
@@ -148,6 +165,7 @@ Each lesson type has a dedicated runner:
 - Cancel subscription (no dark patterns: single-screen confirm with "you'll keep access until [date]").
 
 ### Settings
+
 - Account (Clerk-managed link).
 - Language (also accessible globally).
 - Theme: system / light / dark.
@@ -157,6 +175,7 @@ Each lesson type has a dedicated runner:
 - Help / support / about.
 
 ### Notifications inbox
+
 - In-app feed of recent notifications.
 - Read / unread, group by day.
 - Per-notification quick action (e.g. "Open daily quest", "Send back nudge").
@@ -164,11 +183,12 @@ Each lesson type has a dedicated runner:
 ## 4. Lesson rendering & gating
 
 `LessonPlayer` resolves access via `libs/domain/access.canUserAccessLesson`. If denied:
+
 - Show `PaywallSheet` (slide up on mobile, side panel on desktop).
 - List the cheapest plans that include this course.
 - "Start free preview" if any lesson in the course is free and not yet completed.
 
-Gating decisions are *displayed* on the client but *enforced* server-side. The lesson `contentJson` is never sent to a client without access; preview content for paywalled lessons is a teaser placeholder.
+Gating decisions are _displayed_ on the client but _enforced_ server-side. The lesson `contentJson` is never sent to a client without access; preview content for paywalled lessons is a teaser placeholder.
 
 ## 5. Offline behavior
 
@@ -180,7 +200,7 @@ Full spec in [16-offline.md](./16-offline.md). Highlights:
 - **Exercise + AI prompt + shop + payments + social** require connection; UI clearly disables those actions offline.
 - Reward events queued in `OfflineEventQueue` (IndexedDB) and flushed on reconnect with idempotency keys; server enforces uniqueness on `Progress (userId, lessonId)` to prevent double-credit across devices.
 - **Streak grace**: completion events carry `clientTimestamp`; server normalizes to user-local TZ — a 23:55 local completion synced at 00:30 still counts for the prior day.
-- **Token expired offline**: cached identity stays valid for offline reads; sync queue holds until same-user re-sign-in. If a *different* user signs in, the queue is discarded with an explanatory toast.
+- **Token expired offline**: cached identity stays valid for offline reads; sync queue holds until same-user re-sign-in. If a _different_ user signs in, the queue is discarded with an explanatory toast.
 - **Asset caching**: avatar (config + equipped items + base body) is always cached so the user's identity renders offline, even after eviction of older course downloads.
 - **Storage manager** (Settings → Downloads): per-course size, total used vs budget, Wi-Fi-only and auto-update toggles, LRU eviction.
 
@@ -190,17 +210,17 @@ Everything routes through `RewardOrchestrator`. The canonical event → visual /
 
 ## 7. Capacitor surface
 
-| Plugin | Use |
-|---|---|
-| Haptics | All reward events on iOS/Android |
-| Push Notifications | Streak reminder, daily quest, friend nudge, league result, item drop, billing |
-| Local Notifications | Backup for push if the user disables remote |
-| App | Background / foreground state for streak grace + telemetry |
-| Network | Offline detection |
-| Preferences | Local cache of UI prefs |
-| Browser | Open Stripe Customer Portal in in-app browser |
-| Filesystem | Optional offline lesson cache (large) |
-| StatusBar / SplashScreen | Theme-aware |
+| Plugin                   | Use                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| Haptics                  | All reward events on iOS/Android                                              |
+| Push Notifications       | Streak reminder, daily quest, friend nudge, league result, item drop, billing |
+| Local Notifications      | Backup for push if the user disables remote                                   |
+| App                      | Background / foreground state for streak grace + telemetry                    |
+| Network                  | Offline detection                                                             |
+| Preferences              | Local cache of UI prefs                                                       |
+| Browser                  | Open Stripe Customer Portal in in-app browser                                 |
+| Filesystem               | Optional offline lesson cache (large)                                         |
+| StatusBar / SplashScreen | Theme-aware                                                                   |
 
 Web fallbacks: every Capacitor call wrapped in `libs/ui-ionic/platform.ts` so calls no-op or fall back gracefully on web.
 

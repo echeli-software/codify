@@ -4,11 +4,11 @@ Angular SPA at `admin.codify.app`. Bootstrap-themed via `ui-bootstrap` + tokens.
 
 ## 1. Roles & permissions
 
-| Role | Authoring | Catalog ops | Billing | Users | Items / Shop | Promotions / Multipliers | Audit |
-|---|---|---|---|---|---|---|---|
-| `TEACHER` | Own courses only | View own | – | View own course enrollments (anonymized) | – | View own course-level multipliers | View own actions |
-| `SUPPORT` | – | View | View, refund (capped) | View, suspend, manual coin grant (capped) | View | – | View |
-| `ADMIN` | All | All | All | All | All | All | All |
+| Role      | Authoring        | Catalog ops | Billing               | Users                                     | Items / Shop | Promotions / Multipliers          | Audit            |
+| --------- | ---------------- | ----------- | --------------------- | ----------------------------------------- | ------------ | --------------------------------- | ---------------- |
+| `TEACHER` | Own courses only | View own    | –                     | View own course enrollments (anonymized)  | –            | View own course-level multipliers | View own actions |
+| `SUPPORT` | –                | View        | View, refund (capped) | View, suspend, manual coin grant (capped) | View         | –                                 | View             |
+| `ADMIN`   | All              | All         | All                   | All                                       | All          | All                               | All              |
 
 Permissions enforced server-side. Client uses `*codifyIfRole` directive for UI gating only.
 
@@ -41,12 +41,14 @@ Sidebar
 ## 3. Screens
 
 ### Dashboard
+
 - KPI cards (admin scope): WAU, MAU, paid conversions this week, active subscriptions, MRR (BRL), top 5 courses by completion.
 - Teacher scope: own course enrollments today, top lessons by drop-off, pending translations.
 - Recent audit activity (last 20 actions).
 - Coolify deploy status indicator (read-only, off `GITHUB_API` build webhook last result).
 
 ### Catalog → Courses (list)
+
 - DataTable: cover, title (in admin's locale), author, status, categories chips, lesson count, published date, actions menu.
 - Filters: status, category, author, "has missing translations".
 - Bulk actions: publish, archive, change category.
@@ -80,17 +82,20 @@ Tabs:
 7. **Audit** — last 100 actions on this course.
 
 ### Catalog → Categories
+
 - Simple list. Slug, color token, icon, sortOrder.
 - Reorder by drag.
 - Click → edit translations + assign to plans (matrix view).
 
 ### Catalog → Promotions
+
 - All multipliers across the catalog, filterable by kind / time window.
 - Calendar view (week/month) showing active windows for `CAMPAIGN` and `COURSE_PROMO`.
 - Quick "Activate now for 24h" button on rows.
 - Effective preview: pick a user + lesson, show resolver breakdown (`PREMIUM_DEFAULT × COURSE_PROMO × STREAK_TIER = 6.0x`). Drives trust in the system.
 
 ### Plans
+
 - List: name, all-access flag, prices in BRL/USD, billing period, included categories chips, active toggle, sortOrder.
 - Detail tabs:
   - **Basics**: name, slug, all-access, sortOrder.
@@ -99,6 +104,7 @@ Tabs:
   - **Translations**.
 
 ### Shop → Items
+
 - DataTable: thumbnail, slug, slot, category, rarity, costCoins, requiredLevel, premiumOnly badge, drop window, active toggle.
 - Detail:
   - Sprite upload (`AssetPicker`, accepts SVG, validates dimensions and slot anchor).
@@ -108,24 +114,29 @@ Tabs:
 - "Schedule limited drop" wizard: pick items, set window, set notification copy.
 
 ### Shop → Item Categories
+
 - Slug, sortOrder, translations. Used for shop filtering in student.
 
 ### Gamification → Badges
+
 - List + create. Each badge: slug, icon, hidden flag, rule JSON (with helper builder for common rules).
 - "Test" button: pick a user, simulate, see if the badge would unlock.
 - Translations.
 
 ### Gamification → Quest Templates
+
 - List: kind, target, params, rewards, active.
 - Detail: rewards (xp + coins), kind-specific config (e.g. `categorySlug` for `CATEGORY_LESSON_COUNT`).
 - "Daily mix" planner: define how many quests per day are drawn from this pool and at what weight.
 
 ### Gamification → Leagues
+
 - Configuration of tier promotion/relegation thresholds.
 - This week's snapshot: leagues per tier, member count, p50/p95 weekly XP.
 - Drill into any league → list members + ranks.
 
 ### Users
+
 - DataTable with filters (role, locale, country, last seen, subscription status).
 - Detail tabs:
   - **Profile**: read-only (Clerk-managed), avatar preview, level, XP, coin balance, current streak.
@@ -138,19 +149,23 @@ Tabs:
   - **Audit**: actions performed on this user.
 
 ### Translations
+
 - Workspace view: pick locale → pick entity type → list of entities with translation completeness % and per-field status (missing/outdated/done).
 - Inline editor side-by-side with source locale.
 - "Outdated" flag set when source content changed after last translation.
 - Bulk export/import as CSV or JSON for outsourced translation.
 
 ### Analytics
+
 - Cross-cutting dashboards: retention curves, league participation, shop revenue (coins spent), MRR, churn cohort.
 - Read-only — built on top of the API's analytics endpoints (precomputed nightly).
 
 ### Audit
+
 - Filter by actor, action, entity type, time. Export.
 
 ### Settings
+
 - Branding (color tokens overridable per environment for staging visibility).
 - Default coin rates and `PREMIUM_DEFAULT` multiplier value (writes a `Multiplier` row).
 - Streak tier thresholds and bonuses.
@@ -215,7 +230,7 @@ Tabs:
 
 - Every list has an `EmptyState` with a primary CTA ("+ New course").
 - Every async area has skeletons during load and a typed error state with retry.
-- Permission-denied states explain *which role* would be required.
+- Permission-denied states explain _which role_ would be required.
 
 ## 10. Admin operations API
 
