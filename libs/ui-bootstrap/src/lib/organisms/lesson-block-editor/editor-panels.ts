@@ -26,6 +26,7 @@ import {
   type EmbedProvider,
   type ImageWidth,
 } from '@codify/lesson-schema';
+import { I18nService, TranslatePipe } from '@codify/i18n';
 import {
   LESSON_ASSET_UPLOADER,
   LESSON_IMAGE_MAX_BYTES,
@@ -52,6 +53,7 @@ export interface LinkPanelResult {
 @Component({
   selector: 'cdf-link-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <form
       class="cdf-editor-panel"
@@ -62,10 +64,15 @@ export interface LinkPanelResult {
       (submit)="$event.preventDefault(); submit()"
     >
       <h3 class="cdf-editor-panel__title" [id]="uid + '-title'">
-        {{ hasLink() ? 'Edit link' : 'Add link' }}
+        {{
+          (hasLink()
+            ? 'ui.lessonEditor.link.titleEdit'
+            : 'ui.lessonEditor.link.titleAdd'
+          ) | translate
+        }}
       </h3>
       <label class="cdf-editor-panel__field">
-        <span>URL</span>
+        <span>{{ 'ui.lessonEditor.panel.url' | translate }}</span>
         <input
           type="text"
           inputmode="url"
@@ -73,7 +80,7 @@ export interface LinkPanelResult {
           [value]="href()"
           [attr.aria-invalid]="showError() || null"
           [attr.aria-describedby]="uid + '-help'"
-          placeholder="https://…, /path, #section or mailto:"
+          [placeholder]="'ui.lessonEditor.link.urlPlaceholder' | translate"
           (input)="href.set($any($event.target).value)"
         />
       </label>
@@ -82,11 +89,12 @@ export interface LinkPanelResult {
         [class.cdf-editor-panel__help--error]="showError()"
         [id]="uid + '-help'"
       >
-        @if (showError()) {
-          Only http(s), mailto:, /relative paths and #anchors are allowed.
-        } @else {
-          Links to http(s), mailto:, /relative paths or #anchors.
-        }
+        {{
+          (showError()
+            ? 'ui.lessonEditor.link.invalid'
+            : 'ui.lessonEditor.link.help'
+          ) | translate
+        }}
       </p>
       <label class="cdf-editor-panel__check">
         <input
@@ -94,7 +102,7 @@ export interface LinkPanelResult {
           [checked]="newTab()"
           (change)="newTab.set($any($event.target).checked)"
         />
-        Open in a new tab
+        {{ 'ui.lessonEditor.link.newTab' | translate }}
       </label>
       <div class="cdf-editor-panel__actions">
         @if (hasLink()) {
@@ -103,7 +111,7 @@ export interface LinkPanelResult {
             class="cdf-editor-panel__btn cdf-editor-panel__btn--danger"
             (click)="unlink.emit()"
           >
-            Remove link
+            {{ 'ui.lessonEditor.link.remove' | translate }}
           </button>
         }
         <span class="cdf-editor-panel__spacer"></span>
@@ -112,14 +120,14 @@ export interface LinkPanelResult {
           class="cdf-editor-panel__btn"
           (click)="dismiss.emit()"
         >
-          Cancel
+          {{ 'ui.lessonEditor.panel.cancel' | translate }}
         </button>
         <button
           type="submit"
           class="cdf-editor-panel__btn cdf-editor-panel__btn--primary"
           [disabled]="!valid()"
         >
-          Apply
+          {{ 'ui.lessonEditor.panel.apply' | translate }}
         </button>
       </div>
     </form>
@@ -173,6 +181,7 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 @Component({
   selector: 'cdf-image-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <form
       class="cdf-editor-panel"
@@ -183,12 +192,12 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
       (submit)="$event.preventDefault(); submit()"
     >
       <h3 class="cdf-editor-panel__title" [id]="uid + '-title'">
-        Insert image
+        {{ 'ui.lessonEditor.image.title' | translate }}
       </h3>
 
       @if (canUpload) {
         <label class="cdf-editor-panel__field">
-          <span>Upload a file (PNG, JPEG, WebP, GIF, SVG · max 10 MB)</span>
+          <span>{{ 'ui.lessonEditor.image.upload' | translate }}</span>
           <input
             type="file"
             [accept]="accept"
@@ -201,24 +210,34 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
       @switch (status()) {
         @case ('uploading') {
           <div class="cdf-editor-panel__progress" role="status">
-            <span>Uploading {{ fileName() }}…</span>
+            <span>{{
+              'ui.lessonEditor.image.uploading'
+                | translate: { name: fileName() }
+            }}</span>
             @if (progress() !== null) {
               <progress
                 max="100"
                 [value]="progressPct()"
-                [attr.aria-label]="'Upload progress ' + progressPct() + '%'"
+                [attr.aria-label]="
+                  'ui.lessonEditor.image.progress'
+                    | translate: { pct: progressPct() }
+                "
               >
                 {{ progressPct() }}%
               </progress>
             } @else {
-              <progress aria-label="Uploading"></progress>
+              <progress
+                [attr.aria-label]="
+                  'ui.lessonEditor.image.progressIndeterminate' | translate
+                "
+              ></progress>
             }
             <button
               type="button"
               class="cdf-editor-panel__btn"
               (click)="abortUpload()"
             >
-              Cancel upload
+              {{ 'ui.lessonEditor.image.cancelUpload' | translate }}
             </button>
           </div>
         }
@@ -231,20 +250,27 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
                 class="cdf-editor-panel__btn"
                 (click)="retry()"
               >
-                Retry
+                {{ 'ui.lessonEditor.image.retry' | translate }}
               </button>
             }
           </div>
         }
         @case ('done') {
           <p class="cdf-editor-panel__help" role="status">
-            Uploaded {{ fileName() }}.
+            {{
+              'ui.lessonEditor.image.uploaded' | translate: { name: fileName() }
+            }}
           </p>
         }
       }
 
       <label class="cdf-editor-panel__field">
-        <span>{{ canUpload ? '…or image URL' : 'Image URL' }}</span>
+        <span>{{
+          (canUpload
+            ? 'ui.lessonEditor.image.orUrl'
+            : 'ui.lessonEditor.image.url'
+          ) | translate
+        }}</span>
         <input
           type="text"
           inputmode="url"
@@ -257,7 +283,7 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
       </label>
       @if (srcError()) {
         <p class="cdf-editor-panel__help cdf-editor-panel__help--error">
-          Use an http(s) URL or a /relative path.
+          {{ 'ui.lessonEditor.image.urlInvalid' | translate }}
         </p>
       }
 
@@ -265,21 +291,21 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
         <img
           class="cdf-editor-panel__preview"
           [src]="preview"
-          [alt]="alt() || 'Preview'"
+          [alt]="alt() || ('ui.lessonEditor.image.previewAlt' | translate)"
         />
       }
 
       <label class="cdf-editor-panel__field">
-        <span>Alt text (required)</span>
+        <span>{{ 'ui.lessonEditor.image.alt' | translate }}</span>
         <input
           type="text"
           [value]="alt()"
-          placeholder="Describe the image"
+          [placeholder]="'ui.lessonEditor.image.altPlaceholder' | translate"
           (input)="alt.set($any($event.target).value)"
         />
       </label>
       <label class="cdf-editor-panel__field">
-        <span>Caption (optional)</span>
+        <span>{{ 'ui.lessonEditor.image.caption' | translate }}</span>
         <input
           type="text"
           [value]="caption()"
@@ -287,14 +313,20 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
         />
       </label>
       <label class="cdf-editor-panel__field">
-        <span>Width</span>
+        <span>{{ 'ui.lessonEditor.image.width' | translate }}</span>
         <select
           [value]="width()"
           (change)="width.set($any($event.target).value)"
         >
-          <option value="full">Full</option>
-          <option value="wide">Wide</option>
-          <option value="inline">Inline</option>
+          <option value="full">
+            {{ 'ui.lessonEditor.image.widths.full' | translate }}
+          </option>
+          <option value="wide">
+            {{ 'ui.lessonEditor.image.widths.wide' | translate }}
+          </option>
+          <option value="inline">
+            {{ 'ui.lessonEditor.image.widths.inline' | translate }}
+          </option>
         </select>
       </label>
 
@@ -305,14 +337,14 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
           class="cdf-editor-panel__btn"
           (click)="onCancel()"
         >
-          Cancel
+          {{ 'ui.lessonEditor.panel.cancel' | translate }}
         </button>
         <button
           type="submit"
           class="cdf-editor-panel__btn cdf-editor-panel__btn--primary"
           [disabled]="!canInsert()"
         >
-          Insert image
+          {{ 'ui.lessonEditor.image.insert' | translate }}
         </button>
       </div>
     </form>
@@ -324,6 +356,7 @@ export class ImagePanel implements OnDestroy {
   readonly dismiss = output<void>();
 
   private readonly uploader = inject(LESSON_ASSET_UPLOADER, { optional: true });
+  private readonly i18n = inject(I18nService);
   protected readonly canUpload = !!this.uploader;
   protected readonly accept = LESSON_IMAGE_TYPES.join(',');
   protected readonly uid = `cdf-image-panel-${nextId++}`;
@@ -393,11 +426,11 @@ export class ImagePanel implements OnDestroy {
     this.lastFile = file;
     this.fileName.set(file.name);
     if (!(LESSON_IMAGE_TYPES as readonly string[]).includes(file.type)) {
-      this.fail(`${file.name} is not a supported image type.`);
+      this.fail('ui.lessonEditor.image.errors.type', { name: file.name });
       return;
     }
     if (file.size > LESSON_IMAGE_MAX_BYTES) {
-      this.fail(`${file.name} is larger than 10 MB.`);
+      this.fail('ui.lessonEditor.image.errors.size', { name: file.name });
       return;
     }
     if (!this.uploader) return;
@@ -414,7 +447,7 @@ export class ImagePanel implements OnDestroy {
       });
       if (abort.signal.aborted) return;
       if (!isAllowedImageSrc(res.url)) {
-        this.fail('The upload returned an unsupported URL.');
+        this.fail('ui.lessonEditor.image.errors.url');
         return;
       }
       this.src.set(res.url);
@@ -425,19 +458,20 @@ export class ImagePanel implements OnDestroy {
         this.status.set('idle');
         return;
       }
-      this.fail(
-        err instanceof Error && err.message
-          ? `Upload failed: ${err.message}`
-          : 'Upload failed.',
-      );
+      if (err instanceof Error && err.message)
+        this.fail('ui.lessonEditor.image.errors.failedWith', {
+          message: err.message,
+        });
+      else this.fail('ui.lessonEditor.image.errors.failed');
     } finally {
       if (this.abort === abort) this.abort = null;
     }
   }
 
-  private fail(message: string): void {
+  /** Show a translated error (`key` under `ui.lessonEditor.image.errors`). */
+  private fail(key: string, params?: Record<string, unknown>): void {
     this.status.set('error');
-    this.error.set(message);
+    this.error.set(this.i18n.t(key, params));
   }
 
   protected submit(): void {
@@ -463,6 +497,7 @@ export interface EmbedPanelResult {
 @Component({
   selector: 'cdf-embed-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <form
       class="cdf-editor-panel"
@@ -472,16 +507,18 @@ export interface EmbedPanelResult {
       (keydown.escape)="$event.preventDefault(); dismiss.emit()"
       (submit)="$event.preventDefault(); submit()"
     >
-      <h3 class="cdf-editor-panel__title" [id]="uid + '-title'">Embed</h3>
+      <h3 class="cdf-editor-panel__title" [id]="uid + '-title'">
+        {{ 'ui.lessonEditor.embed.title' | translate }}
+      </h3>
       <label class="cdf-editor-panel__field">
-        <span>URL</span>
+        <span>{{ 'ui.lessonEditor.panel.url' | translate }}</span>
         <input
           type="text"
           inputmode="url"
           [value]="url()"
           [attr.aria-invalid]="urlError() || null"
           [attr.aria-describedby]="uid + '-help'"
-          placeholder="https://www.youtube.com/watch?v=…"
+          [placeholder]="'ui.lessonEditor.embed.urlPlaceholder' | translate"
           (input)="url.set($any($event.target).value.trim())"
         />
       </label>
@@ -491,13 +528,16 @@ export interface EmbedPanelResult {
         [id]="uid + '-help'"
       >
         @if (parsed(); as p) {
-          Detected {{ label(p.provider) }}.
+          {{
+            'ui.lessonEditor.embed.detected'
+              | translate: { provider: label(p.provider) }
+          }}
         } @else {
-          YouTube, Vimeo, CodePen, CodeSandbox or Loom links only.
+          {{ 'ui.lessonEditor.embed.help' | translate }}
         }
       </p>
       <label class="cdf-editor-panel__field">
-        <span>Title (read by screen readers)</span>
+        <span>{{ 'ui.lessonEditor.embed.titleLabel' | translate }}</span>
         <input
           type="text"
           [value]="title()"
@@ -511,14 +551,14 @@ export interface EmbedPanelResult {
           class="cdf-editor-panel__btn"
           (click)="dismiss.emit()"
         >
-          Cancel
+          {{ 'ui.lessonEditor.panel.cancel' | translate }}
         </button>
         <button
           type="submit"
           class="cdf-editor-panel__btn cdf-editor-panel__btn--primary"
           [disabled]="!canInsert()"
         >
-          Insert embed
+          {{ 'ui.lessonEditor.embed.insert' | translate }}
         </button>
       </div>
     </form>

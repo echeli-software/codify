@@ -1,4 +1,5 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { I18nService, provideI18n } from '@codify/i18n';
 import {
   kitchenSinkLessonDoc,
   lessonDocSchema,
@@ -48,10 +49,15 @@ async function mount(
 }> {
   await TestBed.configureTestingModule({
     imports: [LessonBlockEditor],
-    providers: uploader
-      ? [{ provide: LESSON_ASSET_UPLOADER, useValue: uploader }]
-      : [],
+    providers: [
+      provideI18n(),
+      ...(uploader
+        ? [{ provide: LESSON_ASSET_UPLOADER, useValue: uploader }]
+        : []),
+    ],
   }).compileComponents();
+  // Pin the locale so assertions don't depend on navigator.language.
+  TestBed.inject(I18nService).setLocale('en-US');
   const fixture = TestBed.createComponent(LessonBlockEditor);
   const cmp = fixture.componentInstance;
   const changes: LessonDoc[] = [];

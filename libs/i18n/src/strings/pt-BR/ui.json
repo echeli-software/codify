@@ -341,6 +341,81 @@
     },
     "xp": {
       "toNextLevel": "XP para o próximo nível"
+    },
+    "lessonEditor": {
+      "ref": {
+        "kinds": {
+          "exercise": {
+            "label": "Exercício de código",
+            "description": "Os alunos resolvem aqui um exercício de código com correção automática."
+          },
+          "aiPrompt": {
+            "label": "Prompt de IA",
+            "description": "Os alunos respondem aqui a um prompt avaliado por rubrica."
+          },
+          "scenario": {
+            "label": "Cenário",
+            "description": "Os alunos jogam aqui um cenário com ramificações."
+          }
+        },
+        "delete": "Excluir bloco de {kind}",
+        "idLabel": "ID de {kind}",
+        "idPlaceholder": "Cole o ID da lista do admin",
+        "idInvalid": "Informe um ID válido (letras, números, - e _)."
+      },
+      "panel": {
+        "cancel": "Cancelar",
+        "apply": "Aplicar",
+        "url": "URL"
+      },
+      "link": {
+        "titleAdd": "Adicionar link",
+        "titleEdit": "Editar link",
+        "urlPlaceholder": "https://…, /caminho, #secao ou mailto:",
+        "invalid": "Só são permitidos http(s), mailto:, /caminhos relativos e #âncoras.",
+        "help": "Links para http(s), mailto:, /caminhos relativos ou #âncoras.",
+        "newTab": "Abrir em nova aba",
+        "remove": "Remover link"
+      },
+      "image": {
+        "title": "Inserir imagem",
+        "upload": "Enviar um arquivo (PNG, JPEG, WebP, GIF, SVG · máx. 10 MB)",
+        "uploading": "Enviando {name}…",
+        "progress": "Progresso do envio {pct}%",
+        "progressIndeterminate": "Enviando",
+        "cancelUpload": "Cancelar envio",
+        "retry": "Tentar de novo",
+        "uploaded": "{name} enviado.",
+        "orUrl": "…ou URL da imagem",
+        "url": "URL da imagem",
+        "urlInvalid": "Use uma URL http(s) ou um /caminho relativo.",
+        "previewAlt": "Pré-visualização",
+        "alt": "Texto alternativo (obrigatório)",
+        "altPlaceholder": "Descreva a imagem",
+        "caption": "Legenda (opcional)",
+        "width": "Largura",
+        "widths": {
+          "full": "Total",
+          "wide": "Larga",
+          "inline": "Em linha"
+        },
+        "insert": "Inserir imagem",
+        "errors": {
+          "type": "{name} não é um tipo de imagem suportado.",
+          "size": "{name} tem mais de 10 MB.",
+          "url": "O envio retornou uma URL não suportada.",
+          "failedWith": "Falha no envio: {message}",
+          "failed": "Falha no envio."
+        }
+      },
+      "embed": {
+        "title": "Incorporar",
+        "urlPlaceholder": "https://www.youtube.com/watch?v=…",
+        "detected": "{provider} detectado.",
+        "help": "Somente links do YouTube, Vimeo, CodePen, CodeSandbox ou Loom.",
+        "titleLabel": "Título (lido por leitores de tela)",
+        "insert": "Incorporar"
+      }
     }
   }
 }

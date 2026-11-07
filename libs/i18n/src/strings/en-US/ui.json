@@ -341,6 +341,81 @@
     },
     "xp": {
       "toNextLevel": "XP toward next level"
+    },
+    "lessonEditor": {
+      "ref": {
+        "kinds": {
+          "exercise": {
+            "label": "Code exercise",
+            "description": "Students solve an auto-graded coding exercise here."
+          },
+          "aiPrompt": {
+            "label": "AI prompt",
+            "description": "Students answer a rubric-graded prompt here."
+          },
+          "scenario": {
+            "label": "Scenario",
+            "description": "Students play a branching scenario here."
+          }
+        },
+        "delete": "Delete {kind} block",
+        "idLabel": "{kind} id",
+        "idPlaceholder": "Paste the id from the admin list",
+        "idInvalid": "Enter a valid id (letters, digits, - and _)."
+      },
+      "panel": {
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "url": "URL"
+      },
+      "link": {
+        "titleAdd": "Add link",
+        "titleEdit": "Edit link",
+        "urlPlaceholder": "https://…, /path, #section or mailto:",
+        "invalid": "Only http(s), mailto:, /relative paths and #anchors are allowed.",
+        "help": "Links to http(s), mailto:, /relative paths or #anchors.",
+        "newTab": "Open in a new tab",
+        "remove": "Remove link"
+      },
+      "image": {
+        "title": "Insert image",
+        "upload": "Upload a file (PNG, JPEG, WebP, GIF, SVG · max 10 MB)",
+        "uploading": "Uploading {name}…",
+        "progress": "Upload progress {pct}%",
+        "progressIndeterminate": "Uploading",
+        "cancelUpload": "Cancel upload",
+        "retry": "Retry",
+        "uploaded": "Uploaded {name}.",
+        "orUrl": "…or image URL",
+        "url": "Image URL",
+        "urlInvalid": "Use an http(s) URL or a /relative path.",
+        "previewAlt": "Preview",
+        "alt": "Alt text (required)",
+        "altPlaceholder": "Describe the image",
+        "caption": "Caption (optional)",
+        "width": "Width",
+        "widths": {
+          "full": "Full",
+          "wide": "Wide",
+          "inline": "Inline"
+        },
+        "insert": "Insert image",
+        "errors": {
+          "type": "{name} is not a supported image type.",
+          "size": "{name} is larger than 10 MB.",
+          "url": "The upload returned an unsupported URL.",
+          "failedWith": "Upload failed: {message}",
+          "failed": "Upload failed."
+        }
+      },
+      "embed": {
+        "title": "Embed",
+        "urlPlaceholder": "https://www.youtube.com/watch?v=…",
+        "detected": "Detected {provider}.",
+        "help": "YouTube, Vimeo, CodePen, CodeSandbox or Loom links only.",
+        "titleLabel": "Title (read by screen readers)",
+        "insert": "Insert embed"
+      }
     }
   }
 }
