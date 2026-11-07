@@ -11,7 +11,25 @@ export {
 } from './lib/locales.js';
 export { I18nService } from './lib/i18n.service.js';
 export { provideI18n, type ProvideI18nOptions } from './lib/provider.js';
-export { CodifyTranslateLoader, TRANSLATION_BUNDLES } from './lib/loader.js';
+export {
+  CodifyTranslateLoader,
+  I18N_NAMESPACES,
+  type TranslationNamespace,
+  loadTranslationBundle,
+  preloadTranslations,
+} from './lib/loader.js';
+export {
+  COMMON_STRINGS,
+  GAMIFICATION_STRINGS,
+  TIME_STRINGS,
+  BILLING_STRINGS,
+  UI_STRINGS,
+  SHARED_NAMESPACES,
+} from './lib/namespaces/shared.js';
+// App-specific namespaces are secondary entry points — `@codify/i18n/admin`
+// and `@codify/i18n/student` — so neither app's build even sees the other
+// app's string files (a bundler turns every reachable `import()` into a
+// chunk, used or not).
 export { CodifyTranslateCompiler } from './lib/compiler.js';
 export { compileIcu, formatIcu, type IcuParams } from './lib/icu.js';
 export {

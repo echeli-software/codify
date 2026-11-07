@@ -12,6 +12,24 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./admin": {
+      "@codify/source": "./src/admin.ts",
+      "types": "./src/admin.ts",
+      "import": "./src/admin.ts",
+      "default": "./src/admin.ts"
+    },
+    "./student": {
+      "@codify/source": "./src/student.ts",
+      "types": "./src/student.ts",
+      "import": "./src/student.ts",
+      "default": "./src/student.ts"
+    },
+    "./testing": {
+      "@codify/source": "./src/testing.ts",
+      "types": "./src/testing.ts",
+      "import": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {

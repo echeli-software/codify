@@ -1,5 +1,7 @@
 import { compileIcu, formatIcu, needsIcu } from './icu.js';
-import { TRANSLATION_BUNDLES } from './loader.js';
+import { staticTranslationBundles } from './static-bundles.js';
+
+const TRANSLATION_BUNDLES = staticTranslationBundles();
 
 describe('formatIcu', () => {
   it('substitutes single-brace params', () => {

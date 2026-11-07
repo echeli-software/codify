@@ -36,6 +36,7 @@ export class I18nService {
   private readonly content = inject(ContentTranslationService);
   private readonly persistence = inject(LOCALE_PERSISTENCE, { optional: true });
   private readonly _current = signal<Locale>(DEFAULT_LOCALE);
+  private requestSeq = 0;
 
   /** Current locale. Reactive. */
   readonly currentLocale = this._current.asReadonly();
@@ -46,17 +47,26 @@ export class I18nService {
   /** Convenience: meta for the current locale. */
   readonly currentMeta = computed(() => LOCALE_META[this._current()]);
 
-  init(): void {
+  /**
+   * Picks the initial locale and loads its strings. Runs in an app
+   * initializer: the returned promise resolves once `t()` can translate
+   * synchronously (immediately when the strings were preloaded).
+   */
+  init(): Promise<void> {
     this.translate.addLangs([...SUPPORTED_LOCALES]);
     this.translate.setFallbackLang(DEFAULT_LOCALE);
     const initial = this.detectInitial();
-    this.applyLocale(initial);
+    return this.applyLocale(initial);
   }
 
-  setLocale(locale: Locale): void {
-    if (!SUPPORTED_LOCALES.includes(locale)) return;
-    this.applyLocale(locale);
+  /**
+   * Switches locale. The switch (signal, `<html lang>`) is applied once the
+   * locale's strings are loaded — synchronously when they already are.
+   */
+  setLocale(locale: Locale): Promise<void> {
+    if (!SUPPORTED_LOCALES.includes(locale)) return Promise.resolve();
     this.persist(locale);
+    return this.applyLocale(locale);
   }
 
   /**
@@ -66,7 +76,7 @@ export class I18nService {
    */
   async changeLocale(locale: Locale): Promise<void> {
     if (!SUPPORTED_LOCALES.includes(locale)) return;
-    this.setLocale(locale);
+    await this.setLocale(locale);
     if (!this.persistence) return;
     try {
       await this.persistence.persist(locale);
@@ -117,9 +127,28 @@ export class I18nService {
     return pickLocale(candidates);
   }
 
-  private applyLocale(locale: Locale): void {
+  private applyLocale(locale: Locale): Promise<void> {
+    const request = ++this.requestSeq;
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        // A later setLocale() wins over a slower earlier load.
+        if (request === this.requestSeq) this.commitLocale(locale);
+        resolve();
+      };
+      // Emits synchronously when the strings are already loaded.
+      this.translate.use(locale).subscribe({
+        complete: done,
+        error: (err: unknown) => {
+          // Keep the current locale (ngx-translate did not switch either).
+          console.error(`[i18n] could not load ${locale} strings`, err);
+          resolve();
+        },
+      });
+    });
+  }
+
+  private commitLocale(locale: Locale): void {
     this._current.set(locale);
-    this.translate.use(locale);
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('lang', locale);
       document.documentElement.setAttribute('dir', LOCALE_META[locale].dir);

@@ -4,7 +4,8 @@ import {
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideI18n } from '@codify/i18n';
+import { SHARED_NAMESPACES, provideI18n } from '@codify/i18n';
+import { ADMIN_STRINGS } from '@codify/i18n/admin';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
 import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
@@ -32,6 +33,7 @@ export const appConfig: ApplicationConfig = {
     }),
     provideApiClient({ baseUrl: API_BASE_URL }),
     provideI18n({
+      namespaces: [...SHARED_NAMESPACES, ADMIN_STRINGS],
       contentSource: ApiContentTranslationSource,
       persistence: MeLocalePersistence,
     }),

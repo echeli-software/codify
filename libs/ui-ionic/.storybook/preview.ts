@@ -3,6 +3,10 @@ import { applicationConfig } from '@storybook/angular';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular/standalone';
 import { provideI18n } from '@codify/i18n';
+import { preloadAllTranslations } from '@codify/i18n/testing';
+
+// Stories render synchronously with every namespace (apps load lazily).
+preloadAllTranslations();
 
 // Global SCSS is loaded via the `styles` option on the Storybook target in
 // libs/ui-ionic/project.json (Storybook's webpack sass-loader doesn't

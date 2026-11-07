@@ -6,7 +6,15 @@ import {
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
-import { LOCALE_PERSISTENCE, provideI18n } from '@codify/i18n';
+import {
+  LOCALE_PERSISTENCE,
+  SHARED_NAMESPACES,
+  provideI18n,
+} from '@codify/i18n';
+import {
+  STUDENT_PLATFORM_STRINGS,
+  STUDENT_STRINGS,
+} from '@codify/i18n/student';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
 import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
@@ -43,7 +51,14 @@ export const appConfig: ApplicationConfig = {
       clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
     }),
     provideApiClient({ baseUrl: API_BASE_URL }),
-    provideI18n(),
+    // Only the string files the student app renders (no admin strings).
+    provideI18n({
+      namespaces: [
+        ...SHARED_NAMESPACES,
+        STUDENT_STRINGS,
+        STUDENT_PLATFORM_STRINGS,
+      ],
+    }),
     // docs/11 §6: persist the chosen locale on the user (PATCH /me).
     { provide: LOCALE_PERSISTENCE, useExisting: StudentLocalePersistence },
     // docs/11 §3: content translations — API online, downloads offline.
