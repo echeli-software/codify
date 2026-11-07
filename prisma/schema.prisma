@@ -42,6 +42,29 @@ model User {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
+  /// Account lifecycle (docs/14 §Privacy). Self-service deletion sets both
+  /// `deletionRequestedAt` and `deletedAt`; the user may restore within 14
+  /// days, and the row is anonymised (`purgedAt`) after 30. `deletedAt`
+  /// alone (no request) means the auth provider deleted the account.
+  deletionRequestedAt DateTime?
+  purgedAt            DateTime?
+  /// Admin suspension (docs/04 Users, docs/14 audit). Suspended accounts
+  /// are refused by the API with ACCOUNT_SUSPENDED.
+  suspendedAt         DateTime?
+  suspendedReason     String?
+
+  /// Notification settings (docs/10 §3). Null = defaults: 2 push/day,
+  /// reminders at the learned session time (fallback 20:00 user-local).
+  pushDailyCap      Int?
+  /// Explicit opt-in to more than 14 pushes per week (docs/10 §3).
+  pushWeeklyOptIn   Boolean   @default(false)
+  /// Daily-quest reminder time, user-local minutes from midnight.
+  reminderMinute    Int?
+  /// Reactivation (docs/10 §13): last lapsed stage handled (0 none, 7, 14,
+  /// 30) since the user was last active, and when they went dormant (90d).
+  reactivationStage Int       @default(0)
+  dormantAt         DateTime?
+
   /// Running gamification totals — single-row updates from Progress
   /// completions inside the same transaction that writes Progress, so
   /// these two are always in sync. Source of truth: User row; Progress
@@ -53,7 +76,7 @@ model User {
   avatarConfig Json?
 
   auditedActions     AuditLog[]
-  authoredCourses    Course[]           @relation("CourseAuthor")
+  authoredCourses    Course[]                 @relation("CourseAuthor")
   progress           Progress[]
   subscriptions      Subscription[]
   xpEvents           XpEvent[]
@@ -65,12 +88,12 @@ model User {
   items              UserItem[]
   equipped           EquippedItem[]
   leagueMemberships  LeagueMembership[]
-  sentFriendRequests FriendRequest[]    @relation("Sender")
-  recvFriendRequests FriendRequest[]    @relation("Receiver")
-  friendshipsA       Friendship[]       @relation("FriendA")
-  friendshipsB       Friendship[]       @relation("FriendB")
-  sentNudges         FriendNudge[]      @relation("NudgeSender")
-  recvNudges         FriendNudge[]      @relation("NudgeReceiver")
+  sentFriendRequests FriendRequest[]          @relation("Sender")
+  recvFriendRequests FriendRequest[]          @relation("Receiver")
+  friendshipsA       Friendship[]             @relation("FriendA")
+  friendshipsB       Friendship[]             @relation("FriendB")
+  sentNudges         FriendNudge[]            @relation("NudgeSender")
+  recvNudges         FriendNudge[]            @relation("NudgeReceiver")
   submissions        Submission[]
   aiSubmissions      AiSubmission[]
   scenarioRuns       ScenarioRun[]
@@ -79,12 +102,16 @@ model User {
   quizAttempts       QuizAttempt[]
   uploadedAssets     Asset[]
   analyticsEvents    AnalyticsEvent[]
-  referredBy         User?              @relation("Referrals", fields: [referredById], references: [id])
-  referrals          User[]             @relation("Referrals")
+  referredBy         User?                    @relation("Referrals", fields: [referredById], references: [id])
+  referrals          User[]                   @relation("Referrals")
+  notifications      Notification[]
+  notificationPrefs  NotificationPreference[]
+  payments           Payment[]
 
   @@index([role])
   @@index([lastSeenAt])
   @@index([referredById])
+  @@index([deletedAt])
 }
 
 model AuditLog {
@@ -378,6 +405,10 @@ model Subscription {
   /// The access grace window is measured from here, not from
   /// currentPeriodEnd (which Stripe advances before the charge fails).
   pastDueSince         DateTime?
+  /// `created` time of the newest Stripe event applied to this row. Older
+  /// events arriving late (Stripe does not guarantee order) are ignored.
+  lastStripeEventAt    DateTime?
+  payments             Payment[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -860,6 +891,9 @@ model Submission {
   scorePct       Int?
   /// Whether this was a "submit" (scored, visible+hidden) vs a "run".
   scored         Boolean            @default(true)
+  /// Per-test results as returned to the client (hidden tests anonymised
+  /// until a pass), so a past submission can be shown again.
+  resultJson     Json?
   idempotencyKey String?            @unique
   createdAt      DateTime           @default(now())
   completedAt    DateTime?
@@ -1147,4 +1181,123 @@ model AnalyticsEvent {
 
   @@index([name, occurredAt])
   @@index([userId, occurredAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Notifications — in-app inbox + delivery log — docs/10 §3, docs/05 §3
+// ─────────────────────────────────────────────────────────────────────
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  IN_APP
+}
+
+enum NotificationKind {
+  STREAK_REMINDER
+  DAILY_QUEST
+  FRIEND_NUDGE
+  LEAGUE_RESULT
+  ITEM_DROP
+  PROMO
+  BILLING
+  SYSTEM
+  WELCOME
+  WEEKLY_RECAP
+  REACTIVATION
+}
+
+/// One row per notification per channel. IN_APP rows are the inbox (read via
+/// `readAt`); PUSH/EMAIL rows are the delivery log (`sentAt` once delivered,
+/// `scheduledFor` while deferred to the end of quiet hours).
+model Notification {
+  id           String              @id @default(dbgenerated("uuid_generate_v7()"))
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel      NotificationChannel
+  kind         NotificationKind
+  /// { title, body, deepLink?, action?: { type, label?, ref? }, data? }
+  payload      Json
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  readAt       DateTime?
+  createdAt    DateTime            @default(now())
+
+  @@index([userId, channel, createdAt])
+  @@index([userId, readAt])
+  @@index([scheduledFor])
+}
+
+/// Per-kind delivery settings. No row = defaults (push + email on, except
+/// PROMO push which is opt-in). `fewerLevel` is the "fewer like this"
+/// feedback: 0 normal, 1 fewer, 2 much fewer.
+model NotificationPreference {
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         NotificationKind
+  pushEnabled  Boolean          @default(true)
+  emailEnabled Boolean          @default(true)
+  fewerLevel   Int              @default(0)
+  updatedAt    DateTime         @updatedAt
+
+  @@id([userId, kind])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Payments — billing history + refunds — docs/09 §6, docs/05 Subscription
+// ─────────────────────────────────────────────────────────────────────
+
+enum PaymentProvider {
+  STRIPE
+  APPLE
+  GOOGLE
+}
+
+enum PaymentStatus {
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Payment {
+  id             String          @id @default(dbgenerated("uuid_generate_v7()"))
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  provider       PaymentProvider
+  /// Stripe invoice id / store transaction id — the idempotent upsert key.
+  externalId     String          @unique
+  amountCents    Int
+  currency       String
+  status         PaymentStatus
+  /// card | pix | boleto | store
+  method         String?
+  refundedCents  Int             @default(0)
+  /// Hosted invoice / receipt URL when the provider has one.
+  receiptUrl     String?
+  paidAt         DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([subscriptionId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Feature flags + experiments — docs/10 §9, docs/04 Settings
+// ─────────────────────────────────────────────────────────────────────
+
+/// Server-side feature flags. Read-mostly; changes audited.
+/// `value`: { enabled: boolean, rolloutPct?: 0-100, variants?: { key: weight },
+/// holdoutPct?: 0-100, surface?: string }. Rollout and variant are chosen
+/// deterministically from hash(userId, key).
+model FeatureFlag {
+  key         String   @id /// e.g. "leagues.enabled", "shop.enabled"
+  value       Json
+  description String?
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }

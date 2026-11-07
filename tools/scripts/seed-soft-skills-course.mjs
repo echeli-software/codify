@@ -5,7 +5,7 @@
  * skips if the course already exists.
  */
 
-const API = 'http://localhost:3000/api';
+const API = process.env.API_URL ?? 'http://localhost:3000/api';
 const A = { 'content-type': 'application/json', authorization: 'Bearer dev-token-admin' };
 const post = async (p, b) => {
   const r = await fetch(API + p, { method: 'POST', headers: { ...A, 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(b) });
