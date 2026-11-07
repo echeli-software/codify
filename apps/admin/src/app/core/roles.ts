@@ -20,7 +20,8 @@ export type AdminSection =
   | 'profile'
   | 'audit'
   | 'leagues'
-  | 'itemCategories';
+  | 'itemCategories'
+  | 'settings';
 
 /**
  * Who may open each section — UI gating only, the API enforces the real
@@ -46,6 +47,8 @@ export const SECTION_ROLES: Record<AdminSection, readonly UserRole[]> = {
   audit: ['ADMIN', 'TEACHER', 'SUPPORT'],
   leagues: ['ADMIN'],
   itemCategories: ['ADMIN'],
+  // docs/04 Settings: feature flags + Stripe status.
+  settings: ['ADMIN'],
 };
 
 export function canAccess(
@@ -200,6 +203,12 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
   {
     labelKey: 'admin.nav.group.account',
     items: [
+      {
+        section: 'settings',
+        labelKey: 'admin.settings.nav',
+        icon: 'gear',
+        link: '/settings',
+      },
       {
         section: 'profile',
         labelKey: 'admin.nav.profile',

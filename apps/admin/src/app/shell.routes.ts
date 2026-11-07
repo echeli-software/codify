@@ -177,6 +177,12 @@ export const SHELL_ROUTES: Route[] = [
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),
       },
+      {
+        path: 'settings',
+        canActivate: [sectionGuard('settings')],
+        loadComponent: () =>
+          import('./pages/settings.page').then((m) => m.SettingsPage),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: '**',
