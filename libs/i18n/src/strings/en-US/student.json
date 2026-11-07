@@ -838,6 +838,9 @@
         "loadError": "Couldn't load your notification settings.",
         "offline": "Connect to the internet to change your notification settings."
       }
+    },
+    "translationFallback": {
+      "toast": "This content hasn't been translated to {locale, select, en-US {English} pt-BR {Portuguese} other {your language}} yet."
     }
   }
 }

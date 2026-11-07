@@ -15,6 +15,7 @@ import { provideLazyContentTranslationSource } from './platform/lazy-providers';
 import { StudentLocalePersistence } from './platform/locale-persistence';
 import { isNativeRuntime } from './platform/runtime';
 import { accountStateInterceptor } from './pages/account/account-state';
+import { translationFallbackInterceptor } from './platform/translation-fallback.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -30,6 +31,8 @@ export const appConfig: ApplicationConfig = {
         authInterceptor(),
         ...apiClientInterceptors(),
         accountStateInterceptor,
+        // docs/11 §3: one-time toast when content falls back to another locale.
+        translationFallbackInterceptor,
       ]),
     ),
     // Ionic (mode 'md') is configured by the lazily-loaded IonicRoot

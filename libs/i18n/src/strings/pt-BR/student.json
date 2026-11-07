@@ -838,6 +838,9 @@
         "loadError": "Não foi possível carregar suas preferências de notificação.",
         "offline": "Conecte-se à internet para alterar suas preferências de notificação."
       }
+    },
+    "translationFallback": {
+      "toast": "Este conteúdo ainda não foi traduzido para {locale, select, en-US {inglês} pt-BR {português} other {o seu idioma}}."
     }
   }
 }
