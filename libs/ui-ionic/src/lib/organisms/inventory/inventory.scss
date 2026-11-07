@@ -57,17 +57,6 @@
     }
   }
 
-  &__glyph {
-    font-size: 36px;
-    line-height: 1;
-  }
-
-  &__swatch {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--cdf-radius-md);
-  }
-
   &__name {
     font-size: var(--cdf-font-size-sm);
     font-weight: var(--cdf-font-weight-semibold);

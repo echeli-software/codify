@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { levelFromXp, tierForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
 
 export interface PublicProfile {
   userId: string;
@@ -10,7 +11,7 @@ export interface PublicProfile {
   totalXp: number;
   avatar: {
     config: Record<string, unknown> | null;
-    equipped: Record<string, { slug: string; name: string; spriteAssetId: string }>;
+    equipped: Record<string, { slug: string; name: string; spriteAssetId: string; spriteUrl: string | null }>;
   };
   badges: { slug: string; name: string; iconName: string | null; awardedAt: string }[];
   stats: { lessonsCompleted: number; streakDays: number; longestStreak: number; friends: number };
@@ -37,10 +38,16 @@ export class ProfileService {
       this.prisma.friendship.count({ where: { userBId: userId } }),
     ]);
 
+    const spriteUrls = await loadSpriteUrls(this.prisma, equipped.map((e) => e.item.spriteAssetId));
     const equippedMap: PublicProfile['avatar']['equipped'] = {};
     for (const e of equipped) {
       if (e.item.deletedAt) continue;
-      equippedMap[e.slot] = { slug: e.item.slug, name: e.item.name, spriteAssetId: e.item.spriteAssetId };
+      equippedMap[e.slot] = {
+        slug: e.item.slug,
+        name: e.item.name,
+        spriteAssetId: e.item.spriteAssetId,
+        spriteUrl: spriteUrlFor(e.item.spriteAssetId, spriteUrls),
+      };
     }
 
     const level = levelFromXp(user.totalXp);

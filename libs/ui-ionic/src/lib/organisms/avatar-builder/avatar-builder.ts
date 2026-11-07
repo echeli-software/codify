@@ -1,3 +1,4 @@
+import { ItemSprite } from '../../atoms/item-sprite/item-sprite.js';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -16,11 +17,7 @@ import {
   type AvatarSlot,
   type AvatarSprite,
 } from '../../molecules/avatar-renderer/avatar-renderer.js';
-import {
-  SLOT_ORDER,
-  spriteGlyph,
-  type ShopItem,
-} from '../shop-grid/shop-item.js';
+import { SLOT_ORDER, type ShopItem } from '../shop-grid/shop-item.js';
 
 /** slot → equipped item id (null = nothing in that slot). */
 export type EquippedMap = Partial<Record<AvatarSlot, string | null>>;
@@ -37,7 +34,7 @@ let builderSeq = 0;
 @Component({
   selector: 'cdf-avatar-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AvatarRenderer, AppButton, TranslatePipe],
+  imports: [ItemSprite, AvatarRenderer, AppButton, TranslatePipe],
   template: `
     <div class="cdf-builder">
       <div class="cdf-builder__preview">
@@ -105,17 +102,11 @@ let builderSeq = 0;
                 [attr.aria-checked]="draft()[activeSlot()] === item.id"
                 (click)="pick(activeSlot(), item.id)"
               >
-                @if (glyph(item).kind === 'emoji') {
-                  <span class="cdf-builder__glyph" aria-hidden="true">{{
-                    glyph(item).value
-                  }}</span>
-                } @else {
-                  <span
-                    class="cdf-builder__swatch"
-                    aria-hidden="true"
-                    [style.background]="glyph(item).value"
-                  ></span>
-                }
+                <cdf-item-sprite
+                  [token]="item.spriteAssetId"
+                  [url]="item.spriteUrl"
+                  [size]="28"
+                />
                 <span>{{ item.name }}</span>
               </button>
             }
@@ -183,6 +174,7 @@ export class AvatarBuilder {
       if (item)
         out[slot] = {
           spriteAssetId: item.spriteAssetId,
+          spriteUrl: item.spriteUrl ?? null,
           name: item.name,
           rarity: item.rarity,
         };
@@ -209,10 +201,6 @@ export class AvatarBuilder {
 
   protected tabId(slot: AvatarSlot): string {
     return `${this.uid}-tab-${slot}`;
-  }
-
-  protected glyph(item: ShopItem) {
-    return spriteGlyph(item.spriteAssetId);
   }
 
   protected pick(slot: AvatarSlot, id: string | null): void {

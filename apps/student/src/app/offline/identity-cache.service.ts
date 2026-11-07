@@ -136,8 +136,14 @@ export class IdentityCacheService {
         await this.downloads.prefetchAssets({ avatar, inventory });
       }
       const refs = [
-        ...Object.values(avatar?.equipped ?? {}).map((e) => e?.spriteAssetId),
-        ...(bundle.ownedItems ?? []).map((i) => i.spriteAssetId),
+        ...Object.values(avatar?.equipped ?? {}).flatMap((e) => [
+          e?.spriteUrl,
+          e?.spriteAssetId,
+        ]),
+        ...(bundle.ownedItems ?? []).flatMap((i) => [
+          i.spriteUrl,
+          i.spriteAssetId,
+        ]),
         ...(inventory ?? []).map((i) => i.item.thumbnailAssetId),
         ...(bundle.badges ?? []).map((b) => b.iconName),
         bundle.avatarUrl,
@@ -202,6 +208,7 @@ function buildBundle(
           slot: i.item.slot,
           rarity: i.item.rarity,
           spriteAssetId: i.item.spriteAssetId,
+          spriteUrl: i.item.spriteUrl ?? null,
           equipped: i.equipped,
         }))
       : (prev?.ownedItems ?? []),

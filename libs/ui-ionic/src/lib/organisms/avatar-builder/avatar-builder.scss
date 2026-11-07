@@ -96,17 +96,6 @@
     }
   }
 
-  &__glyph {
-    font-size: 28px;
-    line-height: 1;
-  }
-
-  &__swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--cdf-radius-sm);
-  }
-
   &__actions {
     display: flex;
     justify-content: flex-end;

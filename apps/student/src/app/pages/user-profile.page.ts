@@ -242,6 +242,7 @@ export class UserProfilePage {
     )) {
       out[slot as AvatarSlot] = {
         spriteAssetId: ref.spriteAssetId,
+        spriteUrl: ref.spriteUrl ?? null,
         name: ref.name,
       };
     }

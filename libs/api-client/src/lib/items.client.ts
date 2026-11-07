@@ -33,6 +33,11 @@ export interface Item {
   dropStartsAt: string | null;
   dropEndsAt: string | null;
   spriteAssetId: string;
+  /**
+   * Resolved image URL when the sprite is an uploaded Asset (or a URL);
+   * null for inline `emoji:` / `color:` tokens. Optional for older APIs.
+   */
+  spriteUrl?: string | null;
   thumbnailAssetId: string | null;
   isActive: boolean;
 }
@@ -57,6 +62,11 @@ export interface EquippedRef {
   slot: ItemSlot;
   rarity: ItemRarity;
   spriteAssetId: string;
+  /**
+   * Resolved image URL when the sprite is an uploaded Asset (or a URL);
+   * null for inline `emoji:` / `color:` tokens. Optional for older APIs.
+   */
+  spriteUrl?: string | null;
 }
 
 export interface AvatarResponse {

@@ -1,7 +1,19 @@
 import type { ShopItem } from './shop-item.js';
+import { SAMPLE_SPRITE_URLS } from '../../atoms/item-sprite/sample-sprites.js';
 
 /** Deterministic sample catalog for stories / tests (no network). */
 export const SAMPLE_ITEMS: ShopItem[] = [
+  {
+    id: 'i0',
+    name: 'Crown',
+    slot: 'HAT',
+    rarity: 'LEGENDARY',
+    // An uploaded sprite: Asset id + the API-resolved image URL.
+    spriteAssetId: '01960000-0000-7000-8000-000000000001',
+    spriteUrl: SAMPLE_SPRITE_URLS.crown,
+    costCoins: 2000,
+    requiredLevel: 12,
+  },
   {
     id: 'i1',
     name: 'Wizard hat',

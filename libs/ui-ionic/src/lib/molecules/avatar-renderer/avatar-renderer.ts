@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   input,
+  signal,
 } from '@angular/core';
 import { TranslatePipe } from '@codify/i18n';
 
@@ -20,8 +21,10 @@ export type AvatarSlot =
   | 'EMOTE';
 
 export interface AvatarSprite {
-  /** Placeholder token: "emoji:🧢" or "color:#88ccff". */
+  /** Placeholder token ("emoji:🧢" / "color:#88ccff") or an uploaded Asset id. */
   spriteAssetId: string;
+  /** Resolved image URL for an uploaded sprite (API `spriteUrl`). */
+  spriteUrl?: string | null;
   name?: string;
   rarity?: string;
 }
@@ -31,9 +34,11 @@ export interface AvatarConfigLike {
   baseHairColor?: string;
 }
 
+type SpriteKind = 'emoji' | 'color' | 'image';
+
 interface Layer {
   slot: AvatarSlot;
-  kind: 'emoji' | 'color';
+  kind: SpriteKind;
   value: string;
   style: Record<string, string>;
 }
@@ -51,10 +56,10 @@ const SKIN_EMOJI: Record<string, string> = {
 
 /**
  * Composites a 2D avatar from a base config + equipped item sprites, stacked
- * in the documented slot/layer order (docs/08-avatar-and-shop.md §2). Until
- * the SVG/R2 asset pipeline lands, sprites are placeholder tokens
- * ("emoji:🧢" / "color:#hex") rendered as positioned glyphs/shapes — so the
- * dressing room, shop try-on, and admin preview all work end to end.
+ * in the documented slot/layer order (docs/08-avatar-and-shop.md §2).
+ * Uploaded sprites (an API-resolved `spriteUrl`) render as images; inline
+ * tokens ("emoji:🧢" / "color:#hex") as positioned glyphs/shapes. An image
+ * that fails to load falls back to the token rendering.
  */
 @Component({
   selector: 'cdf-avatar-renderer',
@@ -80,7 +85,16 @@ const SKIN_EMOJI: Record<string, string> = {
       }}</span>
 
       @for (layer of layers(); track layer.slot) {
-        @if (layer.kind === 'emoji') {
+        @if (layer.kind === 'image') {
+          <img
+            class="avatar__layer avatar__layer--img"
+            [style]="layer.style"
+            [src]="layer.value"
+            alt=""
+            decoding="async"
+            (error)="markFailed(layer.value)"
+          />
+        } @else if (layer.kind === 'emoji') {
           <span class="avatar__layer" [style]="layer.style">{{
             layer.value
           }}</span>
@@ -94,9 +108,31 @@ const SKIN_EMOJI: Record<string, string> = {
       }
 
       @if (petLayer(); as pet) {
-        <span class="avatar__pet" [style.font-size.px]="size() * 0.28">{{
-          pet
-        }}</span>
+        @if (pet.kind === 'image') {
+          <img
+            class="avatar__pet avatar__pet--img"
+            [src]="pet.value"
+            alt=""
+            [style.width.px]="size() * 0.32"
+            [style.height.px]="size() * 0.32"
+            decoding="async"
+            (error)="markFailed(pet.value)"
+          />
+        } @else {
+          <span class="avatar__pet" [style.font-size.px]="size() * 0.28">{{
+            pet.value
+          }}</span>
+        }
+      }
+
+      @if (frameImage(); as frame) {
+        <img
+          class="avatar__frame"
+          [src]="frame"
+          alt=""
+          decoding="async"
+          (error)="markFailed(frame)"
+        />
       }
 
       @if (showLevelRing() && level() !== null) {
@@ -134,6 +170,18 @@ const SKIN_EMOJI: Record<string, string> = {
       .avatar__layer--color {
         border-radius: 6px;
       }
+      .avatar__layer--img,
+      .avatar__pet--img,
+      .avatar__frame {
+        object-fit: contain;
+      }
+      .avatar__frame {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
       .avatar__pet {
         position: absolute;
         right: -6%;
@@ -167,6 +215,22 @@ export class AvatarRenderer {
   readonly level = input<number | null>(null);
   readonly showLevelRing = input<boolean>(false);
 
+  /** Image URLs that failed to load → render their token instead. */
+  private readonly failedUrls = signal<ReadonlySet<string>>(new Set());
+
+  protected markFailed(url: string): void {
+    if (this.failedUrls().has(url)) return;
+    this.failedUrls.update((s) => new Set(s).add(url));
+  }
+
+  /** Image when resolved + loadable, else the token. */
+  private sprite(s: AvatarSprite): { kind: SpriteKind; value: string } {
+    const url = s.spriteUrl;
+    if (url && !this.failedUrls().has(url))
+      return { kind: 'image', value: url };
+    return parseSprite(s.spriteAssetId);
+  }
+
   protected readonly baseEmoji = computed(() => {
     const tone = this.config()?.skinTone;
     return (tone && SKIN_EMOJI[tone]) || '🧑';
@@ -175,7 +239,9 @@ export class AvatarRenderer {
   protected readonly backgroundStyle = computed(() => {
     const bg = this.equipped()['BACKGROUND'];
     if (!bg) return '';
-    const p = parseSprite(bg.spriteAssetId);
+    const p = this.sprite(bg);
+    if (p.kind === 'image')
+      return `center / cover no-repeat url("${cssUrl(p.value)}")`;
     return p.kind === 'color' ? p.value : '';
   });
 
@@ -186,17 +252,29 @@ export class AvatarRenderer {
   protected readonly ringColor = computed(() => {
     const frame = this.frameLayer();
     if (frame) {
-      const p = parseSprite(frame.spriteAssetId);
+      const p = this.sprite(frame);
       if (p.kind === 'color') return p.value;
     }
     return 'var(--cdf-color-primary, #5b8def)';
   });
 
-  protected readonly petLayer = computed(() => {
+  /** Uploaded frame art, drawn over the whole canvas. */
+  protected readonly frameImage = computed(() => {
+    const frame = this.frameLayer();
+    if (!frame) return null;
+    const p = this.sprite(frame);
+    return p.kind === 'image' ? p.value : null;
+  });
+
+  protected readonly petLayer = computed<{
+    kind: 'emoji' | 'image';
+    value: string;
+  } | null>(() => {
     const pet = this.equipped()['PET'];
     if (!pet) return null;
-    const p = parseSprite(pet.spriteAssetId);
-    return p.kind === 'emoji' ? p.value : '🐾';
+    const p = this.sprite(pet);
+    if (p.kind === 'image') return { kind: 'image', value: p.value };
+    return { kind: 'emoji', value: p.kind === 'emoji' ? p.value : '🐾' };
   });
 
   protected readonly itemNames = computed(() =>
@@ -214,7 +292,7 @@ export class AvatarRenderer {
     for (const slot of STACK_ORDER) {
       const sprite = eq[slot];
       if (!sprite) continue;
-      const p = parseSprite(sprite.spriteAssetId);
+      const p = this.sprite(sprite);
       const pos = SLOT_POS[slot];
       const fontPx = sz * pos.scale;
       const style: Record<string, string> =
@@ -253,6 +331,11 @@ const SLOT_POS: Record<AvatarSlot, { top: number; scale: number }> = {
   FRAME: { top: 0, scale: 1 },
   PET: { top: 70, scale: 0.28 },
 };
+
+/** Escape a URL for a double-quoted CSS `url("…")`. */
+function cssUrl(url: string): string {
+  return url.replace(/["\\\n\r]/g, (c) => encodeURIComponent(c));
+}
 
 function parseSprite(token: string): {
   kind: 'emoji' | 'color';

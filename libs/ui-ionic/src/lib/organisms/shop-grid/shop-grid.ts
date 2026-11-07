@@ -1,3 +1,4 @@
+import { ItemSprite } from '../../atoms/item-sprite/item-sprite.js';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -17,7 +18,6 @@ import { CoinBadge } from '../../atoms/coin-badge/coin-badge.js';
 import {
   RARITIES,
   affordability,
-  spriteGlyph,
   type Affordability,
   type ItemRarity,
   type ShopItem,
@@ -34,7 +34,7 @@ import {
 @Component({
   selector: 'cdf-shop-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ScrollingModule, AppButton, CoinBadge, TranslatePipe],
+  imports: [ItemSprite, ScrollingModule, AppButton, CoinBadge, TranslatePipe],
   template: `
     <div
       class="cdf-shop__filters"
@@ -99,17 +99,12 @@ import {
                 "
                 (click)="preview.emit(item)"
               >
-                @if (glyph(item).kind === 'emoji') {
-                  <span class="cdf-shop__glyph" aria-hidden="true">{{
-                    glyph(item).value
-                  }}</span>
-                } @else {
-                  <span
-                    class="cdf-shop__swatch"
-                    aria-hidden="true"
-                    [style.background]="glyph(item).value"
-                  ></span>
-                }
+                <cdf-item-sprite
+                  [token]="item.spriteAssetId"
+                  [url]="item.spriteUrl"
+                  [size]="48"
+                  [glyphSize]="40"
+                />
               </button>
               <h3 class="cdf-shop__name">{{ item.name }}</h3>
               <span class="cdf-shop__rarity">{{
@@ -220,9 +215,5 @@ export class ShopGrid {
       level: this.level(),
       isPremium: this.isPremium(),
     });
-  }
-
-  protected glyph(item: ShopItem) {
-    return spriteGlyph(item.spriteAssetId);
   }
 }

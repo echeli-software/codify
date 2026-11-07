@@ -8,6 +8,8 @@ export interface CachedOwnedItem {
   slot: string;
   rarity: string;
   spriteAssetId: string;
+  /** Resolved uploaded-sprite URL (cached with the persistent assets). */
+  spriteUrl?: string | null;
   equipped: boolean;
 }
 

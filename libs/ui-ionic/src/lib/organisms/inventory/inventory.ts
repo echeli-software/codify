@@ -1,3 +1,4 @@
+import { ItemSprite } from '../../atoms/item-sprite/item-sprite.js';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -7,11 +8,7 @@ import {
 } from '@angular/core';
 import { TranslatePipe } from '@codify/i18n';
 import type { AvatarSlot } from '../../molecules/avatar-renderer/avatar-renderer.js';
-import {
-  SLOT_ORDER,
-  spriteGlyph,
-  type ShopItem,
-} from '../shop-grid/shop-item.js';
+import { SLOT_ORDER, type ShopItem } from '../shop-grid/shop-item.js';
 
 let inventorySeq = 0;
 
@@ -38,7 +35,7 @@ export function groupBySlot(items: readonly ShopItem[]): InventoryGroup[] {
 @Component({
   selector: 'cdf-inventory',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [ItemSprite, TranslatePipe],
   template: `
     @for (group of groups(); track group.slot) {
       <section
@@ -60,17 +57,11 @@ export function groupBySlot(items: readonly ShopItem[]): InventoryGroup[] {
                 [disabled]="busyId() === item.id"
                 (click)="item.equipped ? unequip.emit(item) : equip.emit(item)"
               >
-                @if (glyph(item).kind === 'emoji') {
-                  <span class="cdf-inv__glyph" aria-hidden="true">{{
-                    glyph(item).value
-                  }}</span>
-                } @else {
-                  <span
-                    class="cdf-inv__swatch"
-                    aria-hidden="true"
-                    [style.background]="glyph(item).value"
-                  ></span>
-                }
+                <cdf-item-sprite
+                  [token]="item.spriteAssetId"
+                  [url]="item.spriteUrl"
+                  [size]="36"
+                />
                 <span class="cdf-inv__name">{{ item.name }}</span>
                 <span class="cdf-inv__state">
                   {{
@@ -104,9 +95,5 @@ export class Inventory {
 
   protected headingId(slot: AvatarSlot): string {
     return `${this.uid}-${slot}`;
-  }
-
-  protected glyph(item: ShopItem) {
-    return spriteGlyph(item.spriteAssetId);
   }
 }

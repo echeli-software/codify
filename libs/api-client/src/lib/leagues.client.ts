@@ -88,7 +88,13 @@ export interface PublicProfile {
     config: Record<string, unknown> | null;
     equipped: Record<
       string,
-      { slug: string; name: string; spriteAssetId: string }
+      {
+        slug: string;
+        name: string;
+        spriteAssetId: string;
+        /** Resolved uploaded-sprite URL; null for `emoji:`/`color:` tokens. */
+        spriteUrl?: string | null;
+      }
     >;
   };
   badges: {

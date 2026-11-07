@@ -31,8 +31,10 @@ export interface ShopItem {
   name: string;
   slot: AvatarSlot;
   rarity: ItemRarity;
-  /** Placeholder token "emoji:🎩" / "color:#hex" (docs/08 §3). */
+  /** Placeholder token "emoji:🎩" / "color:#hex", or an uploaded Asset id (docs/08 §3). */
   spriteAssetId: string;
+  /** Resolved image URL for an uploaded sprite (API `spriteUrl`). */
+  spriteUrl?: string | null;
   costCoins: number;
   requiredLevel?: number;
   isPremiumOnly?: boolean;

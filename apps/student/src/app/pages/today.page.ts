@@ -215,6 +215,7 @@ export class TodayPage {
       if (ref)
         out[slot as AvatarSlot] = {
           spriteAssetId: ref.spriteAssetId,
+          spriteUrl: ref.spriteUrl ?? null,
           name: ref.name,
           rarity: ref.rarity,
         };

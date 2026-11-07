@@ -9,13 +9,17 @@ import type {
 /** Equipped items as renderer sprites, with an optional try-on item on top. */
 export function equippedSprites(
   avatar: AvatarResponse | null,
-  tryOn: Pick<Item, 'slot' | 'spriteAssetId' | 'name' | 'rarity'> | null = null,
+  tryOn: Pick<
+    Item,
+    'slot' | 'spriteAssetId' | 'spriteUrl' | 'name' | 'rarity'
+  > | null = null,
 ): Partial<Record<AvatarSlot, AvatarSprite>> {
   const out: Partial<Record<AvatarSlot, AvatarSprite>> = {};
   for (const [slot, ref] of Object.entries(avatar?.equipped ?? {})) {
     if (ref)
       out[slot as AvatarSlot] = {
         spriteAssetId: ref.spriteAssetId,
+        spriteUrl: ref.spriteUrl ?? null,
         name: ref.name,
         rarity: ref.rarity,
       };
@@ -23,6 +27,7 @@ export function equippedSprites(
   if (tryOn) {
     out[tryOn.slot as AvatarSlot] = {
       spriteAssetId: tryOn.spriteAssetId,
+      spriteUrl: tryOn.spriteUrl ?? null,
       name: tryOn.name,
       rarity: tryOn.rarity,
     };
@@ -68,6 +73,7 @@ export function toUiItem(
     slot: item.slot,
     rarity: item.rarity,
     spriteAssetId: item.spriteAssetId,
+    spriteUrl: item.spriteUrl ?? null,
     costCoins: item.costCoins,
     requiredLevel: item.requiredLevel,
     isPremiumOnly: item.isPremiumOnly,

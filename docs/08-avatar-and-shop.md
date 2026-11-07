@@ -37,6 +37,20 @@ Bottom of stack
 
 Fallback: PNG sprite sheets supported but discouraged (no scaling, no recoloring).
 
+**Sprite references (as built).** `Item.spriteAssetId` is either an inline
+token rendered by the client (`emoji:🧢`, `color:#ffd700`) or the id of an
+uploaded `Asset`. Every API response that carries a sprite — `GET /shop`,
+`GET /inventory`, `GET /avatar` (+ `PUT /avatar/equip|config`),
+`POST /shop/:id/purchase`, the admin `/items` endpoints, `GET /league/current`
+members' avatars and `GET /users/:id/profile`
+— also returns a resolved **`spriteUrl`**: `Asset.url` for an uploaded sprite
+(resolved in one query per response), the value itself for an `http(s)://` or
+`/path` reference, and `null` for inline tokens or an unknown asset id. The
+student renderers (`cdf-item-sprite`, `cdf-avatar-renderer`) draw the image
+and fall back to the token rendering when there is no URL or it fails to
+load. Equipped + owned sprite URLs are cached in the persistent
+`codify-assets-v1` cache on sign-in so the avatar renders offline (docs/16 §6).
+
 ## 4. AvatarRenderer component
 
 Lives in shared visuals (framework-agnostic Angular standalone) — used by admin (item preview, user inspector) and student (everywhere).

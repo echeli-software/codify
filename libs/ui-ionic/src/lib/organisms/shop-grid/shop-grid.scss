@@ -99,17 +99,6 @@
     }
   }
 
-  &__glyph {
-    font-size: 40px;
-    line-height: 1;
-  }
-
-  &__swatch {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--cdf-radius-md);
-  }
-
   &__name {
     margin: 0;
     max-width: 100%;

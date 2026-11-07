@@ -32,6 +32,11 @@ import type {
   ShopQueryDto,
   UpdateItemDto,
 } from './items.dto.js';
+import {
+  loadSpriteUrls,
+  spriteUrlFor,
+  type SpriteUrlMap,
+} from './sprite-urls.js';
 
 const RARITY_ORDER: Record<string, number> = {
   COMMON: 0,
@@ -85,7 +90,8 @@ export class ItemsService {
       where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map(toItemResponse);
+    const urls = await this.spriteUrls(rows);
+    return rows.map((r) => toItemResponse(r, urls));
   }
 
   async createItem(input: CreateItemDto): Promise<ItemResponse> {
@@ -121,7 +127,7 @@ export class ItemsService {
         isActive: input.isActive ?? true,
       },
     });
-    return toItemResponse(created);
+    return toItemResponse(created, await this.spriteUrls([created]));
   }
 
   async updateItem(id: string, patch: UpdateItemDto): Promise<ItemResponse> {
@@ -186,7 +192,7 @@ export class ItemsService {
         isActive: patch.isActive,
       },
     });
-    return toItemResponse(updated);
+    return toItemResponse(updated, await this.spriteUrls([updated]));
   }
 
   async deleteItem(id: string): Promise<void> {
@@ -215,6 +221,7 @@ export class ItemsService {
       this.ownedItemIds(userId),
     ]);
     const now = new Date();
+    const urls = await this.spriteUrls(items);
 
     let shop = items
       .filter((i) => isItemAvailable(i, now) || !i.isLimitedDrop)
@@ -228,7 +235,7 @@ export class ItemsService {
           now,
         });
         return {
-          ...toItemResponse(i),
+          ...toItemResponse(i, urls),
           owned: owned.has(i.id),
           canBuy: eligibility.canBuy,
           reason: eligibility.reason,
@@ -310,7 +317,11 @@ export class ItemsService {
       }
       return spend.coins;
     });
-    return { item: toItemResponse(item), coins, equipped: !!opts.equip };
+    return {
+      item: toItemResponse(item, await this.spriteUrls([item])),
+      coins,
+      equipped: !!opts.equip,
+    };
   }
 
   // ─── Limited drops ──────────────────────────────────────────────────────
@@ -409,10 +420,11 @@ export class ItemsService {
       }),
     ]);
     const equippedIds = new Set(equipped.map((e) => e.itemId));
+    const urls = await this.spriteUrls(rows.map((r) => r.item));
     return rows
       .filter((r) => r.item.deletedAt === null)
       .map((r) => ({
-        item: toItemResponse(r.item),
+        item: toItemResponse(r.item, urls),
         equipped: equippedIds.has(r.itemId),
         acquiredAt: r.acquiredAt.toISOString(),
         source: r.source,
@@ -430,6 +442,7 @@ export class ItemsService {
         include: { item: true },
       }),
     ]);
+    const urls = await this.spriteUrls(equipped.map((e) => e.item));
     const map: AvatarResponse['equipped'] = {};
     for (const e of equipped) {
       if (e.item.deletedAt) continue;
@@ -440,6 +453,7 @@ export class ItemsService {
         slot: e.slot,
         rarity: e.item.rarity,
         spriteAssetId: e.item.spriteAssetId,
+        spriteUrl: spriteUrlFor(e.item.spriteAssetId, urls),
       } satisfies EquippedRef;
     }
     return {
@@ -488,6 +502,16 @@ export class ItemsService {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
+  /** Uploaded-sprite URLs for these items (one Asset query). */
+  private spriteUrls(
+    items: readonly Pick<Item, 'spriteAssetId'>[],
+  ): Promise<SpriteUrlMap> {
+    return loadSpriteUrls(
+      this.prisma,
+      items.map((i) => i.spriteAssetId),
+    );
+  }
+
   private async userContext(
     userId: string,
   ): Promise<{ coins: number; level: number; isPremium: boolean }> {
@@ -527,7 +551,7 @@ function purchaseError(reason: string) {
   }
 }
 
-function toItemResponse(i: Item): ItemResponse {
+function toItemResponse(i: Item, urls: SpriteUrlMap): ItemResponse {
   return {
     id: i.id,
     slug: i.slug,
@@ -543,6 +567,7 @@ function toItemResponse(i: Item): ItemResponse {
     dropStartsAt: i.dropStartsAt?.toISOString() ?? null,
     dropEndsAt: i.dropEndsAt?.toISOString() ?? null,
     spriteAssetId: i.spriteAssetId,
+    spriteUrl: spriteUrlFor(i.spriteAssetId, urls),
     thumbnailAssetId: i.thumbnailAssetId,
     isActive: i.isActive,
   };

@@ -202,6 +202,8 @@ export interface ItemResponse {
   dropStartsAt: string | null;
   dropEndsAt: string | null;
   spriteAssetId: string;
+  /** Resolved image URL for an uploaded sprite; null for `emoji:`/`color:` tokens. */
+  spriteUrl: string | null;
   thumbnailAssetId: string | null;
   isActive: boolean;
 }
@@ -226,6 +228,8 @@ export interface EquippedRef {
   slot: (typeof ITEM_SLOTS)[number];
   rarity: (typeof RARITIES)[number];
   spriteAssetId: string;
+  /** Resolved image URL for an uploaded sprite; null for `emoji:`/`color:` tokens. */
+  spriteUrl: string | null;
 }
 
 export interface AvatarResponse {

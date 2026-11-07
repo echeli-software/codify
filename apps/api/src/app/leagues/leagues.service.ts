@@ -19,6 +19,7 @@ import { UserPushService } from '../gamification/user-push.service.js';
 import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import { LeagueAccumulatorService } from './league-accumulator.service.js';
 import type { AvatarResponse, EquippedRef } from '../items/items.dto.js';
+import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -123,6 +124,10 @@ export class LeaguesService {
       where: { userId: { in: rows.map((r) => r.userId) } },
       include: { item: true },
     });
+    const spriteUrls = await loadSpriteUrls(
+      this.prisma,
+      equipped.map((e) => e.item.spriteAssetId),
+    );
     const equippedByUser = new Map<string, AvatarResponse['equipped']>();
     for (const e of equipped) {
       if (e.item.deletedAt) continue;
@@ -134,6 +139,7 @@ export class LeaguesService {
         slot: e.slot,
         rarity: e.item.rarity,
         spriteAssetId: e.item.spriteAssetId,
+        spriteUrl: spriteUrlFor(e.item.spriteAssetId, spriteUrls),
       } satisfies EquippedRef;
       equippedByUser.set(e.userId, map);
     }
