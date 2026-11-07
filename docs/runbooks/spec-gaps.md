@@ -1,0 +1,153 @@
+# Spec gaps (audit 2026-11-07)
+
+A section-by-section comparison of `docs/` with the code after PR #2. Each
+gap has an ID, the spec reference and the workstream that owns it. Status
+is updated as gaps close; anything that only needs real accounts is in
+[release-checklist.md](./release-checklist.md), not here.
+
+Status: ⬜ open · ✅ done · 📝 docs updated to match the code (deliberate
+difference) · ⏸ deferred by the spec itself.
+
+## FIX — bugs to fix before staging (owner: Platform)
+
+| ID    | Gap                                                                                                                                                             | Spec                  | Status       |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------ |
+| FIX-1 | Deleting a module hard-deletes its lessons and students' progress (DB cascade); translations of deleted content are never cleaned up                            | 02 Conventions        | ⬜           |
+| FIX-2 | Deploy runbooks name env vars the code doesn't read (`CLERK_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT`) and omit required ones (Resend, `CLERK_AUTHORIZED_PARTIES`) | 13 §16, infra/coolify | ⬜           |
+| FIX-3 | Exercise limits allowed by the API (10 s / 512 MB) exceed Judge0's caps (5 s / 256 MB) → every submission of such an exercise fails                             | 12 §3                 | ⬜           |
+| FIX-4 | Client IP wrong behind Cloudflare + Coolify proxy (trusts 1 hop, ignores `CF-Connecting-IP`) → rate limits and audit IPs                                        | 14 §7, §11            | ⬜           |
+| FIX-5 | AI grading falls back to the heuristic in production when the LLM fails, and still pays rewards                                                                 | 17                    | ⬜           |
+| FIX-6 | Translated lesson bodies are served without `lessonDocSchema` validation or a block-structure check                                                             | 14 §3, 11 §3          | ⬜           |
+| FIX-7 | Broken streaks keep getting nightly "N-day streak" reminders; summary shows the stale count                                                                     | 07 §6, 10 §3          | ⬜ (Economy) |
+| FIX-8 | No gamification defaults are seeded (PREMIUM_DEFAULT 2.0, streak tiers, quest templates, starter badges)                                                        | 07 §3, §6–8, 02 seed  | ⬜ (Economy) |
+| FIX-9 | User time zone is never detected or editable → everyone uses São Paulo day boundaries                                                                           | 11 §6                 | ⬜ (Learner) |
+
+## SEC — security and platform (owner: Platform)
+
+| ID     | Gap                                                                                                                                    | Spec          | Status       |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------ |
+| SEC-1  | No server-side MFA requirement and no 12 h absolute session age for ADMIN                                                              | 14 §1, §18    | ⬜           |
+| SEC-2  | No admin role-change endpoint / `user.role_changed` audit                                                                              | 14 §11        | ⬜           |
+| SEC-3  | Audit rows from several controllers lack IP/user agent and before-state; purge doesn't scrub a user's audit IPs                        | 14 §11–12     | ⬜           |
+| SEC-4  | Frontends: admin has no Sentry; student DSN/version never passed at build; no `beforeSend` scrubbing; no missing-translation reporting | 14 §17, 11 §2 | ⬜           |
+| SEC-5  | CI has no dependency audit or licence check                                                                                            | 14 §16        | ⬜           |
+| SEC-6  | No `/.well-known/security.txt`                                                                                                         | 14 §19        | ⬜           |
+| SEC-7  | Exercise submit isn't in the reward rate-limit group; no Judge0 queue-depth throttle                                                   | 14 §7, 12 §7  | ⬜           |
+| SEC-8  | Typed confirmation only on course delete (not suspend, role change, refunds, other destructive admin actions)                          | 14 §18        | ⬜ (Staff)   |
+| SEC-9  | Client timestamps outside the window are rejected instead of clamped + logged                                                          | 16 §8         | ⬜           |
+| SEC-10 | No orphan-asset sweep job; Judge0 default language ids are Node 18 / Python 3.11 (spec: 22 / 3.12)                                     | 01 §6, 12 §4  | ⬜           |
+| SEC-11 | Weekly encrypted `pg_dump` to R2 is a manual one-liner, not scheduled                                                                  | 02, 13 §11    | ⬜           |
+| SEC-12 | Student initial-bundle budget not enforced at the spec's size                                                                          | 01 §9         | ⬜           |
+| SEC-13 | Cookie/analytics consent banner on the web (granular toggles)                                                                          | 14 §13        | ⬜ (Learner) |
+
+## ECO — gamification economy and rewards (owner: Economy)
+
+| ID     | Gap                                                                                                                                                                            | Spec               | Status |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------ |
+| ECO-1  | Earning rules: per-lesson-type defaults, quiz perfect bonus + per-question bonus, exercise/AI-prompt retakes (once/day), scenario branch rewards (cap 3/day), all configurable | 07 §2              | ⬜     |
+| ECO-2  | Daily per-source coin caps + weekly bonus pool (cap 500)                                                                                                                       | 07 §5, §12         | ⬜     |
+| ECO-3  | Reward animation starts ~800 ms late (target < 50 ms)                                                                                                                          | 07 §11, 15 Phase 7 | ⬜     |
+| ECO-4  | Streak-milestone, quest-complete and league-promotion celebrations never play; toast math ignores bonuses                                                                      | 07 §11, 10 §1      | ⬜     |
+| ECO-5  | Reward breakdown is XP-only (coin multipliers invisible)                                                                                                                       | 07 §3              | ⬜     |
+| ECO-6  | Promotion UX: corner badges, campaign banner, `promo_banner_view`; PROMO notification at campaign start                                                                        | 07 §3, 10 §3       | ⬜     |
+| ECO-7  | Badge DSL `where` filters (e.g. `scorePct ≥ 80`, `afterStreakLost`)                                                                                                            | 07 §7              | ⬜     |
+| ECO-8  | Exclusive cosmetics for 30/100/365-day streaks                                                                                                                                 | 10 §1              | ⬜     |
+| ECO-9  | Surprise XP boosts (≤ 2/week), micro-celebration every 3 lessons, XP-sparkle and streak-flame animations                                                                       | 10 §4, §6          | ⬜     |
+| ECO-10 | LEAGUE_RESULT push at Monday 09:00 user-local (now Sunday night for BR)                                                                                                        | 10 §3              | ⬜     |
+| ECO-11 | Daily-quest coin reward default 20 (now 0)                                                                                                                                     | 07 §2              | ⬜     |
+| ECO-12 | Coin promo codes (redeem in app, admin CRUD)                                                                                                                                   | 08 §12             | ⬜     |
+| ECO-13 | Reward/progression analytics events (server `reward_granted`, client `level_up`, `streak_*`, `quest_complete`, `badge_unlocked`)                                               | 07 §13, 10 §14     | ⬜     |
+| ECO-14 | League promotion/relegation thresholds editable (now code constants)                                                                                                           | 04 Leagues, 07 §9  | ⬜     |
+
+## STAFF — billing, staff tools, analytics (owner: Staff)
+
+| ID     | Gap                                                                                                            | Spec                   | Status      |
+| ------ | -------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------- |
+| STF-1  | Refunds: self-serve within the window, SUPPORT capped (≤ 1 month), ADMIN unlimited; audited                    | 09 §5, 14 §2, 04 Users | ⬜          |
+| STF-2  | Manual coin/XP grant (SUPPORT ≤ 1,000 coins, per-admin daily limit, reason, audited)                           | 04 §1, 14 §2           | ⬜          |
+| STF-3  | Trial-ending reminder 2 days before                                                                            | 09 §9                  | ⬜          |
+| STF-4  | Day-30 win-back offer applies a real discount at checkout                                                      | 10 §13                 | ⬜          |
+| STF-5  | SYSTEM notifications (account suspended, terms update)                                                         | 10 §3                  | ⬜          |
+| STF-6  | Analytics: retention curves, league participation, shop revenue, MRR + churn cohorts; TEACHER own-course scope | 04 Analytics           | ⬜          |
+| STF-7  | Billing reporting: per-plan MRR, churn / net-new, trial→paid %, ARPPU, refund rate                             | 09 §13                 | ⬜          |
+| STF-8  | Course detail tabs Translations / Analytics / Audit; user detail Audit tab                                     | 04 Course, Users       | ⬜          |
+| STF-9  | Role matrix: SUPPORT views shop items; TEACHER views own course multipliers and anonymised enrollments         | 04 §1                  | ⬜          |
+| STF-10 | A/B: at most one engagement experiment per user per surface; global hold-out group                             | 10 §9                  | ⬜          |
+| STF-11 | Exercise admin dashboard (pass rate, attempts to pass, failure categories) + bulk language re-test             | 12 §11                 | ⬜          |
+| STF-12 | Stripe Customer Portal opens in an in-app browser on native / new tab on web                                   | 09 §7, 05 §7           | ⬜ (Social) |
+
+## AUT — lesson authoring and content schema (owner: Authoring)
+
+| ID    | Gap                                                                                                                                   | Spec                    | Status |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------ |
+| AUT-1 | Code block: syntax highlighting, language picker, line numbers, highlighted lines, copy button                                        | 06 §3                   | ⬜     |
+| AUT-2 | Quiz kinds `match` and `order` (schema, editor, renderer, grading, offline hashes)                                                    | 06 §3, 05 Quiz          | ⬜     |
+| AUT-3 | Video block placeholder ("coming soon")                                                                                               | 06 §2–3                 | ⬜     |
+| AUT-4 | Embed: StackBlitz and Figma providers, `aspectRatio`, oEmbed metadata on save                                                         | 06 §3                   | ⬜     |
+| AUT-5 | Image `align`; server checks `image.assetId`; admin validates `lessonDocSchema` before save                                           | 06 §3, §6               | ⬜     |
+| AUT-6 | Editor UX: drag handles, floating marks toolbar, properties panel, outline, preview modal (mobile + desktop), lesson multipliers list | 06 §9, 04 Lesson editor | ⬜     |
+| AUT-7 | Deep content search over lesson bodies                                                                                                | 06 §11                  | ⬜     |
+| AUT-8 | Translations: CSV/JSON import/export, per-entity completeness, "mark complete" + audit, `?fallback=` / `_translation`                 | 04 Translations, 11 §3  | ⬜     |
+
+## ADM — admin catalog and UX (owner: Admin)
+
+| ID     | Gap                                                                                                                                                   | Spec                       | Status |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------ |
+| ADM-1  | Curriculum: drag reorder modules/lessons, collapse, duplicate/delete lesson, "first N lessons free"                                                   | 04 Course → Curriculum     | ⬜     |
+| ADM-2  | Courses list: cover, category chips, published date; category/author/"missing translations" filters; bulk publish/archive/category; new-course wizard | 04 Catalog → Courses       | ⬜     |
+| ADM-3  | Promotions: time-window filter, calendar view, effective-multiplier preview (user + lesson)                                                           | 04 Promotions, 15 Phase 7  | ⬜     |
+| ADM-4  | Categories: sortOrder + drag reorder, colour, translations and plan assignment from the category                                                      | 04 Categories              | ⬜     |
+| ADM-5  | Items: limited-drop wizard (items, window, notification copy), category column, inline active toggle                                                  | 04 Shop → Items            | ⬜     |
+| ADM-6  | Badge rule helper builder                                                                                                                             | 04 Badges                  | ⬜     |
+| ADM-7  | Settings: branding tokens, locale enable/disable, default coin rates, notification template defaults                                                  | 04 Settings                | ⬜     |
+| ADM-8  | Cover cropping (ImageCropper), asset dimensions + sha256 dedupe                                                                                       | 04 Course Overview, 06 §10 | ⬜     |
+| ADM-9  | Per-account theme + high-contrast mode; tablet sidebar icons-only                                                                                     | 04 §4, §7                  | ⬜     |
+| ADM-10 | Unsaved-changes guard on every editing form; typed empty/error states with retry on every list                                                        | 04 §5, §9                  | ⬜     |
+
+## LRN — student learning and offline (owner: Learner)
+
+| ID     | Gap                                                                                                                                                                           | Spec                  | Status |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------ |
+| LRN-1  | Scenarios playable offline (bundle graph, queue `scenario_complete`)                                                                                                          | 16 §3, §7             | ⬜     |
+| LRN-2  | Avatar edits offline (queue equips/config, last-write-wins by `clientTimestamp`)                                                                                              | 16 §3, §7–8           | ⬜     |
+| LRN-3  | Catalog, Today and My courses show the last cached data offline                                                                                                               | 16 §3                 | ⬜     |
+| LRN-4  | Offline: estimated balance, optimistic quest progress, pending-sync icon, "already completed elsewhere" toast, more queue kinds (`preference_update`, `lesson_progress_seen`) | 16 §7–8, §10          | ⬜     |
+| LRN-5  | Course covers and "free preview" badge in catalog/course/Today                                                                                                                | 05 §3                 | ⬜     |
+| LRN-6  | Catalog filters (difficulty, free, premium, language), sort, server-side search                                                                                               | 05 Catalog            | ⬜     |
+| LRN-7  | Lesson player: text size / audio settings, exit confirm, module outline rail; offline "Next"                                                                                  | 05 Lesson player      | ⬜     |
+| LRN-8  | Exercise editor uses Monaco; exercise stubs (starter code, visible tests) in the offline bundle                                                                               | 05 Exercise, 16 §5    | ⬜     |
+| LRN-9  | Download prompts after enrolling and "download next 3 lessons"                                                                                                                | 16 §5, §10            | ⬜     |
+| LRN-10 | Desktop header breadcrumb + global search; recommended next by track                                                                                                          | 05 §1, Today          | ⬜     |
+| LRN-11 | Telemetry gaps (route views, onboarding steps, paywall CTA, offline minutes, catalogue names)                                                                                 | 05 §9, 16 §11, 10 §14 | ⬜     |
+| LRN-12 | Browser-side HTML/CSS/JS exercises (sandboxed iframe harness)                                                                                                                 | 12 §4                 | ⬜     |
+
+## SOC — student social, avatar, onboarding, native (owner: Social)
+
+| ID    | Gap                                                                                                                | Spec                           | Status |
+| ----- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------ |
+| SOC-1 | Onboarding steps: schedule (reminder time), launch first lesson, starter pet + naming, Day-2 pet push              | 05 Onboarding, 10 §2           | ⬜     |
+| SOC-2 | Dressing room: random, 3 s autosave, pose picker, per-slot shop link, all slots browsable, pet naming              | 08 §9–10                       | ⬜     |
+| SOC-3 | Avatar config: hair style/colour, eye colour, base body, all 8 skin tones; SVG renderer with poses and rarity glow | 08 §4–5, §14                   | ⬜     |
+| SOC-4 | Shop filters (category, premium, limited, EMOTE); inventory filter/search/bulk equip                               | 08 §7–8                        | ⬜     |
+| SOC-5 | Friends: compare, opt-in activity feed (API + Today); league history beyond last week                              | 05 Friends/League/Today, 10 §5 | ⬜     |
+| SOC-6 | Profile: total XP, courses completed, items owned, badges, help/support/about                                      | 05 Profile                     | ⬜     |
+| SOC-7 | Capacitor: Local Notifications backup, Browser (portal), StatusBar/SplashScreen theming                            | 05 §7                          | ⬜     |
+| SOC-8 | Skill tree / per-topic mastery view                                                                                | 10 §7                          | ⬜     |
+
+## DOC — deliberate differences; docs to be updated (owner: lead)
+
+`/api` vs `/api/v1`; hand-written api-client vs OpenAPI-generated;
+offset pagination on some lists; Progress as a completion record; manual
+soft-delete filtering; in-process cron jobs vs BullMQ + bull-board;
+no OpenTelemetry yet; SVG uploads rejected (docs/14 wins over docs/08);
+Enrollment sources; quiz answer hashes; streak reminder at 20:00–22:00
+(22:00 is inside default quiet hours); league cohorts filled first-come;
+lesson completion idempotent on (user, lesson) instead of a Redis
+Idempotency-Key store; library layout differences (docs/03); ItemSlot
+single ACCESSORY; RTL plumbing; docs/19 ownership matrix out of date;
+monthly/manual PIX renewal (roadmap risk table defers it); zod form
+adapter. ⬜ until docs are updated.
+
+⏸ Deferred by the spec: mystery chests (07 §10), cohort challenges
+(10 §5). Needs accounts: dashboard deploy-status indicator (GitHub API),
+Grafana dashboards, OpenTelemetry backend.
