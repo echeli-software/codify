@@ -50,6 +50,7 @@ import { AppToastService } from '../platform/app-toast.service.js';
 import { OfflineGate } from '../platform/offline-gate.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { activePrices, annualSavings } from './shared/plan-view.js';
+import { BillingHistoryComponent } from './billing/billing-history.component.js';
 import {
   currentSubscription,
   methodsFor,
@@ -94,6 +95,7 @@ const CANCEL_REASONS = [
     OfflineGate,
     TranslatePipe,
     LocalePipe,
+    BillingHistoryComponent,
   ],
   template: `
     <ion-header>
@@ -363,6 +365,7 @@ const CANCEL_REASONS = [
               </cdf-app-button>
             }
           }
+          <cdf-billing-history />
         </cdf-offline-gate>
       </div>
 

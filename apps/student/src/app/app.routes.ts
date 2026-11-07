@@ -4,6 +4,7 @@ import {
   growthLinkGuard,
   rootRedirectGuard,
 } from './pages/shared/route-guards.js';
+import { featureGuard } from './platform/feature-flags.service.js';
 
 export const appRoutes: Route[] = [
   // `/` — Today when signed in, the public landing otherwise.
@@ -68,6 +69,22 @@ export const appRoutes: Route[] = [
     loadComponent: () =>
       import('./pages/growth-link.page').then((m) => m.GrowthLinkPage),
   },
+  // Account lifecycle (docs/14 §13): outside the shell — the API refuses
+  // every other route for a deleted / suspended account.
+  {
+    path: 'account/restore',
+    canActivate: [authGuard()],
+    loadComponent: () =>
+      import('./pages/account/restore.page').then((m) => m.AccountRestorePage),
+  },
+  {
+    path: 'account/suspended',
+    canActivate: [authGuard()],
+    loadComponent: () =>
+      import('./pages/account/suspended.page').then(
+        (m) => m.AccountSuspendedPage,
+      ),
+  },
   {
     path: '',
     canActivate: [authGuard()],
@@ -105,6 +122,7 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'shop',
+        canActivate: [featureGuard('shop.enabled')],
         loadComponent: () =>
           import('./pages/shop.page').then((m) => m.ShopPage),
       },
@@ -120,11 +138,13 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'league',
+        canActivate: [featureGuard('leagues.enabled')],
         loadComponent: () =>
           import('./pages/league.page').then((m) => m.LeaguePage),
       },
       {
         path: 'friends',
+        canActivate: [featureGuard('friends.enabled')],
         loadComponent: () =>
           import('./pages/friends.page').then((m) => m.FriendsPage),
       },
@@ -144,6 +164,11 @@ export const appRoutes: Route[] = [
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),
+      },
+      {
+        path: 'settings/privacy',
+        loadComponent: () =>
+          import('./pages/settings/privacy.page').then((m) => m.PrivacyPage),
       },
       { path: '', pathMatch: 'full', redirectTo: 'today' },
     ],

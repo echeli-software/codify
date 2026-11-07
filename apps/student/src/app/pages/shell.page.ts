@@ -31,6 +31,10 @@ import { AppSessionService } from '../platform/app-session.service.js';
 import { SignOutConfirm } from '../platform/sign-out-confirm.component.js';
 import { StoragePrompt } from '../platform/storage-prompt.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import {
+  FeatureFlagsService,
+  type StudentFeature,
+} from '../platform/feature-flags.service.js';
 
 interface NavEntry {
   path: string;
@@ -38,6 +42,8 @@ interface NavEntry {
   icon: IconName;
   /** Shown in the phone tab bar (max 5); the rest live in "More". */
   primary: boolean;
+  /** Hidden while this feature flag is off (docs/04 Settings). */
+  feature?: StudentFeature;
 }
 
 /** Navigation (docs/05 §1). Paths are app.routes paths. */
@@ -65,18 +71,21 @@ export const NAV: readonly NavEntry[] = [
     labelKey: 'studentPlatform.nav.league',
     icon: 'podium',
     primary: true,
+    feature: 'leagues.enabled',
   },
   {
     path: 'friends',
     labelKey: 'studentPlatform.nav.friends',
     icon: 'chat',
     primary: false,
+    feature: 'friends.enabled',
   },
   {
     path: 'shop',
     labelKey: 'studentPlatform.nav.shop',
     icon: 'cart',
     primary: false,
+    feature: 'shop.enabled',
   },
   {
     path: 'avatar',
@@ -400,6 +409,7 @@ export class ShellPage {
   private readonly xpState = inject(XpService);
   private readonly coinState = inject(CoinService);
   private readonly streakState = inject(StreakService);
+  private readonly flags = inject(FeatureFlagsService);
   // Instantiate so the queue + download triggers are armed under the shell.
   protected readonly sync = inject(OfflineSyncService);
   protected readonly downloads = inject(DownloadService);
@@ -427,14 +437,21 @@ export class ShellPage {
   /** Phone: 5 primary tabs (rest under "More"); desktop sidebar: all. */
   protected readonly tabs = computed<ShellTab[]>(() => {
     this.i18n.currentLocale(); // re-label on locale change
-    const entries = this.desktop() ? NAV : NAV.filter((n) => n.primary);
+    const nav = this.visibleNav();
+    const entries = this.desktop() ? nav : nav.filter((n) => n.primary);
     return entries.map((n) => ({
       path: n.path,
       label: this.i18n.t(n.labelKey),
       icon: n.icon,
     }));
   });
-  protected readonly secondary = computed(() => NAV.filter((n) => !n.primary));
+  protected readonly secondary = computed(() =>
+    this.visibleNav().filter((n) => !n.primary),
+  );
+  /** NAV minus surfaces whose feature flag is off. */
+  private readonly visibleNav = computed(() =>
+    NAV.filter((n) => !n.feature || this.flags.isOn(n.feature)),
+  );
 
   constructor() {
     void this.downloads.hydrate();

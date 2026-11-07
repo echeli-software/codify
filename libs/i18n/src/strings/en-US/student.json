@@ -604,6 +604,10 @@
         "downloads": {
           "title": "Downloads",
           "body": "Offline courses and storage"
+        },
+        "privacy": {
+          "title": "Data & privacy",
+          "body": "Download your data or delete your account"
         }
       },
       "account": "Account",
@@ -669,6 +673,76 @@
       "issued": "Issued",
       "serial": "Serial",
       "invalid": "No certificate matches that serial."
+    },
+    "privacy": {
+      "title": "Data & privacy",
+      "export": {
+        "title": "Download your data",
+        "body": "Get a copy of everything we keep about you — profile, courses and progress, quiz and exercise answers, XP and coin history, items, badges, leagues, friends, subscriptions, payments, notifications and certificates — as a JSON file.",
+        "cta": "Download my data",
+        "done": "Your data export has been downloaded.",
+        "rateLimited": "You just downloaded your data. Try again in {minutes, plural, one {# minute} other {# minutes}}."
+      },
+      "delete": {
+        "title": "Delete account",
+        "body": "Delete your Codify account and personal data. You can change your mind for 14 days.",
+        "cta": "Delete my account"
+      },
+      "confirm": {
+        "title": "Delete your account?",
+        "restore": "You can restore your account by signing in within 14 days. Until then you can't use Codify with it.",
+        "purge": "After 30 days your profile, progress details, friends, notifications and certificates are permanently deleted. Payment records are kept anonymized, as the law requires.",
+        "webSubscription": "Your subscription stops renewing. You keep access until the end of the period you already paid for — you won't be charged again.",
+        "noWebSubscription": "You have no subscription renewing through Codify.",
+        "storeSubscription": "You have a subscription through the App Store or Google Play. We can't cancel it for you — cancel it in your store account settings or it will keep renewing.",
+        "exportFirst": "Want a copy of your data? Download it first — it won't be available after deletion.",
+        "acknowledge": "I understand what happens to my account and data",
+        "cta": "Delete account"
+      }
+    },
+    "account": {
+      "restore": {
+        "title": "Account scheduled for deletion",
+        "heading": "Your account is scheduled for deletion",
+        "body": "You can still restore it until {date}. Everything will be just as you left it.",
+        "purge": "On {date} your personal data will be permanently deleted.",
+        "storeReminder": "Remember to cancel your App Store or Google Play subscription in the store — deleting your account doesn't stop it.",
+        "cta": "Restore my account",
+        "done": "Welcome back! Your account has been restored."
+      },
+      "deleted": {
+        "heading": "This account has been deleted",
+        "body": "The 14-day restore period is over, so this account can no longer be restored. You can sign out and create a new account at any time."
+      },
+      "suspended": {
+        "title": "Account suspended",
+        "heading": "Your account has been suspended",
+        "body": "You can't use Codify with this account right now. If you think this is a mistake, contact our support team.",
+        "contact": "Contact support ({email})",
+        "check": "Check again"
+      }
+    },
+    "billingHistory": {
+      "title": "Billing history",
+      "empty": "No payments yet.",
+      "error": "We couldn't load your billing history.",
+      "more": "Show more",
+      "receipt": "Receipt",
+      "receiptFor": "Receipt for the payment of {date} (opens in a new tab)",
+      "refunded": "{amount} refunded",
+      "status": {
+        "PAID": "Paid",
+        "FAILED": "Failed",
+        "REFUNDED": "Refunded",
+        "PARTIALLY_REFUNDED": "Partially refunded"
+      },
+      "method": {
+        "card": "Card",
+        "pix": "PIX",
+        "boleto": "Boleto",
+        "store": "App store",
+        "unknown": "Other"
+      }
     }
   }
 }

@@ -604,6 +604,10 @@
         "downloads": {
           "title": "Downloads",
           "body": "Cursos offline e armazenamento"
+        },
+        "privacy": {
+          "title": "Dados e privacidade",
+          "body": "Baixe seus dados ou exclua sua conta"
         }
       },
       "account": "Conta",
@@ -669,6 +673,76 @@
       "issued": "Emitido em",
       "serial": "Número de série",
       "invalid": "Nenhum certificado corresponde a esse número de série."
+    },
+    "privacy": {
+      "title": "Dados e privacidade",
+      "export": {
+        "title": "Baixar seus dados",
+        "body": "Receba uma cópia de tudo o que guardamos sobre você — perfil, cursos e progresso, respostas de quizzes e exercícios, histórico de XP e moedas, itens, conquistas, ligas, amigos, assinaturas, pagamentos, notificações e certificados — em um arquivo JSON.",
+        "cta": "Baixar meus dados",
+        "done": "A exportação dos seus dados foi baixada.",
+        "rateLimited": "Você acabou de baixar seus dados. Tente de novo em {minutes, plural, one {# minuto} other {# minutos}}."
+      },
+      "delete": {
+        "title": "Excluir conta",
+        "body": "Exclua sua conta Codify e seus dados pessoais. Você pode mudar de ideia por 14 dias.",
+        "cta": "Excluir minha conta"
+      },
+      "confirm": {
+        "title": "Excluir sua conta?",
+        "restore": "Você pode restaurar sua conta entrando nela em até 14 dias. Até lá, não é possível usar o Codify com ela.",
+        "purge": "Após 30 dias, seu perfil, detalhes de progresso, amigos, notificações e certificados são excluídos permanentemente. Os registros de pagamento são mantidos anonimizados, como exige a lei.",
+        "webSubscription": "Sua assinatura deixa de ser renovada. Você mantém o acesso até o fim do período já pago — não haverá nova cobrança.",
+        "noWebSubscription": "Você não tem nenhuma assinatura com renovação pelo Codify.",
+        "storeSubscription": "Você tem uma assinatura pela App Store ou Google Play. Não conseguimos cancelá-la por você — cancele nas configurações da sua conta da loja, senão ela continuará sendo renovada.",
+        "exportFirst": "Quer uma cópia dos seus dados? Baixe antes — ela não estará disponível após a exclusão.",
+        "acknowledge": "Entendo o que acontece com minha conta e meus dados",
+        "cta": "Excluir conta"
+      }
+    },
+    "account": {
+      "restore": {
+        "title": "Conta com exclusão agendada",
+        "heading": "Sua conta está com exclusão agendada",
+        "body": "Você ainda pode restaurá-la até {date}. Tudo estará como você deixou.",
+        "purge": "Em {date}, seus dados pessoais serão excluídos permanentemente.",
+        "storeReminder": "Lembre-se de cancelar sua assinatura da App Store ou Google Play na loja — excluir a conta não a interrompe.",
+        "cta": "Restaurar minha conta",
+        "done": "Que bom ter você de volta! Sua conta foi restaurada."
+      },
+      "deleted": {
+        "heading": "Esta conta foi excluída",
+        "body": "O prazo de 14 dias para restauração terminou, então esta conta não pode mais ser restaurada. Você pode sair e criar uma nova conta quando quiser."
+      },
+      "suspended": {
+        "title": "Conta suspensa",
+        "heading": "Sua conta foi suspensa",
+        "body": "No momento você não pode usar o Codify com esta conta. Se achar que é um engano, fale com nosso suporte.",
+        "contact": "Falar com o suporte ({email})",
+        "check": "Verificar novamente"
+      }
+    },
+    "billingHistory": {
+      "title": "Histórico de cobranças",
+      "empty": "Nenhum pagamento ainda.",
+      "error": "Não foi possível carregar seu histórico de cobranças.",
+      "more": "Mostrar mais",
+      "receipt": "Recibo",
+      "receiptFor": "Recibo do pagamento de {date} (abre em nova aba)",
+      "refunded": "{amount} reembolsado",
+      "status": {
+        "PAID": "Pago",
+        "FAILED": "Falhou",
+        "REFUNDED": "Reembolsado",
+        "PARTIALLY_REFUNDED": "Reembolso parcial"
+      },
+      "method": {
+        "card": "Cartão",
+        "pix": "PIX",
+        "boleto": "Boleto",
+        "store": "Loja de apps",
+        "unknown": "Outro"
+      }
     }
   }
 }

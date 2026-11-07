@@ -68,6 +68,12 @@ const LINKS: NavLink[] = [
     key: 'downloads',
     testId: 'downloads-link',
   },
+  {
+    path: '/settings/privacy',
+    icon: 'shield',
+    key: 'privacy',
+    testId: 'privacy-link',
+  },
 ];
 
 /**
