@@ -54,6 +54,11 @@ export interface StudentExerciseView {
     expected: unknown;
   }[];
   alreadyPassed: boolean;
+  /**
+   * The caller's most recent graded submission (GET /submissions/:id
+   * re-shows its stored per-test results), or null.
+   */
+  lastSubmissionId: string | null;
 }
 
 /** "Run" (visible tests only) and the admin reference check. */
@@ -172,10 +177,22 @@ export class ExercisesService {
       throw new NotFoundException('No exercise for this lesson');
     await this.assertAccess(userId, lessonId);
     const ex = lesson.exercise;
-    const passed = await this.prisma.submission.findFirst({
-      where: { userId, exerciseId: ex.id, verdict: 'PASS' },
-      select: { id: true },
-    });
+    const [passed, last] = await Promise.all([
+      this.prisma.submission.findFirst({
+        where: { userId, exerciseId: ex.id, verdict: 'PASS' },
+        select: { id: true },
+      }),
+      this.prisma.submission.findFirst({
+        where: {
+          userId,
+          exerciseId: ex.id,
+          scored: true,
+          status: { in: ['COMPLETE', 'WORKER_LOST'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      }),
+    ]);
     return {
       id: ex.id,
       lessonId,
@@ -186,6 +203,7 @@ export class ExercisesService {
         ({ id, name, args, expected }) => ({ id, name, args, expected }),
       ),
       alreadyPassed: !!passed,
+      lastSubmissionId: last?.id ?? null,
     };
   }
 

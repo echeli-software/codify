@@ -8,7 +8,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Submission, SubmissionStatus } from '@prisma/client';
+import type { Prisma, Submission, SubmissionStatus } from '@prisma/client';
 import {
   redactHiddenResults,
   scoreFromResults,
@@ -86,6 +86,19 @@ interface StoredOutcome {
   badgesUnlocked?: UnlockedBadge[];
 }
 
+/**
+ * `Submission.resultJson`: the per-test results exactly as they are returned
+ * to the student — hidden tests anonymised (`hidden-N`, no args/values)
+ * unless the submission passed — so a past submission can be re-shown
+ * without re-deriving (or leaking) anything from the raw outcome.
+ */
+export interface SubmissionResultJson {
+  v: 1;
+  passed: boolean;
+  results: StoredTestResult[];
+  hiddenRevealed: { id: string; name: string }[];
+}
+
 /** Student-facing submission state (POST submit and GET /submissions/:id). */
 export interface SubmissionView {
   submissionId: string;
@@ -99,6 +112,8 @@ export interface SubmissionView {
   memoryKb: number | null;
   createdAt: string;
   completedAt: string | null;
+  /** The submitted source — GET /submissions/:id only (the caller's own). */
+  code?: string;
   /** Present once status is COMPLETE / WORKER_LOST. */
   passed?: boolean;
   results?: StoredTestResult[];
@@ -212,7 +227,7 @@ export class SubmissionsService {
     const s = await this.prisma.submission.findUnique({ where: { id } });
     if (!s || s.userId !== userId)
       throw new NotFoundException('Submission not found');
-    return toView(s);
+    return { ...toView(s), code: s.code };
   }
 
   // ─── Worker ────────────────────────────────────────────────────────────
@@ -321,6 +336,10 @@ export class SubmissionsService {
         runtimeMs: Math.round(run.runtimeMs),
         memoryKb: run.memoryKb ?? null,
         output: serializeOutcome(outcome),
+        resultJson: toResultJson(
+          results,
+          passed,
+        ) as unknown as Prisma.InputJsonValue,
         completedAt: new Date(),
       },
     });
@@ -344,6 +363,7 @@ export class SubmissionsService {
           errorKind: 'error',
           message: RUNNER_UNAVAILABLE_MESSAGE,
         }),
+        resultJson: toResultJson([], false) as unknown as Prisma.InputJsonValue,
       },
     });
     if (res.count)
@@ -460,6 +480,7 @@ export class SubmissionsService {
           errorKind: 'error',
           message: RUNNER_UNAVAILABLE_MESSAGE,
         }),
+        resultJson: toResultJson([], false) as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -519,6 +540,32 @@ export function parseOutcome(output: string | null): StoredOutcome | null {
   }
 }
 
+/** The client-facing results stored in `Submission.resultJson`. */
+export function toResultJson(
+  results: StoredTestResult[],
+  passed: boolean,
+): SubmissionResultJson {
+  return {
+    v: 1,
+    passed,
+    results: redactHiddenResults(results, passed),
+    hiddenRevealed: passed
+      ? results.filter((r) => r.hidden).map((r) => ({ id: r.id, name: r.name }))
+      : [],
+  };
+}
+
+export function parseResultJson(value: unknown): SubmissionResultJson | null {
+  if (!value || typeof value !== 'object') return null;
+  const o = value as Partial<SubmissionResultJson>;
+  return o.v === 1 &&
+    typeof o.passed === 'boolean' &&
+    Array.isArray(o.results) &&
+    Array.isArray(o.hiddenRevealed)
+    ? (o as SubmissionResultJson)
+    : null;
+}
+
 export function toView(s: Submission): SubmissionView {
   const view: SubmissionView = {
     submissionId: s.id,
@@ -535,14 +582,14 @@ export function toView(s: Submission): SubmissionView {
   if (s.status !== 'COMPLETE' && s.status !== 'WORKER_LOST') return view;
   const outcome = parseOutcome(s.output);
   const passed = s.verdict === 'PASS';
+  // Stored client results win; rows graded before resultJson existed are
+  // redacted from the raw outcome the same way.
+  const stored =
+    parseResultJson(s.resultJson) ??
+    toResultJson(outcome?.results ?? [], passed);
   view.passed = passed;
-  view.results = outcome ? redactHiddenResults(outcome.results, passed) : [];
-  view.hiddenRevealed =
-    passed && outcome
-      ? outcome.results
-          .filter((r) => r.hidden)
-          .map((r) => ({ id: r.id, name: r.name }))
-      : [];
+  view.results = stored.results;
+  view.hiddenRevealed = stored.hiddenRevealed;
   if (outcome?.message) view.message = outcome.message;
   if (outcome?.reward) {
     view.reward = outcome.reward;

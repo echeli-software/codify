@@ -14,6 +14,8 @@ import {
   RUNTIME_ERROR_MESSAGE,
   RUNNER_UNAVAILABLE_MESSAGE,
   SubmissionsService,
+  toResultJson,
+  type SubmissionResultJson,
 } from './submissions.service.js';
 
 const EXERCISE = {
@@ -337,8 +339,123 @@ describe('SubmissionsService', () => {
     const json = JSON.stringify(view);
     expect(json).not.toMatch(/-38|-42|-40|secret|h-secret/);
     expect(recordCompletion).not.toHaveBeenCalled();
-    // GET returns the same redacted view.
-    expect(await service.get('u1', view.submissionId)).toEqual(view);
+    // GET returns the same redacted view (plus the caller's own code).
+    expect(await service.get('u1', view.submissionId)).toEqual({
+      ...view,
+      code: 'code',
+    });
+  });
+
+  it('stores the redacted client results in resultJson (no hidden data before a pass)', async () => {
+    const { service, db } = setup({
+      queued: false,
+      run: async (req) => ({
+        results: req.tests.map((t) =>
+          t.id === 'v1'
+            ? { id: t.id, name: t.name, passed: true, actual: 3, expected: 3 }
+            : {
+                id: t.id,
+                name: t.name,
+                passed: false,
+                actual: -42,
+                expected: -38,
+              },
+        ),
+        errorKind: null,
+        runtimeMs: 5,
+      }),
+    });
+    const view = await service.submit('u1', 'ex1', 'code');
+    const stored = db.rows[0].resultJson as unknown as SubmissionResultJson;
+    expect(stored).toEqual({
+      v: 1,
+      passed: false,
+      results: view.results,
+      hiddenRevealed: [],
+    });
+    expect(JSON.stringify(stored)).not.toMatch(/-38|-42|secret|h-secret/);
+  });
+
+  it('stores revealed hidden tests in resultJson on a pass', async () => {
+    const { service, db } = setup({ queued: false });
+    const view = await service.submit('u1', 'ex1', 'code');
+    expect(view.passed).toBe(true);
+    expect(db.rows[0].resultJson).toMatchObject({
+      v: 1,
+      passed: true,
+      hiddenRevealed: [{ id: 'h-secret', name: 'secret negatives' }],
+    });
+  });
+
+  it('GET re-shows a past submission from resultJson, even without the raw outcome', async () => {
+    const { service, db } = setup();
+    const stored = toResultJson(
+      [
+        { id: 'v1', name: 'adds', passed: true, actual: 3, expected: 3 },
+        { id: 'h-secret', name: 'secret', passed: false, hidden: true },
+      ],
+      false,
+    );
+    db.rows.push({
+      id: 'past',
+      userId: 'u1',
+      exerciseId: 'ex1',
+      code: 'old code',
+      status: 'COMPLETE',
+      verdict: 'FAIL',
+      scorePct: 50,
+      createdAt: new Date(),
+      completedAt: new Date(),
+      output: null,
+      resultJson: stored,
+    } as unknown as Submission);
+    const view = await service.get('u1', 'past');
+    expect(view).toMatchObject({
+      status: 'COMPLETE',
+      passed: false,
+      code: 'old code',
+      results: stored.results,
+      hiddenRevealed: [],
+    });
+    expect(JSON.stringify(view)).not.toContain('secret');
+  });
+
+  it('GET still redacts legacy rows that only have the raw outcome', async () => {
+    const { service, db } = setup();
+    db.rows.push({
+      id: 'legacy',
+      userId: 'u1',
+      exerciseId: 'ex1',
+      code: 'c',
+      status: 'COMPLETE',
+      verdict: 'FAIL',
+      createdAt: new Date(),
+      completedAt: new Date(),
+      resultJson: null,
+      output: JSON.stringify({
+        v: 1,
+        errorKind: null,
+        results: [
+          {
+            id: 'h-secret',
+            name: 'secret',
+            passed: false,
+            hidden: true,
+            actual: -42,
+          },
+        ],
+      }),
+    } as unknown as Submission);
+    const view = await service.get('u1', 'legacy');
+    expect(view.results).toEqual([
+      {
+        id: 'hidden-1',
+        name: 'Hidden test 1',
+        passed: false,
+        hidden: true,
+        error: HIDDEN_TEST_FAILED_MESSAGE,
+      },
+    ]);
   });
 
   it('hides runtime stderr on submit (it may echo hidden args)', async () => {

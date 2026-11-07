@@ -24,6 +24,8 @@ export interface StudentExercise {
   starterCode: string;
   visibleTests: ExerciseTestCase[];
   alreadyPassed: boolean;
+  /** Most recent graded submission — `getSubmission(id)` re-shows its results. */
+  lastSubmissionId?: string | null;
 }
 
 export type ExerciseLanguage = 'javascript' | 'typescript' | 'python';
@@ -87,6 +89,8 @@ export interface SubmissionView {
   memoryKb: number | null;
   createdAt: string;
   completedAt: string | null;
+  /** The submitted source — GET /submissions/:id only. */
+  code?: string;
   passed?: boolean;
   results?: ExerciseTestResult[];
   /** Hidden test names — only on a full pass. */

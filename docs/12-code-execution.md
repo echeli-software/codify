@@ -123,6 +123,19 @@ Authoring is in admin's exercise editor (Monaco). Test fields are JSON; validati
    - On pass (and first-time for this user/exercise), invokes `GamificationService.grantReward(...)` (server-side; see [01-architecture.md §6](./01-architecture.md)) and includes the canonical reward payload in the response so the client's `RewardOrchestrator` can play it.
 6. Client receives final state and either celebrates or shows test failure UI.
 
+### Stored results (as built)
+- On completion the worker stores the per-test results **exactly as returned to
+  the student** in `Submission.resultJson` — `{ v: 1, passed, results,
+  hiddenRevealed }`, hidden tests anonymised (`hidden-N`, no args / values /
+  errors) unless the submission passed. The raw outcome (with hidden-test
+  details and staff diagnostics) stays in `Submission.output` and never
+  reaches students.
+- `GET /api/submissions/:id` (student, own submissions only; 404 otherwise)
+  re-shows a past submission from `resultJson` and also returns its `code`.
+  Rows graded before `resultJson` existed are redacted from `output` the same
+  way. `GET /api/lessons/:lessonId/exercise` returns `lastSubmissionId` (the
+  caller's latest graded submission, or null) so the runner can re-show it.
+
 ### Visible vs hidden tests
 - "Run" only executes visible tests (no scoring).
 - "Submit" executes visible + hidden tests (scoring + reward).
