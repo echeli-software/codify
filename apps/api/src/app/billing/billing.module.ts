@@ -26,6 +26,7 @@ import { BullWebhookEnqueuer } from './bull-webhook-enqueuer.js';
 import { WebhookProcessor } from './webhook.processor.js';
 import { BillingJobsService } from './billing-jobs.service.js';
 import { BillingScheduler } from './billing.scheduler.js';
+import { PaymentsService } from './payments.service.js';
 
 /**
  * Global billing module. Provides the BILLING_PROVIDER seam, the reusable
@@ -60,6 +61,7 @@ import { BillingScheduler } from './billing.scheduler.js';
     BillingJobsService,
     BillingScheduler,
     RevenueCatWebhookService,
+    PaymentsService,
     {
       provide: BILLING_PROVIDER,
       useFactory: (): BillingProvider => createBillingProvider(process.env),

@@ -18,6 +18,7 @@ export interface FakeState {
   /** Coin ledger rows (written by the fake GamificationService in specs). */
   coinTransactions: Row[];
   auditLogs: Row[];
+  payments: Row[];
 }
 
 type Where = Record<string, unknown>;
@@ -58,6 +59,7 @@ export class FakeBillingPrisma {
     planPrices: [],
     coinTransactions: [],
     auditLogs: [],
+    payments: [],
   };
   /** Optional failure injection, e.g. to make the next subscription write throw. */
   failNext: { op: string; error: Error } | null = null;
@@ -107,6 +109,47 @@ export class FakeBillingPrisma {
     create: async ({ data }: { data: Record<string, unknown> }) => {
       const row: Row = { id: `audit-${++seq}`, createdAt: new Date(), ...data };
       this.state.auditLogs.push(row);
+      return row;
+    },
+  };
+
+  readonly payment = {
+    findUnique: async ({ where }: { where: { externalId: string } }) =>
+      this.state.payments.find((p) => p['externalId'] === where.externalId) ??
+      null,
+    create: async ({ data }: { data: Record<string, unknown> }) => {
+      if (
+        this.state.payments.some((p) => p['externalId'] === data['externalId'])
+      )
+        throw new Prisma.PrismaClientKnownRequestError(
+          'Unique constraint failed on externalId',
+          { code: 'P2002', clientVersion: 'test' },
+        );
+      const now = new Date();
+      const row: Row = {
+        id: `pay-${++seq}`,
+        refundedCents: 0,
+        method: null,
+        receiptUrl: null,
+        paidAt: null,
+        subscriptionId: null,
+        createdAt: now,
+        updatedAt: now,
+        ...data,
+      };
+      this.state.payments.push(row);
+      return row;
+    },
+    update: async ({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: Record<string, unknown>;
+    }) => {
+      const row = this.state.payments.find((p) => p.id === where.id);
+      if (!row) throw new Error('Record to update not found');
+      Object.assign(row, data, { updatedAt: new Date() });
       return row;
     },
   };
@@ -162,6 +205,7 @@ export class FakeBillingPrisma {
         storeTransactionId: null,
         storeProductId: null,
         revenueCatUserId: null,
+        lastStripeEventAt: null,
         createdAt: now,
         updatedAt: now,
         ...data,

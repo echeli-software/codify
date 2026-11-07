@@ -1,10 +1,14 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   HttpCode,
+  Inject,
   Param,
+  ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -30,6 +34,16 @@ import {
   type SubscriptionResponse,
 } from './billing.dto.js';
 import type { AccessResult } from '@codify/domain';
+import { IntRangePipe } from '../common/int-range.pipe.js';
+import { BILLING_PROVIDER, type BillingProvider } from './billing.provider.js';
+import {
+  PaymentsService,
+  stripeStatus,
+  type AdminPaymentView,
+  type PaymentPage,
+  type PaymentView,
+  type StripeStatusView,
+} from './payments.service.js';
 
 function reqMeta(req: Request) {
   return {
@@ -52,7 +66,20 @@ export class BillingController {
     private readonly admin: BillingAdminService,
     private readonly access: AccessService,
     private readonly audit: AuditService,
+    private readonly payments: PaymentsService,
+    @Inject(BILLING_PROVIDER) private readonly provider: BillingProvider,
   ) {}
+
+  /** Billing history (docs/05 Subscription), newest first. Any signed-in role. */
+  @Get('payments')
+  myPayments(
+    @CurrentUser() actor: ApiUser,
+    @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
+    @Query('take', new DefaultValuePipe(20), new IntRangePipe(1, 100))
+    take: number,
+  ): Promise<PaymentPage<PaymentView>> {
+    return this.payments.listMine(actor.userId, skip, take);
+  }
 
   @Roles('STUDENT')
   @Post('checkout-session')
@@ -163,6 +190,24 @@ export class BillingController {
   }
 
   // ─── Support / admin ────────────────────────────────────────────────
+
+  @Roles('SUPPORT', 'ADMIN')
+  @Get('admin/users/:userId/payments')
+  userPayments(
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+    @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
+    @Query('take', new DefaultValuePipe(20), new IntRangePipe(1, 100))
+    take: number,
+  ): Promise<PaymentPage<AdminPaymentView>> {
+    return this.payments.listForUser(userId, skip, take);
+  }
+
+  /** docs/04 Settings: Stripe connection status (booleans + paths, no secrets). */
+  @Roles('ADMIN')
+  @Get('admin/stripe-status')
+  stripeStatus(): StripeStatusView {
+    return stripeStatus(this.provider.mode);
+  }
 
   @Roles('SUPPORT', 'ADMIN')
   @Get('admin/users/:userId/subscriptions')

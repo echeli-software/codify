@@ -63,6 +63,14 @@ export interface RcEvent {
   transaction_id?: string;
   original_transaction_id?: string;
   environment?: 'SANDBOX' | 'PRODUCTION' | string;
+  /** Price in the store currency (negative on a refund CANCELLATION). */
+  price_in_purchased_currency?: number | null;
+  /** ISO 4217 code of `price_in_purchased_currency`. */
+  currency?: string | null;
+  /** USD price (fallback when the purchased-currency price is missing). */
+  price?: number | null;
+  /** CANCELLATION reason; CUSTOMER_SUPPORT = refunded by the store. */
+  cancel_reason?: string | null;
 }
 
 /** RevenueCat posts `{ api_version, event }`. */

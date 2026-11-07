@@ -17,6 +17,7 @@ import {
   type RevenueCatProvider,
 } from './revenuecat.provider.js';
 import { addDays } from './subscription-view.js';
+import { recordPaid, recordRefund } from './payments.js';
 import {
   DUPLICATE_RESULT,
   DuplicateWebhookEvent,
@@ -90,6 +91,71 @@ export class RevenueCatWebhookService {
   }
 
   private async process(tx: Tx, event: RcEvent): Promise<boolean> {
+    const subscriptionChanged = await this.applySubscription(tx, event);
+    const paymentLogged = await this.logPayment(tx, event);
+    return subscriptionChanged || paymentLogged;
+  }
+
+  /**
+   * Billing history (docs/09 §6, docs/05): store purchases and renewals
+   * (not PRODUCT_CHANGE, which charges on the following RENEWAL) become
+   * PAID Payments keyed on the store `transaction_id` of that
+   * charge; a CANCELLATION with cancel_reason CUSTOMER_SUPPORT is the
+   * store's refund and marks that transaction REFUNDED. Web (Stripe)
+   * purchases relayed by RevenueCat are skipped — the Stripe webhook logs
+   * them. Free trials (price 0) are not payments.
+   */
+  private async logPayment(tx: Tx, event: RcEvent): Promise<boolean> {
+    const provider =
+      event.store === 'APP_STORE'
+        ? ('APPLE' as const)
+        : event.store === 'PLAY_STORE'
+          ? ('GOOGLE' as const)
+          : null;
+    const purchase = PURCHASE_EVENTS.has(event.type);
+    const refund =
+      event.type === 'CANCELLATION' &&
+      event.cancel_reason === 'CUSTOMER_SUPPORT';
+    if (!provider || (!purchase && !refund)) return false;
+    const externalId = event.transaction_id ?? null;
+    const price = event.price_in_purchased_currency ?? event.price ?? null;
+    if (!externalId || price === null || !Number.isFinite(price)) return false;
+    const amountCents = Math.round(Math.abs(price) * 100);
+    if (amountCents === 0) return false;
+
+    const sub = await tx.subscription.findUnique({
+      where: { storeTransactionId: this.txId(event) ?? externalId },
+      select: { id: true, userId: true },
+    });
+    const userId =
+      sub?.userId ??
+      (
+        await tx.user.findUnique({
+          where: { id: event.app_user_id },
+          select: { id: true },
+        })
+      )?.id;
+    if (!userId) return false;
+    const facts = {
+      userId,
+      subscriptionId: sub?.id ?? null,
+      provider,
+      externalId,
+      amountCents,
+      currency:
+        event.price_in_purchased_currency != null && event.currency
+          ? event.currency
+          : 'USD',
+      method: 'store',
+      receiptUrl: null,
+      paidAt: msToDate(event.purchased_at_ms) ?? eventAt(event),
+    };
+    if (purchase) await recordPaid(tx, facts);
+    else await recordRefund(tx, { ...facts, refundedCents: amountCents });
+    return true;
+  }
+
+  private async applySubscription(tx: Tx, event: RcEvent): Promise<boolean> {
     switch (event.type) {
       case 'INITIAL_PURCHASE':
       case 'RENEWAL':
@@ -268,6 +334,13 @@ export class RevenueCatWebhookService {
     return true;
   }
 }
+
+/** Events that charged the customer (one store transaction each). */
+const PURCHASE_EVENTS = new Set([
+  'INITIAL_PURCHASE',
+  'RENEWAL',
+  'NON_RENEWING_PURCHASE',
+]);
 
 /** RevenueCat timestamps are unix milliseconds; null/undefined → null. */
 function msToDate(ms: number | null | undefined): Date | null {

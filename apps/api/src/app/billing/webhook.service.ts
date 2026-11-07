@@ -42,6 +42,14 @@ import {
   type WebhookEnqueuer,
 } from './webhook-queue.js';
 import { paymentFailedCopy } from './billing-push-copy.js';
+import {
+  currencyOf,
+  invoiceFacts,
+  recordFailed,
+  recordPaid,
+  recordRefund,
+  stripeMethodOf,
+} from './payments.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -272,17 +280,18 @@ export class WebhookService {
     const row = await tx.subscription.findUnique({
       where: { stripeSubscriptionId: subId },
     });
-    if (!row) return applied;
+    const logged = await this.logInvoicePayment(tx, event, row);
+    if (!row) return applied || logged;
 
     if (paid) {
       const invoice = event.data.object;
-      if (!isFirstPaidInvoice(invoice, row)) return applied;
+      if (!isFirstPaidInvoice(invoice, row)) return applied || logged;
       const granted = await this.grantFirstPaymentBonus(
         tx,
         row,
         `invoice ${idOf(invoice['id']) ?? '?'}`,
       );
-      return applied || granted;
+      return applied || logged || granted;
     }
 
     if (row.status === 'PAST_DUE' && statusBefore !== 'PAST_DUE') {
@@ -296,7 +305,53 @@ export class WebhookService {
         }),
       });
     }
-    return applied;
+    return applied || logged;
+  }
+
+  /**
+   * Billing history (docs/09 §6 "log payment"): upsert the invoice as a
+   * Payment. The owner is the mirrored subscription's user, else the user
+   * of any subscription with the invoice's customer. $0 invoices (trial
+   * starts) are not payments.
+   */
+  private async logInvoicePayment(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    row: Pick<Subscription, 'id' | 'userId'> | null,
+  ): Promise<boolean> {
+    const paid = event.type === 'invoice.paid';
+    const invoice = event.data.object;
+    const facts = invoiceFacts(invoice, paid);
+    if (!facts || facts.amountCents <= 0) return false;
+    let owner: { userId: string; subscriptionId: string | null } | null = row
+      ? { userId: row.userId, subscriptionId: row.id }
+      : null;
+    if (!owner) {
+      const customerId = idOf(invoice['customer']);
+      const byCustomer = customerId
+        ? await tx.subscription.findFirst({
+            where: { stripeCustomerId: customerId },
+            select: { userId: true },
+          })
+        : null;
+      if (byCustomer)
+        owner = { userId: byCustomer.userId, subscriptionId: null };
+    }
+    if (!owner) {
+      this.logger.warn(
+        `${event.type} ${facts.externalId} (${event.id}): no user resolvable — payment not logged`,
+      );
+      return false;
+    }
+    const base = { ...owner, provider: 'STRIPE' as const, ...facts };
+    if (paid) {
+      await recordPaid(tx, {
+        ...base,
+        paidAt: facts.paidAt ?? eventTime(event),
+      });
+      return true;
+    }
+    return (await recordFailed(tx, base)) !== null;
   }
 
   /**
@@ -370,6 +425,11 @@ export class WebhookService {
     };
 
     const row = await this.findRefundedSubscription(tx, ctx, charge);
+    await this.logRefundPayment(tx, event, ctx, row, {
+      amount,
+      amountRefunded,
+      chargeId,
+    });
     if (!row) {
       this.logger.warn(
         `charge.refunded ${chargeId ?? '?'} (${event.id}): no subscription resolvable — recorded only`,
@@ -391,6 +451,8 @@ export class WebhookService {
 
     let accessEnded = false;
     if (full && latest && row.currentPeriodEnd > now) {
+      // A refund is definitive: applied even if newer events were seen
+      // (no ordering guard), but it still advances the high-water mark.
       await tx.subscription.update({
         where: { id: row.id },
         data: {
@@ -398,6 +460,7 @@ export class WebhookService {
           currentPeriodEnd: now,
           canceledAt: now,
           pastDueSince: null,
+          lastStripeEventAt: laterOf(row.lastStripeEventAt, eventTime(event)),
         },
       });
       accessEnded = true;
@@ -430,6 +493,52 @@ export class WebhookService {
       `charge.refunded ${chargeId ?? '?'} → subscription ${row.id}: ${full ? 'full' : 'partial'}, accessEnded=${accessEnded}, clawedBack=${clawedBack}`,
     );
     return true;
+  }
+
+  /**
+   * docs/09 §6 "record refund": mark the refunded Payment (the invoice, or
+   * the prepay Checkout Session), creating it from the charge if the
+   * payment itself was never logged. Skipped when no user is resolvable.
+   */
+  private async logRefundPayment(
+    tx: Tx,
+    event: StripeWebhookEvent,
+    ctx: ChargeContext,
+    row: Subscription | null,
+    c: { amount: number; amountRefunded: number; chargeId: string | null },
+  ): Promise<void> {
+    const charge = event.data.object;
+    const externalId = ctx.invoiceId ?? ctx.checkoutSessionId ?? c.chargeId;
+    if (!externalId || c.amountRefunded <= 0) return;
+    let userId = row?.userId ?? null;
+    if (!userId) {
+      const metaUser = (charge['metadata'] as Record<string, unknown> | null)?.[
+        'userId'
+      ];
+      if (typeof metaUser === 'string') {
+        const u = await tx.user.findUnique({
+          where: { id: metaUser },
+          select: { id: true },
+        });
+        userId = u?.id ?? null;
+      }
+    }
+    if (!userId) return;
+    await recordRefund(tx, {
+      userId,
+      subscriptionId: row?.id ?? null,
+      provider: 'STRIPE',
+      externalId,
+      amountCents: c.amount,
+      refundedCents: c.amountRefunded,
+      currency: currencyOf(charge),
+      method: stripeMethodOf(charge),
+      receiptUrl:
+        typeof charge['receipt_url'] === 'string'
+          ? charge['receipt_url']
+          : null,
+      paidAt: toDate(charge['created']),
+    });
   }
 
   /** Coins clawed back (0 when there was no bonus or the window passed). */
@@ -635,9 +744,24 @@ export class WebhookService {
         currentPeriodEnd: addBillingPeriod(start, price.period),
         // Prepaid: nothing renews, access ends with the paid period.
         cancelAtPeriodEnd: true,
+        lastStripeEventAt: start,
       },
       update: {},
     });
+    const amount = numberOr(session['amount_total'], 0);
+    if (amount > 0) {
+      await recordPaid(tx, {
+        userId,
+        subscriptionId: row.id,
+        provider: 'STRIPE',
+        externalId: sessionId,
+        amountCents: amount,
+        currency: currencyOf(session),
+        method: stripeMethodOf(session),
+        receiptUrl: null,
+        paidAt: start,
+      });
+    }
     // A prepay is the subscription's first (and only) payment.
     if (!existing)
       await this.grantFirstPaymentBonus(tx, row, `checkout ${sessionId}`);
@@ -657,7 +781,11 @@ export class WebhookService {
     const existing = await tx.subscription.findUnique({
       where: { stripeSubscriptionId: snap.id },
     });
-    if (!opts.fromApi && existing && this.isStale(existing, snap, event)) {
+    if (
+      existing &&
+      (olderThanApplied(existing, event, snap) ||
+        (!opts.fromApi && this.isStale(existing, snap, event)))
+    ) {
       this.logger.log(
         `Skipping stale ${event.type} ${event.id} for ${snap.id}`,
       );
@@ -712,6 +840,7 @@ export class WebhookService {
       canceledAt,
       trialEndsAt: snap.trialEnd ?? existing?.trialEndsAt ?? null,
       pastDueSince,
+      lastStripeEventAt: laterOf(existing?.lastStripeEventAt ?? null, at),
     };
 
     if (existing) {
@@ -782,13 +911,13 @@ export class WebhookService {
   }
 
   /**
-   * Payload-path ordering guard (no API to re-read from). Canceled is
-   * terminal on Stripe's side (a resubscription is a new subscription id),
-   * so an end-of-subscription event always applies and nothing may revive
-   * a canceled row. Otherwise an event is stale when it describes an older
-   * billing period or was created before our row last changed — the latter
-   * uses `updatedAt` as the high-water mark; exact ordering needs a
-   * `lastStripeEventAt` column.
+   * Payload-path ordering guard (no API to re-read from), on top of the
+   * `lastStripeEventAt` check every path gets (see olderThanApplied).
+   * Canceled is terminal on Stripe's side (a resubscription is a new
+   * subscription id), so an end-of-subscription event always applies and
+   * nothing may revive a canceled row. Otherwise an event is stale when it
+   * describes an older billing period, or — for rows mirrored before
+   * `lastStripeEventAt` existed — was created before the row last changed.
    */
   private isStale(
     existing: Subscription,
@@ -803,6 +932,7 @@ export class WebhookService {
     )
       return true;
     return (
+      !existing.lastStripeEventAt &&
       typeof event.created === 'number' &&
       event.created * 1000 < existing.updatedAt.getTime()
     );
@@ -819,10 +949,9 @@ export class WebhookService {
       where: { stripeSubscriptionId },
     });
     if (!existing || existing.status === 'CANCELED') return false;
-    if (
-      typeof event.created === 'number' &&
-      event.created * 1000 < existing.updatedAt.getTime()
-    ) {
+    const highWater =
+      existing.lastStripeEventAt?.getTime() ?? existing.updatedAt.getTime();
+    if (typeof event.created === 'number' && event.created * 1000 < highWater) {
       this.logger.log(`Skipping stale ${event.type} ${event.id}`);
       return false;
     }
@@ -834,10 +963,37 @@ export class WebhookService {
           status === 'PAST_DUE'
             ? (existing.pastDueSince ?? eventTime(event))
             : null,
+        lastStripeEventAt: laterOf(
+          existing.lastStripeEventAt,
+          eventTime(event),
+        ),
       },
     });
     return true;
   }
+}
+
+/**
+ * Ordering guard (docs/09 §6): Stripe does not deliver events in order, so
+ * an event created before the newest one already applied to the row
+ * (`lastStripeEventAt`) must not change it. A canceled snapshot is exempt:
+ * cancellation is terminal and must land even when, say, a later invoice
+ * event for the same subscription was processed first.
+ */
+function olderThanApplied(
+  existing: Pick<Subscription, 'lastStripeEventAt'>,
+  event: StripeWebhookEvent,
+  snap: Pick<SubscriptionSnapshot, 'status'>,
+): boolean {
+  if (snap.status === 'canceled' || !existing.lastStripeEventAt) return false;
+  return (
+    typeof event.created === 'number' &&
+    event.created * 1000 < existing.lastStripeEventAt.getTime()
+  );
+}
+
+function laterOf(a: Date | null, b: Date): Date {
+  return a && a > b ? a : b;
 }
 
 /** The Stripe subscription an event is about, if any. */
