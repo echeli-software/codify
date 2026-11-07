@@ -60,9 +60,8 @@ describe('BillingHistoryComponent', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('R$');
     expect(rows[0].textContent).toContain('29.90');
-    // Keys (translations are not loaded under jest).
-    expect(rows[0].textContent).toContain('student.billingHistory.method.pix');
-    expect(rows[0].textContent).toContain('student.billingHistory.status.PAID');
+    expect(rows[0].textContent).toContain('PIX');
+    expect(rows[0].textContent).toContain('Paid');
     const link = rows[0].querySelector('a') as HTMLAnchorElement;
     expect(link.href).toBe('https://invoice.stripe.com/i/1');
     expect(link.rel).toContain('noopener');
@@ -73,13 +72,9 @@ describe('BillingHistoryComponent', () => {
     expect(myPayments).toHaveBeenLastCalledWith({ skip: 1, take: 10 });
     const all = el.querySelectorAll('[data-testid="payment-row"]');
     expect(all).toHaveLength(2);
-    expect(all[1].textContent).toContain(
-      'student.billingHistory.status.PARTIALLY_REFUNDED',
-    );
-    expect(all[1].textContent).toContain('student.billingHistory.refunded');
-    expect(all[1].textContent).toContain(
-      'student.billingHistory.method.unknown',
-    );
+    expect(all[1].textContent).toContain('Partially refunded');
+    expect(all[1].textContent).toContain('R$10.00 refunded');
+    expect(all[1].textContent).toContain('Other');
     expect(el.querySelector('[data-testid="billing-history-more"]')).toBeNull();
   });
 
