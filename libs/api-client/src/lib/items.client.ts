@@ -40,6 +40,8 @@ export interface Item {
   spriteUrl?: string | null;
   thumbnailAssetId: string | null;
   isActive: boolean;
+  /** Category name in the caller's locale (shop + inventory). */
+  categoryName?: string;
 }
 
 export interface ShopItem extends Item {

@@ -969,7 +969,7 @@
     },
     "translations": {
       "title": "Traduções",
-      "subtitle": "Textos de cursos, módulos, aulas e categorias em cada idioma.",
+      "subtitle": "Cursos, aulas, categorias, planos, medalhas, itens da loja e missões em cada idioma.",
       "saveAll": "{count, plural, =0 {Sem alterações} one {Salvar # tradução} other {Salvar # traduções}}",
       "saved": "{count, plural, one {# tradução salva.} other {# traduções salvas.}}",
       "completeness": "Completude",
@@ -986,13 +986,19 @@
         "MODULE": "Módulos",
         "LESSON": "Aulas",
         "CATEGORY": "Categorias",
+        "PLAN": "Planos",
+        "BADGE": "Medalhas",
+        "ITEM": "Itens da loja",
+        "ITEM_CATEGORY": "Categorias de itens",
+        "QUEST": "Missões",
         "ALL": "Todos"
       },
       "fields": {
         "title": "Título",
         "description": "Descrição",
         "name": "Nome",
-        "contentJson": "Corpo da aula"
+        "contentJson": "Corpo da aula",
+        "tagline": "Slogan"
       },
       "statuses": {
         "missing": "Faltando",

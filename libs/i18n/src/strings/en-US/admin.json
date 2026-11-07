@@ -969,7 +969,7 @@
     },
     "translations": {
       "title": "Translations",
-      "subtitle": "Course, module, lesson and category text in every locale.",
+      "subtitle": "Courses, lessons, categories, plans, badges, shop items and quests in every locale.",
       "saveAll": "{count, plural, =0 {No changes} one {Save # translation} other {Save # translations}}",
       "saved": "{count, plural, one {# translation saved.} other {# translations saved.}}",
       "completeness": "Completeness",
@@ -986,13 +986,19 @@
         "MODULE": "Modules",
         "LESSON": "Lessons",
         "CATEGORY": "Categories",
+        "PLAN": "Plans",
+        "BADGE": "Badges",
+        "ITEM": "Shop items",
+        "ITEM_CATEGORY": "Item categories",
+        "QUEST": "Quests",
         "ALL": "All"
       },
       "fields": {
         "title": "Title",
         "description": "Description",
         "name": "Name",
-        "contentJson": "Lesson body"
+        "contentJson": "Lesson body",
+        "tagline": "Tagline"
       },
       "statuses": {
         "missing": "Missing",

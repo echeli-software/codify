@@ -47,6 +47,11 @@ const ENTITY_TYPES: readonly TranslatableEntityType[] = [
   'MODULE',
   'LESSON',
   'CATEGORY',
+  'PLAN',
+  'BADGE',
+  'ITEM',
+  'ITEM_CATEGORY',
+  'QUEST',
 ];
 const LOCALES: readonly ContentLocale[] = ['pt-BR', 'en-US'];
 const STATUS_VARIANT: Record<TranslationStatus, BadgeVariant> = {

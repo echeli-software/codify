@@ -9,7 +9,20 @@ export type TranslatableEntityType =
   | 'COURSE'
   | 'MODULE'
   | 'LESSON'
-  | 'CATEGORY';
+  | 'CATEGORY'
+  | 'PLAN'
+  | 'BADGE'
+  | 'ITEM'
+  /** entityId = ItemCategory.slug */
+  | 'ITEM_CATEGORY'
+  /** entityId = QuestTemplate.id */
+  | 'QUEST';
+
+/**
+ * Response header naming the locale some translatable text fell back to
+ * (docs/11 §3) — e.g. `X-Translation-Fallback: pt-BR`.
+ */
+export const TRANSLATION_FALLBACK_HEADER = 'X-Translation-Fallback';
 export type TranslationStatus = 'missing' | 'outdated' | 'done';
 
 /** One source/target pair in the admin translation workspace. */
@@ -18,7 +31,7 @@ export interface TranslationRow {
   entityId: string;
   /** Source title/name, for display. */
   label: string;
-  /** title | description | name | contentJson (JSON-encoded Tiptap doc). */
+  /** title | description | name | tagline | contentJson (JSON-encoded Tiptap doc). */
   field: string;
   sourceLocale: string;
   sourceValue: string;

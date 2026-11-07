@@ -195,6 +195,7 @@ export {
 } from './lib/referrals.client.js';
 export {
   TranslationsClient,
+  TRANSLATION_FALLBACK_HEADER,
   type ContentLocale,
   type TranslatableEntityType,
   type TranslationStatus,
