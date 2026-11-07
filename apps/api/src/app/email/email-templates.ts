@@ -93,7 +93,10 @@ ${list}<p style="margin:0 0 8px"><a href="${e(input.ctaUrl)}" style="display:inl
   return { subject: input.title, text, html };
 }
 
-/** The small page GET /email/unsubscribe answers with. */
+/**
+ * The small page /email/unsubscribe answers with. With `copy.button` it is
+ * a confirmation form that POSTs back to the same URL (token included).
+ */
 export function renderUnsubscribePage(
   locale: string,
   copy: UnsubscribePageCopy,
@@ -114,13 +117,15 @@ h1{font-size:22px;margin:0 0 12px}
 p{font-size:16px;line-height:1.6;margin:0 0 20px;color:#1f2937}
 a{color:#4338ca;font-weight:600}
 a:focus-visible{outline:2px solid #4338ca;outline-offset:2px}
+button{font:inherit;font-weight:600;padding:10px 20px;border:0;border-radius:8px;background:#4338ca;color:#fff;cursor:pointer}
+button:focus-visible{outline:2px solid #111827;outline-offset:2px}
 </style>
 </head>
 <body>
 <main>
 <h1>${e(copy.title)}</h1>
 <p>${e(copy.body)}</p>
-<p><a href="${e(settingsUrl)}">${e(copy.link)}</a></p>
+${copy.button ? `<form method="post"><p><button type="submit">${e(copy.button)}</button></p></form>\n` : ''}<p><a href="${e(settingsUrl)}">${e(copy.link)}</a></p>
 </main>
 </body>
 </html>`;

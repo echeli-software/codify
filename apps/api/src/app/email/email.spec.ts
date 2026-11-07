@@ -213,13 +213,33 @@ describe('EmailUnsubscribeController', () => {
     return { ctrl, tokens, prisma, res, req };
   }
 
-  it("turns the kind's email off and answers a translated page", async () => {
+  it('GET only asks to confirm — a link prefetch changes nothing', async () => {
+    const { ctrl, tokens, prisma, res, req } = setup({
+      id: 'u1',
+      locale: 'en-US',
+      deletedAt: null,
+    });
+    await ctrl.get(
+      tokens.sign('u1', 'WEEKLY_RECAP'),
+      req as never,
+      res as never,
+    );
+    expect(prisma.notificationPreference.upsert).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<form method="post">');
+    expect(res.body).toContain('Unsubscribe from these emails?');
+    expect(res.headers['Content-Security-Policy']).toContain(
+      "form-action 'self'",
+    );
+  });
+
+  it("POST turns the kind's email off and answers a translated page", async () => {
     const { ctrl, tokens, prisma, res, req } = setup({
       id: 'u1',
       locale: 'pt-BR',
       deletedAt: null,
     });
-    await ctrl.get(
+    await ctrl.post(
       tokens.sign('u1', 'WEEKLY_RECAP'),
       req as never,
       res as never,

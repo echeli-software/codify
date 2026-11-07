@@ -10,14 +10,15 @@ import { UNSUBSCRIBE_TOKENS, UnsubscribeTokens } from './unsubscribe-token.js';
 
 /** The page has inline styles only: no scripts, no external loads. */
 const PAGE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 /**
- * One-click email unsubscribe (docs/10 §3). Every email links here with a
- * signed token naming (user, kind); visiting it — or the RFC 8058
- * `List-Unsubscribe-Post` POST mail clients send — turns that kind's email
- * off and answers a small translated HTML page. SYSTEM / BILLING email
- * can't be turned off; the page says so.
+ * Email unsubscribe (docs/10 §3). Every email links here with a signed token
+ * naming (user, kind). GET only shows a confirmation page — mail scanners
+ * prefetch links, so a GET must never change anything. POST (the page's
+ * button, or the RFC 8058 `List-Unsubscribe-Post` one-click request mail
+ * clients send) turns that kind's email off. SYSTEM / BILLING email can't
+ * be turned off; the page says so.
  */
 @Controller('email')
 export class EmailUnsubscribeController {
@@ -34,7 +35,7 @@ export class EmailUnsubscribeController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    return this.handle(token, req, res);
+    return this.handle(token, req, res, false);
   }
 
   @Public()
@@ -44,13 +45,14 @@ export class EmailUnsubscribeController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    return this.handle(token, req, res);
+    return this.handle(token, req, res, true);
   }
 
   private async handle(
     token: string | undefined,
     req: Request,
     res: Response,
+    apply: boolean,
   ): Promise<void> {
     const claim = this.tokens.verify(token);
     const user = claim
@@ -71,6 +73,8 @@ export class EmailUnsubscribeController {
       copy = unsubscribePageCopy(locale, 'invalid');
     } else if (LOCKED_KINDS.has(claim.kind)) {
       copy = unsubscribePageCopy(locale, 'locked', claim.kind);
+    } else if (!apply) {
+      copy = unsubscribePageCopy(locale, 'confirm', claim.kind);
     } else {
       await this.prisma.notificationPreference.upsert({
         where: { userId_kind: { userId: user.id, kind: claim.kind } },

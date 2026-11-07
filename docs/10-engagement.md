@@ -111,8 +111,9 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
 - **Email**: `EMAIL_PROVIDER` — Resend over HTTP when `RESEND_API_KEY` + `EMAIL_FROM` are set, a capturing dev
   provider otherwise; production refuses to boot without them or `EMAIL_UNSUBSCRIBE_SECRET`. One accessible
   template (HTML + text, `lang` set) per locale. Every email carries `List-Unsubscribe` and a signed link to
-  `GET|POST /api/email/unsubscribe?token=` (`@Public`, HMAC of user + kind) that turns that kind's email off
-  (`SYSTEM` / `BILLING`: explains they are required) and answers a small translated HTML page.
+  `/api/email/unsubscribe?token=` (`@Public`, HMAC of user + kind). `GET` only shows a confirmation page (mail
+  scanners prefetch links); `POST` — the page's button or the RFC 8058 one-click request — turns that kind's
+  email off (`SYSTEM` / `BILLING`: explains they are required) and answers a small translated HTML page.
 - **Student API** (any signed-in user, own rows only — 404 otherwise):
 
   | Method | Path                                 | Body / query                                                                     | Response                                                                                                                                                                     |

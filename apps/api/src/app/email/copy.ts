@@ -279,15 +279,33 @@ export interface UnsubscribePageCopy {
   title: string;
   body: string;
   link: string;
+  /** Submit label when the page asks to confirm (GET). */
+  button?: string;
 }
 
 export function unsubscribePageCopy(
   locale: string,
-  outcome: 'done' | 'locked' | 'invalid',
+  outcome: 'confirm' | 'done' | 'locked' | 'invalid',
   kind?: NotificationKind,
 ): UnsubscribePageCopy {
   const name = kind ? kindName(locale, kind) : '';
   switch (outcome) {
+    case 'confirm':
+      return pick(
+        locale,
+        {
+          title: 'Cancelar estes emails?',
+          body: `Confirme para parar de receber emails de ${name}. Você pode reativá-los quando quiser nas preferências de notificação.`,
+          link: 'Abrir preferências de notificação',
+          button: 'Cancelar inscrição',
+        },
+        {
+          title: 'Unsubscribe from these emails?',
+          body: `Confirm to stop getting ${name} emails. You can turn them back on anytime in your notification settings.`,
+          link: 'Open notification settings',
+          button: 'Unsubscribe',
+        },
+      );
     case 'done':
       return pick(
         locale,
