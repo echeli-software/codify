@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   DOCUMENT,
+  DestroyRef,
   ElementRef,
   effect,
   inject,
@@ -89,10 +90,23 @@ export class BottomSheet {
 
   constructor() {
     const body = inject(DOCUMENT).body;
+    let moved: HTMLElement | null = null;
+    const release = () => {
+      moved?.remove();
+      moved = null;
+    };
     effect(() => {
-      const el = this.portal()?.nativeElement;
-      if (el && body && el.parentElement !== body) body.appendChild(el);
+      const el = this.portal()?.nativeElement ?? null;
+      if (el === moved) return;
+      // Angular removes the nodes when the @if closes, but not always when
+      // the whole host goes away (e.g. the app is torn down) — clean up.
+      release();
+      if (el && body) {
+        body.appendChild(el);
+        moved = el;
+      }
     });
+    inject(DestroyRef).onDestroy(release);
   }
 
   close(): void {
