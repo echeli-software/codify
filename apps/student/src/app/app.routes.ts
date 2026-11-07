@@ -170,6 +170,20 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('./pages/settings/privacy.page').then((m) => m.PrivacyPage),
       },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./pages/notifications/notifications.page').then(
+            (m) => m.NotificationsPage,
+          ),
+      },
+      {
+        path: 'settings/notifications',
+        loadComponent: () =>
+          import('./pages/notifications/notification-settings.page').then(
+            (m) => m.NotificationSettingsPage,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'today' },
     ],
   },

@@ -23,6 +23,7 @@ import {
   XpService,
 } from '@codify/gamification-engine';
 import { RewardOverlays } from '../reward-overlays.component.js';
+import { NotificationBell } from '../components/notification-bell.component.js';
 import { IdentityCacheService } from '../offline/identity-cache.service.js';
 import { OfflineIndicator } from '../offline/offline-indicator.component.js';
 import { DownloadService } from '../offline/download.service.js';
@@ -129,6 +130,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     TranslatePipe,
     RewardOverlays,
     OfflineIndicator,
+    NotificationBell,
     StoragePrompt,
     SignOutConfirm,
   ],
@@ -188,6 +190,9 @@ const DESKTOP_QUERY = '(min-width: 768px)';
       </div>
 
       <cdf-offline-indicator />
+
+      <!-- Desktop: bell top-right (mobile: in the Today header). -->
+      <cdf-notification-bell only="desktop" />
 
       @if (!desktop()) {
         <button

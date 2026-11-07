@@ -11,6 +11,7 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
+  IonButtons,
   IonContent,
   IonRefresher,
   IonRefresherContent,
@@ -65,6 +66,7 @@ import {
   OnboardingFlowComponent,
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
+import { NotificationBell } from '../components/notification-bell.component.js';
 import { GrowthLinksService } from './shared/growth-links.service.js';
 import { DownloadService } from '../offline/download.service.js';
 import { formatCountdown } from './shared/countdown.js';
@@ -140,6 +142,7 @@ export function needsOnboarding(opts: {
     IonHeader,
     IonToolbar,
     IonTitle,
+    IonButtons,
     IonContent,
     IonRefresher,
     IonRefresherContent,
@@ -158,6 +161,7 @@ export function needsOnboarding(opts: {
     StreakChip,
     XpBar,
     OnboardingFlowComponent,
+    NotificationBell,
     TranslatePipe,
     ContentTranslatePipe,
   ],

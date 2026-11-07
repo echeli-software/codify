@@ -1,6 +1,10 @@
 <ion-header>
   <ion-toolbar>
     <ion-title>{{ 'student.today.title' | translate }}</ion-title>
+    <!-- Mobile: the notifications bell lives here (desktop: shell header). -->
+    <ion-buttons slot="end">
+      <cdf-notification-bell only="mobile" />
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 

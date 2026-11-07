@@ -608,6 +608,10 @@
         "privacy": {
           "title": "Data & privacy",
           "body": "Download your data or delete your account"
+        },
+        "notifications": {
+          "title": "Notifications",
+          "body": "Push, email, reminders and quiet hours"
         }
       },
       "account": "Account",
@@ -742,6 +746,97 @@
         "boleto": "Boleto",
         "store": "App store",
         "unknown": "Other"
+      }
+    },
+    "notifications": {
+      "bell": "Notifications",
+      "bellUnread": "Notifications, {count, plural, one {# unread} other {# unread}}",
+      "title": "Notifications",
+      "settings": "Notification settings",
+      "markAllRead": "Mark all as read",
+      "unreadCount": "{count, plural, one {# unread notification} other {# unread notifications}}",
+      "allRead": "You're all caught up.",
+      "unreadLabel": "Unread:",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "loadMore": "Load older notifications",
+      "emptyTitle": "No notifications yet",
+      "emptyBody": "Reminders, friend nudges and league results will show up here.",
+      "error": "Couldn't load your notifications.",
+      "offlineCached": "You're offline — showing the notifications saved on this device.",
+      "offlineTitle": "You're offline",
+      "offlineBody": "Your notifications will load when you're back online.",
+      "fewer": "Fewer like this",
+      "fewerNamed": "Show fewer notifications like “{title}”",
+      "fewerDone": "Got it — we'll send fewer notifications like this.",
+      "nudgeSent": "Nudge sent!",
+      "nudgeAlready": "You already nudged this friend recently.",
+      "actions": {
+        "open_today": "Open Today",
+        "open_daily_quest": "Open daily quests",
+        "nudge_back": "Send a nudge back",
+        "open_league": "Open league",
+        "open_shop": "Open shop",
+        "open_subscription": "See plans",
+        "open_notification_settings": "Open settings"
+      },
+      "kinds": {
+        "STREAK_REMINDER": "Streak reminders",
+        "DAILY_QUEST": "Daily quest reminders",
+        "FRIEND_NUDGE": "Friend nudges",
+        "LEAGUE_RESULT": "League results",
+        "ITEM_DROP": "Limited drops",
+        "PROMO": "Promotions",
+        "BILLING": "Billing",
+        "SYSTEM": "Account notices",
+        "WELCOME": "Welcome",
+        "WEEKLY_RECAP": "Weekly recap",
+        "REACTIVATION": "Come-back reminders"
+      },
+      "kindHints": {
+        "STREAK_REMINDER": "In the evening when your streak is at risk.",
+        "DAILY_QUEST": "When you usually start, if you haven't studied yet.",
+        "FRIEND_NUDGE": "When a friend nudges you.",
+        "LEAGUE_RESULT": "Your league result on Monday.",
+        "ITEM_DROP": "When a limited item arrives in the shop.",
+        "PROMO": "Offers and campaigns. Off unless you turn it on.",
+        "BILLING": "Payments, renewals and failed charges.",
+        "SYSTEM": "Important notices about your account.",
+        "WELCOME": "Your welcome message.",
+        "WEEKLY_RECAP": "A Monday email with last week's progress.",
+        "REACTIVATION": "One gentle note if you've been away for a while."
+      },
+      "prefs": {
+        "title": "Notification settings",
+        "kindsTitle": "What we send",
+        "kindsIntro": "Choose how each kind of notification reaches you. Everything always appears in your in-app inbox.",
+        "push": "Push",
+        "email": "Email",
+        "locked": "Required — billing and account notices can't be turned off.",
+        "fewer1": "You asked for fewer of these (at most one every 2 days).",
+        "fewer2": "You asked for much fewer of these (at most one a week).",
+        "resetFewer": "Back to normal",
+        "reminderTitle": "Daily quest reminder",
+        "reminderLegend": "When should we remind you?",
+        "reminderAuto": "Automatically — about 30 minutes after you usually start (8 PM until we learn your routine)",
+        "reminderCustom": "At a time I choose",
+        "reminderTime": "Reminder time",
+        "limitsTitle": "Push limits",
+        "capLabel": "Push notifications per day",
+        "capDefault": "Default (2 per day)",
+        "capNone": "None (only critical notices)",
+        "capN": "{count, plural, one {# per day} other {# per day}}",
+        "weeklyOptIn": "Allow more than 14 push notifications per week",
+        "weeklyHint": "By default we never send more than 14 a week, and never two within 30 minutes.",
+        "quietTitle": "Quiet hours",
+        "quietHint": "No push notifications in this window, except critical account notices. Anything else waits until it ends.",
+        "quietStart": "From",
+        "quietEnd": "Until",
+        "invalid": "Enter a valid time.",
+        "save": "Save changes",
+        "saved": "Notification settings saved.",
+        "loadError": "Couldn't load your notification settings.",
+        "offline": "Connect to the internet to change your notification settings."
       }
     }
   }

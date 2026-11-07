@@ -608,6 +608,10 @@
         "privacy": {
           "title": "Dados e privacidade",
           "body": "Baixe seus dados ou exclua sua conta"
+        },
+        "notifications": {
+          "title": "Notificações",
+          "body": "Push, email, lembretes e horário de silêncio"
         }
       },
       "account": "Conta",
@@ -742,6 +746,97 @@
         "boleto": "Boleto",
         "store": "Loja de apps",
         "unknown": "Outro"
+      }
+    },
+    "notifications": {
+      "bell": "Notificações",
+      "bellUnread": "Notificações, {count, plural, one {# não lida} other {# não lidas}}",
+      "title": "Notificações",
+      "settings": "Preferências de notificação",
+      "markAllRead": "Marcar todas como lidas",
+      "unreadCount": "{count, plural, one {# notificação não lida} other {# notificações não lidas}}",
+      "allRead": "Você está em dia.",
+      "unreadLabel": "Não lida:",
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "loadMore": "Carregar notificações anteriores",
+      "emptyTitle": "Nenhuma notificação ainda",
+      "emptyBody": "Lembretes, cutucadas de amigos e resultados da liga aparecem aqui.",
+      "error": "Não foi possível carregar suas notificações.",
+      "offlineCached": "Você está offline — mostrando as notificações salvas neste aparelho.",
+      "offlineTitle": "Você está offline",
+      "offlineBody": "Suas notificações vão carregar quando você voltar a ficar online.",
+      "fewer": "Menos como esta",
+      "fewerNamed": "Mostrar menos notificações como “{title}”",
+      "fewerDone": "Combinado — vamos enviar menos notificações como esta.",
+      "nudgeSent": "Cutucada enviada!",
+      "nudgeAlready": "Você já cutucou este amigo recentemente.",
+      "actions": {
+        "open_today": "Abrir Hoje",
+        "open_daily_quest": "Abrir missões do dia",
+        "nudge_back": "Cutucar de volta",
+        "open_league": "Abrir liga",
+        "open_shop": "Abrir loja",
+        "open_subscription": "Ver planos",
+        "open_notification_settings": "Abrir preferências"
+      },
+      "kinds": {
+        "STREAK_REMINDER": "Lembretes de sequência",
+        "DAILY_QUEST": "Lembretes de missões diárias",
+        "FRIEND_NUDGE": "Cutucadas de amigos",
+        "LEAGUE_RESULT": "Resultados da liga",
+        "ITEM_DROP": "Itens limitados",
+        "PROMO": "Promoções",
+        "BILLING": "Cobrança",
+        "SYSTEM": "Avisos da conta",
+        "WELCOME": "Boas-vindas",
+        "WEEKLY_RECAP": "Resumo semanal",
+        "REACTIVATION": "Lembretes de retorno"
+      },
+      "kindHints": {
+        "STREAK_REMINDER": "À noite, quando sua sequência estiver em risco.",
+        "DAILY_QUEST": "No horário em que você costuma começar, se ainda não estudou.",
+        "FRIEND_NUDGE": "Quando um amigo te cutuca.",
+        "LEAGUE_RESULT": "Seu resultado da liga na segunda-feira.",
+        "ITEM_DROP": "Quando um item limitado chega à loja.",
+        "PROMO": "Ofertas e campanhas. Desativado, a menos que você ative.",
+        "BILLING": "Pagamentos, renovações e cobranças recusadas.",
+        "SYSTEM": "Avisos importantes sobre sua conta.",
+        "WELCOME": "Sua mensagem de boas-vindas.",
+        "WEEKLY_RECAP": "Um email na segunda com o progresso da semana anterior.",
+        "REACTIVATION": "Um único lembrete gentil se você ficar um tempo sem aparecer."
+      },
+      "prefs": {
+        "title": "Preferências de notificação",
+        "kindsTitle": "O que enviamos",
+        "kindsIntro": "Escolha como cada tipo de notificação chega até você. Tudo sempre aparece na sua caixa de notificações do app.",
+        "push": "Push",
+        "email": "Email",
+        "locked": "Obrigatório — avisos de cobrança e da conta não podem ser desativados.",
+        "fewer1": "Você pediu menos destas (no máximo uma a cada 2 dias).",
+        "fewer2": "Você pediu bem menos destas (no máximo uma por semana).",
+        "resetFewer": "Voltar ao normal",
+        "reminderTitle": "Lembrete das missões diárias",
+        "reminderLegend": "Quando devemos te lembrar?",
+        "reminderAuto": "Automaticamente — cerca de 30 minutos depois do horário em que você costuma começar (20h até aprendermos sua rotina)",
+        "reminderCustom": "Em um horário que eu escolher",
+        "reminderTime": "Horário do lembrete",
+        "limitsTitle": "Limites de push",
+        "capLabel": "Notificações push por dia",
+        "capDefault": "Padrão (2 por dia)",
+        "capNone": "Nenhuma (só avisos críticos)",
+        "capN": "{count, plural, one {# por dia} other {# por dia}}",
+        "weeklyOptIn": "Permitir mais de 14 notificações push por semana",
+        "weeklyHint": "Por padrão nunca enviamos mais de 14 por semana, nem duas em menos de 30 minutos.",
+        "quietTitle": "Horário de silêncio",
+        "quietHint": "Nenhuma notificação push neste intervalo, exceto avisos críticos da conta. O resto espera ele terminar.",
+        "quietStart": "Das",
+        "quietEnd": "Até",
+        "invalid": "Informe um horário válido.",
+        "save": "Salvar alterações",
+        "saved": "Preferências de notificação salvas.",
+        "loadError": "Não foi possível carregar suas preferências de notificação.",
+        "offline": "Conecte-se à internet para alterar suas preferências de notificação."
       }
     }
   }

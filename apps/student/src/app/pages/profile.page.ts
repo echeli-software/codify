@@ -74,6 +74,12 @@ const LINKS: NavLink[] = [
     key: 'privacy',
     testId: 'privacy-link',
   },
+  {
+    path: '/settings/notifications',
+    icon: 'notifications',
+    key: 'notifications',
+    testId: 'notifications-settings-link',
+  },
 ];
 
 /**
