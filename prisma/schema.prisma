@@ -1029,11 +1029,17 @@ model IdempotencyRecord {
 // Translations (content-level) — see /docs/02-data-model.md §"Translations"
 // ─────────────────────────────────────────────────────────────────────
 
+/// docs/11 §Content: every entity with user-facing text.
 enum TranslatableEntity {
   COURSE
   MODULE
   LESSON
   CATEGORY
+  PLAN
+  BADGE
+  ITEM
+  ITEM_CATEGORY
+  QUEST
 }
 
 /// Polymorphic translations table. Tried Prisma named relations
