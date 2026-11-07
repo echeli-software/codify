@@ -2,7 +2,8 @@
 
 Everything needed to stand up Codify's hosting from zero, in order. The
 design is in [docs/13-deployment.md](../docs/13-deployment.md); this is the
-operational checklist.
+operational checklist. What must be true before the first production
+release is in [docs/runbooks/release-checklist.md](../docs/runbooks/release-checklist.md).
 
 ```
 infra/

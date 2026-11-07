@@ -88,6 +88,8 @@ Static assets cached aggressively via Cloudflare. App-shell HTML cached short (1
 
 ## 9. CI/CD
 
+Gate for the first production release: [runbooks/release-checklist.md](./runbooks/release-checklist.md).
+
 GitHub Actions (`.github/workflows/`), as built. Every job that needs a secret checks for it first and **skips with a job summary** when it is absent, so forks and partially configured repos stay green. Actions are pinned to major versions; each workflow declares least-privilege `permissions:`.
 
 | Workflow        | Trigger                      | Steps                                                                                                                                                                                                                                                                                                                                                                                   |
