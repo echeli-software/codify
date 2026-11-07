@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   DevicesClient,
@@ -10,6 +10,7 @@ import type {
   FirebaseMessagingPlugin,
   Notification as PushNotification,
 } from '@capacitor-firebase/messaging';
+import { NotificationsStore } from '../pages/notifications/notifications.store.js';
 import { AppToastService } from '../platform/app-toast.service.js';
 import { isNativeRuntime, runtimePlatform } from '../platform/runtime.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
@@ -51,6 +52,19 @@ export function pushDeepLink(
 }
 
 /**
+ * The inbox entry a push belongs to (`data.notificationId`, set by the
+ * API's NotificationService for kinds that also land in the inbox), or null.
+ */
+export function pushNotificationId(
+  notification: Pick<PushNotification, 'data'> | null | undefined,
+): string | null {
+  const id = (notification?.data as Record<string, unknown> | undefined)?.[
+    'notificationId'
+  ];
+  return typeof id === 'string' && id.length > 0 && id.length <= 64 ? id : null;
+}
+
+/**
  * Native push through Firebase Cloud Messaging on **both** iOS and Android
  * (`@capacitor-firebase/messaging`, docs/17). The token registered with
  * `POST /devices` is always an FCM registration token, which is what the
@@ -74,6 +88,8 @@ export class NativePushService {
   private readonly router = inject(Router);
   private readonly toast = inject(AppToastService);
   private readonly telemetry = inject(TelemetryService);
+  // Resolved on first tap only, so the push service stays cheap at boot.
+  private readonly injector = inject(Injector);
 
   private pluginP: Promise<FirebaseMessagingPlugin | null> | null = null;
   private listenersP: Promise<void> | null = null;
@@ -158,8 +174,14 @@ export class NativePushService {
     return true;
   }
 
-  /** Open the route a tapped notification points at. */
+  /**
+   * A notification was tapped: mark its inbox entry read (fire-and-forget;
+   * the store refreshes the bell) and open the route it points at.
+   */
   openFromNotification(notification: PushNotification | undefined): void {
+    const inboxId = pushNotificationId(notification);
+    if (inboxId)
+      void this.injector.get(NotificationsStore).markReadFromPush(inboxId);
     const route = pushDeepLink(notification);
     this.telemetry.track('push_opened', { hasUrl: !!route });
     if (route) void this.router.navigateByUrl(route);

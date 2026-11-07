@@ -3,7 +3,12 @@ import { Router, provideRouter } from '@angular/router';
 import { DevicesClient, ProblemDetailsError } from '@codify/api-client';
 import { AppToastService } from '../platform/app-toast.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
-import { NativePushService, pushDeepLink } from './native-push.service';
+import { NotificationsStore } from '../pages/notifications/notifications.store';
+import {
+  NativePushService,
+  pushDeepLink,
+  pushNotificationId,
+} from './native-push.service';
 
 type Listener = (event: Record<string, unknown>) => void;
 
@@ -51,6 +56,7 @@ describe('NativePushService', () => {
   let unregister: jest.Mock;
   let track: jest.Mock;
   let show: jest.Mock;
+  let markReadFromPush: jest.Mock;
 
   function setup(platform: 'ios' | 'android' | null = 'ios') {
     if (platform)
@@ -62,12 +68,14 @@ describe('NativePushService', () => {
     unregister = jest.fn().mockResolvedValue(undefined);
     track = jest.fn();
     show = jest.fn();
+    markReadFromPush = jest.fn().mockResolvedValue(undefined);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         { provide: DevicesClient, useValue: { register, unregister } },
         { provide: TelemetryService, useValue: { track, flush: jest.fn() } },
         { provide: AppToastService, useValue: { show } },
+        { provide: NotificationsStore, useValue: { markReadFromPush } },
       ],
     });
     const router = TestBed.inject(Router);
@@ -170,6 +178,26 @@ describe('NativePushService', () => {
     expect(track).toHaveBeenCalledWith('push_opened', { hasUrl: true });
   });
 
+  it('marks the tapped push read in the inbox (by payload notificationId)', async () => {
+    const { svc, router } = setup('ios');
+    await svc.init();
+    plugin.emit('notificationActionPerformed', {
+      actionId: 'tap',
+      notification: {
+        data: { url: '/league', kind: 'LEAGUE_RESULT', notificationId: 'n-1' },
+      },
+    });
+    expect(markReadFromPush).toHaveBeenCalledWith('n-1');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/league');
+    // Pushes without an inbox entry (e.g. STREAK_AT_RISK) mark nothing.
+    markReadFromPush.mockClear();
+    plugin.emit('notificationActionPerformed', {
+      actionId: 'tap',
+      notification: { data: { url: '/today' } },
+    });
+    expect(markReadFromPush).not.toHaveBeenCalled();
+  });
+
   it('never navigates to an external or protocol-relative link', async () => {
     const { svc, router } = setup('android');
     await svc.init();
@@ -216,6 +244,19 @@ describe('NativePushService', () => {
     expect(unregister).toHaveBeenCalledWith('fcm-token-1');
     expect(plugin.deleteToken).toHaveBeenCalled();
     expect(svc.token).toBeNull();
+  });
+});
+
+describe('pushNotificationId', () => {
+  it('reads data.notificationId, ignoring empty / non-string / oversized ids', () => {
+    expect(pushNotificationId({ data: { notificationId: 'abc' } })).toBe('abc');
+    expect(pushNotificationId({ data: { notificationId: '' } })).toBeNull();
+    expect(pushNotificationId({ data: { notificationId: 42 } })).toBeNull();
+    expect(
+      pushNotificationId({ data: { notificationId: 'x'.repeat(65) } }),
+    ).toBeNull();
+    expect(pushNotificationId({ data: {} })).toBeNull();
+    expect(pushNotificationId(undefined)).toBeNull();
   });
 });
 

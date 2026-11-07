@@ -171,6 +171,24 @@ export class NotificationsStore {
     }
   }
 
+  /**
+   * A push for inbox entry `id` was tapped (payload `notificationId`,
+   * docs/10 §3): mark it read on the server, then re-sync the bell's unread
+   * count. Fire-and-forget — failures are logged, never thrown.
+   */
+  async markReadFromPush(id: string): Promise<void> {
+    try {
+      await this.auth.whenReady();
+      if (!this.auth.user()) return;
+      const updated = await this.client.markRead(id);
+      this.patch(id, { readAt: updated?.readAt ?? new Date().toISOString() });
+    } catch (err) {
+      console.warn('[notifications] could not mark the tapped push read', err);
+      return;
+    }
+    await this.refreshUnread();
+  }
+
   async markAllRead(): Promise<void> {
     const before = this._items();
     const unreadBefore = this._unread();

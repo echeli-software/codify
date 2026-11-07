@@ -98,7 +98,10 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
   `scheduledFor` while a push waits for quiet hours to end — the same row gets `sentAt` on delivery, or is deleted
   if the push is skipped then). Copy is built per recipient locale (pt-BR / en-US). Friend nudges, league results,
   item drops, streak reminders and billing notices all go through it. Push payloads carry `data.url` (deep link),
-  `data.kind` and `data.notificationId`.
+  `data.kind` and `data.notificationId`. Tapping a native push marks that inbox entry read
+  (`POST /notifications/:id/read`, fire-and-forget) and re-syncs the bell's unread count
+  (`NativePushService` → `NotificationsStore.markReadFromPush`). The PWA has no web push (no VAPID / `SwPush`
+  subscription), so there is no service-worker click path.
 - **Channels per kind**: push — every kind except `WELCOME` / `WEEKLY_RECAP`; email — `WELCOME`, `BILLING`,
   `WEEKLY_RECAP`, `REACTIVATION`, `SYSTEM`. Dormant (§13) and suspended users only get `BILLING` (+ `SYSTEM`)
   push/email; the inbox row is still written.

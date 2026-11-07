@@ -39,7 +39,10 @@ describe('NotificationsStore', () => {
       providers: [
         { provide: NotificationsClient, useValue: client },
         { provide: NetworkStatusService, useValue: { online } },
-        { provide: AuthService, useValue: { user: signal(user) } },
+        {
+          provide: AuthService,
+          useValue: { user: signal(user), whenReady: () => Promise.resolve() },
+        },
       ],
     });
     const store = TestBed.inject(NotificationsStore);
@@ -107,6 +110,37 @@ describe('NotificationsStore', () => {
     await expect(store.markRead(store.items()[0])).rejects.toThrow('boom');
     expect(store.items()[0].readAt).toBeNull();
     expect(store.unread()).toBe(1);
+  });
+
+  it('a tapped push marks its entry read and re-syncs the unread count', async () => {
+    const store = setup();
+    await store.load();
+    client['markRead'].mockResolvedValueOnce({
+      readAt: '2026-11-07T10:00:00Z',
+    });
+    client['unreadCount'].mockResolvedValueOnce({ count: 0 });
+    await store.markReadFromPush('a');
+    expect(client['markRead']).toHaveBeenCalledWith('a');
+    expect(store.items().find((i) => i.id === 'a')?.readAt).toBe(
+      '2026-11-07T10:00:00Z',
+    );
+    expect(store.unread()).toBe(0);
+  });
+
+  it('a failed push mark-read is logged, not thrown; signed out does nothing', async () => {
+    const warn = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const store = setup();
+    client['markRead'].mockRejectedValueOnce(new Error('offline'));
+    await expect(store.markReadFromPush('a')).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    TestBed.resetTestingModule();
+    const signedOut = setup(null);
+    client['markRead'].mockClear();
+    await signedOut.markReadFromPush('a');
+    expect(client['markRead']).not.toHaveBeenCalled();
   });
 
   it('mark all read clears unread; loadMore appends the next page', async () => {
