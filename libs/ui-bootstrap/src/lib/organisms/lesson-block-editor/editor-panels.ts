@@ -468,7 +468,7 @@ export class ImagePanel implements OnDestroy {
     }
   }
 
-  /** Show a translated error (`key` under `ui.lessonEditor.image.errors`). */
+  /** Show a translated error (a `ui.lessonEditor.image.errors.*` key). */
   private fail(key: string, params?: Record<string, unknown>): void {
     this.status.set('error');
     this.error.set(this.i18n.t(key, params));

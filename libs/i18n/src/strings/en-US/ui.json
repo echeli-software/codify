@@ -415,6 +415,15 @@
         "help": "YouTube, Vimeo, CodePen, CodeSandbox or Loom links only.",
         "titleLabel": "Title (read by screen readers)",
         "insert": "Insert embed"
+      },
+      "placeholder": "Start writing the lesson…",
+      "contentLabel": "Lesson content",
+      "announce": {
+        "calloutTopLevel": "Callouts can only be placed at the top level of the lesson.",
+        "quizInserted": "Quiz block inserted.",
+        "blockInserted": "Block inserted.",
+        "imageInserted": "Image inserted.",
+        "embedInserted": "Embed inserted."
       }
     }
   }

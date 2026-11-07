@@ -415,6 +415,15 @@
         "help": "Somente links do YouTube, Vimeo, CodePen, CodeSandbox ou Loom.",
         "titleLabel": "Título (lido por leitores de tela)",
         "insert": "Incorporar"
+      },
+      "placeholder": "Comece a escrever a lição…",
+      "contentLabel": "Conteúdo da lição",
+      "announce": {
+        "calloutTopLevel": "Destaques só podem ficar no nível principal da lição.",
+        "quizInserted": "Bloco de quiz inserido.",
+        "blockInserted": "Bloco inserido.",
+        "imageInserted": "Imagem inserida.",
+        "embedInserted": "Incorporação inserida."
       }
     }
   }

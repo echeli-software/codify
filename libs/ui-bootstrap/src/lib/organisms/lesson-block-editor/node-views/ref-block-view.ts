@@ -18,25 +18,25 @@ interface RefKind {
   icon: string;
 }
 
-const KIND_KEYS = 'ui.lessonEditor.ref.kinds';
+const KIND_KEYS = 'ui.lessonEditor.ref.kinds.';
 
 const KINDS: RefKind[] = [
   {
     attr: 'exerciseId',
-    label: `${KIND_KEYS}.exercise.label`,
-    description: `${KIND_KEYS}.exercise.description`,
+    label: `${KIND_KEYS}exercise.label`,
+    description: `${KIND_KEYS}exercise.description`,
     icon: 'Terminal',
   },
   {
     attr: 'aiPromptId',
-    label: `${KIND_KEYS}.aiPrompt.label`,
-    description: `${KIND_KEYS}.aiPrompt.description`,
+    label: `${KIND_KEYS}aiPrompt.label`,
+    description: `${KIND_KEYS}aiPrompt.description`,
     icon: 'Robot',
   },
   {
     attr: 'scenarioId',
-    label: `${KIND_KEYS}.scenario.label`,
-    description: `${KIND_KEYS}.scenario.description`,
+    label: `${KIND_KEYS}scenario.label`,
+    description: `${KIND_KEYS}scenario.description`,
     icon: 'TreeStructure',
   },
 ];

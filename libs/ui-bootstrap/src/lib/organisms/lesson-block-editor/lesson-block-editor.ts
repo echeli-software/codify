@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Editor } from '@tiptap/core';
+import { I18nService } from '@codify/i18n';
 // Side-effect imports — bring in the chained-command type augmentations
 // from each Tiptap extension so editor.chain().toggleHeading() etc. type-check.
 import '@tiptap/starter-kit';
@@ -84,10 +85,12 @@ interface MenuState {
   ],
 })
 export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
-  readonly placeholder = input('Start writing the lesson…');
+  /** Empty-document hint; defaults to `ui.lessonEditor.placeholder`. */
+  readonly placeholder = input<string>();
   readonly readonly = input(false);
 
   private readonly hostEl = inject(ElementRef<HTMLElement>);
+  private readonly i18n = inject(I18nService);
   private readonly injector = inject(EnvironmentInjector);
   private readonly editorContainer =
     viewChild.required<ElementRef<HTMLElement>>('editorHost');
@@ -151,7 +154,8 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
       this.editor = new Editor({
         element: host,
         extensions: buildLessonExtensions({
-          placeholder: this.placeholder(),
+          placeholder:
+            this.placeholder() ?? this.i18n.t('ui.lessonEditor.placeholder'),
           nodeViews: {
             quiz: angularNodeView(QuizBlockView, nodeHost),
             exerciseRef: angularNodeView(RefBlockView, nodeHost),
@@ -172,7 +176,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
           attributes: {
             role: 'textbox',
             'aria-multiline': 'true',
-            'aria-label': 'Lesson content',
+            'aria-label': this.i18n.t('ui.lessonEditor.contentLabel'),
           },
         },
         onUpdate: ({ editor }) => {
@@ -282,9 +286,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
         break;
       case 'callout':
         if (!chain().toggleCallout('info').run()) {
-          this.announce(
-            'Callouts can only be placed at the top level of the lesson.',
-          );
+          this.announce('ui.lessonEditor.announce.calloutTopLevel');
         }
         break;
       case 'divider':
@@ -303,7 +305,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
         chain()
           .insertRootBlock({ type: 'quiz', attrs: { ...newQuizAttrs() } })
           .run();
-        this.announce('Quiz block inserted.');
+        this.announce('ui.lessonEditor.announce.quizInserted');
         break;
       case 'insert':
         this.openMenu();
@@ -418,7 +420,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
       default:
         return;
     }
-    this.announce(`${type} inserted.`);
+    this.announce('ui.lessonEditor.announce.blockInserted');
     this.refreshState();
   }
 
@@ -472,7 +474,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   protected insertImage(result: ImagePanelResult): void {
     this.panel.set(null);
     this.editor?.chain().focus().insertLessonImage(result).run();
-    this.announce('Image inserted.');
+    this.announce('ui.lessonEditor.announce.imageInserted');
   }
 
   protected insertEmbed(result: EmbedPanelResult): void {
@@ -482,7 +484,7 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
       .focus()
       .insertRootBlock({ type: 'embed', attrs: { ...result } })
       .run();
-    this.announce('Embed inserted.');
+    this.announce('ui.lessonEditor.announce.embedInserted');
   }
 
   protected closePanel(): void {
@@ -497,7 +499,9 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
     return json;
   }
 
-  private announce(message: string): void {
+  /** Polite live-region message (a `ui.lessonEditor.announce.*` key). */
+  private announce(key: string): void {
+    const message = this.i18n.t(key);
     this.announcement.set('');
     queueMicrotask(() => this.announcement.set(message));
   }

@@ -41,6 +41,7 @@ beforeAll(() => {
 async function mount(
   doc: LessonDoc | null = null,
   uploader?: LessonAssetUploader,
+  locale: 'en-US' | 'pt-BR' = 'en-US',
 ): Promise<{
   fixture: ComponentFixture<LessonBlockEditor>;
   cmp: LessonBlockEditor;
@@ -57,7 +58,7 @@ async function mount(
     ],
   }).compileComponents();
   // Pin the locale so assertions don't depend on navigator.language.
-  TestBed.inject(I18nService).setLocale('en-US');
+  void TestBed.inject(I18nService).setLocale(locale);
   const fixture = TestBed.createComponent(LessonBlockEditor);
   const cmp = fixture.componentInstance;
   const changes: LessonDoc[] = [];
@@ -131,6 +132,22 @@ describe('LessonBlockEditor', () => {
     );
     expect(toolbarButton(el, 'image').hasAttribute('aria-pressed')).toBe(false);
     expect(el.querySelector('[role="toolbar"]')).toBeTruthy();
+  });
+
+  it('translates its placeholder, label and live-region announcements', async () => {
+    const { fixture, el } = await mount(null, undefined, 'pt-BR');
+    const content = el.querySelector<HTMLElement>('[role="textbox"]');
+    expect(content?.getAttribute('aria-label')).toBe('Conteúdo da lição');
+    expect(
+      el.querySelector('[data-placeholder]')?.getAttribute('data-placeholder'),
+    ).toBe('Comece a escrever a lição…');
+    toolbarButton(el, 'quiz').click();
+    await settle(fixture);
+    await Promise.resolve();
+    fixture.detectChanges();
+    expect(el.querySelector('[aria-live="polite"]')?.textContent).toBe(
+      'Bloco de quiz inserido.',
+    );
   });
 
   describe('quiz blocks', () => {
