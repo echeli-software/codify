@@ -1,5 +1,10 @@
 import { Cron } from '@nestjs/schedule';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import type { LeagueTier, Prisma } from '@prisma/client';
 import {
   computeRollover,
@@ -20,6 +25,7 @@ import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import { LeagueAccumulatorService } from './league-accumulator.service.js';
 import type { AvatarResponse, EquippedRef } from '../items/items.dto.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
 
 const WEEK_MS = 7 * 86_400_000;
 /** Accounts that take part in leagues: not deleted, not suspended. */
@@ -92,6 +98,7 @@ export class LeaguesService {
     private readonly accumulator: LeagueAccumulatorService,
     private readonly config: GamificationConfigService,
     private readonly push: UserPushService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   /** The caller's current-week cohort leaderboard (lazy-assigns them in). */
@@ -147,6 +154,19 @@ export class LeaguesService {
         spriteUrl: spriteUrlFor(e.item.spriteAssetId, spriteUrls),
       } satisfies EquippedRef;
       equippedByUser.set(e.userId, map);
+    }
+    // Equipped item names in the caller's locale (docs/11 §3).
+    const refs = [...equippedByUser.values()].flatMap((m) =>
+      Object.values(m).filter((r): r is EquippedRef => !!r),
+    );
+    if (this.localizer && refs.length) {
+      const tr = await this.localizer.localize([
+        {
+          entityType: 'ITEM',
+          items: refs.map((r) => ({ id: r.itemId, values: { name: r.name } })),
+        },
+      ]);
+      for (const r of refs) tr.apply('ITEM', r.itemId, r, ['name']);
     }
 
     const members: LeagueMemberView[] = rows.map((r, i) => ({

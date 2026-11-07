@@ -12,6 +12,7 @@ import type {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { noteTranslationFallback } from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
   CourseDetail,
@@ -125,6 +126,15 @@ export class CoursesService {
     }
 
     const covers = await this.coverUrls(rows.map((r) => r.coverAssetId));
+    for (const r of rows)
+      if (
+        fellBack(
+          translations.filter((t) => t.entityId === r.id),
+          locale,
+          r.sourceLocale,
+        )
+      )
+        noteTranslationFallback(r.sourceLocale);
     return {
       items: rows.map((r) =>
         toListItem(
@@ -244,6 +254,16 @@ export class CoursesService {
           ) ?? `Lesson ${l.order + 1}`,
       })),
     }));
+
+    // docs/11 §3: tell the client when any title fell back to the source.
+    if (
+      fellBack(
+        [...courseTranslations, ...childTranslations],
+        locale,
+        course.sourceLocale,
+      )
+    )
+      noteTranslationFallback(course.sourceLocale);
 
     return { ...list, modules };
   }
@@ -579,6 +599,32 @@ function pickTitleAndDescription(
     description,
     fromTranslation: !!titleAtLocale && titleAtLocale.locale !== sourceLocale,
   };
+}
+
+/**
+ * True when some field has source-locale text but no translation in
+ * `locale` (→ the response serves source text; `X-Translation-Fallback`).
+ */
+function fellBack(
+  translations: Pick<
+    ContentTranslation,
+    'entityType' | 'entityId' | 'field' | 'locale' | 'value'
+  >[],
+  locale: string,
+  sourceLocale: string,
+): boolean {
+  if (locale === sourceLocale) return false;
+  const translated = new Set(
+    translations
+      .filter((t) => t.locale === locale && t.value)
+      .map((t) => `${t.entityType}|${t.entityId}|${t.field}`),
+  );
+  return translations.some(
+    (t) =>
+      t.locale === sourceLocale &&
+      !!t.value &&
+      !translated.has(`${t.entityType}|${t.entityId}|${t.field}`),
+  );
 }
 
 function pickTitle(

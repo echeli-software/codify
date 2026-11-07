@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Plan, PlanPrice, Prisma } from '@prisma/client';
 import { planIncludesCourse } from '@codify/domain';
@@ -13,6 +14,10 @@ import {
   BILLING_PROVIDER,
   type BillingProvider,
 } from '../billing/billing.provider.js';
+import {
+  ContentLocalizer,
+  changedFields,
+} from '../translations/content-localizer.service.js';
 import type {
   CreatePlanDto,
   ListPlansQueryDto,
@@ -46,11 +51,12 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(BILLING_PROVIDER) private readonly billing: BillingProvider,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   async list(
     query: ListPlansQueryDto,
-    opts: { includeInactive: boolean },
+    opts: { includeInactive: boolean; localize?: boolean },
   ): Promise<PlanListResponse> {
     const where: Prisma.PlanWhereInput = opts.includeInactive
       ? {}
@@ -85,12 +91,14 @@ export class PlansService {
     }
 
     const map = (p: PlanWithRelations) => toResponse(p, opts.includeInactive);
-    return { items: plans.map(map), total: plans.length };
+    const items = plans.map(map);
+    if (opts.localize) await this.localizePlans(items, query.locale);
+    return { items, total: items.length };
   }
 
   async getById(
     id: string,
-    opts: { includeInactive: boolean },
+    opts: { includeInactive: boolean; localize?: boolean },
   ): Promise<PlanResponse> {
     const plan = await this.prisma.plan.findFirst({
       where: opts.includeInactive
@@ -99,7 +107,35 @@ export class PlansService {
       include: PLAN_INCLUDE,
     });
     if (!plan) throw new NotFoundException('Plan not found');
-    return toResponse(plan, opts.includeInactive);
+    const res = toResponse(plan, opts.includeInactive);
+    if (opts.localize) await this.localizePlans([res]);
+    return res;
+  }
+
+  /** name / description / tagline in the caller's locale (docs/11 §3). */
+  private async localizePlans(
+    plans: PlanResponse[],
+    locale?: string,
+  ): Promise<void> {
+    if (!this.localizer || plans.length === 0) return;
+    const tr = await this.localizer.localize(
+      [
+        {
+          entityType: 'PLAN',
+          items: plans.map((p) => ({
+            id: p.id,
+            values: {
+              name: p.name,
+              description: p.description,
+              tagline: p.tagline,
+            },
+          })),
+        },
+      ],
+      locale,
+    );
+    for (const p of plans)
+      tr.apply('PLAN', p.id, p, ['name', 'description', 'tagline']);
   }
 
   async create(input: CreatePlanDto): Promise<PlanResponse> {
@@ -188,6 +224,12 @@ export class PlansService {
         }
       }
     });
+    // Source text changed → its translations need review (docs/11 §3).
+    await this.localizer?.markSourceChanged(
+      'PLAN',
+      id,
+      changedFields(target, patch, ['name', 'description', 'tagline']),
+    );
     return this.getById(id, { includeInactive: true });
   }
 

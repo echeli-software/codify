@@ -71,7 +71,8 @@ async function bootstrap() {
   app.enableCors({
     origin: config.corsOrigins,
     credentials: true,
-    exposedHeaders: ['Retry-After', 'X-Request-Id'],
+    // X-Translation-Fallback: content served from another locale (docs/11 §3).
+    exposedHeaders: ['Retry-After', 'X-Request-Id', 'X-Translation-Fallback'],
   });
 
   app.useGlobalPipes(

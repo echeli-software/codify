@@ -264,8 +264,11 @@ export class TranslationsService {
 
   /**
    * Entities of one type with their source locale + source values. Courses
-   * own `sourceLocale`; modules/lessons inherit their course's; categories
-   * keep name/description on the row in the default locale.
+   * own `sourceLocale`; modules/lessons inherit their course's. Categories,
+   * plans, badges, items, item categories (id = slug) and quest templates
+   * keep their source text in their own columns, in the default locale.
+   * `includeBody` = staff workspace (all rows); false = public resolver
+   * (active, non-hidden rows only).
    */
   private async loadEntities(
     type: TranslatableEntityType,
@@ -291,6 +294,92 @@ export class TranslationsService {
           label: c.name || c.slug,
           sourceValues: { name: c.name, description: c.description },
         }));
+      }
+      case 'PLAN': {
+        if (scope?.authorId) return [];
+        const rows = await this.prisma.plan.findMany({
+          where: {
+            deletedAt: null,
+            ...(includeBody ? {} : { isActive: true }),
+            ...idFilter,
+          },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            description: true,
+            tagline: true,
+          },
+          orderBy: [{ sortOrder: 'asc' }, { slug: 'asc' }],
+        });
+        return rows.map((p) =>
+          columnEntity(type, p.id, p.name || p.slug, {
+            name: p.name,
+            description: p.description,
+            tagline: p.tagline,
+          }),
+        );
+      }
+      case 'BADGE': {
+        if (scope?.authorId) return [];
+        // The public resolver never reveals hidden/inactive badges.
+        const rows = await this.prisma.badge.findMany({
+          where: {
+            ...(includeBody ? {} : { isActive: true, isHidden: false }),
+            ...idFilter,
+          },
+          select: { id: true, slug: true, name: true, description: true },
+          orderBy: { slug: 'asc' },
+        });
+        return rows.map((b) =>
+          columnEntity(type, b.id, b.name || b.slug, {
+            name: b.name,
+            description: b.description,
+          }),
+        );
+      }
+      case 'ITEM': {
+        if (scope?.authorId) return [];
+        const rows = await this.prisma.item.findMany({
+          where: {
+            deletedAt: null,
+            ...(includeBody ? {} : { isActive: true }),
+            ...idFilter,
+          },
+          select: { id: true, slug: true, name: true, description: true },
+          orderBy: { slug: 'asc' },
+        });
+        return rows.map((i) =>
+          columnEntity(type, i.id, i.name || i.slug, {
+            name: i.name,
+            description: i.description,
+          }),
+        );
+      }
+      case 'ITEM_CATEGORY': {
+        if (scope?.authorId) return [];
+        const rows = await this.prisma.itemCategory.findMany({
+          where: ids ? { slug: { in: ids } } : {},
+          select: { slug: true, name: true },
+          orderBy: [{ sortOrder: 'asc' }, { slug: 'asc' }],
+        });
+        return rows.map((c) =>
+          columnEntity(type, c.slug, c.name || c.slug, { name: c.name }),
+        );
+      }
+      case 'QUEST': {
+        if (scope?.authorId) return [];
+        const rows = await this.prisma.questTemplate.findMany({
+          where: {
+            ...(includeBody ? {} : { isActive: true }),
+            ...idFilter,
+          },
+          select: { id: true, slug: true, title: true },
+          orderBy: [{ difficulty: 'asc' }, { slug: 'asc' }],
+        });
+        return rows.map((q) =>
+          columnEntity(type, q.id, q.title || q.slug, { title: q.title }),
+        );
       }
       case 'COURSE': {
         const rows = await this.prisma.course.findMany({
@@ -403,4 +492,20 @@ export class TranslationsService {
       };
     });
   }
+}
+
+/** An entity whose source text is its own columns, in `DEFAULT_LOCALE`. */
+function columnEntity(
+  entityType: TranslatableEntityType,
+  entityId: string,
+  label: string,
+  sourceValues: Record<string, string | null>,
+): SourceEntity {
+  return {
+    entityType,
+    entityId,
+    sourceLocale: DEFAULT_LOCALE,
+    label,
+    sourceValues,
+  };
 }

@@ -6,6 +6,7 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
+  Optional,
   PayloadTooLargeException,
 } from '@nestjs/common';
 import type { Course, Module as PrismaModule, Prisma } from '@prisma/client';
@@ -24,6 +25,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from '../billing/access.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
+import { noteTranslationFallback } from '../translations/translation-context.js';
 import type {
   CreateLessonDto,
   LessonMeta,
@@ -51,6 +54,7 @@ export class LessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   async create(
@@ -116,10 +120,53 @@ export class LessonsService {
     const l = await this.loadForStudent(id);
     await this.assertStudentAccess(actor, l);
     const meta = await this.meta(l);
+    const { title, doc } = await this.localizeForStudent(l, meta.title);
     return {
       ...meta,
-      contentJson: stripQuizAnswers(this.readDoc(l.contentJson)),
+      title,
+      contentJson: stripQuizAnswers(this.readDoc(doc)),
     };
+  }
+
+  /**
+   * Title + body in the caller's locale (docs/11 §3): the requested
+   * locale's ContentTranslation rows, else the course's source locale
+   * (noted for `X-Translation-Fallback`). An outdated body translation is
+   * not served — its block structure may no longer match the source.
+   */
+  private async localizeForStudent(
+    l: LessonWithCourse,
+    sourceTitle: string,
+  ): Promise<{ title: string; doc: unknown }> {
+    const source = l.module.course.sourceLocale;
+    const locale = (await this.localizer?.requestLocale()) ?? source;
+    if (locale === source) return { title: sourceTitle, doc: l.contentJson };
+    const rows = await this.prisma.contentTranslation.findMany({
+      where: {
+        entityType: 'LESSON',
+        entityId: l.id,
+        locale,
+        field: { in: ['title', 'contentJson'] },
+      },
+      select: { field: true, value: true, outdated: true },
+    });
+    const title = rows.find((r) => r.field === 'title' && r.value)?.value;
+    const body = rows.find(
+      (r) => r.field === 'contentJson' && r.value && !r.outdated,
+    );
+    let doc: unknown = null;
+    if (body) {
+      try {
+        const parsed: unknown = JSON.parse(body.value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+          doc = parsed;
+      } catch {
+        /* unreadable translation → serve the source */
+      }
+    }
+    if (!title || (doc == null && l.contentJson != null))
+      noteTranslationFallback(source);
+    return { title: title ?? sourceTitle, doc: doc ?? l.contentJson };
   }
 
   /**

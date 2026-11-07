@@ -2,9 +2,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
 import type {
   CreateItemCategoryAdminDto,
   ItemCategoryAdminView,
@@ -37,12 +39,16 @@ const WITH_COUNT = { _count: { select: { items: true } } } as const;
  * Shop → Item Categories (docs/04): slug, name, sortOrder. The slug is the
  * primary key items reference, so it can't change; a category still used
  * by any item (including soft-deleted ones — the FK remains) can't be
- * deleted. ItemCategory is not a TranslatableEntity, so names are
- * single-locale for now.
+ * deleted. `name` is the pt-BR source; other locales are ITEM_CATEGORY
+ * ContentTranslation rows keyed by slug (docs/11 §3) — renaming marks them
+ * outdated.
  */
 @Injectable()
 export class ItemCategoriesAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly localizer?: ContentLocalizer,
+  ) {}
 
   async list(): Promise<ItemCategoryAdminView[]> {
     const rows = await this.prisma.itemCategory.findMany({
@@ -90,6 +96,8 @@ export class ItemCategoriesAdminService {
       },
       include: WITH_COUNT,
     });
+    if (row.name !== before.name)
+      await this.localizer?.markSourceChanged('ITEM_CATEGORY', slug, ['name']);
     return { before, after: toView(row) };
   }
 

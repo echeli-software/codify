@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Prisma, QuestKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -11,6 +12,10 @@ import { GamificationService } from './gamification.service.js';
 import { GamificationConfigService } from './gamification-config.service.js';
 import { jobsEnabled, ENGAGEMENT_CRONS } from './jobs.js';
 import { pickDailyQuests, type PickableTemplate } from './quest-picker.js';
+import {
+  ContentLocalizer,
+  changedFields,
+} from '../translations/content-localizer.service.js';
 
 type PickableQuestTemplate = PickableTemplate;
 /** Only users seen (or created) this recently get quests pre-assigned. */
@@ -37,6 +42,8 @@ export interface QuestView {
 
 export interface CompletedQuest {
   id: string;
+  /** QuestTemplate id (the QUEST translation entity). */
+  templateId?: string;
   title: string;
   xpReward: number;
   coinReward: number;
@@ -92,6 +99,7 @@ export class QuestsService {
     private readonly prisma: PrismaService,
     private readonly gamification: GamificationService,
     private readonly config: GamificationConfigService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   // ─── Templates (admin) ─────────────────────────────────────────────────
@@ -131,7 +139,7 @@ export class QuestsService {
       where: { id },
     });
     if (!target) throw new NotFoundException('Quest template not found');
-    return this.prisma.questTemplate.update({
+    const updated = await this.prisma.questTemplate.update({
       where: { id },
       data: {
         kind: patch.kind,
@@ -147,6 +155,13 @@ export class QuestsService {
         isActive: patch.isActive,
       },
     });
+    // Source text changed → its translations need review (docs/11 §3).
+    await this.localizer?.markSourceChanged(
+      'QUEST',
+      id,
+      changedFields(target, patch, ['title']),
+    );
+    return updated;
   }
 
   async deleteTemplate(id: string): Promise<void> {
@@ -172,12 +187,24 @@ export class QuestsService {
       include: { template: true },
       orderBy: { template: { difficulty: 'asc' } },
     });
+    // Titles in the caller's locale (docs/11 §3).
+    const tr = await this.localizer?.localize([
+      {
+        entityType: 'QUEST',
+        items: rows.map((a) => ({
+          id: a.templateId,
+          values: { title: a.template.title },
+        })),
+      },
+    ]);
     return rows.map((a) => ({
       id: a.id,
       templateId: a.templateId,
       slug: a.template.slug,
       kind: a.template.kind,
-      title: a.template.title,
+      title:
+        tr?.text('QUEST', a.templateId, 'title', a.template.title) ??
+        a.template.title,
       target: a.template.target,
       progress: a.progress,
       completed: a.completedAt != null,
@@ -373,6 +400,7 @@ export class QuestsService {
         );
         completed.push({
           id: a.id,
+          templateId: a.templateId,
           title: a.template.title,
           xpReward: a.template.xpReward,
           coinReward: a.template.coinReward,

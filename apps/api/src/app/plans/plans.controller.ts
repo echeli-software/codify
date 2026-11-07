@@ -48,13 +48,21 @@ export class PlansController {
   ): Promise<PlanListResponse> {
     const includeInactive =
       isStaff(req.user) && query.includeInactive === 'true';
-    return this.plans.list(query, { includeInactive });
+    // Staff read source text (they edit it); everyone else gets the
+    // caller's locale (docs/11 §3).
+    return this.plans.list(query, {
+      includeInactive,
+      localize: !isStaff(req.user),
+    });
   }
 
   @Public()
   @Get(':id')
   detail(@Req() req: Request, @Param('id') id: string): Promise<PlanResponse> {
-    return this.plans.getById(id, { includeInactive: isStaff(req.user) });
+    return this.plans.getById(id, {
+      includeInactive: isStaff(req.user),
+      localize: !isStaff(req.user),
+    });
   }
 
   @Roles('ADMIN')

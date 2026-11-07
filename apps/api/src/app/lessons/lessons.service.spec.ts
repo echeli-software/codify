@@ -10,6 +10,7 @@ import {
   LESSON_DOC_VERSION,
 } from '@codify/lesson-schema';
 import { LessonsService } from './lessons.service.js';
+import { runInTranslationContext } from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
 
 const user = (
@@ -166,6 +167,77 @@ describe('LessonsService.getById — student gating', () => {
     const res = await svc.getById(ADMIN, 'lesson-1');
     expect(JSON.stringify(res.contentJson)).toContain('correctOptionIds');
     expect(access.resolveLessonAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('LessonsService.getById — content locale (docs/11 §3)', () => {
+  const localizer = (locale: string) => ({
+    requestLocale: jest.fn(async () => locale),
+  });
+  const enDoc = { ...kitchenSinkLessonDoc(), marker: 'pt' };
+
+  function withTranslations(rows: unknown[]) {
+    const { prisma, access } = setup({ isFree: true });
+    prisma.contentTranslation.findMany = jest.fn(async () => rows);
+    return { prisma, access };
+  }
+
+  it('serves the requested locale’s title and body', async () => {
+    const { prisma, access } = withTranslations([
+      { field: 'title', value: 'Sinais 101', outdated: false },
+      { field: 'contentJson', value: JSON.stringify(enDoc), outdated: false },
+    ]);
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      localizer('pt-BR') as never,
+    );
+    const ctx = await runInTranslationContext({} as never, async (c) => {
+      const res = await svc.getById(STUDENT, 'lesson-1');
+      expect(res.title).toBe('Sinais 101');
+      expect(res.contentJson).toMatchObject({ marker: 'pt' });
+      return c;
+    });
+    expect(ctx.fallbackFrom).toBeNull();
+    expect(prisma.contentTranslation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          entityId: 'lesson-1',
+          locale: 'pt-BR',
+        }),
+      }),
+    );
+  });
+
+  it('falls back to the source (and notes it) for an outdated body', async () => {
+    const { prisma, access } = withTranslations([
+      { field: 'title', value: 'Sinais 101', outdated: false },
+      { field: 'contentJson', value: JSON.stringify(enDoc), outdated: true },
+    ]);
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      localizer('pt-BR') as never,
+    );
+    const ctx = await runInTranslationContext({} as never, async (c) => {
+      const res = await svc.getById(STUDENT, 'lesson-1');
+      expect(res.contentJson).not.toHaveProperty('marker');
+      return c;
+    });
+    // The course's source locale in the fixture is 'en'.
+    expect(ctx.fallbackFrom).toBe('en');
+  });
+
+  it('source-locale callers skip the translations query', async () => {
+    const { prisma, access } = withTranslations([]);
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      localizer('en') as never,
+    );
+    const res = await svc.getById(STUDENT, 'lesson-1');
+    expect(res.title).toBe('Signals 101');
+    expect(prisma.contentTranslation.findMany).not.toHaveBeenCalled();
   });
 });
 

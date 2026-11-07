@@ -203,6 +203,11 @@ export class ListPlansQueryDto {
   @IsOptional()
   @IsString()
   courseId?: string;
+
+  /** Content locale for name/description/tagline (docs/11 §3); defaults to Accept-Language. */
+  @IsOptional()
+  @IsIn(['pt-BR', 'en-US'])
+  locale?: 'pt-BR' | 'en-US';
 }
 
 export interface PlanPriceResponse {

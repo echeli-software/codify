@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Item, ItemSlot, Prisma } from '@prisma/client';
 import {
@@ -20,6 +21,10 @@ import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { UserPushService } from '../gamification/user-push.service.js';
 import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
+import {
+  ContentLocalizer,
+  changedFields,
+} from '../translations/content-localizer.service.js';
 import type {
   AvatarResponse,
   CreateItemCategoryDto,
@@ -50,6 +55,10 @@ const RARITY_ORDER: Record<string, number> = {
 const DROP_ANNOUNCE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 /** Drop pushes go to students seen in the last 30 days. */
 const DROP_AUDIENCE_ACTIVE_MS = 30 * 24 * 60 * 60 * 1000;
+/** Category name for student-facing item lists (translated as ITEM_CATEGORY). */
+const WITH_CATEGORY_NAME = {
+  category: { select: { name: true } },
+} satisfies Prisma.ItemInclude;
 
 @Injectable()
 export class ItemsService {
@@ -60,6 +69,7 @@ export class ItemsService {
     private readonly gamification: GamificationService,
     private readonly push: UserPushService,
     private readonly access: AccessService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   // ─── Categories (admin) ─────────────────────────────────────────────────
@@ -195,6 +205,12 @@ export class ItemsService {
         isActive: patch.isActive,
       },
     });
+    // Source text changed → its translations need review (docs/11 §3).
+    await this.localizer?.markSourceChanged(
+      'ITEM',
+      id,
+      changedFields(target, patch, ['name', 'description']),
+    );
     return toItemResponse(updated, await this.spriteUrls([updated]));
   }
 
@@ -219,7 +235,7 @@ export class ItemsService {
     if (query.premiumOnly === 'true') where.isPremiumOnly = true;
 
     const [items, ctx, owned] = await Promise.all([
-      this.prisma.item.findMany({ where }),
+      this.prisma.item.findMany({ where, include: WITH_CATEGORY_NAME }),
       this.userContext(userId),
       this.ownedItemIds(userId),
     ]);
@@ -239,6 +255,7 @@ export class ItemsService {
         });
         return {
           ...toItemResponse(i, urls),
+          categoryName: i.category?.name,
           owned: owned.has(i.id),
           canBuy: eligibility.canBuy,
           reason: eligibility.reason,
@@ -246,6 +263,7 @@ export class ItemsService {
       });
 
     if (query.affordableOnly === 'true') shop = shop.filter((s) => s.canBuy);
+    await this.localizeItems(shop);
 
     // Limited drops first, then by rarity desc, then cheapest.
     shop.sort((a, b) => {
@@ -320,11 +338,9 @@ export class ItemsService {
       }
       return spend.coins;
     });
-    return {
-      item: toItemResponse(item, await this.spriteUrls([item])),
-      coins,
-      equipped: !!opts.equip,
-    };
+    const bought = toItemResponse(item, await this.spriteUrls([item]));
+    await this.localizeItems([bought]);
+    return { item: bought, coins, equipped: !!opts.equip };
   }
 
   // ─── Limited drops ──────────────────────────────────────────────────────
@@ -357,6 +373,13 @@ export class ItemsService {
     });
     let announced = 0;
     let pushed = 0;
+    // Per-recipient-locale item names (docs/11 §3).
+    const names =
+      (await this.localizer?.byLocale(
+        'ITEM',
+        drops.map((d) => d.id),
+        'name',
+      )) ?? new Map<string, string>();
     for (const item of drops) {
       try {
         await this.prisma.idempotencyRecord.create({
@@ -381,7 +404,11 @@ export class ItemsService {
       for (const u of audience) {
         const res = await this.push.sendToUser(
           u.id,
-          ({ locale }) => dropCopy(locale, item),
+          ({ locale }) =>
+            dropCopy(locale, {
+              ...item,
+              name: names.get(`${item.id}|${locale}`) ?? item.name,
+            }),
           now,
         );
         pushed += res.sent;
@@ -414,7 +441,7 @@ export class ItemsService {
     const [rows, equipped] = await Promise.all([
       this.prisma.userItem.findMany({
         where: { userId },
-        include: { item: true },
+        include: { item: { include: WITH_CATEGORY_NAME } },
         orderBy: { acquiredAt: 'desc' },
       }),
       this.prisma.equippedItem.findMany({
@@ -424,14 +451,19 @@ export class ItemsService {
     ]);
     const equippedIds = new Set(equipped.map((e) => e.itemId));
     const urls = await this.spriteUrls(rows.map((r) => r.item));
-    return rows
+    const out = rows
       .filter((r) => r.item.deletedAt === null)
       .map((r) => ({
-        item: toItemResponse(r.item, urls),
+        item: {
+          ...toItemResponse(r.item, urls),
+          categoryName: r.item.category?.name,
+        },
         equipped: equippedIds.has(r.itemId),
         acquiredAt: r.acquiredAt.toISOString(),
         source: r.source,
       }));
+    await this.localizeItems(out.map((o) => o.item));
+    return out;
   }
 
   async getAvatar(userId: string): Promise<AvatarResponse> {
@@ -459,6 +491,7 @@ export class ItemsService {
         spriteUrl: spriteUrlFor(e.item.spriteAssetId, urls),
       } satisfies EquippedRef;
     }
+    await this.localizeEquipped(map);
     return {
       config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
       equipped: map,
@@ -504,6 +537,56 @@ export class ItemsService {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────
+
+  /**
+   * Item name/description + category name in the caller's locale
+   * (docs/11 §3) — one translations query for the whole response.
+   */
+  private async localizeItems(items: ItemResponse[]): Promise<void> {
+    if (!this.localizer || items.length === 0) return;
+    const tr = await this.localizer.localize([
+      {
+        entityType: 'ITEM',
+        items: items.map((i) => ({
+          id: i.id,
+          values: { name: i.name, description: i.description },
+        })),
+      },
+      {
+        entityType: 'ITEM_CATEGORY',
+        items: items.flatMap((i) =>
+          i.categoryName != null
+            ? [{ id: i.categorySlug, values: { name: i.categoryName } }]
+            : [],
+        ),
+      },
+    ]);
+    for (const i of items) {
+      tr.apply('ITEM', i.id, i, ['name', 'description']);
+      if (i.categoryName != null)
+        i.categoryName = tr.text(
+          'ITEM_CATEGORY',
+          i.categorySlug,
+          'name',
+          i.categoryName,
+        );
+    }
+  }
+
+  /** Equipped item names in the caller's locale. */
+  private async localizeEquipped(
+    map: AvatarResponse['equipped'],
+  ): Promise<void> {
+    const refs = Object.values(map).filter((r): r is EquippedRef => !!r);
+    if (!this.localizer || refs.length === 0) return;
+    const tr = await this.localizer.localize([
+      {
+        entityType: 'ITEM',
+        items: refs.map((r) => ({ id: r.itemId, values: { name: r.name } })),
+      },
+    ]);
+    for (const r of refs) tr.apply('ITEM', r.itemId, r, ['name']);
+  }
 
   /** Asset-id sprite refs must point at an uploaded, confirmed Asset. */
   private async assertSpriteAssets(

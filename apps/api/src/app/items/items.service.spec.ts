@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ItemsService, dropCopy } from './items.service.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
+import { runInTranslationContext } from '../translations/translation-context.js';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1',
@@ -213,5 +215,87 @@ describe('ItemsService.announceDrops', () => {
     expect(
       dropCopy('en-US', { id: 'i1', name: 'Hat', dropEndsAt: new Date() }).body,
     ).toContain('limited time');
+  });
+});
+
+describe('ItemsService content translations (docs/11 §3)', () => {
+  it('shop names, descriptions and category names follow the caller locale', async () => {
+    const { prisma, gamification, push, access } = setup();
+    const findMany = jest.fn(async () => [
+      {
+        entityType: 'ITEM',
+        entityId: 'i1',
+        locale: 'en-US',
+        field: 'name',
+        value: 'Top Hat (EN)',
+      },
+      {
+        entityType: 'ITEM_CATEGORY',
+        entityId: 'hats',
+        locale: 'en-US',
+        field: 'name',
+        value: 'Hats',
+      },
+    ]);
+    const localizer = new ContentLocalizer({
+      contentTranslation: { findMany },
+    } as never);
+    const svc = new ItemsService(
+      prisma as never,
+      gamification as never,
+      push as never,
+      access as never,
+      localizer,
+    );
+    prisma.item.findMany.mockResolvedValueOnce([
+      { ...item({ id: 'i1' }), category: { name: 'Chapéus' } },
+      {
+        ...item({ id: 'i2', name: 'Óculos', description: 'Escuros' }),
+        category: { name: 'Chapéus' },
+      },
+    ]);
+    const ctx = await runInTranslationContext(
+      { query: {}, headers: { 'accept-language': 'en-US' } } as never,
+      async (c) => ({ shop: await svc.shop('u1', {}), c }),
+    );
+    const byId = new Map(ctx.shop.map((s) => [s.id, s]));
+    expect(byId.get('i1')).toMatchObject({
+      name: 'Top Hat (EN)',
+      categoryName: 'Hats',
+    });
+    // i2 has no en-US text → source text + a fallback note for the header.
+    expect(byId.get('i2')).toMatchObject({
+      name: 'Óculos',
+      description: 'Escuros',
+    });
+    expect(ctx.c.fallbackFrom).toBe('pt-BR');
+    expect(findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('drop pushes use each recipient’s translated item name', async () => {
+    const { prisma, gamification, push, access } = setup();
+    const localizer = new ContentLocalizer({
+      contentTranslation: {
+        findMany: jest.fn(async () => [
+          { entityId: 'i1', locale: 'en-US', value: 'Crown' },
+        ]),
+      },
+    } as never);
+    const svc = new ItemsService(
+      prisma as never,
+      gamification as never,
+      push as never,
+      access as never,
+      localizer,
+    );
+    prisma.item.findMany.mockResolvedValueOnce([
+      item({ isLimitedDrop: true, name: 'Coroa' }),
+    ]);
+    await svc.announceDrops(new Date('2026-11-07T12:00:00Z'));
+    const build = (push.sendToUser.mock.calls[0] as unknown[])[1] as (u: {
+      locale: string;
+    }) => { title: string };
+    expect(build({ locale: 'en-US' }).title).toContain('Crown');
+    expect(build({ locale: 'pt-BR' }).title).toContain('Coroa');
   });
 });

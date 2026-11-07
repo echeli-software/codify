@@ -25,10 +25,15 @@ export const TRANSLATABLE_ENTITIES = [
   'MODULE',
   'LESSON',
   'CATEGORY',
+  'PLAN',
+  'BADGE',
+  'ITEM',
+  'ITEM_CATEGORY',
+  'QUEST',
 ] as const;
 export type TranslatableEntityType = (typeof TRANSLATABLE_ENTITIES)[number];
 
-/** Translatable fields per entity type. */
+/** Translatable fields per entity type (docs/11 §3). */
 export const TRANSLATABLE_FIELDS: Record<
   TranslatableEntityType,
   readonly string[]
@@ -37,6 +42,11 @@ export const TRANSLATABLE_FIELDS: Record<
   MODULE: ['title'],
   LESSON: ['title', 'contentJson'],
   CATEGORY: ['name', 'description'],
+  PLAN: ['name', 'description', 'tagline'],
+  BADGE: ['name', 'description'],
+  ITEM: ['name', 'description'],
+  ITEM_CATEGORY: ['name'],
+  QUEST: ['title'],
 };
 
 /** Fields the public batch-resolve endpoint may return (no paywalled body). */
@@ -46,7 +56,118 @@ export const PUBLIC_FIELDS: Record<TranslatableEntityType, readonly string[]> =
     MODULE: ['title'],
     LESSON: ['title'],
     CATEGORY: ['name', 'description'],
+    PLAN: ['name', 'description', 'tagline'],
+    BADGE: ['name', 'description'],
+    ITEM: ['name', 'description'],
+    ITEM_CATEGORY: ['name'],
+    QUEST: ['title'],
   };
+
+/** Normalize a locale tag to a supported locale ("en" / "en-GB" → "en-US"). */
+export function matchSupportedLocale(
+  tag: string | null | undefined,
+): SupportedLocale | null {
+  const t = tag?.split(';')[0]?.trim();
+  if (!t) return null;
+  const exact = SUPPORTED_LOCALES.find(
+    (l) => l.toLowerCase() === t.toLowerCase(),
+  );
+  if (exact) return exact;
+  const lang = t.split('-')[0].toLowerCase();
+  return (
+    SUPPORTED_LOCALES.find((l) => l.toLowerCase().startsWith(`${lang}-`)) ??
+    null
+  );
+}
+
+/**
+ * The locale a request asks for, before the caller's stored locale is
+ * consulted: an explicit `?locale=` wins, then the first Accept-Language
+ * tag that maps onto a supported locale. Null = not stated.
+ */
+export function explicitRequestLocale(
+  queryLocale: unknown,
+  acceptLanguage: string | null | undefined,
+): SupportedLocale | null {
+  if (typeof queryLocale === 'string') {
+    const q = matchSupportedLocale(queryLocale);
+    if (q) return q;
+  }
+  for (const tag of (acceptLanguage ?? '').split(',')) {
+    const m = matchSupportedLocale(tag);
+    if (m) return m;
+  }
+  return null;
+}
+
+/** One entity's source values for {@link localizeValues}. */
+export interface LocalizableEntity {
+  id: string;
+  /** Locale of `values`; defaults to `DEFAULT_LOCALE` (column-sourced). */
+  sourceLocale?: string;
+  /** Source text per translatable field; null/'' = nothing to translate. */
+  values: Record<string, string | null | undefined>;
+}
+
+export interface LocalizeGroup {
+  entityType: TranslatableEntityType;
+  items: readonly LocalizableEntity[];
+}
+
+export const localizedKey = (
+  entityType: string,
+  entityId: string,
+  field: string,
+) => `${entityType}\u0000${entityId}\u0000${field}`;
+
+export interface LocalizedValues {
+  /** `localizedKey(type, id, field)` → translation in the requested locale. */
+  values: Map<string, string>;
+  /**
+   * Source locale of the first field that had source text but no
+   * translation in the requested locale (→ `X-Translation-Fallback`).
+   */
+  fallbackFrom: string | null;
+}
+
+/**
+ * Resolve a response's translatable text: the requested locale's
+ * ContentTranslation row when present and non-empty, otherwise the source
+ * value (which is then a fallback, unless the source is already in the
+ * requested locale). `rows` should hold the requested locale's rows only.
+ */
+export function localizeValues(
+  groups: readonly LocalizeGroup[],
+  rows: readonly Pick<
+    TranslationRowLike,
+    'entityType' | 'entityId' | 'locale' | 'field' | 'value'
+  >[],
+  locale: string,
+): LocalizedValues {
+  const found = new Map<string, string>();
+  for (const r of rows) {
+    if (r.locale !== locale || !r.value) continue;
+    found.set(localizedKey(r.entityType, r.entityId, r.field), r.value);
+  }
+  const values = new Map<string, string>();
+  let fallbackFrom: string | null = null;
+  for (const g of groups) {
+    const fields = TRANSLATABLE_FIELDS[g.entityType];
+    for (const e of g.items) {
+      const source = e.sourceLocale ?? DEFAULT_LOCALE;
+      if (source === locale) continue;
+      for (const field of fields) {
+        const sourceValue = e.values[field];
+        if (sourceValue == null || sourceValue === '') continue;
+        const k = localizedKey(g.entityType, e.id, field);
+        const t = found.get(k);
+        if (t != null) values.set(k, t);
+        else fallbackFrom ??= source;
+      }
+    }
+  }
+  return { values, fallbackFrom };
+}
 
 /** An entity with its source locale and source-locale field values. */
 export interface SourceEntity {

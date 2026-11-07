@@ -5,6 +5,7 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -13,6 +14,9 @@ import { AccessService } from '../billing/access.service.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { QuestsService } from '../gamification/quests.service.js';
 import { BadgesService } from '../gamification/badges.service.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
+import type { CompletedQuest } from '../gamification/quests.service.js';
+import type { UnlockedBadge } from '../gamification/badges.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type { CoinSource, LessonType, XpSource } from '@prisma/client';
 import type { QuestEventContext } from '../gamification/quests.service.js';
@@ -67,7 +71,39 @@ export class ProgressService {
     private readonly gamification: GamificationService,
     private readonly quests: QuestsService,
     private readonly badges: BadgesService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
+
+  /**
+   * Quest titles + badge names/descriptions of a completion's celebration
+   * in the caller's locale (docs/11 §3); after the transaction, one query.
+   */
+  private async localizeRewards(
+    quests: CompletedQuest[],
+    badges: UnlockedBadge[],
+  ): Promise<void> {
+    if (!this.localizer || (quests.length === 0 && badges.length === 0)) return;
+    const tr = await this.localizer.localize([
+      {
+        entityType: 'QUEST',
+        items: quests.flatMap((q) =>
+          q.templateId
+            ? [{ id: q.templateId, values: { title: q.title } }]
+            : [],
+        ),
+      },
+      {
+        entityType: 'BADGE',
+        items: badges.map((b) => ({
+          id: b.id,
+          values: { name: b.name, description: b.description },
+        })),
+      },
+    ]);
+    for (const q of quests)
+      if (q.templateId) tr.apply('QUEST', q.templateId, q, ['title']);
+    for (const b of badges) tr.apply('BADGE', b.id, b, ['name', 'description']);
+  }
 
   /**
    * Record a completion. Awards `lesson.baseXp` + `lesson.baseCoins`
@@ -266,6 +302,7 @@ export class ProgressService {
           badgesUnlocked,
         };
       });
+      await this.localizeRewards(out.questsCompleted, out.badgesUnlocked);
       return {
         alreadyCompleted: false,
         progress: toItem(out.progress),

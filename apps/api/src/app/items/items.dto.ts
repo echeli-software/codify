@@ -207,6 +207,8 @@ export interface ItemResponse {
   spriteUrl: string | null;
   thumbnailAssetId: string | null;
   isActive: boolean;
+  /** Item category name, in the caller's locale (shop + inventory only). */
+  categoryName?: string;
 }
 
 export interface ShopItem extends ItemResponse {

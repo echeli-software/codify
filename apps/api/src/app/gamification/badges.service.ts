@@ -3,10 +3,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GamificationService } from './gamification.service.js';
+import {
+  ContentLocalizer,
+  changedFields,
+} from '../translations/content-localizer.service.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -89,6 +94,7 @@ export class BadgesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamification: GamificationService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   // ─── CRUD (admin) ──────────────────────────────────────────────────────
@@ -131,7 +137,7 @@ export class BadgesService {
       });
       if (dupe) throw new ConflictException('Slug already in use');
     }
-    return this.prisma.badge.update({
+    const updated = await this.prisma.badge.update({
       where: { id },
       data: {
         slug: patch.slug,
@@ -147,6 +153,13 @@ export class BadgesService {
         isActive: patch.isActive,
       },
     });
+    // Source text changed → its translations need review (docs/11 §3).
+    await this.localizer?.markSourceChanged(
+      'BADGE',
+      id,
+      changedFields(target, patch, ['name', 'description']),
+    );
+    return updated;
   }
 
   async deleteBadge(id: string): Promise<void> {
@@ -168,17 +181,27 @@ export class BadgesService {
       this.prisma.userBadge.findMany({ where: { userId } }),
     ]);
     const earnedMap = new Map(earned.map((e) => [e.badgeId, e.awardedAt]));
-    return badges
-      .filter((b) => !b.isHidden || earnedMap.has(b.id))
-      .map((b) => ({
-        id: b.id,
-        slug: b.slug,
-        name: b.name,
-        description: b.description,
-        iconName: b.iconName,
-        earned: earnedMap.has(b.id),
-        awardedAt: earnedMap.get(b.id)?.toISOString() ?? null,
-      }));
+    const visible = badges.filter((b) => !b.isHidden || earnedMap.has(b.id));
+    // name / description in the caller's locale (docs/11 §3).
+    const tr = await this.localizer?.localize([
+      {
+        entityType: 'BADGE',
+        items: visible.map((b) => ({
+          id: b.id,
+          values: { name: b.name, description: b.description },
+        })),
+      },
+    ]);
+    return visible.map((b) => ({
+      id: b.id,
+      slug: b.slug,
+      name: tr?.text('BADGE', b.id, 'name', b.name) ?? b.name,
+      description:
+        tr?.text('BADGE', b.id, 'description', b.description) ?? b.description,
+      iconName: b.iconName,
+      earned: earnedMap.has(b.id),
+      awardedAt: earnedMap.get(b.id)?.toISOString() ?? null,
+    }));
   }
 
   // ─── Evaluator ─────────────────────────────────────────────────────────
