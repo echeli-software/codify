@@ -15,9 +15,11 @@
     grid-template-columns: 64px 1fr;
   }
 
-  // Mobile (< 768px)
+  // Mobile (< 768px): the sidebar is a fixed drawer (out of flow), so
+  // the main column is the only grid item — one column, or it lands in a
+  // 0-width first track and the page renders blank.
   @media (max-width: 767px) {
-    grid-template-columns: 0 1fr;
+    grid-template-columns: 1fr; // __main has min-width: 0
 
     .cdf-shell__sidebar {
       position: fixed;
