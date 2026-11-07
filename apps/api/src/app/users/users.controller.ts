@@ -18,6 +18,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { UsersService } from './users.service.js';
 import {
   UpdateMeDto,
+  UserListFiltersDto,
   type AdminUserListItem,
   type MeResponse,
 } from './users.dto.js';
@@ -36,6 +37,7 @@ export class UsersController {
     take: number,
     @Query('q') q?: string,
     @Query('role') role?: string,
+    @Query() filters: UserListFiltersDto = {},
   ): Promise<{ items: AdminUserListItem[]; total: number }> {
     if (q !== undefined && (typeof q !== 'string' || q.length > 120)) {
       throw new BadRequestException('q must be at most 120 characters');
@@ -48,11 +50,24 @@ export class UsersController {
         `role must be one of ${Object.values(UserRole).join(', ')}`,
       );
     }
+    const lastSeenFrom = filters.lastSeenFrom
+      ? new Date(filters.lastSeenFrom)
+      : undefined;
+    const lastSeenTo = filters.lastSeenTo
+      ? new Date(filters.lastSeenTo)
+      : undefined;
+    if (lastSeenFrom && lastSeenTo && lastSeenFrom > lastSeenTo) {
+      throw new BadRequestException('lastSeenFrom must be before lastSeenTo');
+    }
     return this.users.listForAdmin({
       skip,
       take,
       q: q || undefined,
       role: role as UserRole | undefined,
+      locale: filters.locale || undefined,
+      lastSeenFrom,
+      lastSeenTo,
+      subscriptionStatus: filters.subscriptionStatus,
     });
   }
 

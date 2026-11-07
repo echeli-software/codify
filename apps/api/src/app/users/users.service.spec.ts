@@ -75,6 +75,36 @@ describe('UsersService.listForAdmin', () => {
     expect(prisma.user.count).toHaveBeenCalledWith({ where });
   });
 
+  it('filters by locale, last-seen range and subscription status', async () => {
+    const { svc, prisma } = setup();
+    const from = new Date('2026-10-01T00:00:00Z');
+    const to = new Date('2026-11-01T00:00:00Z');
+    await svc.listForAdmin({
+      skip: 0,
+      take: 20,
+      locale: 'en-US',
+      lastSeenFrom: from,
+      lastSeenTo: to,
+      subscriptionStatus: 'ACTIVE',
+    });
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: {
+        deletedAt: null,
+        locale: 'en-US',
+        lastSeenAt: { gte: from, lte: to },
+        subscriptions: { some: { status: 'ACTIVE' } },
+      },
+    });
+  });
+
+  it('subscriptionStatus NONE matches users without subscriptions', async () => {
+    const { svc, prisma } = setup();
+    await svc.listForAdmin({ skip: 0, take: 20, subscriptionStatus: 'NONE' });
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: { deletedAt: null, subscriptions: { none: {} } },
+    });
+  });
+
   it('lists everyone not deleted without filters', async () => {
     const { svc, prisma } = setup();
     await svc.listForAdmin({ skip: 0, take: 20 });

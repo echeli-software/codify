@@ -1,6 +1,8 @@
 import {
   IsBoolean,
+  IsIn,
   IsInt,
+  IsISO8601,
   IsOptional,
   IsString,
   Length,
@@ -109,4 +111,56 @@ export interface AdminUserListItem {
   locale: string;
   lastSeenAt: string | null;
   createdAt: string;
+}
+
+/** Subscription statuses accepted by the `subscriptionStatus` filter. */
+export const SUBSCRIPTION_STATUS_FILTERS = [
+  'TRIALING',
+  'ACTIVE',
+  'PAST_DUE',
+  'CANCELED',
+  'INCOMPLETE',
+  'INCOMPLETE_EXPIRED',
+  'UNPAID',
+  'PAUSED',
+  'NONE',
+] as const;
+
+/**
+ * Extra `GET /api/users` filters (docs/04 "Users"). `q`, `role`, `skip`
+ * and `take` stay explicit query params on the handler.
+ */
+export class UserListFiltersDto {
+  @IsOptional()
+  @IsString()
+  @Length(2, 16)
+  locale?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  lastSeenFrom?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  lastSeenTo?: string;
+
+  @IsOptional()
+  @IsIn(SUBSCRIPTION_STATUS_FILTERS)
+  subscriptionStatus?: (typeof SUBSCRIPTION_STATUS_FILTERS)[number];
+
+  // Declared so the whitelist accepts them; the handler reads them
+  // through their own @Query params.
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  skip?: unknown;
+
+  @IsOptional()
+  take?: unknown;
 }

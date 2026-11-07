@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, User, UserRole } from '@prisma/client';
+import type {
+  Prisma,
+  SubscriptionStatus,
+  User,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   AdminUserListItem,
@@ -59,6 +64,10 @@ export class UsersService {
     take: number;
     q?: string;
     role?: UserRole;
+    locale?: string;
+    lastSeenFrom?: Date;
+    lastSeenTo?: Date;
+    subscriptionStatus?: SubscriptionStatusFilter;
   }): Promise<{
     items: AdminUserListItem[];
     total: number;
@@ -67,6 +76,16 @@ export class UsersService {
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
       ...(opts.role ? { role: opts.role } : {}),
+      ...(opts.locale ? { locale: opts.locale } : {}),
+      ...(opts.lastSeenFrom || opts.lastSeenTo
+        ? {
+            lastSeenAt: {
+              ...(opts.lastSeenFrom ? { gte: opts.lastSeenFrom } : {}),
+              ...(opts.lastSeenTo ? { lte: opts.lastSeenTo } : {}),
+            },
+          }
+        : {}),
+      ...subscriptionWhere(opts.subscriptionStatus),
       ...(q
         ? {
             OR: [
@@ -117,6 +136,20 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     return toMeResponse(user);
   }
+}
+
+/**
+ * `subscriptionStatus` list filter: a SubscriptionStatus matches users with
+ * any subscription in that status; `NONE` matches users who never had one.
+ */
+export type SubscriptionStatusFilter = SubscriptionStatus | 'NONE';
+
+function subscriptionWhere(
+  status: SubscriptionStatusFilter | undefined,
+): Prisma.UserWhereInput {
+  if (!status) return {};
+  if (status === 'NONE') return { subscriptions: { none: {} } };
+  return { subscriptions: { some: { status } } };
 }
 
 function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
