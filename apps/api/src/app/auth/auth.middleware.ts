@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  Optional,
   type NestMiddleware,
 } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
@@ -10,6 +11,7 @@ import {
   type AccountLifecycle,
 } from '../account/account-state.js';
 import { AppConfigService } from '../config/app-config.service.js';
+import { UserLifecycleService } from '../engagement/user-lifecycle.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from './auth.types.js';
@@ -86,6 +88,8 @@ export class AuthMiddleware implements NestMiddleware {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly clerk: ClerkService,
+    /** Welcome + return-from-lapse hooks (docs/10 §3, §13). */
+    @Optional() private readonly lifecycle?: UserLifecycleService,
   ) {}
 
   async use(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -155,7 +159,10 @@ export class AuthMiddleware implements NestMiddleware {
       where: { clerkId },
       select: USER_FIELDS,
     });
-    if (!row) row = await this.provision(clerkId, await profile());
+    if (!row) {
+      row = await this.provision(clerkId, await profile());
+      if (row && !row.deletedAt) this.lifecycle?.onCreated(row.id);
+    }
     if (!row || row.purgedAt) return null;
     if (!row.deletedAt && !row.suspendedAt) this.touch(row);
     return {
@@ -234,6 +241,12 @@ export class AuthMiddleware implements NestMiddleware {
       now - row.lastSeenAt.getTime() < LAST_SEEN_INTERVAL_MS
     )
       return;
+    // First request ever → welcome; back after a lapse → reset the
+    // reactivation stage (+ welcome-back quest). Fire-and-forget.
+    this.lifecycle?.onSeen(
+      { id: row.id, lastSeenAt: row.lastSeenAt },
+      new Date(now),
+    );
     const cutoff = new Date(now - LAST_SEEN_INTERVAL_MS);
     void this.prisma.user
       .updateMany({

@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { BillingJobsService } from './billing-jobs.service.js';
 import type { AccessService } from './access.service.js';
-import type { PushService } from '../notifications/push.service.js';
+import type { NotificationService } from '../notifications/notification.service.js';
 
 const NOW = new Date('2026-10-07T12:43:00Z');
 const DAY_MS = 86_400_000;
@@ -53,7 +53,7 @@ function setup(
   const svc = new BillingJobsService(
     prisma as never,
     access as unknown as AccessService,
-    push as unknown as PushService,
+    push as unknown as NotificationService,
   );
   return { svc, prisma, push, claimed };
 }

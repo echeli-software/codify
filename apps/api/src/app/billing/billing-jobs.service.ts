@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { PushService } from '../notifications/push.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { AccessService } from './access.service.js';
 import { pixRenewalCopy } from './billing-push-copy.js';
 
@@ -37,7 +37,8 @@ export class BillingJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
-    private readonly push: PushService,
+    /** Billing notices go through NotificationService (inbox + push + email). */
+    private readonly push: NotificationService,
   ) {}
 
   /**

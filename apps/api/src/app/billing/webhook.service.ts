@@ -12,10 +12,9 @@ import {
   GamificationService,
   coinKey,
 } from '../gamification/gamification.service.js';
-import {
-  PushService,
-  type UserPushContent,
-} from '../notifications/push.service.js';
+import { paymentReceivedCopy } from '../email/copy.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import { type UserPushContent } from '../notifications/push.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   BILLING_PROVIDER,
@@ -127,7 +126,8 @@ export class WebhookService {
     private readonly enqueuer: WebhookEnqueuer,
     private readonly gamification: GamificationService,
     private readonly config: GamificationConfigService,
-    private readonly push: PushService,
+    /** Billing notices go through NotificationService (inbox + push + email). */
+    private readonly push: NotificationService,
   ) {}
 
   async handleStripe(
@@ -285,6 +285,23 @@ export class WebhookService {
 
     if (paid) {
       const invoice = event.data.object;
+      const receipt = invoiceFacts(invoice, true);
+      if (receipt && receipt.amountCents > 0) {
+        // "Payment received" — inbox + email only (docs/10 §3 billing email).
+        effects.push({
+          kind: 'push',
+          userId: row.userId,
+          what: 'payment-received',
+          content: ({ locale }) => ({
+            ...paymentReceivedCopy(locale, {
+              cents: receipt.amountCents,
+              currency: receipt.currency,
+            }),
+            data: { type: 'billing_payment_received', subscriptionId: row.id },
+            channels: { push: false },
+          }),
+        });
+      }
       if (!isFirstPaidInvoice(invoice, row)) return applied || logged;
       const granted = await this.grantFirstPaymentBonus(
         tx,
