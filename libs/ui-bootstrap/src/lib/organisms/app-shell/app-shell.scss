@@ -207,8 +207,7 @@
 
   &__content {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden auto; // x hidden, y scrolls
     padding: var(--cdf-space-6);
 
     @media (max-width: 767px) {

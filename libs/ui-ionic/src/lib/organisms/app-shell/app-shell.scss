@@ -29,10 +29,15 @@
     z-index: var(--cdf-z-drawer);
   }
 
-  // Push the Ionic tabs / outlet content over to make room.
+  // Push the Ionic tabs / outlet content over to make room. ion-tabs is
+  // absolutely positioned with `width: 100%`; with a start inset that
+  // overflows the viewport by 240px (and clips fixed sheets inside pages),
+  // so let the insets define the width instead.
   .cdf-shell__tabs {
     --offset-start: 240px;
     inset-inline-start: 240px;
+    inset-inline-end: 0;
+    width: auto;
   }
 
   // Hide bottom tabs on desktop — sidebar takes over the role.
@@ -76,7 +81,8 @@
   font-size: var(--cdf-font-size-sm);
   font-weight: var(--cdf-font-weight-medium);
   transition:
-    background-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+    background-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard),
     color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
 
   &:hover {

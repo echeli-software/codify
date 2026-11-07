@@ -1,8 +1,13 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DOCUMENT,
+  ElementRef,
+  effect,
+  inject,
   input,
   model,
+  viewChild,
 } from '@angular/core';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { TranslatePipe } from '@codify/i18n';
@@ -15,6 +20,11 @@ let sheetSeq = 0;
  * side panel on desktop (≥ md), per docs/03. Modal semantics — focus is
  * trapped and restored, Esc / backdrop / close button dismiss it.
  *
+ * While open, the backdrop + panel are moved to `document.body` (like
+ * Ionic's own overlays): inside a page they would share `ion-content`'s
+ * stacking context and containing block, so the page header covered the
+ * top of the desktop side panel. Angular still removes the nodes on close.
+ *
  *   <cdf-bottom-sheet [(open)]="filtersOpen" [title]="'student.filters' | translate">
  *     …filters…
  *     <div sheetFooter>…</div>
@@ -26,41 +36,43 @@ let sheetSeq = 0;
   imports: [CdkTrapFocus, Icon, TranslatePipe],
   template: `
     @if (open()) {
-      <div
-        class="cdf-sheet__backdrop"
-        aria-hidden="true"
-        (click)="dismissable() && close()"
-      ></div>
-      <section
-        class="cdf-sheet"
-        role="dialog"
-        aria-modal="true"
-        [attr.aria-labelledby]="titleId"
-        cdkTrapFocus
-        [cdkTrapFocusAutoCapture]="true"
-        (keydown.escape)="dismissable() && close()"
-      >
-        <div class="cdf-sheet__handle" aria-hidden="true"></div>
-        <header class="cdf-sheet__head">
-          <h2 class="cdf-sheet__title" [id]="titleId">{{ title() }}</h2>
-          @if (dismissable()) {
-            <button
-              type="button"
-              class="cdf-sheet__close"
-              [attr.aria-label]="'common.close' | translate"
-              (click)="close()"
-            >
-              <cdf-icon name="close" size="md" />
-            </button>
-          }
-        </header>
-        <div class="cdf-sheet__body">
-          <ng-content />
-        </div>
-        <footer class="cdf-sheet__foot">
-          <ng-content select="[sheetFooter]" />
-        </footer>
-      </section>
+      <div class="cdf-sheet__portal" #portal>
+        <div
+          class="cdf-sheet__backdrop"
+          aria-hidden="true"
+          (click)="dismissable() && close()"
+        ></div>
+        <section
+          class="cdf-sheet"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="titleId"
+          cdkTrapFocus
+          [cdkTrapFocusAutoCapture]="true"
+          (keydown.escape)="dismissable() && close()"
+        >
+          <div class="cdf-sheet__handle" aria-hidden="true"></div>
+          <header class="cdf-sheet__head">
+            <h2 class="cdf-sheet__title" [id]="titleId">{{ title() }}</h2>
+            @if (dismissable()) {
+              <button
+                type="button"
+                class="cdf-sheet__close"
+                [attr.aria-label]="'common.close' | translate"
+                (click)="close()"
+              >
+                <cdf-icon name="close" size="md" />
+              </button>
+            }
+          </header>
+          <div class="cdf-sheet__body">
+            <ng-content />
+          </div>
+          <footer class="cdf-sheet__foot">
+            <ng-content select="[sheetFooter]" />
+          </footer>
+        </section>
+      </div>
     }
   `,
   styleUrl: './bottom-sheet.scss',
@@ -72,6 +84,16 @@ export class BottomSheet {
   readonly dismissable = input(true);
 
   protected readonly titleId = `cdf-sheet-title-${++sheetSeq}`;
+
+  private readonly portal = viewChild<ElementRef<HTMLDivElement>>('portal');
+
+  constructor() {
+    const body = inject(DOCUMENT).body;
+    effect(() => {
+      const el = this.portal()?.nativeElement;
+      if (el && body && el.parentElement !== body) body.appendChild(el);
+    });
+  }
 
   close(): void {
     this.open.set(false);
