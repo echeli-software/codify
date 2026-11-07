@@ -36,13 +36,14 @@ export const RARITIES = [
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
 /**
  * A sprite/thumbnail reference: a placeholder token (`emoji:🎩`,
- * `color:#88ccff`) or the URL of an uploaded Asset — an absolute https URL
- * (R2 public URL) or the dev provider's `/api/assets/dev/<key>` path.
+ * `color:#88ccff`), an uploaded Asset's id (UUID — responses resolve it to
+ * `spriteUrl`), or an uploaded Asset's URL — an absolute https URL (R2
+ * public URL) or the dev provider's `/api/assets/dev/<key>` path.
  */
 export const SPRITE_REF =
-  /^(?:emoji:\S.*|color:#[0-9a-fA-F]{3,8}|https:\/\/\S+|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/\S+|\/api\/assets\/dev\/\S+)$/u;
+  /^(?:emoji:\S.*|color:#[0-9a-fA-F]{3,8}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|https:\/\/\S+|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/\S+|\/api\/assets\/dev\/\S+)$/u;
 const SPRITE_REF_MESSAGE =
-  'must be an emoji:/color: placeholder or an uploaded asset URL (https://… or /api/assets/dev/…)';
+  'must be an emoji:/color: placeholder, an uploaded asset id or an uploaded asset URL (https://… or /api/assets/dev/…)';
 
 export class CreateItemCategoryDto {
   @IsString()

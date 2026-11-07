@@ -33,6 +33,7 @@ import type {
   UpdateItemDto,
 } from './items.dto.js';
 import {
+  isAssetSpriteRef,
   loadSpriteUrls,
   spriteUrlFor,
   type SpriteUrlMap,
@@ -103,6 +104,7 @@ export class ItemsService {
       where: { slug: input.categorySlug },
     });
     if (!cat) throw new BadRequestException('Unknown category');
+    await this.assertSpriteAssets(input.spriteAssetId, input.thumbnailAssetId);
     assertDropWindow({
       isLimitedDrop: input.isLimitedDrop ?? false,
       dropStartsAt: input.dropStartsAt || null,
@@ -135,6 +137,7 @@ export class ItemsService {
       where: { id, deletedAt: null },
     });
     if (!target) throw new NotFoundException('Item not found');
+    await this.assertSpriteAssets(patch.spriteAssetId, patch.thumbnailAssetId);
     if (
       patch.categorySlug !== undefined &&
       patch.categorySlug !== target.categorySlug
@@ -501,6 +504,23 @@ export class ItemsService {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────
+
+  /** Asset-id sprite refs must point at an uploaded, confirmed Asset. */
+  private async assertSpriteAssets(
+    ...refs: (string | null | undefined)[]
+  ): Promise<void> {
+    const ids = refs.filter((r): r is string => isAssetSpriteRef(r));
+    if (ids.length === 0) return;
+    const found = await this.prisma.asset.findMany({
+      where: { id: { in: ids }, confirmed: true },
+      select: { id: true },
+    });
+    if (found.length < new Set(ids).size)
+      throw new BadRequestException({
+        code: 'item.sprite_asset_unknown',
+        message: 'Sprite asset not found (upload and confirm it first)',
+      });
+  }
 
   /** Uploaded-sprite URLs for these items (one Asset query). */
   private spriteUrls(

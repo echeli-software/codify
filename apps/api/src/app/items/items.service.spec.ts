@@ -44,7 +44,16 @@ function setup() {
       findMany: jest.fn(async () => [{ id: 'u1' }, { id: 'u2' }]),
     },
     subscription: { findMany: jest.fn(async () => []) },
-    userItem: { findUnique: jest.fn(async () => null) },
+    asset: {
+      findMany: jest.fn(
+        async (_args?: unknown) => [] as { id: string; url?: string }[],
+      ),
+    },
+    equippedItem: { findMany: jest.fn(async () => [] as unknown[]) },
+    userItem: {
+      findUnique: jest.fn(async () => null),
+      findMany: jest.fn(async () => [] as unknown[]),
+    },
     idempotencyRecord: { create: jest.fn(async () => ({})) },
     $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
@@ -88,6 +97,59 @@ describe('ItemsService.purchase', () => {
       svc.purchase('u1', 'i1', { equip: true }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.equippedItem.upsert).not.toHaveBeenCalled();
+  });
+});
+
+const ASSET = '01960000-0000-7000-8000-0000000000aa';
+
+describe('ItemsService sprite URLs', () => {
+  it('resolves an uploaded sprite to Asset.url in the shop (one query)', async () => {
+    const { svc, prisma } = setup();
+    prisma.item.findMany.mockResolvedValueOnce([
+      item({ id: 'i1', spriteAssetId: ASSET }),
+      item({ id: 'i2', spriteAssetId: 'emoji:🎩' }),
+    ]);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      { id: ASSET, url: 'https://cdn.test/crown.png' },
+    ]);
+    const shop = await svc.shop('u1', {});
+    expect(shop.find((s) => s.id === 'i1')?.spriteUrl).toBe(
+      'https://cdn.test/crown.png',
+    );
+    expect(shop.find((s) => s.id === 'i2')?.spriteUrl).toBeNull();
+    expect(prisma.asset.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes spriteUrl on equipped avatar refs', async () => {
+    const { svc, prisma } = setup();
+    prisma.user.findUniqueOrThrow.mockResolvedValueOnce({
+      avatarConfig: null,
+    } as never);
+    prisma.equippedItem.findMany.mockResolvedValueOnce([
+      {
+        userId: 'u1',
+        slot: 'HAT',
+        itemId: 'i1',
+        item: item({ spriteAssetId: ASSET }),
+      },
+    ]);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      { id: ASSET, url: 'https://cdn.test/crown.png' },
+    ]);
+    const avatar = await svc.getAvatar('u1');
+    expect(avatar.equipped.HAT?.spriteUrl).toBe('https://cdn.test/crown.png');
+  });
+
+  it('rejects an asset-id sprite that is not an uploaded, confirmed asset', async () => {
+    const { svc, prisma } = setup();
+    prisma.asset.findMany.mockResolvedValueOnce([]);
+    await expect(
+      svc.updateItem('i1', { spriteAssetId: ASSET }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.asset.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [ASSET] }, confirmed: true },
+      select: { id: true },
+    });
   });
 });
 

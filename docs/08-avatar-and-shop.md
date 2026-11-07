@@ -38,8 +38,9 @@ Bottom of stack
 Fallback: PNG sprite sheets supported but discouraged (no scaling, no recoloring).
 
 **Sprite references (as built).** `Item.spriteAssetId` is either an inline
-token rendered by the client (`emoji:🧢`, `color:#ffd700`) or the id of an
-uploaded `Asset`. Every API response that carries a sprite — `GET /shop`,
+token rendered by the client (`emoji:🧢`, `color:#ffd700`), the id of an
+uploaded `Asset` (create/update reject an id that isn't a confirmed asset —
+400 `item.sprite_asset_unknown`) or an uploaded asset's URL. Every API response that carries a sprite — `GET /shop`,
 `GET /inventory`, `GET /avatar` (+ `PUT /avatar/equip|config`),
 `POST /shop/:id/purchase`, the admin `/items` endpoints, `GET /league/current`
 members' avatars and `GET /users/:id/profile`
