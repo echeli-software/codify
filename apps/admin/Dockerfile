@@ -26,7 +26,7 @@ WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --frozen-lockfile
 COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile --offline
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile --prefer-offline
 RUN bash infra/web/build-frontend.sh admin "${API_URL}" nginx
 
 # The tag is pinned in the NGINX_IMAGE build arg above.
