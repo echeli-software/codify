@@ -703,8 +703,17 @@ enum NotificationKind {
   PROMO
   BILLING
   SYSTEM
+  WELCOME
+  WEEKLY_RECAP
+  REACTIVATION
 }
 
+/// One row per notification per channel (docs/10 §3 "Implementation").
+/// IN_APP rows are the inbox: payload { title, body, deepLink, action?: { type, ref? }, data? },
+/// sentAt = created, readAt set by the student. PUSH rows are the push delivery log:
+/// payload { title, body, deepLink, inAppId }, scheduledFor while deferred past quiet hours,
+/// sentAt once delivered (the "fewer like this" and 14/week caps count these). EMAIL rows:
+/// payload { subject, body, deepLink, provider, providerId }, sentAt once accepted by the provider.
 model Notification {
   id        String              @id @default(dbgenerated("uuid_generate_v7()"))
   userId    String
@@ -717,8 +726,22 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime            @default(now())
 
+  @@index([userId, channel, createdAt])
   @@index([userId, readAt])
   @@index([scheduledFor])
+}
+
+/// Per-kind delivery settings. No row = defaults (push + email on, PROMO push off).
+/// SYSTEM / BILLING are always on. fewerLevel: 0 normal, 1 ≤ 1 push / 2 days, 2 ≤ 1 push / 7 days.
+model NotificationPreference {
+  userId       String
+  kind         NotificationKind
+  pushEnabled  Boolean  @default(true)
+  emailEnabled Boolean  @default(true)
+  fewerLevel   Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([userId, kind])
 }
 
 // ─────────────────────────────────────────────────────────────────────

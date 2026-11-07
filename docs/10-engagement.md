@@ -90,6 +90,57 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
 - Across all kinds, never more than 14/week without explicit opt-in.
 - We never push "we miss you" lapsed-user spam without a content reason.
 
+### Implementation (API contract)
+
+- **Entry point**: `NotificationService.notify(userId, { kind, title, body, deepLink?, action?, data? }, { channels?, respectQuietHours?, now? })`
+  (`apps/api/src/app/notifications/`). It always writes the `IN_APP` row (the inbox), then delivers push through
+  `PushService` for push kinds and email for email kinds, and logs `PUSH` / `EMAIL` rows (`sentAt`, or
+  `scheduledFor` while a push waits for quiet hours to end — the same row gets `sentAt` on delivery, or is deleted
+  if the push is skipped then). Copy is built per recipient locale (pt-BR / en-US). Friend nudges, league results,
+  item drops, streak reminders and billing notices all go through it. Push payloads carry `data.url` (deep link),
+  `data.kind` and `data.notificationId`.
+- **Channels per kind**: push — every kind except `WELCOME` / `WEEKLY_RECAP`; email — `WELCOME`, `BILLING`,
+  `WEEKLY_RECAP`, `REACTIVATION`, `SYSTEM`. Dormant (§13) and suspended users only get `BILLING` (+ `SYSTEM`)
+  push/email; the inbox row is still written.
+- **Push rules** (`PushService.sendToUser`, in order): per-kind `pushEnabled` → devices → quiet hours (deferred
+  on the `push-deferred` queue) → "fewer like this" (level 1: ≤ 1 push of the kind per 2 days, level 2: per 7 days)
+  → ≤ 14 non-SYSTEM pushes per user-local ISO week unless `User.pushWeeklyOptIn` (counted from the PUSH log) →
+  the user's daily cap `User.pushDailyCap ?? 2` (0 = no non-SYSTEM push) and ≥ 30 min spacing (Redis). `SYSTEM`
+  bypasses everything; `SYSTEM` and `BILLING` can never be disabled.
+- **Preferences**: `NotificationPreference` row per kind; no row = defaults (all on, `PROMO` push off).
+- **Email**: `EMAIL_PROVIDER` — Resend over HTTP when `RESEND_API_KEY` + `EMAIL_FROM` are set, a capturing dev
+  provider otherwise; production refuses to boot without them or `EMAIL_UNSUBSCRIBE_SECRET`. One accessible
+  template (HTML + text, `lang` set) per locale. Every email carries `List-Unsubscribe` and a signed link to
+  `GET|POST /api/email/unsubscribe?token=` (`@Public`, HMAC of user + kind) that turns that kind's email off
+  (`SYSTEM` / `BILLING`: explains they are required) and answers a small translated HTML page.
+- **Student API** (any signed-in user, own rows only — 404 otherwise):
+
+  | Method | Path                                 | Body / query                                                                     | Response                                                                                                                                                                     |
+  | ------ | ------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | GET    | `/api/me/notifications`              | `?cursor=<id>&limit=1..50` (20)                                                  | `{ items: [{ id, kind, title, body, deepLink, action: { type, ref? } \| null, createdAt, readAt }], nextCursor }` newest first                                               |
+  | GET    | `/api/me/notifications/unread-count` | —                                                                                | `{ count }`                                                                                                                                                                  |
+  | POST   | `/api/me/notifications/:id/read`     | —                                                                                | the item                                                                                                                                                                     |
+  | POST   | `/api/me/notifications/read-all`     | —                                                                                | `{ updated }`                                                                                                                                                                |
+  | POST   | `/api/me/notifications/:id/fewer`    | —                                                                                | `{ kind, fewerLevel }` (max 2; 400 `NOTIFICATION_KIND_LOCKED` for SYSTEM/BILLING)                                                                                            |
+  | GET    | `/api/me/notification-preferences`   | —                                                                                | `{ pushDailyCap: number\|null, pushWeeklyOptIn, reminderMinute: number\|null, kinds: [{ kind, pushEnabled, emailEnabled, fewerLevel, locked, channels: { push, email } }] }` |
+  | PUT    | `/api/me/notification-preferences`   | same fields, all optional; `kinds` entries partial; `null` resets cap / reminder | same as GET; 400 `NOTIFICATION_KIND_LOCKED` / `NOTIFICATION_KIND_DUPLICATE`                                                                                                  |
+
+  Quiet hours stay on `PATCH /api/me` (`quietHoursStart` / `quietHoursEnd`). Action types:
+  `open_today`, `open_daily_quest`, `nudge_back` (`ref` = friend id), `open_league`, `open_shop`,
+  `open_subscription`, `open_notification_settings`.
+
+- **Jobs** (`apps/api/src/app/engagement/`, behind `JOBS_ENABLED`, all idempotent): daily-quest reminder every
+  15 min (users active in the last 7 days with no lesson today, at `User.reminderMinute`, else 30 min after the
+  typical session start — median of the first `app_opened` / `session_start` per local day over 28 days, once
+  ≥ 7 days exist — else 20:00; never inside quiet hours; once per local day); weekly recap hourly, sent Monday
+  09:00–12:00 user-local to users with XP or lessons last week (inbox + email, respects `emailEnabled`); the
+  reactivation sweep daily at 13:40 UTC (§13). ADMIN triggers: `POST /api/admin/engagement/{daily-quest-reminders|weekly-recap|reactivation}/run`.
+- **WELCOME**: sent once (inbox + email) when the auth middleware provisions a user, or on the first request of a
+  user the Clerk webhook created (`lastSeenAt` still null).
+- **Student app**: bell with unread count (desktop shell header / mobile Today header) → `/notifications`
+  (grouped by day, quick actions, "fewer like this", offline: the last inbox cached on the device) and
+  `/settings/notifications`.
+
 ## 4. Animations & feedback
 
 `RewardOrchestrator` (see [03-shared-libraries.md](./03-shared-libraries.md) and [07-gamification.md §11](./07-gamification.md)) is the only entry point for reinforcement.
@@ -234,6 +285,23 @@ For users who lapse 7+ days:
 
 After 90 days lapsed without engagement, mark dormant; only billing emails go to dormant users (to avoid surprise charges if they had a card on file).
 
+### Implementation
+
+`ReactivationService` (daily) computes days lapsed from `lastSeenAt` (else `createdAt`) and jumps straight to the
+highest stage reached, claiming it on `User.reactivationStage` with a conditional update before sending (reruns and
+replicas never repeat a stage; a user first seen 40 days lapsed gets only the day-30 message):
+
+- **7** → `REACTIVATION` inbox + email ("your progress is saved"). No push.
+- **14** → `REACTIVATION` inbox + push announcing the welcome-back quest. The quest itself is assigned when the user
+  comes back: an extra assignment of the inactive `welcome-back-<locale>` `LESSON_COUNT(1)` template (created on
+  first use, 150 coins + 50 XP, admin-editable, never drawn by the daily picker) for their local today, after the
+  regular daily quests, so it pays through the normal quest pipeline.
+- **30** → one win-back offer (inbox + push + email) deep-linking to `/subscription?offer=winback`; skipped for
+  users with an active subscription (stage still advances).
+- **90** → `dormantAt` set; only `BILLING` email/push reaches them.
+
+Any activity (the auth middleware's `lastSeenAt` refresh) resets the stage to 0 and clears `dormantAt`.
+
 ## 14. Product analytics — event catalogue
 
 Client and server flows emit product-analytics events so every flow in the
@@ -340,9 +408,17 @@ Common props on every event (added by the client SDK): `platform`
 
 **Notifications**
 
-| Event                           | When                                         | Props                          |
-| ------------------------------- | -------------------------------------------- | ------------------------------ | ---------- | ----- |
-| `push_sent`                     | Push delivered to the provider (server-side) | `kind`, `devices`              |
-| `push_skipped`                  | Push suppressed (server-side)                | `kind`, `reason` (`quiet_hours | no_devices | cap`) |
-| `push_open`                     | App opened from a push                       | `kind`                         |
-| `notification_settings_changed` | Quiet hours / opt-outs edited                | `kind?`, `enabled?`            |
+| Event                           | When                                         | Props                                                                          |
+| ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `push_sent`                     | Push delivered to the provider (server-side) | `kind`, `devices`                                                              |
+| `push_skipped`                  | Push suppressed (server-side)                | `kind`, `reason` (`quiet_hours` / `no_devices` / `cap` / `disabled` / `fewer`) |
+| `push_open`                     | App opened from a push                       | `kind`                                                                         |
+| `notification_settings_changed` | Quiet hours / opt-outs edited                | `kind?`, `channel?`, `enabled?`, `fields?`                                     |
+| `notifications_inbox_opened`    | Inbox screen opened                          | `unread`, `count`, `fromCache`                                                 |
+| `notification_opened`           | Inbox entry or its quick action tapped       | `kind`, `via` (`item` / `action`), `action?`                                   |
+| `notification_fewer`            | "Fewer like this" tapped                     | `kind`, `level`                                                                |
+| `app_opened` / `session_start`  | App start (student boot); session start      | `online`                                                                       |
+
+Server-side events (`push_sent`, `push_skipped`) are written by `PushService` with `platform: "server"`. The
+daily-quest reminder learns the typical session start from `app_opened` (emitted on every app start) and
+`session_start`.
