@@ -38,6 +38,8 @@ import { AppConfigModule } from './config/config.module.js';
 import { PlatformModule } from './common/platform.module.js';
 import { OpsModule } from './ops/ops.module.js';
 import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
+import { AccountModule } from './account/account.module.js';
+import { FlagsModule } from './flags/flags.module.js';
 
 @Module({
   imports: [
@@ -75,6 +77,8 @@ import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
     PlatformModule,
     OpsModule,
     AdminOpsModule,
+    AccountModule,
+    FlagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

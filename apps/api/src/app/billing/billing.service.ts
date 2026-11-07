@@ -256,6 +256,40 @@ export class BillingService {
     return this.view(updated, sub.plan.name);
   }
 
+  /**
+   * Account deletion (docs/14 §13): stop every auto-renewal we control —
+   * renewing web subscriptions are set to cancel at period end (at Stripe
+   * first). Store (App Store / Google Play) subscriptions can only be
+   * cancelled by the user in the store; they are returned so the caller can
+   * tell them. Access already paid for is left to run out.
+   */
+  async stopAutoRenewForUser(userId: string): Promise<{
+    stopped: Array<{ id: string; planName: string }>;
+    store: Array<{ id: string; planName: string; source: string }>;
+  }> {
+    const subs = await this.prisma.subscription.findMany({
+      where: {
+        userId,
+        status: { in: [...LIVE_STATUSES] },
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: { gt: new Date() },
+      },
+      include: { plan: { select: { name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const stopped: Array<{ id: string; planName: string }> = [];
+    const store: Array<{ id: string; planName: string; source: string }> = [];
+    for (const sub of subs) {
+      if (sub.source === 'APPLE_IAP' || sub.source === 'GOOGLE_PLAY') {
+        store.push({ id: sub.id, planName: sub.plan.name, source: sub.source });
+      } else if (sub.source === 'STRIPE_WEB') {
+        await this.setCancelAtPeriodEnd(sub, true);
+        stopped.push({ id: sub.id, planName: sub.plan.name });
+      }
+    }
+    return { stopped, store };
+  }
+
   /** Undo a pending cancellation while the paid period is still running. */
   async resumeMine(
     actor: ApiUser,

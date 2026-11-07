@@ -18,6 +18,9 @@ interface Row {
   displayName: string;
   lastSeenAt: Date | null;
   deletedAt: Date | null;
+  deletionRequestedAt?: Date | null;
+  purgedAt?: Date | null;
+  suspendedAt?: Date | null;
 }
 
 function fakePrisma(rows: Row[] = []) {
@@ -347,5 +350,124 @@ describe('AuthMiddleware', () => {
     await mw.use(anon as never, {} as never, next);
     expect(anon.user).toBeUndefined();
     expect(next).toHaveBeenCalledTimes(2);
+  });
+
+  describe('account lifecycle', () => {
+    const DAY = 86_400_000;
+    const base = {
+      id: 'u1',
+      clerkId: 'dev-student',
+      email: 'student@codify.local',
+      role: 'STUDENT' as const,
+      displayName: 'S',
+      lastSeenAt: null,
+      deletedAt: null,
+    };
+    const mwFor = (row: Partial<Row>) =>
+      new AuthMiddleware(
+        fakePrisma([{ ...base, ...row }]) as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+    const call = async (
+      mw: AuthMiddleware,
+      method: string,
+      originalUrl: string,
+    ) => {
+      const req = {
+        method,
+        originalUrl,
+        headers: { authorization: 'Bearer dev-token-student' },
+      } as { user?: { userId: string } };
+      const next = jest.fn();
+      try {
+        await mw.use(req as never, {} as never, next);
+        return { user: req.user, next: next.mock.calls.length, error: null };
+      } catch (error) {
+        return {
+          user: req.user,
+          next: next.mock.calls.length,
+          error: error as { status: number; response: Record<string, unknown> },
+        };
+      }
+    };
+
+    it('deleted (restorable): only account-status and restore pass', async () => {
+      const deletedAt = new Date(Date.now() - 2 * DAY);
+      const mw = mwFor({ deletedAt, deletionRequestedAt: deletedAt });
+      expect(await mw.resolve('dev-token-student')).toBeNull();
+      expect(
+        (await mw.resolveAccount('dev-token-student'))?.lifecycle.deletedAt,
+      ).toEqual(deletedAt);
+
+      const blocked = await call(mw, 'GET', '/api/me?x=1');
+      expect(blocked.error?.status).toBe(403);
+      expect(blocked.error?.response).toMatchObject({
+        code: 'ACCOUNT_DELETED',
+        restorableUntil: new Date(deletedAt.getTime() + 14 * DAY).toISOString(),
+      });
+      expect(blocked.next).toBe(0);
+
+      const status = await call(mw, 'GET', '/api/me/account-status');
+      expect(status).toMatchObject({
+        error: null,
+        next: 1,
+        user: { userId: 'u1' },
+      });
+      const restore = await call(mw, 'POST', '/api/me/restore');
+      expect(restore).toMatchObject({ error: null, next: 1 });
+      expect((await call(mw, 'GET', '/api/me/restore')).error?.status).toBe(
+        403,
+      );
+    });
+
+    it('deleted past 14 days or by the provider: restorableUntil null', async () => {
+      const old = new Date(Date.now() - 20 * DAY);
+      const late = await call(
+        mwFor({ deletedAt: old, deletionRequestedAt: old }),
+        'GET',
+        '/api/today',
+      );
+      expect(late.error?.response).toMatchObject({
+        code: 'ACCOUNT_DELETED',
+        restorableUntil: null,
+      });
+      const byProvider = await call(
+        mwFor({ deletedAt: new Date() }),
+        'GET',
+        '/api/today',
+      );
+      expect(byProvider.error?.response).toMatchObject({
+        code: 'ACCOUNT_DELETED',
+        restorableUntil: null,
+      });
+    });
+
+    it('suspended: only account-status passes', async () => {
+      const mw = mwFor({ suspendedAt: new Date() });
+      expect(await mw.resolve('dev-token-student')).toBeNull();
+      expect(
+        (await call(mw, 'GET', '/api/me/account-status')).error,
+      ).toBeNull();
+      for (const [m, u] of [
+        ['POST', '/api/me/restore'],
+        ['GET', '/api/league/current'],
+      ]) {
+        const r = await call(mw, m, u);
+        expect(r.error?.response).toMatchObject({ code: 'ACCOUNT_SUSPENDED' });
+      }
+    });
+
+    it('purged accounts are unauthenticated', async () => {
+      const at = new Date(Date.now() - 40 * DAY);
+      const mw = mwFor({
+        deletedAt: at,
+        deletionRequestedAt: at,
+        purgedAt: new Date(),
+      });
+      expect(await mw.resolveAccount('dev-token-student')).toBeNull();
+      const r = await call(mw, 'GET', '/api/me/account-status');
+      expect(r).toMatchObject({ error: null, next: 1, user: undefined });
+    });
   });
 });

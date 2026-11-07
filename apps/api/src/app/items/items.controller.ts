@@ -32,6 +32,7 @@ import {
   type ShopItem,
 } from './items.dto.js';
 import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
+import { RequireFeature } from '../flags/feature.guard.js';
 
 /**
  * Shop + inventory + avatar (student) and item/category management (admin).
@@ -46,6 +47,7 @@ export class ItemsController {
   // ─── Student ───────────────────────────────────────────────────────────
 
   @Roles('STUDENT')
+  @RequireFeature('shop.enabled')
   @Get('shop')
   shop(
     @CurrentUser() actor: ApiUser,
@@ -56,6 +58,7 @@ export class ItemsController {
 
   @RewardThrottle()
   @Roles('STUDENT')
+  @RequireFeature('shop.enabled')
   @Post('shop/:id/purchase')
   @HttpCode(201)
   async purchase(

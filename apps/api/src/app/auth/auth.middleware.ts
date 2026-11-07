@@ -1,5 +1,14 @@
-import { Injectable, Logger, type NestMiddleware } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  type NestMiddleware,
+} from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
+import {
+  accountBlockFor,
+  type AccountLifecycle,
+} from '../account/account-state.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -21,16 +30,24 @@ const USER_FIELDS = {
   displayName: true,
   lastSeenAt: true,
   deletedAt: true,
+  deletionRequestedAt: true,
+  purgedAt: true,
+  suspendedAt: true,
 } as const;
 
-interface ResolvedRow {
+interface ResolvedRow extends AccountLifecycle {
   id: string;
   clerkId: string;
   email: string;
   role: ApiUser['role'];
   displayName: string;
   lastSeenAt: Date | null;
-  deletedAt: Date | null;
+}
+
+/** A resolved caller plus their account lifecycle state. */
+export interface ResolvedAccount {
+  user: ApiUser;
+  lifecycle: AccountLifecycle;
 }
 
 interface NewUserProfile {
@@ -52,9 +69,14 @@ interface NewUserProfile {
  *  - `dev-token-<role>` / `dev-token-studentN`: only when NODE_ENV is not
  *    production AND ALLOW_DEV_AUTH=true.
  *
- * Soft-deleted users (deletedAt set, e.g. via the Clerk `user.deleted`
- * webhook) are treated as unauthenticated. `lastSeenAt` is written at most
- * once per LAST_SEEN_INTERVAL_MS per user, never on every request.
+ * Account lifecycle (docs/14, account/account-state.ts): a soft-deleted
+ * account may only call `GET /me/account-status` and `POST /me/restore`;
+ * every other request is refused with 403 `ACCOUNT_DELETED`
+ * (`restorableUntil` while the 14-day window is open, else null). A
+ * suspended account may only call `GET /me/account-status`; everything else
+ * is 403 `ACCOUNT_SUSPENDED`. A purged (anonymised) account is treated as
+ * unauthenticated. `lastSeenAt` is written at most once per
+ * LAST_SEEN_INTERVAL_MS per active user, never on every request.
  */
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
@@ -71,19 +93,35 @@ export class AuthMiddleware implements NestMiddleware {
     if (typeof header === 'string' && header.startsWith('Bearer ')) {
       const token = header.slice('Bearer '.length).trim();
       if (token) {
+        let account: ResolvedAccount | null = null;
         try {
-          const user = await this.resolve(token);
-          if (user) req.user = user;
+          account = await this.resolveAccount(token);
         } catch (err) {
           this.logger.warn(`Auth resolution failed: ${(err as Error).message}`);
+        }
+        if (account) {
+          const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
+          const block = accountBlockFor(account.lifecycle, req.method, path);
+          // Thrown (not next(err)) so Nest's exception filter renders it as
+          // problem+json.
+          if (block) throw new ForbiddenException(block);
+          req.user = account.user;
         }
       }
     }
     next();
   }
 
-  /** Token → ApiUser (or null). Exposed for tests. */
+  /** Token → ApiUser of an ACTIVE account (or null). Exposed for tests. */
   async resolve(token: string): Promise<ApiUser | null> {
+    const account = await this.resolveAccount(token);
+    if (!account) return null;
+    const l = account.lifecycle;
+    return l.deletedAt || l.suspendedAt ? null : account.user;
+  }
+
+  /** Token → caller + lifecycle state (deleted/suspended included), or null. */
+  async resolveAccount(token: string): Promise<ResolvedAccount | null> {
     if (token.startsWith('dev-token-')) {
       if (!this.config.devAuthEnabled) return null;
       const stub = parseStubToken(token);
@@ -112,20 +150,28 @@ export class AuthMiddleware implements NestMiddleware {
   private async findOrProvision(
     clerkId: string,
     profile: () => Promise<NewUserProfile>,
-  ): Promise<ApiUser | null> {
+  ): Promise<ResolvedAccount | null> {
     let row: ResolvedRow | null = await this.prisma.user.findUnique({
       where: { clerkId },
       select: USER_FIELDS,
     });
     if (!row) row = await this.provision(clerkId, await profile());
-    if (!row || row.deletedAt) return null;
-    this.touch(row);
+    if (!row || row.purgedAt) return null;
+    if (!row.deletedAt && !row.suspendedAt) this.touch(row);
     return {
-      userId: row.id,
-      clerkId: row.clerkId,
-      email: row.email,
-      role: row.role,
-      displayName: row.displayName,
+      user: {
+        userId: row.id,
+        clerkId: row.clerkId,
+        email: row.email,
+        role: row.role,
+        displayName: row.displayName,
+      },
+      lifecycle: {
+        deletedAt: row.deletedAt ?? null,
+        deletionRequestedAt: row.deletionRequestedAt ?? null,
+        purgedAt: row.purgedAt ?? null,
+        suspendedAt: row.suspendedAt ?? null,
+      },
     };
   }
 

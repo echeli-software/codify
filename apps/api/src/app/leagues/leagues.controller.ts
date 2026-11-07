@@ -18,6 +18,7 @@ import {
   type FriendView,
 } from './friends.service.js';
 import { ProfileService, type PublicProfile } from './profile.service.js';
+import { RequireFeature } from '../flags/feature.guard.js';
 
 class SendFriendRequestDto {
   @IsEmail()
@@ -42,6 +43,7 @@ export class LeaguesController {
   ) {}
 
   @Roles('STUDENT')
+  @RequireFeature('leagues.enabled')
   @Get('current')
   current(@CurrentUser() actor: ApiUser): Promise<CurrentLeagueView> {
     return this.leagues.getCurrent(actor.userId);
@@ -49,6 +51,7 @@ export class LeaguesController {
 
   /** My result for last week's cohort (404 until the rollover has run). */
   @Roles('STUDENT')
+  @RequireFeature('leagues.enabled')
   @Get('last-week')
   lastWeek(@CurrentUser() actor: ApiUser): Promise<LastWeekResultView> {
     return this.leagues.getLastWeek(actor.userId);
@@ -71,6 +74,7 @@ export class LeaguesController {
 }
 
 /** Friends + invite links. */
+@RequireFeature('friends.enabled')
 @Controller('friends')
 export class FriendsController {
   constructor(private readonly friends: FriendsService) {}
