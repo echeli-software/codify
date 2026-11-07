@@ -38,6 +38,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Android 13+: runtime permission requested by NativePlatformService.registerForPush -->
+    <!-- Android 13+: runtime permission requested by NativePushService.register (FCM) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

@@ -42,11 +42,68 @@ identical to a Stripe-web subscription.
   and prunes tokens the provider reports invalid. Cron in prod; admin-triggered
   via `POST /notifications/streak-reminder/run` for verification.
 
+### Push on device: FCM on iOS + Android (as built)
+
+The app uses **`@capacitor-firebase/messaging`** on both platforms, so the
+token sent to `POST /devices` is always an **FCM registration token** — the
+only kind the API's `FcmPushProvider` delivers to (iOS through FCM's APNs
+bridge). `@capacitor/push-notifications` was removed: it returns a raw APNs
+token on iOS and the plugin documents that the two must not be installed
+together.
+
+`NativePushService` (`apps/student/src/app/native/native-push.service.ts`):
+
+- **Boot** (`NativePlatformService.init`): listeners for notification taps
+  (also on a cold start), foreground messages and token refresh.
+- **Sign-in**: permission prompt only while undecided (`checkPermissions` →
+  `requestPermissions`; a denial is respected) → `getToken` → `POST /devices`
+  with `IOS` / `ANDROID` (one retry on 409 `device.rebind_required`).
+- **Token refresh** (`tokenReceived`): the new token is bound, then the old
+  one is unregistered.
+- **Foreground**: iOS shows the banner itself (`presentationOptions` in
+  `capacitor.config.ts`); Android shows an in-app toast with an "Open" action
+  when the message has a deep link.
+- **Tap**: opens the route from the data payload — `deepLink`, else `url`
+  (what `NotificationService` sends), else `route`, else the FCM `link`. Only
+  app-relative paths (or absolute URLs on the app's own origin) are followed.
+- **Sign-out**: `DELETE /devices/:token` + `deleteToken()`, so the next account
+  on the device gets a fresh token.
+- The plugin is registered by name with `@capacitor/core` (types only from the
+  package), so its web implementation and the Firebase JS SDK never enter the
+  web bundle.
+
+#### Push setup (needs real accounts — never commit these files)
+
+1. **Firebase project**: add an iOS app (bundle id `app.codify.student`) and an
+   Android app (package `app.codify.student`).
+2. **Android**: download `google-services.json` into
+   `apps/student/android/app/` (the Gradle build applies the
+   google-services plugin only when the file exists).
+3. **iOS**: download `GoogleService-Info.plist`, add it to the **App** target
+   in Xcode (`apps/student/ios/App/App/`); enable the **Push Notifications**
+   capability (adds `aps-environment` to the entitlements) — Background Modes
+   → Remote notifications is already on. `AppDelegate.swift` already forwards
+   the APNs token / background messages to the plugin. Run `pod install`
+   (`npx cap sync ios`) on macOS.
+4. **APNs key**: Apple Developer → Keys → create an APNs auth key (.p8) and
+   upload it in Firebase → Project settings → Cloud Messaging → Apple app
+   configuration (Key ID + Team ID).
+5. **API**: set `FIREBASE_SERVICE_ACCOUNT_JSON` (base64 service-account JSON,
+   see `.env.example`) so `FcmPushProvider` replaces the dev provider.
+6. Both files and the key are secrets/config per environment — keep them out
+   of git (CI injects them before `cap sync`).
+
+### Lesson images offline on device
+
+Course downloads store lesson images on the device filesystem in the native
+shell (no service worker there) and render them from the local copy — see
+docs/16 §9 "As built (native lesson images)".
+
 ### Capacitor + native bridge
 
 - `apps/student/capacitor.config.ts` (app id, web dir, push presentation).
 - `NativePlatformService`: feature-detects the Capacitor runtime and bridges
-  push registration + RevenueCat purchase/restore via indirected dynamic
+  push registration (via `NativePushService`) + RevenueCat purchase/restore via indirected dynamic
   `import()` (so the web bundle never resolves native-only plugins).
 - Subscription page: on native, subscribing routes through store IAP (App Store
   / Play forbid linking out to web payment for digital goods) and a "Restore

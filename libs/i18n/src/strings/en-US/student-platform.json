@@ -203,6 +203,9 @@
       "clientTimestamp": "Your device clock looks off — check the date and time.",
       "enrollmentGranted": "This course was granted to you and can't be removed here.",
       "deviceRebind": "This device was linked to another account. Try again to link it to yours."
+    },
+    "push": {
+      "open": "Open"
     }
   }
 }

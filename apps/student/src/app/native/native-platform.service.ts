@@ -1,16 +1,11 @@
 import { Injectable, Injector, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Platform } from '@ionic/angular/standalone';
-import {
-  DevicesClient,
-  toProblemDetails,
-  type DevicePlatform,
-} from '@codify/api-client';
-import { safeRedirect } from '@codify/auth';
+import { type DevicePlatform } from '@codify/api-client';
 import type { PurchasesPlugin } from '@revenuecat/purchases-capacitor';
 import { REVENUECAT_ANDROID_KEY, REVENUECAT_IOS_KEY } from '../api-base-url.js';
 import { isNativeRuntime, runtimePlatform } from '../platform/runtime.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { NativePushService } from './native-push.service.js';
 
 /** Thrown when a plan price has no App Store / Play product configured. */
 export class StoreProductMissingError extends Error {
@@ -27,27 +22,21 @@ export class StoreProductMissingError extends Error {
  * `import()` only when running natively, so they live in lazy chunks the
  * web never executes.
  *
- *   - Push: permission → register → POST /devices (retries once on 409
- *     `device.rebind_required`, the server's anti-hijack handshake);
- *     notification taps deep-link to their in-app `url`.
+ *   - Push: FCM on iOS + Android via `NativePushService` (permission →
+ *     FCM token → POST /devices, token refresh, foreground messages,
+ *     notification taps deep-link into the app).
  *   - RevenueCat: `configure` with the per-store key from the build define,
  *     `logIn(userId)` after sign-in / `logOut` on sign-out, purchases by the
  *     price's `storeProductId`, restore.
  *   - Android hardware back button (exit at the root) + app foreground state.
- *
- * NOTE: iOS push here goes through APNs via @capacitor/push-notifications;
- * delivering FCM messages to iOS needs `@capacitor-firebase/messaging`
- * (not installed) — see the mobile runbook.
  */
 @Injectable({ providedIn: 'root' })
 export class NativePlatformService {
-  private readonly devices = inject(DevicesClient);
+  private readonly push = inject(NativePushService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly telemetry = inject(TelemetryService);
 
-  private registeredToken: string | null = null;
-  private pushListenersAdded = false;
   private purchasesP: Promise<PurchasesPlugin | null> | null = null;
   private rcConfigured = false;
   private rcUserId: string | null = null;
@@ -77,8 +66,14 @@ export class NativePlatformService {
   async init(): Promise<void> {
     if (this.initialized || !this.isNative) return;
     this.initialized = true;
+    // Tap listeners go on at boot so a cold start from a notification
+    // still deep-links (the token is only requested after sign-in).
+    void this.push.init();
     try {
       const { App } = await import('@capacitor/app');
+      // Ionic is loaded lazily (platform/ionic-root.component.ts) — keep it
+      // out of the initial graph that imports this service.
+      const { Platform } = await import('@ionic/angular/standalone');
       await App.addListener('appStateChange', ({ isActive }) => {
         this._appActive.set(isActive);
         this.telemetry.track(
@@ -112,9 +107,7 @@ export class NativePlatformService {
   /** On sign-out: unbind the push token and reset the RevenueCat customer. */
   async onSignedOut(): Promise<void> {
     if (!this.isNative) return;
-    const token = this.registeredToken;
-    this.registeredToken = null;
-    if (token) await this.devices.unregister(token).catch(() => undefined);
+    await this.push.unregister();
     if (this.rcConfigured && this.rcUserId) {
       const Purchases = await this.purchases();
       await Purchases?.logOut().catch(() => undefined);
@@ -125,64 +118,17 @@ export class NativePlatformService {
   // ─── Push ───────────────────────────────────────────────────────────────
 
   /**
-   * Request push permission, register with APNs/FCM, and POST the resulting
-   * token to /devices. No-op on web.
+   * Request push permission, fetch the FCM token and POST it to /devices
+   * (see NativePushService). No-op on web.
    */
   async registerForPush(): Promise<void> {
     if (!this.isNative) return;
-    try {
-      const { PushNotifications } =
-        await import('@capacitor/push-notifications');
-      const perm = await PushNotifications.requestPermissions();
-      if (perm.receive !== 'granted') return;
-      if (!this.pushListenersAdded) {
-        this.pushListenersAdded = true;
-        await PushNotifications.addListener('registration', (t) => {
-          if (t.value && t.value !== this.registeredToken)
-            void this.bindToken(t.value);
-        });
-        await PushNotifications.addListener('registrationError', (e) => {
-          this.telemetry.track('push_registration_failed', {
-            error: String(e?.error ?? ''),
-          });
-        });
-        await PushNotifications.addListener(
-          'pushNotificationActionPerformed',
-          (a) => {
-            const url = (a.notification?.data as { url?: unknown } | undefined)
-              ?.url;
-            this.telemetry.track('push_opened', {
-              hasUrl: typeof url === 'string',
-            });
-            if (typeof url === 'string') {
-              void this.router.navigateByUrl(safeRedirect(url, '/today'));
-            }
-          },
-        );
-      }
-      await PushNotifications.register();
-    } catch {
-      /* push unavailable in this shell */
-    }
+    await this.push.register();
   }
 
   /** POST /devices; on 409 `device.rebind_required` register once more. */
-  async bindToken(token: string): Promise<boolean> {
-    const platform = this.platform();
-    try {
-      await this.devices.register(token, platform);
-    } catch (err) {
-      const p = toProblemDetails(err);
-      if (p.status !== 409 || p.code !== 'device.rebind_required') return false;
-      try {
-        await this.devices.register(token, platform);
-      } catch {
-        return false;
-      }
-    }
-    this.registeredToken = token;
-    this.telemetry.track('push_registered', { platform });
-    return true;
+  bindToken(token: string): Promise<boolean> {
+    return this.push.bindToken(token);
   }
 
   // ─── RevenueCat ─────────────────────────────────────────────────────────

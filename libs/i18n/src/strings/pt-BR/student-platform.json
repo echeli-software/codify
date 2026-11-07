@@ -203,6 +203,9 @@
       "clientTimestamp": "O relógio do seu aparelho parece errado — confira data e hora.",
       "enrollmentGranted": "Este curso foi concedido a você e não pode ser removido aqui.",
       "deviceRebind": "Este aparelho estava vinculado a outra conta. Tente de novo para vinculá-lo à sua."
+    },
+    "push": {
+      "open": "Abrir"
     }
   }
 }
