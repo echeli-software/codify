@@ -131,6 +131,22 @@ describe('request locale', () => {
   });
 });
 
+describe('request locale — lookup failure', () => {
+  it('serves the default locale when the user lookup fails', async () => {
+    const localizer = new ContentLocalizer({
+      user: {
+        findUnique: jest.fn(async () => {
+          throw new Error('db down');
+        }),
+      },
+    } as never);
+    await runInTranslationContext(
+      req({ user: { userId: 'u1' } } as never),
+      async () => expect(await localizer.requestLocale()).toBe('pt-BR'),
+    );
+  });
+});
+
 describe('localizeValues', () => {
   const groups = [
     {

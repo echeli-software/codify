@@ -89,11 +89,15 @@ export class ContentLocalizer {
     );
     if (explicit) return explicit;
     if (req.user?.userId) {
-      const u = await this.prisma.user.findUnique({
-        where: { id: req.user.userId },
-        select: { locale: true },
-      });
-      if (isSupportedLocale(u?.locale)) return u.locale;
+      try {
+        const u = await this.prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { locale: true },
+        });
+        if (isSupportedLocale(u?.locale)) return u.locale;
+      } catch {
+        /* never fail a read over the locale: serve the default */
+      }
     }
     return DEFAULT_LOCALE;
   }
