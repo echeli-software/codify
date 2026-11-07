@@ -175,7 +175,8 @@ export class ShellPage {
   protected onGlobalKeydown(ev: KeyboardEvent): void {
     if (!isPaletteShortcut(ev)) return;
     ev.preventDefault();
-    this.searchOpen.update((open) => !open);
+    // Opens only; while open the palette handles the shortcut (closes).
+    this.searchOpen.set(true);
   }
 
   protected readonly nav = computed<NavSection[]>(() => {

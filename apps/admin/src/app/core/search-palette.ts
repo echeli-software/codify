@@ -356,6 +356,13 @@ export class SearchPalette {
   }
 
   protected onKeydown(ev: KeyboardEvent): void {
+    // Cmd/Ctrl-K again closes (and must not reach the shell's opener).
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.close();
+      return;
+    }
     const count = this.flat().length;
     switch (ev.key) {
       case 'ArrowDown':
