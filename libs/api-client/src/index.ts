@@ -162,6 +162,14 @@ export {
   type AdminCancelBody,
 } from './lib/billing.client.js';
 export { type UpdatePlanPriceBody } from './lib/plans.client.js';
+export type {
+  PaymentProviderKind,
+  PaymentStatus,
+  PaymentView,
+  AdminPaymentView,
+  PaymentPage,
+  StripeStatus,
+} from './lib/billing.client.js';
 
 // Engagement area additions (gamification config, leagues, shop, referrals, translations)
 export type {
@@ -289,3 +297,37 @@ export {
   type BadgeTestResult,
   type ItemCategoryAdmin,
 } from './lib/admin-ops.client.js';
+
+// Account lifecycle + privacy (docs/14 §13) and feature flags (docs/10 §9).
+export {
+  AccountClient,
+  ACCOUNT_DELETED,
+  ACCOUNT_SUSPENDED,
+  EXPORT_RATE_LIMITED,
+  type AccountStatus,
+  type AccountStatusView,
+  type AdminAccountStatusView,
+  type DeleteAccountResult,
+  type AccountExport,
+} from './lib/account.client.js';
+export {
+  FlagsClient,
+  FEATURE_DISABLED,
+  type FlagEvaluation,
+  type FeatureFlag,
+  type FeatureFlagValue,
+  type CreateFeatureFlagBody,
+  type UpdateFeatureFlagBody,
+} from './lib/flags.client.js';
+
+// Notification inbox + preferences (docs/05 Notifications, docs/10 §3).
+export {
+  NotificationsClient,
+  type NotificationKind,
+  type NotificationAction,
+  type InboxNotification,
+  type InboxPage,
+  type KindPreference,
+  type NotificationPreferences,
+  type UpdateNotificationPreferencesBody,
+} from './lib/notifications.client.js';
