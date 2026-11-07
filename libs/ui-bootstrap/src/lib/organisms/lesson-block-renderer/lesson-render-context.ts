@@ -26,6 +26,23 @@ export const LESSON_BLOCK_RENDERER = new InjectionToken<
   BlockRendererProtocol<Type<unknown>>
 >('LESSON_BLOCK_RENDERER');
 
+/**
+ * Maps an image `src` authored in the LessonDoc (already validated by
+ * `isAllowedImageSrc`) to the URL to render — e.g. the device-local copy of
+ * a downloaded lesson image in the native app (docs/16 §8). Return null to
+ * keep the authored src. Signals read inside `resolve` are tracked, so the
+ * image re-renders when the app's store changes.
+ *
+ *   providers: [{ provide: LESSON_IMAGE_RESOLVER, useValue: { resolve: (src) => localCopy(src) } }]
+ */
+export interface LessonImageResolver {
+  resolve(src: string): string | null;
+}
+
+export const LESSON_IMAGE_RESOLVER = new InjectionToken<LessonImageResolver>(
+  'LESSON_IMAGE_RESOLVER',
+);
+
 /** Server grading result fed back into the renderer for per-question feedback. */
 export interface LessonQuizResult {
   scorePct: number;

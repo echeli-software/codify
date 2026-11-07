@@ -983,16 +983,9 @@ export class CourseDetailPage {
   }
 
   private async refreshDownloadedLessons(): Promise<void> {
-    const ids = this.allLessons().map((l) => l.id);
-    const found = await Promise.all(
-      ids.map((id) =>
-        this.downloads
-          .getDownloadedLesson(id)
-          .then((x) => (x ? id : null))
-          .catch(() => null),
-      ),
-    );
-    this.downloadedLessons.set(new Set(found.filter((x): x is string => !!x)));
+    const id = this.courseId();
+    if (!id) return;
+    this.downloadedLessons.set(await this.downloads.downloadedLessonIds(id));
   }
 
   // ─── Enrollment ───────────────────────────────────────────────────────

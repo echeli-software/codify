@@ -99,7 +99,9 @@ export { LessonBlockEditor } from './lib/organisms/lesson-block-editor/lesson-bl
 export { LessonBlockRenderer } from './lib/organisms/lesson-block-renderer/lesson-block-renderer.js';
 export {
   LESSON_BLOCK_RENDERER,
+  LESSON_IMAGE_RESOLVER,
   LessonRefSlot,
+  type LessonImageResolver,
   type LessonQuizResult,
   type LessonRefSlotContext,
 } from './lib/organisms/lesson-block-renderer/lesson-render-context.js';

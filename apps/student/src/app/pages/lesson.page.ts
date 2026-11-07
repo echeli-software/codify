@@ -84,6 +84,7 @@ import {
   type LessonViewState,
   type RequiredPlan,
 } from './lesson/lesson-state.js';
+import { provideNativeLessonImages } from '../offline/native-lesson-images.js';
 
 interface Completion {
   xp: number;
@@ -110,6 +111,8 @@ interface Neighbour {
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // docs/16 §8: downloaded lesson images render from the device on native.
+  providers: [provideNativeLessonImages()],
   imports: [
     RouterLink,
     IonHeader,

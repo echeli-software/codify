@@ -11,6 +11,7 @@ import {
 } from '@codify/lesson-schema';
 import { LessonBlockRenderer } from './lesson-block-renderer.js';
 import {
+  LESSON_IMAGE_RESOLVER,
   LESSON_BLOCK_RENDERER,
   LessonRefSlot,
   type LessonQuizResult,
@@ -156,6 +157,30 @@ describe('LessonBlockRenderer', () => {
       ).toBe('wide');
       expect(el.querySelector('figcaption')?.textContent).toContain(
         'component tree',
+      );
+    });
+
+    it('renders a stored local copy through LESSON_IMAGE_RESOLVER (reactively)', async () => {
+      const local = signal<string | null>(null);
+      const resolve = jest.fn((src: string) =>
+        src.startsWith('https://cdn.codify.app/') ? local() : null,
+      );
+      const { fixture, el } = await mount([
+        { provide: LESSON_IMAGE_RESOLVER, useValue: { resolve } },
+      ]);
+      const img = () =>
+        el.querySelector<HTMLImageElement>('figure.cdf-figure img');
+      expect(img()?.getAttribute('src')).toBe(
+        'https://cdn.codify.app/img/0192f3a4-sample',
+      );
+      local.set('capacitor://localhost/_capacitor_file_/data/a.png');
+      await settle(fixture);
+      expect(img()?.getAttribute('src')).toBe(
+        'capacitor://localhost/_capacitor_file_/data/a.png',
+      );
+      // Only allowlisted authored srcs ever reach the resolver.
+      expect(resolve).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^(data|javascript):/),
       );
     });
   });

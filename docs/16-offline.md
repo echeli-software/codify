@@ -217,6 +217,18 @@ These are the rules that prevent double-counting and weird divergence:
 - **Capacitor Preferences**: lightweight settings (theme, locale, reminder time, download settings).
 - **SQLite (optional)**: not in v1; consider if IndexedDB perf is insufficient for very large libraries.
 
+**As built (native lesson images):** `NativeImageStore` downloads each lesson
+image of a course download natively (`Filesystem.downloadFile`, no CORS) into
+`Directory.Data/lesson-images/<hash>.<ext>`, keeps a URL → bytes index in
+Capacitor Preferences, and the lesson renderer maps a stored image to its
+WebView URL (`Capacitor.convertFileSrc`) through `LESSON_IMAGE_RESOLVER`
+(ui-bootstrap), provided by the lesson page. Byte counts feed the same
+`DownloadedLesson.sizeBytes` / `DownloadRecord.totalBytes` accounting as the
+web cache, so the budget, LRU eviction and "Remove" free filesystem images
+exactly like Cache Storage entries. The web keeps Cache Storage + service
+worker. `DownloadService.downloadedLessons(courseId)` /
+`downloadedLessonIds(courseId)` list what is stored for one course.
+
 ### Web (PWA)
 - **IndexedDB**: same structured data.
 - **Cache Storage API** (via service worker): app shell + image/asset responses.

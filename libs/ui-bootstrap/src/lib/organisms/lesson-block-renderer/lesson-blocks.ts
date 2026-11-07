@@ -33,7 +33,10 @@ import {
   LessonQuiz,
   LessonRef,
 } from './lesson-interactive-blocks.js';
-import { LessonRenderContext } from './lesson-render-context.js';
+import {
+  LESSON_IMAGE_RESOLVER,
+  LessonRenderContext,
+} from './lesson-render-context.js';
 
 const CALLOUT_LABELS: Record<CalloutKind, string> = {
   info: 'Info',
@@ -82,6 +85,9 @@ export class LessonBlocks {
   readonly blocks = input<readonly AnyBlockNode[] | null | undefined>([]);
 
   private readonly ctx = inject(LessonRenderContext);
+  private readonly imageResolver = inject(LESSON_IMAGE_RESOLVER, {
+    optional: true,
+  });
 
   protected override(block: AnyBlockNode): Type<unknown> | null {
     return this.ctx.protocol?.resolve(block.type) ?? null;
@@ -141,7 +147,8 @@ export class LessonBlocks {
 
   protected imageSrc(b: AnyBlockNode): string | null {
     const src = this.image(b).attrs?.src;
-    return isAllowedImageSrc(src) ? src : null;
+    if (!isAllowedImageSrc(src)) return null;
+    return this.imageResolver?.resolve(src) ?? src;
   }
 
   /** Rows split into a header row (first row of only header cells) + body. */

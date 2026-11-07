@@ -25,6 +25,7 @@ import {
   CONTENT_ASSET_CACHE,
 } from './asset-cache.service.js';
 import { idbAvailable, idbStores, tx } from './db.js';
+import { NativeImageStore } from './native-image-store.service.js';
 import { NetworkStatusService } from './network-status.service.js';
 
 const {
@@ -243,6 +244,7 @@ export class DownloadService {
   private readonly i18n = inject(I18nService);
   private readonly network = inject(NetworkStatusService);
   private readonly assets = inject(AssetCacheService);
+  private readonly nativeImages = inject(NativeImageStore);
   private readonly telemetry = inject(TelemetryService);
 
   /** All download records (reactive). */
@@ -322,6 +324,7 @@ export class DownloadService {
   hydrate(): Promise<void> {
     if (!this.hydrateP) {
       this.hydrateP = (async () => {
+        void this.nativeImages.init();
         if (!idbAvailable()) return;
         try {
           this.downloads.set(await this.allRecords());
@@ -364,6 +367,17 @@ export class DownloadService {
       this.statusCache.set(courseId, s);
     }
     return s;
+  }
+
+  /** Every lesson of `courseId` stored on this device (one index query). */
+  async downloadedLessons(courseId: string): Promise<DownloadedLesson[]> {
+    return this.lessonsByCourse(courseId).catch(() => []);
+  }
+
+  /** Ids of the lessons of `courseId` stored on this device. */
+  async downloadedLessonIds(courseId: string): Promise<Set<string>> {
+    const lessons = await this.downloadedLessons(courseId);
+    return new Set(lessons.map((l) => l.lessonId));
   }
 
   /** Downloaded lesson (offline read). */
@@ -671,10 +685,7 @@ export class DownloadService {
           .filter((r) => r.courseId !== courseId)
           .flatMap((r) => r.imageUrls ?? []),
       );
-      await this.assets.removeUrls(
-        rec.imageUrls.filter((u) => !stillUsed.has(u)),
-        CONTENT_ASSET_CACHE,
-      );
+      await this.removeImages(rec.imageUrls.filter((u) => !stillUsed.has(u)));
     }
     if (idbAvailable()) {
       await tx(STORE_DOWNLOADS, 'readwrite', (s) => s.delete(courseId));
@@ -688,6 +699,7 @@ export class DownloadService {
     for (const rec of [...this.downloads()])
       await this.removeCourse(rec.courseId);
     await this.assets.clear(CONTENT_ASSET_CACHE);
+    await this.nativeImages.clear();
   }
 
   /** Touch a course's lastReadAt so it survives LRU eviction. */
@@ -1016,10 +1028,7 @@ export class DownloadService {
     for (let attempt = 0; attempt <= ITEM_RETRIES; attempt += 1) {
       try {
         const bundle = await this.lessonsClient.offlineBundle(lessonId);
-        const images = await this.assets.cacheUrls(
-          bundle.imageSrcs ?? [],
-          CONTENT_ASSET_CACHE,
-        );
+        const images = await this.storeImages(bundle.imageSrcs ?? []);
         const lesson = toDownloadedLesson(bundle, courseId, images.bytes);
         if (idbAvailable()) {
           await tx(STORE_DL_LESSONS, 'readwrite', (s) => s.put(lesson));
@@ -1048,6 +1057,22 @@ export class DownloadService {
       }
     }
     throw lastErr;
+  }
+
+  /**
+   * Lesson images: device filesystem in the native shell (no service worker
+   * there), Cache Storage on the web. Same result shape, so lesson sizes,
+   * `imageUrls` and eviction are accounted identically.
+   */
+  private storeImages(urls: readonly string[]) {
+    return this.nativeImages.supported
+      ? this.nativeImages.store(urls)
+      : this.assets.cacheUrls(urls, CONTENT_ASSET_CACHE);
+  }
+
+  private async removeImages(urls: readonly string[]): Promise<void> {
+    if (this.nativeImages.supported) await this.nativeImages.remove(urls);
+    else await this.assets.removeUrls(urls, CONTENT_ASSET_CACHE);
   }
 
   /** Current locale's ContentTranslation rows for the course's entities. */

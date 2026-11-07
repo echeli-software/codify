@@ -11,6 +11,7 @@ import {
 import { I18nService } from '@codify/i18n';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { AssetCacheService } from './asset-cache.service';
+import { NativeImageStore } from './native-image-store.service';
 import {
   DownloadService,
   autoDownloadSelection,
@@ -110,8 +111,30 @@ describe('DownloadService', () => {
   let online: ReturnType<typeof signal<boolean>>;
   let type: ReturnType<typeof signal<ConnectionType>>;
   let offlineBundle: jest.Mock;
+  let cacheUrls: jest.Mock;
+  let native: {
+    supported: boolean;
+    init: jest.Mock;
+    store: jest.Mock;
+    remove: jest.Mock;
+    clear: jest.Mock;
+  };
 
-  function setup() {
+  function setup(opts: { native?: boolean; imageSrcs?: string[] } = {}) {
+    cacheUrls = jest
+      .fn()
+      .mockResolvedValue({ cached: [], bytes: 0, failed: [] });
+    native = {
+      supported: !!opts.native,
+      init: jest.fn().mockResolvedValue(undefined),
+      store: jest.fn(async (urls: string[]) => ({
+        cached: urls,
+        bytes: 100 * urls.length,
+        failed: [],
+      })),
+      remove: jest.fn().mockResolvedValue(undefined),
+      clear: jest.fn().mockResolvedValue(undefined),
+    };
     online = signal(true);
     type = signal<ConnectionType>('wifi');
     offlineBundle = jest.fn(async (id: string) => ({
@@ -130,7 +153,7 @@ describe('DownloadService', () => {
       },
       doc: { type: 'doc', content: [] },
       quizAnswerHashes: { algorithm: 'sha256', salt: 's', hashes: {} },
-      imageSrcs: [],
+      imageSrcs: opts.imageSrcs ?? [],
       updatedAt: 'v1',
     }));
     TestBed.configureTestingModule({
@@ -166,13 +189,12 @@ describe('DownloadService', () => {
         {
           provide: AssetCacheService,
           useValue: {
-            cacheUrls: jest
-              .fn()
-              .mockResolvedValue({ cached: [], bytes: 0, failed: [] }),
+            cacheUrls,
             removeUrls: jest.fn(),
             clear: jest.fn(),
           },
         },
+        { provide: NativeImageStore, useValue: native },
         { provide: TelemetryService, useValue: { track: jest.fn() } },
       ],
     });
@@ -194,6 +216,30 @@ describe('DownloadService', () => {
     expect(offlineBundle).toHaveBeenCalledTimes(3);
     expect(out?.status).toBeDefined();
     expect(svc.status('c1')().state).not.toBe('downloading');
+  });
+
+  it('web: lesson images go to Cache Storage', async () => {
+    const svc = setup({ imageSrcs: ['https://cdn.test/a.png'] });
+    await svc.downloadCourse('c1');
+    expect(cacheUrls).toHaveBeenCalledWith(
+      ['https://cdn.test/a.png'],
+      'codify-content-v1',
+    );
+    expect(native.store).not.toHaveBeenCalled();
+  });
+
+  it('native: lesson images go to the device filesystem, removed with the downloads', async () => {
+    const svc = setup({ native: true, imageSrcs: ['https://cdn.test/a.png'] });
+    await svc.downloadCourse('c1');
+    expect(native.store).toHaveBeenCalledWith(['https://cdn.test/a.png']);
+    expect(cacheUrls).not.toHaveBeenCalled();
+    await svc.removeAll();
+    expect(native.clear).toHaveBeenCalled();
+  });
+
+  it('downloadedLessonIds is empty without device storage', async () => {
+    const svc = setup();
+    await expect(svc.downloadedLessonIds('c1')).resolves.toEqual(new Set());
   });
 
   it('Wi-Fi only: waits on cellular and resumes on Wi-Fi', async () => {
