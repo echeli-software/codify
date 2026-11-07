@@ -14,7 +14,10 @@ import {
   Button,
   Icon,
   Kbd,
+  LanguageSwitcher,
   type NavSection,
+  Popover,
+  ThemeToggle,
   ToastHost,
 } from '@codify/ui-bootstrap';
 import { AuthService } from '@codify/auth';
@@ -46,7 +49,10 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
     Button,
     Icon,
     Kbd,
+    LanguageSwitcher,
+    Popover,
     SearchPalette,
+    ThemeToggle,
     ToastHost,
     TranslatePipe,
   ],
@@ -91,6 +97,37 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
               {{ 'admin.shell.signOut' | translate }}
             </cdf-button>
           </span>
+          <!-- < 1024 px: language, theme, user and sign-out move into this menu. -->
+          <button
+            type="button"
+            class="topbar-menu"
+            [cdfPopover]="accountMenu"
+            cdfPopoverPlacement="bottom-end"
+            cdfPopoverAutoClose="outside"
+            [attr.aria-label]="'admin.shell.accountMenu' | translate"
+            aria-haspopup="dialog"
+            [attr.aria-expanded]="menuOpen()"
+            (cdfPopoverShown)="menuOpen.set(true)"
+            (cdfPopoverHidden)="menuOpen.set(false)"
+            data-testid="account-menu"
+          >
+            <cdf-avatar [name]="u.displayName" size="sm" />
+          </button>
+          <ng-template #accountMenu>
+            <div class="topbar-menu__panel" data-testid="account-menu-panel">
+              <div class="topbar-menu__who">
+                <span class="topbar-user__name">{{ u.displayName }}</span>
+                <span class="topbar-user__role">{{
+                  'admin.roles.' + u.role | translate
+                }}</span>
+              </div>
+              <cdf-language-switcher />
+              <cdf-theme-toggle />
+              <cdf-button kind="ghost" size="sm" (click)="signOut()">
+                {{ 'admin.shell.signOut' | translate }}
+              </cdf-button>
+            </div>
+          </ng-template>
         }
       </ng-container>
 
@@ -144,7 +181,35 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
         flex: 1;
         text-align: start;
       }
-      @media (max-width: 640px) {
+      .topbar-menu {
+        display: none;
+        align-items: center;
+        padding: 2px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: none;
+      }
+      .topbar-menu:hover {
+        border-color: var(--cdf-color-border);
+      }
+      .topbar-menu:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
+      .topbar-menu__panel {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--cdf-space-3);
+        min-width: 200px;
+      }
+      .topbar-menu__who {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+      }
+      /* Narrower desktops: icon-only search, no name next to the avatar. */
+      @media (max-width: 1199.98px) {
         .topbar-user__meta,
         .topbar-search__label,
         .topbar-search__kbd {
@@ -152,6 +217,21 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
         }
         .topbar-search {
           min-width: 0;
+          padding: 6px 8px;
+        }
+      }
+      /*
+       * Phone + tablet (at 768 px the sidebar leaves ~530 px of topbar):
+       * language / theme / user / sign-out collapse into the menu.
+       */
+      @media (max-width: 1023.98px) {
+        :host ::ng-deep .cdf-shell__topbar-right > cdf-language-switcher,
+        :host ::ng-deep .cdf-shell__topbar-right > cdf-theme-toggle,
+        .topbar-user {
+          display: none;
+        }
+        .topbar-menu {
+          display: inline-flex;
         }
       }
     `,
@@ -163,6 +243,7 @@ export class ShellPage {
   private readonly i18n = inject(I18nService);
   protected readonly user = computed(() => this.auth.user());
   protected readonly searchOpen = signal(false);
+  protected readonly menuOpen = signal(false);
   protected readonly isMac =
     typeof navigator !== 'undefined' &&
     /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
