@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import {
   NATIVE_IMAGE_DIR,
+  NATIVE_SPRITE_DIR,
   NativeImageStore,
+  NativeSpriteStore,
   nativeImageFileName,
 } from './native-image-store.service';
 
@@ -128,5 +130,34 @@ describe('NativeImageStore', () => {
       expect.objectContaining({ path: NATIVE_IMAGE_DIR, recursive: true }),
     );
     expect(store.storedUrls()).toEqual([]);
+  });
+
+  it('retainOnly() deletes every stored image not kept', async () => {
+    const store = setup();
+    await store.store([A, B]);
+    await store.retainOnly([B]);
+    expect(store.storedUrls()).toEqual([B]);
+  });
+
+  it('NativeSpriteStore keeps its own folder and index', async () => {
+    setup();
+    const lessons = TestBed.inject(NativeImageStore);
+    const sprites = TestBed.inject(NativeSpriteStore);
+    await sprites.store([A]);
+    expect(Filesystem.downloadFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: `${NATIVE_SPRITE_DIR}/${nativeImageFileName(A)}`,
+      }),
+    );
+    expect(sprites.resolve(A)).toContain(`/${NATIVE_SPRITE_DIR}/`);
+    expect(prefs.has('codify.nativeSprites.v1')).toBe(true);
+    await lessons.init();
+    expect(lessons.resolve(A)).toBeNull();
+    // "Remove all downloads" wipes lesson images only.
+    await lessons.clear();
+    expect(Filesystem.rmdir).toHaveBeenCalledWith(
+      expect.objectContaining({ path: NATIVE_IMAGE_DIR }),
+    );
+    expect(sprites.storedUrls()).toEqual([A]);
   });
 });

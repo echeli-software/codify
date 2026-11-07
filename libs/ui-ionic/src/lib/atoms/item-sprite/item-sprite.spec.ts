@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { provideI18n } from '@codify/i18n';
+import { AvatarRenderer } from '../../molecules/avatar-renderer/avatar-renderer.js';
 import { ItemSprite } from './item-sprite.js';
+import { SPRITE_URL_RESOLVER } from './sprite-url-resolver.js';
 
 function mount(inputs: { token: string; url?: string | null; size?: number }) {
   const fixture = TestBed.createComponent(ItemSprite);
@@ -50,5 +54,57 @@ describe('ItemSprite', () => {
     expect(el.querySelector('img')?.getAttribute('src')).toBe(
       'https://cdn.test/ok.png',
     );
+  });
+
+  it('renders through SPRITE_URL_RESOLVER when provided (reactively)', () => {
+    const local = signal<string | null>(null);
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: SPRITE_URL_RESOLVER,
+          useValue: {
+            resolve: (url: string) =>
+              url === 'https://cdn.test/crown.png' ? local() : null,
+          },
+        },
+      ],
+    });
+    const { fixture, el } = mount({
+      token: 'emoji:👑',
+      url: 'https://cdn.test/crown.png',
+    });
+    // Not stored yet → the original URL.
+    expect(el.querySelector('img')?.getAttribute('src')).toBe(
+      'https://cdn.test/crown.png',
+    );
+    local.set('capacitor://localhost/_capacitor_file_/sprites/crown.png');
+    fixture.detectChanges();
+    expect(el.querySelector('img')?.getAttribute('src')).toBe(
+      'capacitor://localhost/_capacitor_file_/sprites/crown.png',
+    );
+  });
+});
+
+describe('AvatarRenderer + SPRITE_URL_RESOLVER', () => {
+  it('renders equipped sprite images from the resolved URL', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideI18n(),
+        {
+          provide: SPRITE_URL_RESOLVER,
+          useValue: { resolve: (url: string) => `local:${url}` },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AvatarRenderer);
+    fixture.componentRef.setInput('equipped', {
+      HAT: { spriteAssetId: 'emoji:🎩', spriteUrl: 'https://cdn.test/hat.png' },
+      SHOES: { spriteAssetId: 'emoji:👟' },
+    });
+    fixture.detectChanges();
+    const imgs = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('img'),
+    ).map((i) => i.getAttribute('src'));
+    expect(imgs).toEqual(['local:https://cdn.test/hat.png']);
   });
 });

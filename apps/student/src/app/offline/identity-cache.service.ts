@@ -21,6 +21,7 @@ import {
   IdentityStore,
   type CachedIdentity,
 } from './identity-store.js';
+import { NativeSpriteStore } from './native-image-store.service.js';
 import { NetworkStatusService } from './network-status.service.js';
 
 /**
@@ -29,7 +30,9 @@ import { NetworkStatusService } from './network-status.service.js';
  *   - Online: `/me` + gamification summary + avatar + inventory +
  *     subscription + badges (in parallel; a failing part keeps its previous
  *     cached value) → IndexedDB, then prefetches avatar/owned/equipped
- *     sprites and badge icons into the persistent asset cache.
+ *     sprites and badge icons into the persistent asset cache — and, in
+ *     the native shell (no service worker), equipped/owned sprite images
+ *     into `NativeSpriteStore` on the device filesystem.
  *   - Offline / server unreachable: the cached bundle for the same user.
  *
  * `identity()` is the bundle for the signed-in user (null otherwise) — the
@@ -45,6 +48,7 @@ export class IdentityCacheService {
   private readonly network = inject(NetworkStatusService);
   private readonly assets = inject(AssetCacheService);
   private readonly downloads = inject(DownloadService);
+  private readonly sprites = inject(NativeSpriteStore);
 
   private readonly _identity = signal<CachedIdentity | null>(null);
   /** Cached bundle for the signed-in user. */
@@ -106,6 +110,7 @@ export class IdentityCacheService {
     await IdentityStore.clear().catch(() => undefined);
     await this.assets.clear(PERSISTENT_ASSET_CACHE);
     await this.downloads.clearCachedAssets().catch(() => undefined);
+    await this.sprites.clear();
   }
 
   /** True once the offline bundle is older than the session max (30 days). */
@@ -156,9 +161,33 @@ export class IdentityCacheService {
         .filter((u): u is string => !!u);
       if (urls.length > 0)
         await this.assets.cacheUrls(urls, PERSISTENT_ASSET_CACHE);
+      await this.storeNativeSprites(bundle, avatar, inventory);
     } catch {
       /* best-effort */
     }
+  }
+
+  /**
+   * Native shell: equipped + owned uploaded sprites → device filesystem
+   * (rendered via `SPRITE_URL_RESOLVER`). Sprites of items no longer owned
+   * are pruned, but only when both avatar and inventory loaded fresh.
+   */
+  private async storeNativeSprites(
+    bundle: CachedIdentity,
+    avatar: AvatarResponse | null,
+    inventory: InventoryItem[] | null,
+  ): Promise<void> {
+    if (!this.sprites.supported) return;
+    const urls = [
+      ...new Set(
+        [
+          ...Object.values(avatar?.equipped ?? {}).map((e) => e?.spriteUrl),
+          ...(bundle.ownedItems ?? []).map((i) => i.spriteUrl),
+        ].filter((u): u is string => !!u && /^https?:\/\//i.test(u)),
+      ),
+    ];
+    await this.sprites.store(urls);
+    if (avatar && inventory) await this.sprites.retainOnly(urls);
   }
 }
 

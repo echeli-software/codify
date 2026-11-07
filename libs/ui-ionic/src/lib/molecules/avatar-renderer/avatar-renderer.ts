@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   signal,
 } from '@angular/core';
 import { TranslatePipe } from '@codify/i18n';
+import { SPRITE_URL_RESOLVER } from '../../atoms/item-sprite/sprite-url-resolver.js';
 
 export type AvatarSlot =
   | 'PET'
@@ -59,7 +61,8 @@ const SKIN_EMOJI: Record<string, string> = {
  * in the documented slot/layer order (docs/08-avatar-and-shop.md §2).
  * Uploaded sprites (an API-resolved `spriteUrl`) render as images; inline
  * tokens ("emoji:🧢" / "color:#hex") as positioned glyphs/shapes. An image
- * that fails to load falls back to the token rendering.
+ * that fails to load falls back to the token rendering. An optional
+ * `SPRITE_URL_RESOLVER` may swap a `spriteUrl` for a local copy.
  */
 @Component({
   selector: 'cdf-avatar-renderer',
@@ -215,6 +218,8 @@ export class AvatarRenderer {
   readonly level = input<number | null>(null);
   readonly showLevelRing = input<boolean>(false);
 
+  private readonly resolver = inject(SPRITE_URL_RESOLVER, { optional: true });
+
   /** Image URLs that failed to load → render their token instead. */
   private readonly failedUrls = signal<ReadonlySet<string>>(new Set());
 
@@ -225,7 +230,9 @@ export class AvatarRenderer {
 
   /** Image when resolved + loadable, else the token. */
   private sprite(s: AvatarSprite): { kind: SpriteKind; value: string } {
-    const url = s.spriteUrl;
+    const url = s.spriteUrl
+      ? (this.resolver?.resolve(s.spriteUrl) ?? s.spriteUrl)
+      : null;
     if (url && !this.failedUrls().has(url))
       return { kind: 'image', value: url };
     return parseSprite(s.spriteAssetId);

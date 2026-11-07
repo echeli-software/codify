@@ -51,6 +51,10 @@ export function nativeImageFileName(url: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class NativeImageStore {
+  /** Folder under `Directory.Data` (subclasses keep their own). */
+  protected readonly dir: string = NATIVE_IMAGE_DIR;
+  /** Preferences key of the URL → bytes index. */
+  protected readonly indexKey: string = INDEX_KEY;
   /** URL → bytes of every stored image (reactive: the renderer re-resolves). */
   private readonly index = signal<ReadonlyMap<string, number>>(new Map());
   private baseUri: string | null = null;
@@ -70,7 +74,7 @@ export class NativeImageStore {
       this.initP = (async () => {
         try {
           const prefs = await this.prefs();
-          const raw = (await prefs?.get({ key: INDEX_KEY }))?.value;
+          const raw = (await prefs?.get({ key: this.indexKey }))?.value;
           const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
           this.index.set(new Map(Object.entries(parsed)));
         } catch {
@@ -80,7 +84,7 @@ export class NativeImageStore {
           const fs = await this.fs();
           const res = await fs?.getUri({
             directory: DATA_DIR,
-            path: NATIVE_IMAGE_DIR,
+            path: this.dir,
           });
           this.baseUri = res?.uri ?? null;
         } catch {
@@ -126,7 +130,7 @@ export class NativeImageStore {
         out.bytes += known;
         continue;
       }
-      const path = `${NATIVE_IMAGE_DIR}/${nativeImageFileName(url)}`;
+      const path = `${this.dir}/${nativeImageFileName(url)}`;
       try {
         await fs.downloadFile({
           url,
@@ -163,7 +167,7 @@ export class NativeImageStore {
       gone.add(url);
       await fs
         ?.deleteFile({
-          path: `${NATIVE_IMAGE_DIR}/${nativeImageFileName(url)}`,
+          path: `${this.dir}/${nativeImageFileName(url)}`,
           directory: DATA_DIR,
         })
         .catch(() => undefined);
@@ -173,6 +177,14 @@ export class NativeImageStore {
     await this.persist();
   }
 
+  /** Delete every stored image not in `keep` (prune stale entries). */
+  async retainOnly(keep: readonly string[]): Promise<void> {
+    if (!this.supported) return;
+    await this.init();
+    const wanted = new Set(keep);
+    await this.remove(this.storedUrls().filter((u) => !wanted.has(u)));
+  }
+
   /** Remove every stored lesson image (Downloads → "Remove all", sign-out). */
   async clear(): Promise<void> {
     if (!this.supported) return;
@@ -180,7 +192,7 @@ export class NativeImageStore {
     const fs = await this.fs();
     await fs
       ?.rmdir({
-        path: NATIVE_IMAGE_DIR,
+        path: this.dir,
         directory: DATA_DIR,
         recursive: true,
       })
@@ -193,7 +205,7 @@ export class NativeImageStore {
     try {
       const prefs = await this.prefs();
       await prefs?.set({
-        key: INDEX_KEY,
+        key: this.indexKey,
         value: JSON.stringify(Object.fromEntries(this.index())),
       });
     } catch {
@@ -222,4 +234,21 @@ export class NativeImageStore {
     }
     return this.prefsP;
   }
+}
+
+/** Folder under `Directory.Data` holding equipped / owned item sprites. */
+export const NATIVE_SPRITE_DIR = 'item-sprites';
+
+/**
+ * Uploaded item sprites (`spriteUrl`) of the signed-in user's equipped and
+ * owned items, on the device filesystem — the native counterpart of the
+ * persistent Cache Storage copy the PWA keeps (`codify-assets-v1`).
+ * Filled by IdentityCacheService, rendered through `SPRITE_URL_RESOLVER`
+ * (see ./native-sprites.ts). Separate from the lesson images so "Remove
+ * all downloads" leaves the avatar intact.
+ */
+@Injectable({ providedIn: 'root' })
+export class NativeSpriteStore extends NativeImageStore {
+  protected override readonly dir = NATIVE_SPRITE_DIR;
+  protected override readonly indexKey = 'codify.nativeSprites.v1';
 }

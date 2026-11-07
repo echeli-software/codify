@@ -2,16 +2,19 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   linkedSignal,
 } from '@angular/core';
 import { spriteGlyph } from '../../organisms/shop-grid/shop-item.js';
+import { SPRITE_URL_RESOLVER } from './sprite-url-resolver.js';
 
 /**
  * One item sprite (docs/08 §3): the uploaded image when the API resolved a
  * `spriteUrl`, otherwise the inline token — `emoji:🎩` as a glyph,
  * `color:#hex` as a swatch. A broken image falls back to the token
- * rendering. Decorative: the caller labels the surrounding control.
+ * rendering. Decorative: the caller labels the surrounding control. An
+ * optional `SPRITE_URL_RESOLVER` may swap the URL for a local copy.
  *
  *   <cdf-item-sprite [token]="item.spriteAssetId" [url]="item.spriteUrl" [size]="48" />
  */
@@ -73,14 +76,18 @@ export class ItemSprite {
   /** Emoji font size in px (defaults to `size`). */
   readonly glyphSize = input<number | null>(null);
 
+  private readonly resolver = inject(SPRITE_URL_RESOLVER, { optional: true });
+
   /** Reset whenever the URL changes, so a new image gets its own chance. */
   protected readonly failed = linkedSignal({
     source: () => this.url(),
     computation: () => false,
   });
-  protected readonly imageUrl = computed(() =>
-    this.failed() ? null : this.url() || null,
-  );
+  protected readonly imageUrl = computed(() => {
+    const url = this.url();
+    if (this.failed() || !url) return null;
+    return this.resolver?.resolve(url) ?? url;
+  });
   protected readonly glyph = computed(() => spriteGlyph(this.token()));
   protected readonly glyphPx = computed(() => this.glyphSize() ?? this.size());
 }

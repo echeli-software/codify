@@ -16,6 +16,7 @@ import {
   PopoverController,
 } from '@ionic/angular/standalone';
 import { initialize, type IonicConfig } from '@ionic/core/components';
+import { provideNativeSprites } from '../offline/native-sprites.js';
 import { AppToastHost } from './app-toast-host.component.js';
 
 /**
@@ -46,6 +47,8 @@ export const IONIC_CONFIG: IonicConfig = { mode: 'md' };
     AngularDelegate,
     ModalController,
     PopoverController,
+    // Native shell: equipped / owned sprites from their device-local copy.
+    provideNativeSprites(),
   ],
   template: `<ion-app><ion-router-outlet /><cdf-app-toast-host /></ion-app>`,
 })

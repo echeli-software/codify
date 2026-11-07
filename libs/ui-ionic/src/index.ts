@@ -149,6 +149,10 @@ export {
 } from './lib/organisms/shop-grid/shop-item.js';
 export { ShopGrid } from './lib/organisms/shop-grid/shop-grid.js';
 export { ItemSprite } from './lib/atoms/item-sprite/item-sprite.js';
+export {
+  SPRITE_URL_RESOLVER,
+  type SpriteUrlResolver,
+} from './lib/atoms/item-sprite/sprite-url-resolver.js';
 export { SAMPLE_ITEMS } from './lib/organisms/shop-grid/sample-items.js';
 export {
   Inventory,

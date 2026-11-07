@@ -229,6 +229,15 @@ exactly like Cache Storage entries. The web keeps Cache Storage + service
 worker. `DownloadService.downloadedLessons(courseId)` /
 `downloadedLessonIds(courseId)` list what is stored for one course.
 
+**As built (native item sprites):** `NativeSpriteStore` (same pattern, its own
+`Directory.Data/item-sprites/` folder and index) holds the uploaded sprite
+images (`spriteUrl`) of the user's equipped + owned items, filled by
+`IdentityCacheService.prime()` next to the web's persistent Cache Storage
+copy; sprites of items no longer owned are pruned, the folder is cleared on
+sign-out and untouched by "Remove all downloads". `cdf-item-sprite` and
+`cdf-avatar-renderer` resolve URLs through the optional `SPRITE_URL_RESOLVER`
+(ui-ionic), which the IonicRoot provides on native only.
+
 ### Web (PWA)
 - **IndexedDB**: same structured data.
 - **Cache Storage API** (via service worker): app shell + image/asset responses.
