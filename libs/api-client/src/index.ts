@@ -319,15 +319,3 @@ export {
   type CreateFeatureFlagBody,
   type UpdateFeatureFlagBody,
 } from './lib/flags.client.js';
-
-// Notification inbox + preferences (docs/05 Notifications, docs/10 §3).
-export {
-  NotificationsClient,
-  type NotificationKind,
-  type NotificationAction,
-  type InboxNotification,
-  type InboxPage,
-  type KindPreference,
-  type NotificationPreferences,
-  type UpdateNotificationPreferencesBody,
-} from './lib/notifications.client.js';
