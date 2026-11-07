@@ -37,6 +37,7 @@ import { TranslationsModule } from './translations/translations.module.js';
 import { AppConfigModule } from './config/config.module.js';
 import { PlatformModule } from './common/platform.module.js';
 import { OpsModule } from './ops/ops.module.js';
+import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { OpsModule } from './ops/ops.module.js';
     AppConfigModule,
     PlatformModule,
     OpsModule,
+    AdminOpsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
