@@ -1,5 +1,5 @@
 import nx from '@nx/eslint-plugin';
-import baseConfig from '../../eslint.config.mjs';
+import baseConfig, { noRawTemplateTextOptions } from '../../eslint.config.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -20,7 +20,9 @@ export default [
         'error',
         {
           type: 'element',
-          prefix: 'app',
+          // `cdf-` for app-local shared widgets that mirror the design-system
+          // naming (e.g. the lazy Monaco `cdf-code-editor`).
+          prefix: ['app', 'cdf'],
           style: 'kebab-case',
         },
       ],
@@ -28,7 +30,12 @@ export default [
   },
   {
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    // index.html is served before Angular boots (no translate pipe); its
+    // <noscript> fallback is deliberately bilingual.
+    ignores: ['**/src/index.html'],
+    rules: {
+      // docs/11 §11 — every app template string goes through i18n.
+      'codify/no-raw-template-text': ['error', noRawTemplateTextOptions],
+    },
   },
 ];

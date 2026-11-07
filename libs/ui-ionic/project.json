@@ -36,7 +36,9 @@
         "compodoc": false
       },
       "configurations": {
-        "ci": { "quiet": true }
+        "ci": {
+          "quiet": true
+        }
       }
     },
     "build-storybook": {
@@ -49,7 +51,9 @@
         "compodoc": false
       },
       "configurations": {
-        "ci": { "quiet": true }
+        "ci": {
+          "quiet": true
+        }
       }
     },
     "static-storybook": {
@@ -61,7 +65,16 @@
         "spa": true
       },
       "configurations": {
-        "ci": { "buildTarget": "ui-ionic:build-storybook:ci" }
+        "ci": {
+          "buildTarget": "ui-ionic:build-storybook:ci"
+        }
+      }
+    },
+    "test-storybook": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-storybook"],
+      "options": {
+        "command": "node tools/scripts/test-storybook.mjs ui-ionic 4501"
       }
     }
   }

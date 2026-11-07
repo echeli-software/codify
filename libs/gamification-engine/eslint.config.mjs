@@ -3,6 +3,12 @@ import baseConfig from '../../eslint.config.mjs';
 export default [
   ...baseConfig,
   {
+    // The engine owns the reward state services — it is the one place
+    // allowed to mutate them.
+    files: ['**/*.ts'],
+    rules: { 'codify/rewards-through-orchestrator': 'off' },
+  },
+  {
     files: ['**/*.json'],
     rules: {
       '@nx/dependency-checks': [

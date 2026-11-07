@@ -19,7 +19,11 @@ export class StreakService {
   readonly freezesAvailable = this.freezesSig.asReadonly();
   readonly bestDays = this.bestDaysSig.asReadonly();
 
-  set(state: { currentDays?: number; freezes?: number; bestDays?: number }): void {
+  set(state: {
+    currentDays?: number;
+    freezes?: number;
+    bestDays?: number;
+  }): void {
     if (typeof state.currentDays === 'number') {
       this.currentDaysSig.set(Math.max(0, Math.floor(state.currentDays)));
     }

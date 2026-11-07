@@ -12,6 +12,36 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./format": {
+      "@codify/source": "./src/lib/format/index.ts",
+      "types": "./src/lib/format/index.ts",
+      "import": "./src/lib/format/index.ts",
+      "default": "./src/lib/format/index.ts"
+    },
+    "./level": {
+      "@codify/source": "./src/lib/level/index.ts",
+      "types": "./src/lib/level/index.ts",
+      "import": "./src/lib/level/index.ts",
+      "default": "./src/lib/level/index.ts"
+    },
+    "./validate": {
+      "@codify/source": "./src/lib/validate/index.ts",
+      "types": "./src/lib/validate/index.ts",
+      "import": "./src/lib/validate/index.ts",
+      "default": "./src/lib/validate/index.ts"
+    },
+    "./color": {
+      "@codify/source": "./src/lib/color/index.ts",
+      "types": "./src/lib/color/index.ts",
+      "import": "./src/lib/color/index.ts",
+      "default": "./src/lib/color/index.ts"
+    },
+    "./random": {
+      "@codify/source": "./src/lib/random/index.ts",
+      "types": "./src/lib/random/index.ts",
+      "import": "./src/lib/random/index.ts",
+      "default": "./src/lib/random/index.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {
@@ -19,5 +49,6 @@
   },
   "dependencies": {
     "zod": "^4.4.2"
-  }
+  },
+  "sideEffects": false
 }

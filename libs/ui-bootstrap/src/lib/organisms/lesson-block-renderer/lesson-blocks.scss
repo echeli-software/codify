@@ -1,0 +1,196 @@
+// Component styles for the student-facing block renderer. Text-level prose
+// (headings, lists, code, callouts, tables, kbd, mark) is shared with the
+// editor through the global `lesson-prose.scss`.
+
+// ─── Quiz ──────────────────────────────────────────────────────────────────
+.cdf-quiz {
+  margin: 0;
+  padding: var(--cdf-space-4);
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-md);
+  background: var(--cdf-color-surface);
+  min-width: 0;
+
+  &--correct {
+    border-color: var(--cdf-color-success);
+  }
+
+  &--incorrect {
+    border-color: var(--cdf-color-danger);
+  }
+
+  &__question {
+    font-weight: var(--cdf-font-weight-semibold);
+    font-size: var(--cdf-font-size-lg);
+    padding: 0;
+  }
+
+  &__hint {
+    margin: var(--cdf-space-1) 0 var(--cdf-space-3);
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  &__options {
+    list-style: none;
+    margin: 0;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-2);
+  }
+
+  &__option {
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-sm);
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: var(--cdf-space-3);
+      padding: var(--cdf-space-2) var(--cdf-space-3);
+      cursor: pointer;
+    }
+
+    input {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    input:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &:has(input:disabled) label {
+      cursor: default;
+    }
+
+    &--selected {
+      border-color: var(--cdf-color-primary);
+      background: var(--cdf-color-primary-subtle);
+    }
+
+    &--answer {
+      border-color: var(--cdf-color-success);
+      background: color-mix(in srgb, var(--cdf-color-success) 12%, transparent);
+    }
+
+    &--wrong {
+      border-color: var(--cdf-color-danger);
+      background: color-mix(in srgb, var(--cdf-color-danger) 10%, transparent);
+    }
+  }
+
+  &__text {
+    flex: 1;
+  }
+
+  &__tag {
+    font-size: var(--cdf-font-size-xs);
+    font-weight: var(--cdf-font-weight-medium);
+    color: var(--cdf-color-success);
+
+    &--wrong {
+      color: var(--cdf-color-danger);
+    }
+  }
+
+  &__feedback {
+    margin-top: var(--cdf-space-3);
+    font-size: var(--cdf-font-size-sm);
+
+    p {
+      margin: var(--cdf-space-1) 0 0;
+    }
+  }
+}
+
+// ─── Embed ─────────────────────────────────────────────────────────────────
+.cdf-embed {
+  margin: 0;
+
+  &__frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--cdf-radius-md);
+    overflow: hidden;
+    background: var(--cdf-color-bg);
+
+    iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  }
+
+  &__caption {
+    margin-top: var(--cdf-space-1);
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__unavailable {
+    padding: var(--cdf-space-3);
+    border: 1px dashed var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    color: var(--cdf-color-text-muted);
+  }
+}
+
+// ─── Ref card ──────────────────────────────────────────────────────────────
+.cdf-ref-card {
+  display: flex;
+  align-items: center;
+  gap: var(--cdf-space-4);
+  padding: var(--cdf-space-4);
+  border: 1px solid var(--cdf-color-border);
+  border-left: 4px solid var(--cdf-color-primary);
+  border-radius: var(--cdf-radius-md);
+  background: var(--cdf-color-surface);
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0 !important;
+    font-size: var(--cdf-font-size-md) !important;
+  }
+
+  &__text {
+    margin: var(--cdf-space-1) 0 0;
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  &__cta {
+    font: inherit;
+    font-weight: var(--cdf-font-weight-medium);
+    padding: var(--cdf-space-2) var(--cdf-space-4);
+    border: none;
+    border-radius: var(--cdf-radius-sm);
+    background: var(--cdf-color-primary);
+    color: var(--cdf-color-primary-on);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--cdf-color-primary-hover);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}

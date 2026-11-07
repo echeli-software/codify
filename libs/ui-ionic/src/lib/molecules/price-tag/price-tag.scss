@@ -1,0 +1,45 @@
+:host {
+  display: inline-flex;
+}
+
+.cdf-price {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--cdf-color-text);
+
+  &__amount {
+    font-weight: var(--cdf-font-weight-bold);
+    font-size: var(--cdf-font-size-md);
+  }
+
+  &__installments {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__was {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+}
+
+:host([data-size='sm']) .cdf-price__amount {
+  font-size: var(--cdf-font-size-sm);
+}
+
+:host([data-size='lg']) .cdf-price__amount {
+  font-size: var(--cdf-font-size-xl);
+}
+
+.cdf-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

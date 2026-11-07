@@ -1,0 +1,125 @@
+:host {
+  display: block;
+}
+
+.cdf-ai {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+  color: var(--cdf-color-text);
+
+  &__prompt {
+    margin: 0;
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__context {
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__label {
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__answer {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--cdf-space-3);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    line-height: 1.5;
+    color: var(--cdf-color-text);
+    background: var(--cdf-color-surface);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    resize: vertical;
+
+    &::placeholder {
+      color: var(--cdf-color-text-muted);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cdf-space-2);
+  }
+
+  &__cached {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-danger-text);
+  }
+
+  &__heading {
+    margin: var(--cdf-space-2) 0 0;
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__rubric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--cdf-space-2);
+      font-size: var(--cdf-font-size-sm);
+      color: var(--cdf-color-text-muted);
+      transition: color var(--cdf-motion-duration-base)
+        var(--cdf-motion-easing-standard);
+
+      &[data-state='pass'] {
+        color: var(--cdf-color-success-text);
+      }
+
+      &[data-state='fail'] {
+        color: var(--cdf-color-danger-text);
+      }
+    }
+  }
+
+  &__criterion {
+    font-weight: var(--cdf-font-weight-medium);
+  }
+
+  &__detail {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__done {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    margin: var(--cdf-space-2) 0 0;
+    font-weight: var(--cdf-font-weight-bold);
+    color: var(--cdf-color-success-text);
+  }
+}

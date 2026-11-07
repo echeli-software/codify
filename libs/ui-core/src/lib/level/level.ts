@@ -58,11 +58,9 @@ export function levelProgress(xp: number): number {
   const level = levelFromXp(xp);
   const base = xpForLevel(level);
   const next = xpForLevel(level + 1);
-  if (next === base) return 1;
-  const ratio = (xp - base) / (next - base);
-  if (ratio < 0) return 0;
-  if (ratio > 1) return 1;
-  return ratio;
+  // xpForLevel is strictly increasing, so next > base and base ≤ xp < next;
+  // the clamp only guards against floating-point drift.
+  return Math.min(1, Math.max(0, (xp - base) / (next - base)));
 }
 
 /** Convenience for UI: 0–100 percent. */

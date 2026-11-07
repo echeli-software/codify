@@ -1,0 +1,128 @@
+:host {
+  display: block;
+}
+
+.cdf-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+  padding: var(--cdf-space-3) var(--cdf-space-4);
+  background: var(--cdf-color-surface);
+  border-bottom: 1px solid var(--cdf-color-border);
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+
+    input[type='text'],
+    select {
+      font: inherit;
+      font-size: var(--cdf-font-size-sm);
+      padding: var(--cdf-space-1) var(--cdf-space-2);
+      border: 1px solid var(--cdf-color-border);
+      border-radius: var(--cdf-radius-sm);
+      background: var(--cdf-color-surface);
+      color: var(--cdf-color-text);
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: var(--cdf-shadow-focus-ring);
+      }
+
+      &[aria-invalid='true'] {
+        border-color: var(--cdf-color-danger);
+      }
+    }
+  }
+
+  &__check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  &__help {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+
+    &--error {
+      color: var(--cdf-color-danger);
+    }
+  }
+
+  &__progress,
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+
+    progress {
+      flex: 1;
+    }
+  }
+
+  &__error {
+    color: var(--cdf-color-danger);
+  }
+
+  &__preview {
+    max-width: 240px;
+    max-height: 160px;
+    object-fit: contain;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-sm);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+
+  &__btn {
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    padding: var(--cdf-space-1) var(--cdf-space-3);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-sm);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--primary {
+      background: var(--cdf-color-primary);
+      border-color: var(--cdf-color-primary);
+      color: var(--cdf-color-primary-on);
+    }
+
+    &--danger {
+      color: var(--cdf-color-danger);
+    }
+  }
+}

@@ -5,9 +5,12 @@ import {
   input,
   output,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon } from '../../atoms/icon/icon.js';
 import { StreakChip } from '../../molecules/streak-chip/streak-chip.js';
 import { AppButton } from '../../atoms/app-button/app-button.js';
+
+let streakWidgetSeq = 0;
 
 export interface StreakDay {
   /** ISO date `YYYY-MM-DD` */
@@ -29,11 +32,13 @@ export interface StreakDay {
 @Component({
   selector: 'cdf-streak-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, StreakChip, AppButton],
+  imports: [Icon, StreakChip, AppButton, TranslatePipe],
   template: `
-    <section class="cdf-streak-widget" aria-labelledby="cdf-streak-heading">
+    <section class="cdf-streak-widget" [attr.aria-labelledby]="headingId">
       <header class="cdf-streak-widget__header">
-        <h2 id="cdf-streak-heading" class="cdf-streak-widget__title">Your streak</h2>
+        <h2 [id]="headingId" class="cdf-streak-widget__title">
+          {{ 'ui.streak.title' | translate }}
+        </h2>
         <cdf-streak-chip
           [days]="currentDays()"
           [freezes]="freezes()"
@@ -41,37 +46,52 @@ export interface StreakDay {
         />
       </header>
 
-      <ol class="cdf-streak-widget__week" aria-label="Last 7 days">
+      <ol
+        class="cdf-streak-widget__week"
+        [attr.aria-label]="
+          'ui.streak.lastDays' | translate: { count: week().length }
+        "
+      >
         @for (day of week(); track day.date) {
-        <li
-          class="cdf-streak-widget__day"
-          [class.cdf-streak-widget__day--done]="day.completed"
-          [class.cdf-streak-widget__day--frozen]="day.frozen"
-          [attr.aria-label]="dayAria(day)"
-          [title]="dayAria(day)"
-        >
-          <span class="cdf-streak-widget__dot">
-            @if (day.completed) {
-            <cdf-icon name="flame" size="xs" />
-            } @else if (day.frozen) {
-            ❄
-            }
-          </span>
-          <span class="cdf-streak-widget__day-label">{{ shortLabel(day.date) }}</span>
-        </li>
+          <li
+            class="cdf-streak-widget__day"
+            [class.cdf-streak-widget__day--done]="day.completed"
+            [class.cdf-streak-widget__day--frozen]="day.frozen"
+            [attr.aria-label]="
+              'ui.streak.dayState.' + dayState(day)
+                | translate: { date: day.date }
+            "
+            [title]="
+              'ui.streak.dayState.' + dayState(day)
+                | translate: { date: day.date }
+            "
+          >
+            <span class="cdf-streak-widget__dot">
+              @if (day.completed) {
+                <cdf-icon name="flame" size="xs" />
+              } @else if (day.frozen) {
+                ❄
+              }
+            </span>
+            <span class="cdf-streak-widget__day-label">{{
+              shortLabel(day.date)
+            }}</span>
+          </li>
         }
       </ol>
 
       <footer class="cdf-streak-widget__footer">
-        <p class="cdf-streak-widget__msg">{{ message() }}</p>
+        <p class="cdf-streak-widget__msg">
+          {{ message().key | translate: message().params }}
+        </p>
         @if ((freezes() ?? 0) > 0 && currentDays() > 0) {
-        <cdf-app-button
-          kind="secondary"
-          size="sm"
-          (buttonClick)="emitUseFreeze()"
-        >
-          Use a freeze
-        </cdf-app-button>
+          <cdf-app-button
+            kind="secondary"
+            size="sm"
+            (buttonClick)="emitUseFreeze()"
+          >
+            {{ 'ui.streak.useFreeze' | translate }}
+          </cdf-app-button>
         }
       </footer>
     </section>
@@ -84,19 +104,26 @@ export class StreakWidget {
   readonly week = input.required<StreakDay[]>();
   readonly useFreezeClicked = output<void>();
 
+  protected readonly headingId = `cdf-streak-heading-${++streakWidgetSeq}`;
+
+  /** Motivational line → `ui.streak.message.*` key + params. */
   protected readonly message = computed(() => {
     const d = this.currentDays();
-    if (d === 0) return 'Start a streak today — finish one lesson.';
-    if (d === 1) return 'Day 1 — keep going tomorrow!';
-    if (d < 7) return `${d} days strong. ${7 - d} to your first weekly badge.`;
-    if (d < 30) return `${d} days! Aim for the 30-day mark.`;
-    if (d < 100) return `${d} days. Century streak in sight.`;
-    return `${d} days — legendary streak.`;
+    if (d === 0) return { key: 'ui.streak.message.start', params: {} };
+    if (d === 1) return { key: 'ui.streak.message.first', params: {} };
+    if (d < 7)
+      return {
+        key: 'ui.streak.message.week',
+        params: { days: d, left: 7 - d },
+      };
+    if (d < 30) return { key: 'ui.streak.message.month', params: { days: d } };
+    if (d < 100)
+      return { key: 'ui.streak.message.century', params: { days: d } };
+    return { key: 'ui.streak.message.legendary', params: { days: d } };
   });
 
-  protected dayAria(day: StreakDay): string {
-    const state = day.completed ? 'completed' : day.frozen ? 'frozen' : 'missed';
-    return `${day.date}: ${state}`;
+  protected dayState(day: StreakDay): 'completed' | 'frozen' | 'missed' {
+    return day.completed ? 'completed' : day.frozen ? 'frozen' : 'missed';
   }
 
   protected shortLabel(iso: string): string {

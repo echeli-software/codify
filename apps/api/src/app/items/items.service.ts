@@ -1,15 +1,30 @@
+import { Cron } from '@nestjs/schedule';
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Item, ItemSlot, Prisma } from '@prisma/client';
-import { evaluatePurchase, isItemAvailable, subscriptionGrantsAccess } from '@codify/domain';
+import {
+  evaluatePurchase,
+  isItemAvailable,
+  validateDropWindow,
+} from '@codify/domain';
 import { levelFromXp } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AccessService } from '../billing/access.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
+import { UserPushService } from '../gamification/user-push.service.js';
+import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
+import {
+  ContentLocalizer,
+  changedFields,
+} from '../translations/content-localizer.service.js';
 import type {
   AvatarResponse,
   CreateItemCategoryDto,
@@ -22,42 +37,89 @@ import type {
   ShopQueryDto,
   UpdateItemDto,
 } from './items.dto.js';
+import {
+  isAssetSpriteRef,
+  loadSpriteUrls,
+  spriteUrlFor,
+  type SpriteUrlMap,
+} from './sprite-urls.js';
 
-const RARITY_ORDER: Record<string, number> = { COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4 };
+const RARITY_ORDER: Record<string, number> = {
+  COMMON: 0,
+  UNCOMMON: 1,
+  RARE: 2,
+  EPIC: 3,
+  LEGENDARY: 4,
+};
+/** Never announce a drop that went live longer ago than this. */
+const DROP_ANNOUNCE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+/** Drop pushes go to students seen in the last 30 days. */
+const DROP_AUDIENCE_ACTIVE_MS = 30 * 24 * 60 * 60 * 1000;
+/** Category name for student-facing item lists (translated as ITEM_CATEGORY). */
+const WITH_CATEGORY_NAME = {
+  category: { select: { name: true } },
+} satisfies Prisma.ItemInclude;
 
 @Injectable()
 export class ItemsService {
+  private readonly logger = new Logger(ItemsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamification: GamificationService,
+    private readonly push: UserPushService,
+    private readonly access: AccessService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
   // ─── Categories (admin) ─────────────────────────────────────────────────
 
   listCategories() {
-    return this.prisma.itemCategory.findMany({ orderBy: [{ sortOrder: 'asc' }, { slug: 'asc' }] });
+    return this.prisma.itemCategory.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { slug: 'asc' }],
+    });
   }
 
   async createCategory(input: CreateItemCategoryDto) {
-    const dupe = await this.prisma.itemCategory.findUnique({ where: { slug: input.slug } });
+    const dupe = await this.prisma.itemCategory.findUnique({
+      where: { slug: input.slug },
+    });
     if (dupe) throw new ConflictException('Category slug already in use');
     return this.prisma.itemCategory.create({
-      data: { slug: input.slug, name: input.name, sortOrder: input.sortOrder ?? 0 },
+      data: {
+        slug: input.slug,
+        name: input.name,
+        sortOrder: input.sortOrder ?? 0,
+      },
     });
   }
 
   // ─── Items (admin) ──────────────────────────────────────────────────────
 
   async listItems(): Promise<ItemResponse[]> {
-    const rows = await this.prisma.item.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } });
-    return rows.map(toItemResponse);
+    const rows = await this.prisma.item.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    const urls = await this.spriteUrls(rows);
+    return rows.map((r) => toItemResponse(r, urls));
   }
 
   async createItem(input: CreateItemDto): Promise<ItemResponse> {
-    const dupe = await this.prisma.item.findUnique({ where: { slug: input.slug } });
+    const dupe = await this.prisma.item.findUnique({
+      where: { slug: input.slug },
+    });
     if (dupe) throw new ConflictException('Item slug already in use');
-    const cat = await this.prisma.itemCategory.findUnique({ where: { slug: input.categorySlug } });
+    const cat = await this.prisma.itemCategory.findUnique({
+      where: { slug: input.categorySlug },
+    });
     if (!cat) throw new BadRequestException('Unknown category');
+    await this.assertSpriteAssets(input.spriteAssetId, input.thumbnailAssetId);
+    assertDropWindow({
+      isLimitedDrop: input.isLimitedDrop ?? false,
+      dropStartsAt: input.dropStartsAt || null,
+      dropEndsAt: input.dropEndsAt || null,
+    });
     const created = await this.prisma.item.create({
       data: {
         slug: input.slug,
@@ -77,12 +139,43 @@ export class ItemsService {
         isActive: input.isActive ?? true,
       },
     });
-    return toItemResponse(created);
+    return toItemResponse(created, await this.spriteUrls([created]));
   }
 
   async updateItem(id: string, patch: UpdateItemDto): Promise<ItemResponse> {
-    const target = await this.prisma.item.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.item.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Item not found');
+    await this.assertSpriteAssets(patch.spriteAssetId, patch.thumbnailAssetId);
+    if (
+      patch.categorySlug !== undefined &&
+      patch.categorySlug !== target.categorySlug
+    ) {
+      const cat = await this.prisma.itemCategory.findUnique({
+        where: { slug: patch.categorySlug },
+      });
+      if (!cat) throw new BadRequestException('Unknown category');
+    }
+    // Validate the drop window as it will be stored after the patch (only
+    // when the patch touches it, so legacy rows stay editable).
+    if (
+      patch.isLimitedDrop !== undefined ||
+      patch.dropStartsAt !== undefined ||
+      patch.dropEndsAt !== undefined
+    ) {
+      assertDropWindow({
+        isLimitedDrop: patch.isLimitedDrop ?? target.isLimitedDrop,
+        dropStartsAt:
+          patch.dropStartsAt === undefined
+            ? target.dropStartsAt
+            : patch.dropStartsAt || null,
+        dropEndsAt:
+          patch.dropEndsAt === undefined
+            ? target.dropEndsAt
+            : patch.dropEndsAt || null,
+      });
+    }
     const updated = await this.prisma.item.update({
       where: { id },
       data: {
@@ -95,20 +188,41 @@ export class ItemsService {
         requiredLevel: patch.requiredLevel,
         isPremiumOnly: patch.isPremiumOnly,
         isLimitedDrop: patch.isLimitedDrop,
-        dropStartsAt: patch.dropStartsAt === undefined ? undefined : patch.dropStartsAt ? new Date(patch.dropStartsAt) : null,
-        dropEndsAt: patch.dropEndsAt === undefined ? undefined : patch.dropEndsAt ? new Date(patch.dropEndsAt) : null,
+        dropStartsAt:
+          patch.dropStartsAt === undefined
+            ? undefined
+            : patch.dropStartsAt
+              ? new Date(patch.dropStartsAt)
+              : null,
+        dropEndsAt:
+          patch.dropEndsAt === undefined
+            ? undefined
+            : patch.dropEndsAt
+              ? new Date(patch.dropEndsAt)
+              : null,
         spriteAssetId: patch.spriteAssetId,
         thumbnailAssetId: patch.thumbnailAssetId,
         isActive: patch.isActive,
       },
     });
-    return toItemResponse(updated);
+    // Source text changed → its translations need review (docs/11 §3).
+    await this.localizer?.markSourceChanged(
+      'ITEM',
+      id,
+      changedFields(target, patch, ['name', 'description']),
+    );
+    return toItemResponse(updated, await this.spriteUrls([updated]));
   }
 
   async deleteItem(id: string): Promise<void> {
-    const target = await this.prisma.item.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.item.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Item not found');
-    await this.prisma.item.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+    await this.prisma.item.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
   }
 
   // ─── Shop (student) ─────────────────────────────────────────────────────
@@ -121,11 +235,12 @@ export class ItemsService {
     if (query.premiumOnly === 'true') where.isPremiumOnly = true;
 
     const [items, ctx, owned] = await Promise.all([
-      this.prisma.item.findMany({ where }),
+      this.prisma.item.findMany({ where, include: WITH_CATEGORY_NAME }),
       this.userContext(userId),
       this.ownedItemIds(userId),
     ]);
     const now = new Date();
+    const urls = await this.spriteUrls(items);
 
     let shop = items
       .filter((i) => isItemAvailable(i, now) || !i.isLimitedDrop)
@@ -138,10 +253,17 @@ export class ItemsService {
           owned: owned.has(i.id),
           now,
         });
-        return { ...toItemResponse(i), owned: owned.has(i.id), canBuy: eligibility.canBuy, reason: eligibility.reason };
+        return {
+          ...toItemResponse(i, urls),
+          categoryName: i.category?.name,
+          owned: owned.has(i.id),
+          canBuy: eligibility.canBuy,
+          reason: eligibility.reason,
+        };
       });
 
     if (query.affordableOnly === 'true') shop = shop.filter((s) => s.canBuy);
+    await this.localizeItems(shop);
 
     // Limited drops first, then by rarity desc, then cheapest.
     shop.sort((a, b) => {
@@ -159,8 +281,14 @@ export class ItemsService {
    * one transaction. Idempotent: the UserItem (userId,itemId) unique +
    * the spend idempotency key prevent a double charge.
    */
-  async purchase(userId: string, itemId: string): Promise<PurchaseResponse> {
-    const item = await this.prisma.item.findFirst({ where: { id: itemId, deletedAt: null, isActive: true } });
+  async purchase(
+    userId: string,
+    itemId: string,
+    opts: { equip?: boolean } = {},
+  ): Promise<PurchaseResponse> {
+    const item = await this.prisma.item.findFirst({
+      where: { id: itemId, deletedAt: null, isActive: true },
+    });
     if (!item) throw new NotFoundException('Item not found');
 
     const ctx = await this.userContext(userId);
@@ -178,39 +306,178 @@ export class ItemsService {
     if (!eligibility.canBuy) throw purchaseError(eligibility.reason);
 
     const coins = await this.prisma.$transaction(async (tx) => {
+      // spendCoins row-locks the user, so concurrent purchases serialize here.
       const spend = await this.gamification.spendCoins(
-        { userId, amount: item.costCoins, source: 'ITEM_PURCHASE', refType: 'item', refId: item.id, idempotencyKey: `purchase:${userId}:${item.id}` },
+        {
+          userId,
+          amount: item.costCoins,
+          source: 'ITEM_PURCHASE',
+          refType: 'item',
+          refId: item.id,
+          idempotencyKey: `purchase:${userId}:${item.id}`,
+        },
         tx,
       );
-      await tx.userItem.create({ data: { userId, itemId: item.id, source: 'PURCHASE' } });
+      try {
+        await tx.userItem.create({
+          data: { userId, itemId: item.id, source: 'PURCHASE' },
+        });
+      } catch (err) {
+        // A concurrent purchase of the same item won the race: roll back.
+        if (isUniqueViolation(err))
+          throw new ConflictException('You already own this item');
+        throw err;
+      }
+      if (opts.equip) {
+        // Equip in the same transaction — buying and wearing is atomic.
+        await tx.equippedItem.upsert({
+          where: { userId_slot: { userId, slot: item.slot } },
+          create: { userId, slot: item.slot, itemId: item.id },
+          update: { itemId: item.id },
+        });
+      }
       return spend.coins;
     });
-    return { item: toItemResponse(item), coins };
+    const bought = toItemResponse(item, await this.spriteUrls([item]));
+    await this.localizeItems([bought]);
+    return { item: bought, coins, equipped: !!opts.equip };
+  }
+
+  // ─── Limited drops ──────────────────────────────────────────────────────
+
+  /**
+   * Announce limited drops that went live since the last run (docs/08
+   * §Limited drops, docs/10 ITEM_DROP). Idempotent per item via an
+   * `IdempotencyRecord` (`item_drop:<itemId>`), so overlapping runs or
+   * replicas announce each drop once. Drops that started more than
+   * {@link DROP_ANNOUNCE_LOOKBACK_MS} ago are never announced (no stale
+   * pushes when the job is first deployed or was down).
+   *
+   * is the job entry point.
+   */
+  async announceDrops(
+    now: Date = new Date(),
+  ): Promise<{ drops: number; pushed: number }> {
+    const drops = await this.prisma.item.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        isLimitedDrop: true,
+        dropStartsAt: {
+          lte: now,
+          gt: new Date(now.getTime() - DROP_ANNOUNCE_LOOKBACK_MS),
+        },
+        OR: [{ dropEndsAt: null }, { dropEndsAt: { gt: now } }],
+      },
+      orderBy: { dropStartsAt: 'asc' },
+    });
+    let announced = 0;
+    let pushed = 0;
+    // Per-recipient-locale item names (docs/11 §3).
+    const names =
+      (await this.localizer?.byLocale(
+        'ITEM',
+        drops.map((d) => d.id),
+        'name',
+      )) ?? new Map<string, string>();
+    for (const item of drops) {
+      try {
+        await this.prisma.idempotencyRecord.create({
+          data: { key: `item_drop:${item.id}`, scope: 'item_drop' },
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) continue; // already announced
+        throw err;
+      }
+      announced += 1;
+      const audience = await this.prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          role: 'STUDENT',
+          lastSeenAt: {
+            gte: new Date(now.getTime() - DROP_AUDIENCE_ACTIVE_MS),
+          },
+          deviceTokens: { some: {} },
+        },
+        select: { id: true },
+      });
+      for (const u of audience) {
+        const res = await this.push.sendToUser(
+          u.id,
+          ({ locale }) =>
+            dropCopy(locale, {
+              ...item,
+              name: names.get(`${item.id}|${locale}`) ?? item.name,
+            }),
+          now,
+        );
+        pushed += res.sent;
+      }
+    }
+    return { drops: announced, pushed };
+  }
+
+  /** Job entry point (no-op under jest or with JOBS_ENABLED=false). */
+  @Cron(ENGAGEMENT_CRONS.dropAnnouncements, {
+    name: 'runScheduledDropAnnouncements',
+    timeZone: 'UTC',
+  })
+  async runScheduledDropAnnouncements(): Promise<{
+    drops: number;
+    pushed: number;
+  } | null> {
+    if (!jobsEnabled()) return null;
+    try {
+      return await this.announceDrops();
+    } catch (err) {
+      this.logger.error(`drop announcements failed: ${(err as Error).message}`);
+      return null;
+    }
   }
 
   // ─── Inventory + avatar (student) ───────────────────────────────────────
 
   async inventory(userId: string): Promise<InventoryItem[]> {
     const [rows, equipped] = await Promise.all([
-      this.prisma.userItem.findMany({ where: { userId }, include: { item: true }, orderBy: { acquiredAt: 'desc' } }),
-      this.prisma.equippedItem.findMany({ where: { userId }, select: { itemId: true } }),
+      this.prisma.userItem.findMany({
+        where: { userId },
+        include: { item: { include: WITH_CATEGORY_NAME } },
+        orderBy: { acquiredAt: 'desc' },
+      }),
+      this.prisma.equippedItem.findMany({
+        where: { userId },
+        select: { itemId: true },
+      }),
     ]);
     const equippedIds = new Set(equipped.map((e) => e.itemId));
-    return rows
+    const urls = await this.spriteUrls(rows.map((r) => r.item));
+    const out = rows
       .filter((r) => r.item.deletedAt === null)
       .map((r) => ({
-        item: toItemResponse(r.item),
+        item: {
+          ...toItemResponse(r.item, urls),
+          categoryName: r.item.category?.name,
+        },
         equipped: equippedIds.has(r.itemId),
         acquiredAt: r.acquiredAt.toISOString(),
         source: r.source,
       }));
+    await this.localizeItems(out.map((o) => o.item));
+    return out;
   }
 
   async getAvatar(userId: string): Promise<AvatarResponse> {
     const [user, equipped] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { avatarConfig: true } }),
-      this.prisma.equippedItem.findMany({ where: { userId }, include: { item: true } }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { avatarConfig: true },
+      }),
+      this.prisma.equippedItem.findMany({
+        where: { userId },
+        include: { item: true },
+      }),
     ]);
+    const urls = await this.spriteUrls(equipped.map((e) => e.item));
     const map: AvatarResponse['equipped'] = {};
     for (const e of equipped) {
       if (e.item.deletedAt) continue;
@@ -221,18 +488,33 @@ export class ItemsService {
         slot: e.slot,
         rarity: e.item.rarity,
         spriteAssetId: e.item.spriteAssetId,
+        spriteUrl: spriteUrlFor(e.item.spriteAssetId, urls),
       } satisfies EquippedRef;
     }
-    return { config: (user.avatarConfig as Record<string, unknown> | null) ?? null, equipped: map };
+    await this.localizeEquipped(map);
+    return {
+      config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
+      equipped: map,
+    };
   }
 
-  async saveConfig(userId: string, config: Record<string, unknown>): Promise<AvatarResponse> {
-    await this.prisma.user.update({ where: { id: userId }, data: { avatarConfig: config as Prisma.InputJsonValue } });
+  async saveConfig(
+    userId: string,
+    config: Record<string, unknown>,
+  ): Promise<AvatarResponse> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarConfig: config as Prisma.InputJsonValue },
+    });
     return this.getAvatar(userId);
   }
 
   /** Equip an owned item into its slot, or unequip when itemId is null. */
-  async equip(userId: string, slot: ItemSlot, itemId: string | null | undefined): Promise<AvatarResponse> {
+  async equip(
+    userId: string,
+    slot: ItemSlot,
+    itemId: string | null | undefined,
+  ): Promise<AvatarResponse> {
     if (!itemId) {
       await this.prisma.equippedItem.deleteMany({ where: { userId, slot } });
       return this.getAvatar(userId);
@@ -242,7 +524,10 @@ export class ItemsService {
       include: { item: true },
     });
     if (!owned) throw new ForbiddenException('You do not own this item');
-    if (owned.item.slot !== slot) throw new BadRequestException(`Item belongs to slot ${owned.item.slot}, not ${slot}`);
+    if (owned.item.slot !== slot)
+      throw new BadRequestException(
+        `Item belongs to slot ${owned.item.slot}, not ${slot}`,
+      );
     await this.prisma.equippedItem.upsert({
       where: { userId_slot: { userId, slot } },
       create: { userId, slot, itemId },
@@ -253,20 +538,101 @@ export class ItemsService {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
-  private async userContext(userId: string): Promise<{ coins: number; level: number; isPremium: boolean }> {
-    const [user, subs] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { coins: true, totalXp: true } }),
-      this.prisma.subscription.findMany({ where: { userId }, select: { status: true, currentPeriodEnd: true, planId: true } }),
+  /**
+   * Item name/description + category name in the caller's locale
+   * (docs/11 §3) — one translations query for the whole response.
+   */
+  private async localizeItems(items: ItemResponse[]): Promise<void> {
+    if (!this.localizer || items.length === 0) return;
+    const tr = await this.localizer.localize([
+      {
+        entityType: 'ITEM',
+        items: items.map((i) => ({
+          id: i.id,
+          values: { name: i.name, description: i.description },
+        })),
+      },
+      {
+        entityType: 'ITEM_CATEGORY',
+        items: items.flatMap((i) =>
+          i.categoryName != null
+            ? [{ id: i.categorySlug, values: { name: i.categoryName } }]
+            : [],
+        ),
+      },
     ]);
-    const now = new Date();
-    const isPremium = subs.some((s) =>
-      subscriptionGrantsAccess({ planId: s.planId, status: s.status, currentPeriodEnd: s.currentPeriodEnd }, now),
+    for (const i of items) {
+      tr.apply('ITEM', i.id, i, ['name', 'description']);
+      if (i.categoryName != null)
+        i.categoryName = tr.text(
+          'ITEM_CATEGORY',
+          i.categorySlug,
+          'name',
+          i.categoryName,
+        );
+    }
+  }
+
+  /** Equipped item names in the caller's locale. */
+  private async localizeEquipped(
+    map: AvatarResponse['equipped'],
+  ): Promise<void> {
+    const refs = Object.values(map).filter((r): r is EquippedRef => !!r);
+    if (!this.localizer || refs.length === 0) return;
+    const tr = await this.localizer.localize([
+      {
+        entityType: 'ITEM',
+        items: refs.map((r) => ({ id: r.itemId, values: { name: r.name } })),
+      },
+    ]);
+    for (const r of refs) tr.apply('ITEM', r.itemId, r, ['name']);
+  }
+
+  /** Asset-id sprite refs must point at an uploaded, confirmed Asset. */
+  private async assertSpriteAssets(
+    ...refs: (string | null | undefined)[]
+  ): Promise<void> {
+    const ids = refs.filter((r): r is string => isAssetSpriteRef(r));
+    if (ids.length === 0) return;
+    const found = await this.prisma.asset.findMany({
+      where: { id: { in: ids }, confirmed: true },
+      select: { id: true },
+    });
+    if (found.length < new Set(ids).size)
+      throw new BadRequestException({
+        code: 'item.sprite_asset_unknown',
+        message: 'Sprite asset not found (upload and confirm it first)',
+      });
+  }
+
+  /** Uploaded-sprite URLs for these items (one Asset query). */
+  private spriteUrls(
+    items: readonly Pick<Item, 'spriteAssetId'>[],
+  ): Promise<SpriteUrlMap> {
+    return loadSpriteUrls(
+      this.prisma,
+      items.map((i) => i.spriteAssetId),
     );
+  }
+
+  private async userContext(
+    userId: string,
+  ): Promise<{ coins: number; level: number; isPremium: boolean }> {
+    const [user, isPremium] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { coins: true, totalXp: true },
+      }),
+      this.access.hasActiveSubscription(userId),
+    ]);
     return { coins: user.coins, level: levelFromXp(user.totalXp), isPremium };
   }
 
   private async ownedItemIds(userId: string): Promise<Set<string>> {
-    const owned = await this.prisma.userItem.findMany({ where: { userId }, select: { itemId: true } });
+    const owned = await this.prisma.userItem.findMany({
+      where: { userId },
+      select: { itemId: true },
+    });
     return new Set(owned.map((o) => o.itemId));
   }
 }
@@ -288,7 +654,7 @@ function purchaseError(reason: string) {
   }
 }
 
-function toItemResponse(i: Item): ItemResponse {
+function toItemResponse(i: Item, urls: SpriteUrlMap): ItemResponse {
   return {
     id: i.id,
     slug: i.slug,
@@ -304,7 +670,35 @@ function toItemResponse(i: Item): ItemResponse {
     dropStartsAt: i.dropStartsAt?.toISOString() ?? null,
     dropEndsAt: i.dropEndsAt?.toISOString() ?? null,
     spriteAssetId: i.spriteAssetId,
+    spriteUrl: spriteUrlFor(i.spriteAssetId, urls),
     thumbnailAssetId: i.thumbnailAssetId,
     isActive: i.isActive,
+  };
+}
+
+function assertDropWindow(w: Parameters<typeof validateDropWindow>[0]): void {
+  const errors = validateDropWindow(w);
+  if (errors.length) throw new BadRequestException(errors);
+}
+
+/** ITEM_DROP push copy (pt-BR / en-US). */
+export function dropCopy(
+  locale: string,
+  item: Pick<Item, 'id' | 'name' | 'dropEndsAt'>,
+) {
+  const pt = locale.startsWith('pt');
+  let body: string;
+  if (item.dropEndsAt)
+    body = pt
+      ? 'Disponível por tempo limitado na loja.'
+      : 'In the shop for a limited time.';
+  else body = pt ? 'Já disponível na loja.' : 'Now available in the shop.';
+  return {
+    kind: 'ITEM_DROP' as const,
+    title: pt
+      ? `✨ Novo item limitado: ${item.name}`
+      : `✨ Limited drop: ${item.name}`,
+    body,
+    data: { itemId: item.id, route: '/shop' },
   };
 }

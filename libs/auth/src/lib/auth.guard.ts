@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 import { AuthService } from './auth.service.js';
+import { AUTH_CONFIG } from './config.js';
 import type { UserRole } from './types.js';
 
 /**
@@ -9,26 +10,27 @@ import type { UserRole } from './types.js';
  *
  *   { path: 'admin', canActivate: [authGuard(['ADMIN', 'SUPPORT'])], ... }
  *
- * Behavior:
- * - Unauthenticated → redirect to `/login` (configurable via `loginPath`).
- * - Authenticated but wrong role → redirect to `/forbidden`.
- * - Authenticated and authorized → returns true synchronously.
- *
- * Bypasses redirects when the user state is still loading; the auth service
- * resolves loading on construction so this rarely matters in practice.
+ * - Waits for the initial auth state (Clerk load + `/me`) before deciding.
+ * - Unauthenticated → `/login?redirect=<attempted url>`.
+ * - Authenticated but wrong role → `/forbidden`.
  */
 export function authGuard(
   roles: readonly UserRole[] = [],
   options: { loginPath?: string; forbiddenPath?: string } = {},
 ): CanActivateFn {
-  return (): boolean | UrlTree => {
+  return async (_route, state): Promise<boolean | UrlTree> => {
     const auth = inject(AuthService);
     const router = inject(Router);
-    const loginPath = options.loginPath ?? '/login';
-    const forbiddenPath = options.forbiddenPath ?? '/forbidden';
+    const config = inject(AUTH_CONFIG);
+    const loginPath = options.loginPath ?? config.loginPath ?? '/login';
+    const forbiddenPath =
+      options.forbiddenPath ?? config.forbiddenPath ?? '/forbidden';
 
+    await auth.whenReady();
     if (!auth.isAuthenticated()) {
-      return router.parseUrl(loginPath);
+      return router.createUrlTree([loginPath], {
+        queryParams: { redirect: state.url },
+      });
     }
     if (!auth.hasAnyRole(roles)) {
       return router.parseUrl(forbiddenPath);

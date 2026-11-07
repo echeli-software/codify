@@ -5,6 +5,7 @@ import {
   input,
   output,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon } from '../icon/icon.js';
 
 /**
@@ -14,19 +15,19 @@ import { Icon } from '../icon/icon.js';
 @Component({
   selector: 'cdf-tag',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   template: `
-    <span [class]="cssClass()">
+    <span [class]="cssClass()" [attr.aria-disabled]="disabled() || null">
       <ng-content />
       @if (removable()) {
-      <button
-        type="button"
-        class="cdf-tag__remove"
-        (click)="onRemove($event)"
-        [attr.aria-label]="removeLabel()"
-      >
-        <cdf-icon name="x" size="xs" />
-      </button>
+        <button
+          type="button"
+          class="cdf-tag__remove"
+          (click)="onRemove($event)"
+          [attr.aria-label]="removeLabel() ?? ('common.remove' | translate)"
+        >
+          <cdf-icon name="x" size="xs" />
+        </button>
       }
     </span>
   `,
@@ -35,7 +36,7 @@ import { Icon } from '../icon/icon.js';
 export class Tag {
   readonly removable = input(false);
   readonly disabled = input(false);
-  readonly removeLabel = input('Remove');
+  readonly removeLabel = input<string | null>(null);
   readonly remove = output<void>();
 
   protected readonly cssClass = computed(() => {

@@ -5,210 +5,327 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
   IonTitle,
+  IonButtons,
+  IonBackButton,
   IonContent,
 } from '@ionic/angular/standalone';
 import {
-  AppBadge,
+  AppAvatar,
   AppButton,
   AppCard,
   AppInput,
+  AppSkeleton,
   EmptyState,
+  FormField,
   Icon,
+  LevelBadge,
 } from '@codify/ui-ionic';
 import {
   LeaguesClient,
   ProblemDetailsError,
   type Friend,
+  type FriendInvite,
   type FriendRequest,
 } from '@codify/api-client';
+import { I18nService, TranslatePipe } from '@codify/i18n';
+import { AppToastService } from '../platform/app-toast.service.js';
+import { OfflineGate } from '../platform/offline-gate.component.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { shareLink } from './shared/share.js';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Friends MVP — add by email, accept/reject incoming requests, and nudge a
- * friend (rate-limited server-side to once per 24h). Tap a friend to view
- * their public profile.
+ * Friends (docs/10 §5): share an invite link, add by email, answer
+ * requests, nudge (rate-limited server-side) and open public profiles.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     IonHeader,
     IonToolbar,
     IonTitle,
+    IonButtons,
+    IonBackButton,
     IonContent,
-    AppBadge,
+    AppAvatar,
     AppButton,
     AppCard,
     AppInput,
+    AppSkeleton,
     EmptyState,
+    FormField,
     Icon,
+    LevelBadge,
+    OfflineGate,
+    TranslatePipe,
   ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Friends</ion-title>
+        <ion-buttons slot="start">
+          <ion-back-button defaultHref="/profile" />
+        </ion-buttons>
+        <ion-title>{{ 'student.friends.title' | translate }}</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <!-- Add friend -->
-      <cdf-app-card padding="normal">
-        <h3>Add a friend</h3>
-        <div class="add">
-          <cdf-app-input
-            [(ngModel)]="email"
-            placeholder="friend@email.com"
-            data-testid="friend-email"
-          />
-          <cdf-app-button
-            kind="primary"
-            size="sm"
-            [loading]="sending()"
-            (buttonClick)="add()"
-            data-testid="add-friend-btn"
-            >Send</cdf-app-button
-          >
-        </div>
-        @if (message(); as m) {
-          <p class="msg" [class.msg--err]="isError()">{{ m }}</p>
-        }
-      </cdf-app-card>
+      <div class="fr">
+        <cdf-offline-gate capability="social">
+          <!-- Invite link -->
+          <cdf-app-card padding="normal" data-testid="invite-card">
+            <h2>{{ 'student.friends.inviteTitle' | translate }}</h2>
+            <p class="fr__muted">
+              {{ 'student.friends.inviteBody' | translate }}
+            </p>
+            @if (invite(); as inv) {
+              <div class="fr__invite">
+                <code class="fr__link" data-testid="invite-link">{{
+                  inv.url
+                }}</code>
+                <cdf-app-button
+                  kind="primary"
+                  size="sm"
+                  (buttonClick)="shareInvite(inv)"
+                  data-testid="share-invite"
+                >
+                  <cdf-icon name="share" size="sm" />
+                  {{ 'student.friends.share' | translate }}
+                </cdf-app-button>
+              </div>
+            } @else {
+              <cdf-app-skeleton shape="text" />
+            }
+          </cdf-app-card>
 
-      <!-- Incoming requests -->
-      @if (requests().length > 0) {
-        <h3 class="section">Requests</h3>
-        <div class="list" data-testid="requests-list">
-          @for (r of requests(); track r.id) {
-            <cdf-app-card padding="normal" class="row">
-              <span class="row__name">{{ r.senderName }}</span>
+          <!-- Add by email -->
+          <cdf-app-card padding="normal">
+            <h2>{{ 'student.friends.addTitle' | translate }}</h2>
+            <form class="fr__add" (submit)="add($event)">
+              <cdf-form-field
+                [label]="'student.friends.emailLabel' | translate"
+                class="fr__field"
+              >
+                <cdf-app-input
+                  type="email"
+                  name="email"
+                  [(ngModel)]="email"
+                  [placeholder]="'student.friends.emailPlaceholder' | translate"
+                  data-testid="friend-email"
+                />
+              </cdf-form-field>
               <cdf-app-button
                 kind="primary"
                 size="sm"
-                (buttonClick)="respond(r, true)"
-                data-testid="accept-btn"
-                >Accept</cdf-app-button
+                type="submit"
+                [loading]="sending()"
+                data-testid="add-friend-btn"
               >
-              <cdf-app-button
-                kind="ghost"
-                size="sm"
-                (buttonClick)="respond(r, false)"
-                >Decline</cdf-app-button
-              >
-            </cdf-app-card>
-          }
-        </div>
-      }
-
-      <!-- Friends -->
-      <h3 class="section">Your friends ({{ friends().length }})</h3>
-      @if (friends().length === 0) {
-        <cdf-empty-state
-          icon="person"
-          title="No friends yet"
-          description="Add one by email to compete and cheer each other on."
-        />
-      } @else {
-        <div class="list" data-testid="friends-list">
-          @for (f of friends(); track f.userId) {
-            <cdf-app-card
-              padding="normal"
-              class="row"
-              [attr.data-user-id]="f.userId"
-            >
-              <button
-                type="button"
-                class="row__name row__name--link"
-                (click)="openProfile(f.userId)"
-              >
-                {{ f.displayName }}
-              </button>
-              <cdf-app-badge variant="neutral" [subtle]="true"
-                >Lv {{ f.level }}</cdf-app-badge
-              >
-              <cdf-app-button
-                kind="secondary"
-                size="sm"
-                (buttonClick)="nudge(f)"
-                [attr.data-testid]="'nudge-btn'"
-              >
-                <cdf-icon name="notifications" size="sm" /> Nudge
+                {{ 'student.friends.send' | translate }}
               </cdf-app-button>
-            </cdf-app-card>
+            </form>
+          </cdf-app-card>
+
+          <!-- Incoming requests -->
+          @if (requests().length > 0) {
+            <h2 class="fr__section">
+              {{ 'student.friends.requests' | translate }}
+            </h2>
+            <ul class="fr__list" data-testid="requests-list">
+              @for (r of requests(); track r.id) {
+                <li class="fr__row">
+                  <cdf-app-avatar [name]="r.senderName" size="sm" />
+                  <span class="fr__name">{{ r.senderName }}</span>
+                  <cdf-app-button
+                    kind="primary"
+                    size="sm"
+                    [ariaLabel]="
+                      'student.friends.acceptNamed'
+                        | translate: { name: r.senderName }
+                    "
+                    (buttonClick)="respond(r, true)"
+                    data-testid="accept-btn"
+                  >
+                    {{ 'student.friends.accept' | translate }}
+                  </cdf-app-button>
+                  <cdf-app-button
+                    kind="ghost"
+                    size="sm"
+                    [ariaLabel]="
+                      'student.friends.declineNamed'
+                        | translate: { name: r.senderName }
+                    "
+                    (buttonClick)="respond(r, false)"
+                  >
+                    {{ 'student.friends.decline' | translate }}
+                  </cdf-app-button>
+                </li>
+              }
+            </ul>
           }
-        </div>
-      }
+
+          <!-- Friends -->
+          <h2 class="fr__section">
+            {{
+              'student.friends.yourFriends'
+                | translate: { count: friends().length }
+            }}
+          </h2>
+          @if (loading()) {
+            <cdf-app-skeleton shape="rect" [height]="64" />
+          } @else if (friends().length === 0) {
+            <cdf-empty-state
+              icon="person"
+              [title]="'student.friends.emptyTitle' | translate"
+              [description]="'student.friends.emptyBody' | translate"
+            />
+          } @else {
+            <ul class="fr__list" data-testid="friends-list">
+              @for (f of friends(); track f.userId) {
+                <li class="fr__row" [attr.data-user-id]="f.userId">
+                  <a class="fr__person" [routerLink]="['/u', f.userId]">
+                    <cdf-app-avatar [name]="f.displayName" size="sm" />
+                    <span class="fr__name">{{ f.displayName }}</span>
+                  </a>
+                  <cdf-level-badge [level]="f.level" size="sm" />
+                  <cdf-app-button
+                    kind="secondary"
+                    size="sm"
+                    [loading]="nudging() === f.userId"
+                    [disabled]="nudged().has(f.userId)"
+                    [ariaLabel]="
+                      'student.friends.nudgeNamed'
+                        | translate: { name: f.displayName }
+                    "
+                    (buttonClick)="nudge(f)"
+                    data-testid="nudge-btn"
+                  >
+                    <cdf-icon name="notifications" size="sm" />
+                    {{
+                      (nudged().has(f.userId)
+                        ? 'student.friends.nudged'
+                        : 'student.friends.nudge'
+                      ) | translate
+                    }}
+                  </cdf-app-button>
+                </li>
+              }
+            </ul>
+          }
+        </cdf-offline-gate>
+      </div>
     </ion-content>
   `,
   styles: [
     `
-      h3 {
+      .fr {
+        max-width: 720px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--cdf-space-3);
+      }
+      h2 {
         margin: 0 0 var(--cdf-space-2);
         font-size: var(--cdf-font-size-md);
       }
-      h3.section {
-        margin-top: var(--cdf-space-4);
+      .fr__section {
+        margin: var(--cdf-space-2) 0 0;
       }
-      cdf-app-card {
-        display: block;
-        margin-bottom: var(--cdf-space-2);
+      .fr__muted {
+        color: var(--cdf-color-text-muted);
+        font-size: var(--cdf-font-size-sm);
+        margin: 0 0 var(--cdf-space-2);
       }
-      .add {
+      .fr__invite {
         display: flex;
         gap: var(--cdf-space-2);
         align-items: center;
+        flex-wrap: wrap;
       }
-      .add cdf-app-input {
-        flex: 1;
-      }
-      .msg {
+      .fr__link {
+        flex: 1 1 200px;
         font-size: 13px;
-        margin: var(--cdf-space-2) 0 0;
-        color: var(--cdf-color-success, #2e9e5b);
+        word-break: break-all;
+        background: var(--cdf-color-surface-2, rgba(0, 0, 0, 0.04));
+        padding: 6px 8px;
+        border-radius: 8px;
       }
-      .msg--err {
-        color: var(--cdf-color-danger, #d0454c);
+      .fr__add {
+        display: flex;
+        gap: var(--cdf-space-2);
+        align-items: flex-end;
+        flex-wrap: wrap;
       }
-      .list {
+      .fr__field {
+        flex: 1 1 220px;
+      }
+      .fr__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
         display: flex;
         flex-direction: column;
+        gap: var(--cdf-space-1);
       }
-      .row {
+      .fr__row {
         display: flex;
         align-items: center;
         gap: var(--cdf-space-2);
+        padding: var(--cdf-space-2);
+        border-radius: 12px;
+        background: var(--cdf-color-surface);
+        border: 1px solid var(--cdf-color-border);
       }
-      .row__name {
+      .fr__person {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--cdf-space-2);
+        color: inherit;
+        text-decoration: none;
+        min-width: 0;
+        border-radius: 8px;
+      }
+      .fr__person:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
+      .fr__name {
         flex: 1;
         font-weight: 600;
-      }
-      .row__name--link {
-        background: none;
-        border: 0;
-        padding: 0;
-        text-align: left;
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     `,
   ],
 })
 export class FriendsPage {
   private readonly client = inject(LeaguesClient);
-  private readonly router = inject(Router);
+  private readonly toast = inject(AppToastService);
+  private readonly i18n = inject(I18nService);
+  private readonly telemetry = inject(TelemetryService);
 
   protected email = '';
+  protected readonly loading = signal(true);
   protected readonly sending = signal(false);
-  protected readonly message = signal<string | null>(null);
-  protected readonly isError = signal(false);
+  protected readonly nudging = signal<string | null>(null);
+  protected readonly nudged = signal<Set<string>>(new Set());
   protected readonly friends = signal<Friend[]>([]);
   protected readonly requests = signal<FriendRequest[]>([]);
+  protected readonly invite = signal<FriendInvite | null>(null);
 
   constructor() {
     void this.refresh();
+    void this.loadInvite();
   }
 
   private async refresh(): Promise<void> {
@@ -219,26 +336,72 @@ export class FriendsPage {
       ]);
       this.friends.set(friends);
       this.requests.set(requests);
-    } catch {
-      /* offline — leave as is */
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  protected async add(): Promise<void> {
-    const email = this.email.trim();
-    if (!email) return;
-    this.sending.set(true);
-    this.message.set(null);
+  private async loadInvite(): Promise<void> {
     try {
-      const res = await this.client.sendFriendRequest(email);
-      this.isError.set(false);
-      this.message.set(
-        res.status === 'sent' ? 'Request sent!' : 'Request already pending.',
-      );
+      this.invite.set(await this.client.friendInvite());
+    } catch (err) {
+      this.toast.error(err);
+    }
+  }
+
+  protected async shareInvite(inv: FriendInvite): Promise<void> {
+    const outcome = await shareLink({
+      title: this.i18n.t('student.friends.shareTitle'),
+      text: this.i18n.t('student.friends.shareText'),
+      url: inv.url,
+    });
+    if (outcome === 'shared' || outcome === 'copied') {
+      this.telemetry.track('friend_invite_shared', {
+        channel: outcome === 'shared' ? 'share_sheet' : 'clipboard',
+      });
+    }
+    if (outcome === 'copied') {
+      this.toast.show({ message: 'student.friends.copied', kind: 'success' });
+    } else if (outcome === 'failed') {
+      this.toast.show({
+        message: 'student.friends.shareFailed',
+        kind: 'warning',
+      });
+    }
+  }
+
+  protected async add(ev?: Event): Promise<void> {
+    ev?.preventDefault();
+    const email = this.email.trim();
+    if (!EMAIL_RE.test(email)) {
+      this.toast.show({
+        message: 'student.friends.invalidEmail',
+        kind: 'warning',
+      });
+      return;
+    }
+    this.sending.set(true);
+    try {
+      await this.client.sendFriendRequest(email);
+      this.telemetry.track('friend_request_sent');
+      // The API never reveals whether the address has an account.
+      this.toast.show({
+        message: 'student.friends.requestSent',
+        kind: 'success',
+        params: { email },
+      });
       this.email = '';
     } catch (err) {
-      this.isError.set(true);
-      this.message.set(this.describe(err));
+      if (err instanceof ProblemDetailsError && err.status === 400) {
+        this.toast.show({
+          message: 'student.friends.cannotAddSelf',
+          kind: 'warning',
+        });
+      } else {
+        this.toast.error(err);
+      }
     } finally {
       this.sending.set(false);
     }
@@ -248,39 +411,53 @@ export class FriendsPage {
     try {
       await this.client.respondRequest(r.id, accept);
       this.requests.update((rs) => rs.filter((x) => x.id !== r.id));
-      if (accept) await this.refresh();
-    } catch {
-      /* surfaced by interceptor */
+      if (accept) {
+        this.telemetry.track('friend_request_accepted');
+        this.toast.show({
+          message: 'student.friends.accepted',
+          kind: 'success',
+          params: { name: r.senderName },
+        });
+        await this.refresh();
+      }
+    } catch (err) {
+      this.toast.error(err);
     }
   }
 
   protected async nudge(f: Friend): Promise<void> {
-    this.message.set(null);
+    this.nudging.set(f.userId);
     try {
-      await this.client.nudge(f.userId);
-      this.isError.set(false);
-      this.message.set(`Nudged ${f.displayName}!`);
+      const res = await this.client.nudge(f.userId);
+      this.telemetry.track('friend_nudge_sent', {
+        pushed: res.pushed ?? false,
+      });
+      this.markNudged(f.userId);
+      this.toast.show({
+        message:
+          res.pushed === false
+            ? 'student.friends.nudgeQueued'
+            : 'student.friends.nudgeSent',
+        kind: 'success',
+        params: { name: f.displayName },
+      });
     } catch (err) {
-      this.isError.set(true);
-      this.message.set(
-        err instanceof ProblemDetailsError && err.status === 409
-          ? 'You already nudged them recently.'
-          : this.describe(err),
-      );
+      if (err instanceof ProblemDetailsError && err.status === 409) {
+        this.markNudged(f.userId);
+        this.toast.show({
+          message: 'student.friends.nudgeTooSoon',
+          kind: 'info',
+          params: { name: f.displayName },
+        });
+      } else {
+        this.toast.error(err);
+      }
+    } finally {
+      this.nudging.set(null);
     }
   }
 
-  protected openProfile(userId: string): void {
-    void this.router.navigate(['/u', userId]);
-  }
-
-  private describe(err: unknown): string {
-    if (err instanceof ProblemDetailsError) {
-      if (err.isNotFound) return 'No user with that email.';
-      if (err.status === 409) return 'Already friends or pending.';
-      if (err.status === 400) return err.message || 'Invalid request.';
-      if (err.message) return err.message;
-    }
-    return 'Something went wrong.';
+  private markNudged(id: string): void {
+    this.nudged.update((s) => new Set(s).add(id));
   }
 }

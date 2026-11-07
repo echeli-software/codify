@@ -25,7 +25,9 @@ import {
  * apps can layer their own interceptors in any order without re-providing
  * HttpClient.
  */
-export function provideApiClient(config: ApiClientConfig): EnvironmentProviders {
+export function provideApiClient(
+  config: ApiClientConfig,
+): EnvironmentProviders {
   return makeEnvironmentProviders([
     { provide: API_CLIENT_CONFIG, useValue: config },
   ]);

@@ -72,6 +72,11 @@ import {
   send,
   arrowForward,
   arrowBack,
+  lockClosed,
+  play,
+  mic,
+  colorPalette,
+  shirt,
 } from 'ionicons/icons';
 
 /**
@@ -164,6 +169,12 @@ export const ICON_NAMES = [
 
   // tech
   'chip',
+  // roadmap additions
+  'lock',
+  'play',
+  'mic',
+  'color-palette',
+  'shirt',
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -241,6 +252,12 @@ const NAME_MAP: Record<IconName, { name: string; svg: string }> = {
   'help-circle': { name: 'help-circle', svg: helpCircle },
 
   chip: { name: 'chip', svg: hardwareChip },
+
+  lock: { name: 'lock-closed', svg: lockClosed },
+  play: { name: 'play', svg: play },
+  mic: { name: 'mic', svg: mic },
+  'color-palette': { name: 'color-palette', svg: colorPalette },
+  shirt: { name: 'shirt', svg: shirt },
 };
 
 // Register every icon once at module load. ion-icon will then resolve by name.

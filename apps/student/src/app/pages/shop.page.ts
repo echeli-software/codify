@@ -1,5 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -7,277 +14,543 @@ import {
   IonContent,
 } from '@ionic/angular/standalone';
 import {
-  AppBadge,
   AppButton,
-  AppCard,
   AppSkeleton,
   AvatarRenderer,
-  type AvatarSlot,
-  type AvatarSprite,
+  BottomSheet,
+  CoinCounter,
   EmptyState,
   Icon,
+  ShopGrid,
+  type ShopItem as UiShopItem,
 } from '@codify/ui-ionic';
 import {
+  BillingClient,
   GamificationClient,
   ItemsClient,
+  ProblemDetailsError,
   type AvatarResponse,
   type ItemSlot,
   type ShopItem,
 } from '@codify/api-client';
+import { RewardOrchestrator } from '@codify/gamification-engine';
+import { I18nService, TranslatePipe } from '@codify/i18n';
+import { AppToastService } from '../platform/app-toast.service.js';
+import { OfflineGate } from '../platform/offline-gate.component.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { equippedSprites, toUiItem } from './shared/avatar.js';
+import { formatCountdown } from './shared/countdown.js';
+import { StaleGuard } from './shared/stale-guard.js';
 
-const SLOT_FILTERS: { value: ItemSlot | 'ALL'; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'HAT', label: 'Hats' },
-  { value: 'GLASSES', label: 'Glasses' },
-  { value: 'TOP', label: 'Tops' },
-  { value: 'PET', label: 'Pets' },
-  { value: 'BACKGROUND', label: 'Backgrounds' },
-  { value: 'FRAME', label: 'Frames' },
+const SLOT_FILTERS: (ItemSlot | null)[] = [
+  null,
+  'HAT',
+  'HAIR',
+  'GLASSES',
+  'TOP',
+  'BOTTOM',
+  'SHOES',
+  'ACCESSORY',
+  'PET',
+  'BACKGROUND',
+  'FRAME',
 ];
 
-const REASON_LABEL: Record<string, string> = {
-  owned: 'Owned',
-  insufficient_coins: 'Not enough coins',
-  level_locked: 'Level locked',
-  premium_required: 'Premium only',
-  not_available: 'Unavailable',
+const REASON_KEYS: Record<string, string> = {
+  owned: 'ui.shop.owned',
+  insufficient_coins: 'student.shop.reason.coins',
+  level_locked: 'student.shop.reason.level',
+  premium_required: 'billing.premiumOnly',
+  not_available: 'student.shop.reason.unavailable',
 };
 
 /**
- * Shop — browse cosmetics, try them on against the live avatar, and buy with
- * coins. Limited drops are pinned to the top with a live countdown; premium-
- * only items carry a star badge. Eligibility comes from the server (the same
- * @codify/domain rule the API enforces), so the Buy button never lies.
+ * Shop (docs/08): limited drops pinned with a countdown, slot filters
+ * (aria-pressed chips) and the virtualized `ShopGrid`. Tapping an item
+ * opens its detail sheet with a live try-on, "Try on in the dressing
+ * room", and Buy / Buy & wear (`{ equip: true }`, atomic server-side).
+ * Every API error is surfaced; online-only.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, IonHeader, IonToolbar, IonTitle, IonContent, AppBadge, AppButton, AppCard, AppSkeleton, AvatarRenderer, EmptyState, Icon],
+  imports: [
+    RouterLink,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    AppButton,
+    AppSkeleton,
+    AvatarRenderer,
+    BottomSheet,
+    CoinCounter,
+    EmptyState,
+    Icon,
+    ShopGrid,
+    OfflineGate,
+    TranslatePipe,
+  ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Shop</ion-title>
+        <ion-title>{{ 'student.shop.title' | translate }}</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <div class="coins" data-testid="coin-balance">
-        <cdf-icon name="diamond" size="sm" /> {{ coins() }} coins
-      </div>
-
-      <!-- Try-on preview -->
-      <div class="preview">
-        <cdf-avatar-renderer [config]="avatar()?.config ?? null" [equipped]="previewEquipped()" [size]="140" />
-        @if (tryOn(); as t) {
-        <p class="muted">Trying on: <strong>{{ t.name }}</strong></p>
-        }
-      </div>
-
-      <!-- Slot filters -->
-      <div class="filters" data-testid="slot-filters">
-        @for (f of slotFilters; track f.value) {
-        <button class="chip" [class.chip--active]="slot() === f.value" (click)="setSlot(f.value)">{{ f.label }}</button>
-        }
-        <button class="chip" [class.chip--active]="affordableOnly()" (click)="toggleAffordable()">Can buy</button>
-      </div>
-
-      @if (loading()) {
-      <cdf-app-skeleton shape="rect" />
-      } @else if (items().length === 0) {
-      <cdf-empty-state icon="cart" title="Nothing here yet" description="Check back as new items drop." />
-      } @else {
-        @if (limitedItems().length > 0) {
-        <section class="limited" data-testid="limited-section">
-          <h3 class="limited__title">
-            <cdf-icon name="flame" size="sm" /> Limited drop
-            <span class="limited__count" data-testid="limited-countdown">· ends in {{ countdownLabel() }}</span>
-          </h3>
-          <div class="grid" data-testid="limited-grid">
-            @for (it of limitedItems(); track it.id) {
-            <ng-container *ngTemplateOutlet="card; context: { $implicit: it }" />
-            }
+      <div class="sh">
+        <cdf-offline-gate capability="shop">
+          <div class="sh__top">
+            <div class="sh__balance" data-testid="coin-balance">
+              <span class="sh__label">{{
+                'student.shop.balance' | translate
+              }}</span>
+              <cdf-coin-counter [value]="coins()" size="md" />
+            </div>
+            <a routerLink="/avatar" class="sh__link">{{
+              'student.shop.dressingRoom' | translate
+            }}</a>
           </div>
-        </section>
-        }
 
-        <div class="grid" data-testid="shop-grid">
-          @for (it of regularItems(); track it.id) {
-          <ng-container *ngTemplateOutlet="card; context: { $implicit: it }" />
-          }
-        </div>
-      }
-
-      <ng-template #card let-it>
-        <cdf-app-card padding="normal" class="item" [class.item--limited]="it.isLimitedDrop" [attr.data-item-id]="it.id" (click)="setTryOn(it)">
-          <div class="item__sprite" [style.background]="swatch(it)">{{ glyph(it) }}</div>
-          <h3>{{ it.name }}</h3>
-          <div class="item__badges">
-            <cdf-app-badge [variant]="rarityVariant(it.rarity)" [subtle]="true">{{ it.rarity }}</cdf-app-badge>
-            @if (it.isPremiumOnly) {
-            <cdf-app-badge variant="warning" [subtle]="true" data-testid="premium-badge">★ Premium</cdf-app-badge>
+          <div
+            class="sh__filters"
+            role="group"
+            [attr.aria-label]="'student.shop.filterSlot' | translate"
+            data-testid="slot-filters"
+          >
+            @for (s of slotFilters; track s ?? 'all') {
+              <button
+                type="button"
+                class="sh__chip"
+                [attr.aria-pressed]="slot() === s"
+                (click)="setSlot(s)"
+              >
+                {{ (s ? 'ui.item.slot.' + s : 'ui.shop.all') | translate }}
+              </button>
             }
+            <button
+              type="button"
+              class="sh__chip"
+              [attr.aria-pressed]="affordableOnly()"
+              (click)="toggleAffordable()"
+              data-testid="affordable-filter"
+            >
+              {{ 'student.shop.canAfford' | translate }}
+            </button>
           </div>
-          <div class="item__cost"><cdf-icon name="diamond" size="xs" /> {{ it.costCoins }}</div>
-          @if (it.owned) {
-          <cdf-app-badge variant="success" [subtle]="true">Owned</cdf-app-badge>
-          } @else if (it.canBuy) {
-          <cdf-app-button kind="primary" size="sm" [fullWidth]="true" [loading]="buyingId() === it.id" (buttonClick)="buy(it, $event)" [attr.data-testid]="'buy-btn'">
-            Buy
-          </cdf-app-button>
+
+          @if (loading()) {
+            <cdf-app-skeleton shape="rect" [height]="320" />
+          } @else if (items().length === 0) {
+            <cdf-empty-state
+              icon="cart"
+              [title]="'student.shop.emptyTitle' | translate"
+              [description]="'student.shop.emptyBody' | translate"
+            />
           } @else {
-          <span class="item__locked">{{ reasonLabel(it.reason) }}</span>
+            @if (limited().length > 0) {
+              <section
+                class="sh__limited"
+                aria-labelledby="sh-limited"
+                data-testid="limited-section"
+              >
+                <h2 id="sh-limited">
+                  <cdf-icon name="flame" size="sm" />
+                  {{ 'student.shop.limitedTitle' | translate }}
+                  @if (countdown(); as c) {
+                    <span class="sh__count" data-testid="limited-countdown">{{
+                      'student.shop.endsIn' | translate: { time: c }
+                    }}</span>
+                  }
+                </h2>
+                <cdf-shop-grid
+                  [items]="limitedUi()"
+                  [balance]="coins()"
+                  [level]="level()"
+                  [isPremium]="isPremium()"
+                  [height]="260"
+                  (buy)="open($event)"
+                  (preview)="open($event)"
+                />
+              </section>
+            }
+            <section aria-labelledby="sh-all">
+              <h2 id="sh-all" class="sh__sr">
+                {{ 'student.shop.allItems' | translate }}
+              </h2>
+              <cdf-shop-grid
+                data-testid="shop-grid"
+                [items]="regularUi()"
+                [balance]="coins()"
+                [level]="level()"
+                [isPremium]="isPremium()"
+                (buy)="open($event)"
+                (preview)="open($event)"
+              />
+            </section>
           }
-        </cdf-app-card>
-      </ng-template>
+        </cdf-offline-gate>
+      </div>
+
+      @if (selected(); as it) {
+        <cdf-bottom-sheet
+          [open]="sheetOpen()"
+          (openChange)="sheetOpen.set($event)"
+          [title]="it.name"
+        >
+          <div
+            class="sh__detail"
+            data-testid="item-sheet"
+            [attr.data-item-id]="it.id"
+          >
+            <cdf-avatar-renderer
+              [config]="avatar()?.config ?? null"
+              [equipped]="previewSprites()"
+              [size]="160"
+            />
+            <p class="sh__muted">{{ 'student.shop.tryingOn' | translate }}</p>
+            @if (it.description) {
+              <p>{{ it.description }}</p>
+            }
+            <p class="sh__meta">
+              {{ 'ui.item.rarity.' + it.rarity | translate }} ·
+              {{ 'ui.item.slot.' + it.slot | translate }} ·
+              {{ 'ui.item.cost' | translate: { value: it.costCoins } }}
+            </p>
+            @if (!it.canBuy && !it.owned) {
+              <p class="sh__warn" role="note">
+                {{
+                  reasonKey(it.reason) | translate: { level: it.requiredLevel }
+                }}
+              </p>
+            }
+          </div>
+          <div sheetFooter class="sh__actions">
+            <cdf-app-button
+              kind="ghost"
+              (buttonClick)="tryInDressingRoom(it)"
+              data-testid="try-on-room"
+            >
+              {{ 'student.shop.tryInRoom' | translate }}
+            </cdf-app-button>
+            @if (it.owned) {
+              <cdf-app-button
+                kind="secondary"
+                (buttonClick)="equip(it)"
+                data-testid="equip-owned"
+              >
+                {{ 'student.shop.wear' | translate }}
+              </cdf-app-button>
+            } @else {
+              <cdf-app-button
+                kind="secondary"
+                [disabled]="!it.canBuy"
+                [loading]="buying() === 'plain'"
+                (buttonClick)="buy(it, false)"
+                data-testid="buy-btn"
+              >
+                {{ 'student.shop.buy' | translate: { cost: it.costCoins } }}
+              </cdf-app-button>
+              <cdf-app-button
+                kind="primary"
+                [disabled]="!it.canBuy"
+                [loading]="buying() === 'equip'"
+                (buttonClick)="buy(it, true)"
+                data-testid="buy-equip-btn"
+              >
+                {{ 'student.shop.buyAndWear' | translate }}
+              </cdf-app-button>
+            }
+          </div>
+        </cdf-bottom-sheet>
+      }
     </ion-content>
   `,
   styles: [
     `
-      .coins { display: flex; align-items: center; gap: 6px; font-weight: 700; margin-bottom: var(--cdf-space-2); }
-      .preview { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: var(--cdf-space-3); }
-      .muted { color: var(--cdf-color-text-muted); font-size: 13px; margin: 0; }
-      .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--cdf-space-2); margin-bottom: var(--cdf-space-2); }
-      .chip { flex: 0 0 auto; border: 1px solid var(--cdf-color-border, #ccc); background: transparent; border-radius: 16px; padding: 4px 12px; font-size: 13px; }
-      .chip--active { background: var(--cdf-color-primary, #5b8def); color: #fff; border-color: transparent; }
-      .limited { border: 1px solid var(--cdf-color-warning, #e0a800); border-radius: 14px; padding: var(--cdf-space-3); margin-bottom: var(--cdf-space-3); background: rgba(224, 168, 0, 0.06); }
-      .limited__title { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--cdf-space-2); font-size: 15px; }
-      .limited__count { color: var(--cdf-color-text-muted); font-weight: 500; font-size: 13px; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--cdf-space-2); }
-      .item { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-      .item--limited { outline: 1px solid var(--cdf-color-warning, #e0a800); }
-      .item h3 { margin: 2px 0 0; font-size: 14px; }
-      .item__badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
-      .item__sprite { width: 56px; height: 56px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; background: var(--cdf-color-surface-2, #eef1f6); }
-      .item__cost { display: flex; align-items: center; gap: 4px; font-weight: 600; }
-      .item__locked { font-size: 12px; color: var(--cdf-color-text-muted); }
+      .sh {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .sh__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--cdf-space-2);
+        margin-bottom: var(--cdf-space-2);
+      }
+      .sh__balance {
+        display: flex;
+        align-items: center;
+        gap: var(--cdf-space-2);
+      }
+      .sh__label,
+      .sh__muted {
+        color: var(--cdf-color-text-muted);
+        font-size: var(--cdf-font-size-sm);
+      }
+      .sh__link {
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+      }
+      .sh__filters {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: var(--cdf-space-2);
+        margin-bottom: var(--cdf-space-2);
+      }
+      .sh__chip {
+        flex: 0 0 auto;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        border-radius: 999px;
+        padding: 6px 14px;
+        font: inherit;
+        font-size: var(--cdf-font-size-sm);
+        cursor: pointer;
+        min-height: 36px;
+      }
+      .sh__chip[aria-pressed='true'] {
+        background: var(--cdf-color-primary);
+        color: var(--cdf-color-on-primary, #fff);
+        border-color: transparent;
+      }
+      .sh__chip:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
+      .sh__limited {
+        border: 1px solid var(--cdf-color-warning);
+        border-radius: 14px;
+        padding: var(--cdf-space-3);
+        margin-bottom: var(--cdf-space-3);
+      }
+      .sh__limited h2 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 0 0 var(--cdf-space-2);
+        font-size: var(--cdf-font-size-md);
+      }
+      .sh__count {
+        color: var(--cdf-color-text-muted);
+        font-weight: 500;
+        font-size: var(--cdf-font-size-sm);
+      }
+      .sh__sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      .sh__detail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 4px;
+      }
+      .sh__meta {
+        font-weight: 600;
+      }
+      .sh__warn {
+        color: var(--cdf-color-warning);
+      }
+      .sh__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--cdf-space-2);
+        justify-content: flex-end;
+      }
     `,
   ],
 })
 export class ShopPage {
-  private readonly items_ = inject(ItemsClient);
+  private readonly itemsClient = inject(ItemsClient);
   private readonly gamification = inject(GamificationClient);
+  private readonly billing = inject(BillingClient);
+  private readonly orchestrator = inject(RewardOrchestrator);
+  private readonly router = inject(Router);
+  private readonly toast = inject(AppToastService);
+  private readonly telemetry = inject(TelemetryService);
+  private readonly i18n = inject(I18nService);
+  private readonly guard = new StaleGuard();
 
   protected readonly slotFilters = SLOT_FILTERS;
   protected readonly loading = signal(true);
   protected readonly items = signal<ShopItem[]>([]);
   protected readonly avatar = signal<AvatarResponse | null>(null);
   protected readonly coins = signal(0);
-  protected readonly slot = signal<ItemSlot | 'ALL'>('ALL');
+  protected readonly level = signal(1);
+  protected readonly isPremium = signal(false);
+  protected readonly slot = signal<ItemSlot | null>(null);
   protected readonly affordableOnly = signal(false);
-  protected readonly buyingId = signal<string | null>(null);
-  protected readonly tryOn = signal<ShopItem | null>(null);
-  /** Ticks each second to drive the limited-drop countdown. */
+  protected readonly selected = signal<ShopItem | null>(null);
+  protected readonly sheetOpen = signal(false);
+  protected readonly buying = signal<'plain' | 'equip' | null>(null);
   protected readonly now = signal(Date.now());
 
-  protected readonly limitedItems = computed(() => this.items().filter((i) => i.isLimitedDrop));
-  protected readonly regularItems = computed(() => this.items().filter((i) => !i.isLimitedDrop));
-
-  /** Soonest limited-drop end, formatted as a coarse countdown. */
-  protected readonly countdownLabel = computed(() => {
-    const ends = this.limitedItems()
+  protected readonly limited = computed(() =>
+    this.items().filter((i) => i.isLimitedDrop),
+  );
+  protected readonly limitedUi = computed(() =>
+    this.limited().map((i) => toUiItem(i, { owned: i.owned })),
+  );
+  protected readonly regularUi = computed(() =>
+    this.items()
+      .filter((i) => !i.isLimitedDrop)
+      .map((i) => toUiItem(i, { owned: i.owned })),
+  );
+  protected readonly previewSprites = computed(() =>
+    equippedSprites(this.avatar(), this.selected()),
+  );
+  protected readonly countdown = computed(() => {
+    const ends = this.limited()
       .map((i) => (i.dropEndsAt ? new Date(i.dropEndsAt).getTime() : null))
       .filter((t): t is number => t != null);
-    if (ends.length === 0) return '—';
-    const remaining = Math.max(0, Math.min(...ends) - this.now());
-    return formatRemaining(remaining);
-  });
-
-  /** Equipped map with the try-on item overlaid into its slot. */
-  protected readonly previewEquipped = computed<Partial<Record<AvatarSlot, AvatarSprite>>>(() => {
-    const base: Partial<Record<AvatarSlot, AvatarSprite>> = {};
-    const eq = this.avatar()?.equipped ?? {};
-    for (const [s, ref] of Object.entries(eq)) {
-      if (ref) base[s as AvatarSlot] = { spriteAssetId: ref.spriteAssetId, name: ref.name, rarity: ref.rarity };
-    }
-    const t = this.tryOn();
-    if (t) base[t.slot as AvatarSlot] = { spriteAssetId: t.spriteAssetId, name: t.name, rarity: t.rarity };
-    return base;
+    this.i18n.currentLocale();
+    if (ends.length === 0) return null;
+    return formatCountdown(
+      Math.min(...ends) - this.now(),
+      (k, p) => this.i18n.t(k, p),
+      true,
+    );
   });
 
   constructor() {
-    void this.load();
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(timer);
+      this.guard.cancel();
+    });
+    void this.load();
   }
 
   private async load(): Promise<void> {
     this.loading.set(true);
-    try {
-      const [shop, av, summary] = await Promise.all([
-        this.items_.shop(this.queryArgs()),
-        this.items_.avatar().catch(() => null),
-        this.gamification.summary().catch(() => null),
-      ]);
-      this.items.set(shop);
-      if (av) this.avatar.set(av);
-      if (summary) this.coins.set(summary.coins);
-    } finally {
-      this.loading.set(false);
+    const [, av, summary, mine] = await Promise.allSettled([
+      this.loadItems(),
+      this.itemsClient.avatar(),
+      this.gamification.summary(),
+      this.billing.mySubscription(),
+    ]);
+    if (av.status === 'fulfilled') this.avatar.set(av.value);
+    if (summary.status === 'fulfilled') {
+      this.coins.set(summary.value.coins);
+      this.level.set(summary.value.level);
     }
+    if (mine.status === 'fulfilled')
+      this.isPremium.set(mine.value.activePlanIds.length > 0);
+    this.loading.set(false);
+    this.telemetry.track('shop_view');
   }
 
-  private queryArgs() {
-    return {
-      slot: this.slot() === 'ALL' ? undefined : (this.slot() as ItemSlot),
-      affordableOnly: this.affordableOnly() || undefined,
-    };
+  /** Filter-driven loads go through a StaleGuard (latest filter wins). */
+  private async loadItems(): Promise<void> {
+    const res = await this.guard.run(() =>
+      this.itemsClient.shop({
+        slot: this.slot() ?? undefined,
+        affordableOnly: this.affordableOnly() || undefined,
+      }),
+    );
+    if (res.stale) return;
+    if (res.ok) this.items.set(res.value);
+    else this.toast.error(res.error);
   }
 
-  protected setSlot(s: ItemSlot | 'ALL'): void {
+  protected setSlot(s: ItemSlot | null): void {
+    if (this.slot() === s) return;
     this.slot.set(s);
-    void this.refreshShop();
+    void this.loadItems();
   }
+
   protected toggleAffordable(): void {
     this.affordableOnly.update((v) => !v);
-    void this.refreshShop();
-  }
-  private async refreshShop(): Promise<void> {
-    this.items.set(await this.items_.shop(this.queryArgs()));
+    void this.loadItems();
   }
 
-  protected setTryOn(it: ShopItem): void {
-    this.tryOn.set(it);
+  protected open(ui: UiShopItem): void {
+    const it = this.items().find((i) => i.id === ui.id) ?? null;
+    this.selected.set(it);
+    this.sheetOpen.set(!!it);
   }
 
-  protected async buy(it: ShopItem, ev: MouseEvent): Promise<void> {
-    ev.stopPropagation();
-    this.buyingId.set(it.id);
+  protected reasonKey(reason: string): string {
+    return REASON_KEYS[reason] ?? 'student.shop.reason.unavailable';
+  }
+
+  protected tryInDressingRoom(it: ShopItem): void {
+    this.sheetOpen.set(false);
+    void this.router.navigate(['/avatar'], { queryParams: { tryOn: it.id } });
+  }
+
+  protected async buy(it: ShopItem, equip: boolean): Promise<void> {
+    if (this.buying()) return;
+    this.buying.set(equip ? 'equip' : 'plain');
     try {
-      const res = await this.items_.purchase(it.id);
+      const res = await this.itemsClient.purchase(it.id, { equip });
+      // Coin debit: snap the engine counters to the server's balance.
+      this.orchestrator.reconcile({ coins: res.coins });
       this.coins.set(res.coins);
-      const [shop, av] = await Promise.all([this.items_.shop(this.queryArgs()), this.items_.avatar()]);
-      this.items.set(shop);
+      this.telemetry.track('item_purchase', {
+        itemId: it.id,
+        rarity: it.rarity,
+        costCoins: it.costCoins,
+        equipOnPurchase: equip,
+      });
+      if (res.equipped) this.telemetry.track('item_equip', { itemId: it.id });
+      this.sheetOpen.set(false);
+      this.toast.show({
+        message: res.equipped
+          ? 'student.shop.boughtAndWearing'
+          : 'student.shop.bought',
+        kind: 'success',
+        params: { name: it.name },
+        ...(res.equipped
+          ? {}
+          : {
+              action: {
+                label: 'student.shop.wear',
+                handler: () => void this.equip(it),
+              },
+            }),
+      });
+      const [, av] = await Promise.all([
+        this.loadItems(),
+        this.itemsClient.avatar(),
+      ]);
       this.avatar.set(av);
-    } catch {
-      /* surfaced by the global toast interceptor */
+    } catch (err) {
+      if (err instanceof ProblemDetailsError && err.status === 409) {
+        this.toast.show({
+          message: 'student.shop.alreadyOwned',
+          kind: 'info',
+          params: { name: it.name },
+        });
+        void this.loadItems();
+      } else {
+        this.toast.error(err);
+      }
     } finally {
-      this.buyingId.set(null);
+      this.buying.set(null);
     }
   }
 
-  protected glyph(it: { spriteAssetId: string }): string {
-    return it.spriteAssetId.startsWith('emoji:') ? it.spriteAssetId.slice(6) : '';
+  protected async equip(it: ShopItem): Promise<void> {
+    try {
+      this.avatar.set(await this.itemsClient.equip(it.slot, it.id));
+      this.telemetry.track('item_equip', { itemId: it.id });
+      this.sheetOpen.set(false);
+      this.toast.show({
+        message: 'student.shop.wearing',
+        kind: 'success',
+        params: { name: it.name },
+      });
+    } catch (err) {
+      this.toast.error(err);
+    }
   }
-  protected swatch(it: { spriteAssetId: string }): string {
-    return it.spriteAssetId.startsWith('color:') ? it.spriteAssetId.slice(6) : '';
-  }
-  protected reasonLabel(reason: string): string {
-    return REASON_LABEL[reason] ?? 'Unavailable';
-  }
-  protected rarityVariant(r: string): 'neutral' | 'info' | 'success' | 'warning' {
-    if (r === 'LEGENDARY' || r === 'EPIC') return 'warning';
-    if (r === 'RARE') return 'info';
-    if (r === 'UNCOMMON') return 'success';
-    return 'neutral';
-  }
-}
-
-/** Coarse "2d 4h" / "3h 12m" / "45s" countdown formatting. */
-function formatRemaining(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s % 60}s`;
-  return `${s}s`;
 }

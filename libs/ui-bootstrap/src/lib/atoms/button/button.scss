@@ -16,9 +16,11 @@
   line-height: var(--cdf-line-height-snug);
   cursor: pointer;
   transition:
-    background-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+    background-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard),
     color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
-    border-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+    border-color var(--cdf-motion-duration-fast)
+      var(--cdf-motion-easing-standard),
     box-shadow var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
     transform var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
 
@@ -85,7 +87,7 @@
 
   &--danger {
     background: var(--cdf-color-danger);
-    color: #fff;
+    color: var(--cdf-color-danger-on);
 
     &:hover:not(:disabled) {
       filter: brightness(0.9);

@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
   IonTabs,
@@ -44,28 +45,32 @@ export interface ShellTab {
     IonTabButton,
     IonLabel,
     Icon,
+    TranslatePipe,
   ],
   template: `
     <div class="cdf-shell">
-      <aside class="cdf-shell__sidebar" aria-label="Primary navigation">
+      <aside
+        class="cdf-shell__sidebar"
+        [attr.aria-label]="'ui.shell.primaryNav' | translate"
+      >
         <div class="cdf-shell__brand">{{ brand() }}</div>
         <nav>
           <ul>
             @for (t of tabs(); track t.path) {
-            <li>
-              <a
-                class="cdf-shell__sidebar-link"
-                [routerLink]="['/', t.path]"
-                routerLinkActive="cdf-shell__sidebar-link--active"
-                [routerLinkActiveOptions]="{ exact: false }"
-              >
-                <cdf-icon [name]="t.icon" size="md" />
-                <span>{{ t.label }}</span>
-                @if (t.badge) {
-                <span class="cdf-shell__sidebar-badge">{{ t.badge }}</span>
-                }
-              </a>
-            </li>
+              <li>
+                <a
+                  class="cdf-shell__sidebar-link"
+                  [routerLink]="['/', t.path]"
+                  routerLinkActive="cdf-shell__sidebar-link--active"
+                  [routerLinkActiveOptions]="{ exact: false }"
+                >
+                  <cdf-icon [name]="t.icon" size="md" />
+                  <span>{{ t.label }}</span>
+                  @if (t.badge) {
+                    <span class="cdf-shell__sidebar-badge">{{ t.badge }}</span>
+                  }
+                </a>
+              </li>
             }
           </ul>
         </nav>
@@ -74,13 +79,13 @@ export interface ShellTab {
       <ion-tabs class="cdf-shell__tabs">
         <ion-tab-bar slot="bottom" class="cdf-shell__tab-bar">
           @for (t of tabs(); track t.path) {
-          <ion-tab-button [tab]="t.path" [href]="'/' + t.path">
-            <cdf-icon [name]="t.icon" size="md" />
-            <ion-label>{{ t.label }}</ion-label>
-            @if (t.badge) {
-            <span class="cdf-shell__tab-badge">{{ t.badge }}</span>
-            }
-          </ion-tab-button>
+            <ion-tab-button [tab]="t.path" [href]="'/' + t.path">
+              <cdf-icon [name]="t.icon" size="md" />
+              <ion-label>{{ t.label }}</ion-label>
+              @if (t.badge) {
+                <span class="cdf-shell__tab-badge">{{ t.badge }}</span>
+              }
+            </ion-tab-button>
           }
         </ion-tab-bar>
       </ion-tabs>

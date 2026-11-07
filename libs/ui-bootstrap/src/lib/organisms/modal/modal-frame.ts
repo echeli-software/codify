@@ -1,5 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, input } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  input,
+} from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { TranslatePipe } from '@codify/i18n';
 import { IconButton } from '../../atoms/icon-button/icon-button.js';
 
 /**
@@ -17,14 +23,14 @@ import { IconButton } from '../../atoms/icon-button/icon-button.js';
 @Component({
   selector: 'cdf-modal-frame',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconButton],
+  imports: [IconButton, TranslatePipe],
   template: `
     <div class="cdf-modal">
       <header class="cdf-modal__head">
         <h2 class="cdf-modal__title">{{ title() }}</h2>
         <cdf-icon-button
           icon="x"
-          ariaLabel="Close"
+          [ariaLabel]="'common.close' | translate"
           kind="ghost"
           size="sm"
           (click)="modal.dismiss('close')"

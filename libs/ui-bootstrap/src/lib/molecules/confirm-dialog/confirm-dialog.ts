@@ -6,7 +6,12 @@ import {
   Injectable,
   signal,
 } from '@angular/core';
-import { NgbActiveModal, NgbModal, type NgbModalOptions } from '@ng-bootstrap/ng-bootstrap';
+import {
+  NgbActiveModal,
+  NgbModal,
+  type NgbModalOptions,
+} from '@ng-bootstrap/ng-bootstrap';
+import { TranslatePipe } from '@codify/i18n';
 import { Button, type ButtonKind } from '../../atoms/button/button.js';
 import { Icon, type IconName } from '../../atoms/icon/icon.js';
 
@@ -26,6 +31,8 @@ export interface ConfirmDialogOptions {
   typeToConfirm?: string;
 }
 
+let confirmSeq = 0;
+
 /**
  * Internal modal component. Use `ConfirmDialogService.open()` instead of
  * mounting this directly.
@@ -33,12 +40,12 @@ export interface ConfirmDialogOptions {
 @Component({
   selector: 'cdf-confirm-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Icon],
+  imports: [Button, Icon, TranslatePipe],
   template: `
     <div class="cdf-confirm">
       <header class="cdf-confirm__head">
         @if (opts().icon; as i) {
-        <cdf-icon [name]="i" size="lg" />
+          <cdf-icon [name]="i" size="lg" />
         }
         <h2 class="cdf-confirm__title">{{ opts().title }}</h2>
       </header>
@@ -46,26 +53,29 @@ export interface ConfirmDialogOptions {
       <p class="cdf-confirm__message">{{ opts().message }}</p>
 
       @if (opts().typeToConfirm; as expected) {
-      <p class="cdf-confirm__hint">
-        Type <code>{{ expected }}</code> to confirm.
-      </p>
-      <input
-        type="text"
-        class="cdf-confirm__input"
-        (input)="typed.set($any($event.target).value)"
-      />
+        <label class="cdf-confirm__hint" [for]="inputId">
+          {{ 'ui.confirm.typeToConfirm' | translate: { value: expected } }}
+        </label>
+        <input
+          type="text"
+          class="cdf-confirm__input"
+          autocomplete="off"
+          spellcheck="false"
+          [id]="inputId"
+          (input)="typed.set($any($event.target).value)"
+        />
       }
 
       <footer class="cdf-confirm__footer">
         <cdf-button kind="ghost" (click)="modal.dismiss(false)">
-          {{ opts().cancelLabel ?? 'Cancel' }}
+          {{ opts().cancelLabel ?? ('common.cancel' | translate) }}
         </cdf-button>
         <cdf-button
           [kind]="opts().confirmKind ?? 'primary'"
           [disabled]="!canConfirm()"
           (click)="modal.close(true)"
         >
-          {{ opts().confirmLabel ?? 'Confirm' }}
+          {{ opts().confirmLabel ?? ('common.confirm' | translate) }}
         </cdf-button>
       </footer>
     </div>
@@ -74,8 +84,12 @@ export interface ConfirmDialogOptions {
 })
 export class ConfirmDialog {
   protected readonly modal = inject(NgbActiveModal);
-  protected readonly opts = signal<ConfirmDialogOptions>({ title: '', message: '' });
+  protected readonly opts = signal<ConfirmDialogOptions>({
+    title: '',
+    message: '',
+  });
   protected readonly typed = signal('');
+  protected readonly inputId = `cdf-confirm-input-${++confirmSeq}`;
 
   protected readonly canConfirm = computed(() => {
     const expected = this.opts().typeToConfirm;
@@ -98,7 +112,10 @@ export class ConfirmDialog {
 export class ConfirmDialogService {
   private readonly modal = inject(NgbModal);
 
-  async open(opts: ConfirmDialogOptions, modalOpts?: NgbModalOptions): Promise<boolean | null> {
+  async open(
+    opts: ConfirmDialogOptions,
+    modalOpts?: NgbModalOptions,
+  ): Promise<boolean | null> {
     const ref = this.modal.open(ConfirmDialog, {
       centered: true,
       animation: true,

@@ -1,4 +1,9 @@
-import { isLocale, pickLocale, DEFAULT_LOCALE, SUPPORTED_LOCALES } from './locales.js';
+import {
+  isLocale,
+  pickLocale,
+  DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+} from './locales.js';
 
 describe('isLocale', () => {
   it('accepts supported codes', () => {

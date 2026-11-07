@@ -4,17 +4,24 @@ import {
   computed,
   input,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { RouterLink } from '@angular/router';
-import {
-  IonItem,
-  IonLabel,
-  IonNote,
-} from '@ionic/angular/standalone';
+import { IonItem, IonLabel, IonNote } from '@ionic/angular/standalone';
 import { Icon, type IconName } from '../../atoms/icon/icon.js';
 import { AppBadge } from '../../atoms/app-badge/app-badge.js';
 
-export type LessonItemType = 'reading' | 'quiz' | 'exercise' | 'ai-prompt' | 'scenario';
-export type LessonItemStatus = 'not-started' | 'in-progress' | 'completed' | 'locked';
+export type LessonItemType =
+  | 'reading'
+  | 'quiz'
+  | 'exercise'
+  | 'ai-prompt'
+  | 'scenario'
+  | 'capstone';
+export type LessonItemStatus =
+  | 'not-started'
+  | 'in-progress'
+  | 'completed'
+  | 'locked';
 
 const TYPE_ICON: Record<LessonItemType, IconName> = {
   reading: 'school-outline',
@@ -22,6 +29,7 @@ const TYPE_ICON: Record<LessonItemType, IconName> = {
   exercise: 'chip',
   'ai-prompt': 'sparkles',
   scenario: 'chat-ellipses',
+  capstone: 'trophy',
 };
 
 const STATUS_ICON: Record<LessonItemStatus, IconName | null> = {
@@ -40,7 +48,15 @@ const STATUS_ICON: Record<LessonItemStatus, IconName | null> = {
 @Component({
   selector: 'cdf-lesson-item',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonItem, IonLabel, IonNote, RouterLink, Icon, AppBadge],
+  imports: [
+    IonItem,
+    IonLabel,
+    IonNote,
+    RouterLink,
+    Icon,
+    AppBadge,
+    TranslatePipe,
+  ],
   template: `
     <ion-item
       [button]="!locked()"
@@ -52,17 +68,26 @@ const STATUS_ICON: Record<LessonItemStatus, IconName | null> = {
       <ion-label>
         <h3>{{ title() }}</h3>
         @if (subtitle()) {
-        <p>{{ subtitle() }}</p>
+          <p>{{ subtitle() }}</p>
         }
         @if (isFree()) {
-        <cdf-app-badge variant="success" [subtle]="true">Free preview</cdf-app-badge>
+          <cdf-app-badge variant="success" [subtle]="true">{{
+            'billing.freePreview' | translate
+          }}</cdf-app-badge>
         }
       </ion-label>
       @if (statusIcon(); as si) {
-      <cdf-icon slot="end" [name]="si" size="sm" [label]="statusLabel()" />
+        <cdf-icon
+          slot="end"
+          [name]="si"
+          size="sm"
+          [label]="'ui.lesson.status.' + status() | translate"
+        />
       }
       @if (estimateMinutes(); as min) {
-      <ion-note slot="end">{{ min }} min</ion-note>
+        <ion-note slot="end">{{
+          'ui.duration.minutes' | translate: { m: min }
+        }}</ion-note>
       }
     </ion-item>
   `,
@@ -77,8 +102,9 @@ export class LessonItem {
   readonly estimateMinutes = input<number | null>(null);
   readonly routerLink = input<unknown[] | string | null>(null);
 
-  protected readonly leadingIcon = computed<IconName>(() => TYPE_ICON[this.type()]);
+  protected readonly leadingIcon = computed<IconName>(
+    () => TYPE_ICON[this.type()],
+  );
   protected readonly statusIcon = computed(() => STATUS_ICON[this.status()]);
   protected readonly locked = computed(() => this.status() === 'locked');
-  protected readonly statusLabel = computed(() => this.status().replace('-', ' '));
 }

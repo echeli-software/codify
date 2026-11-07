@@ -1,5 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -7,24 +13,33 @@ import {
   IonContent,
 } from '@ionic/angular/standalone';
 import {
-  AppBadge,
   AppButton,
   AppCard,
   AppSkeleton,
+  AvatarBuilder,
   AvatarRenderer,
-  type AvatarSlot,
-  type AvatarSprite,
-  EmptyState,
   Icon,
+  Inventory,
+  type EquippedMap,
+  type ShopItem as UiShopItem,
 } from '@codify/ui-ionic';
 import {
   ItemsClient,
   type AvatarResponse,
   type InventoryItem,
-  type ItemSlot,
+  type ShopItem,
 } from '@codify/api-client';
+import { TranslatePipe } from '@codify/i18n';
 import { DownloadService } from '../offline/download.service.js';
 import { NetworkStatusService } from '../offline/network-status.service.js';
+import { AppToastService } from '../platform/app-toast.service.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
+import {
+  changedSlots,
+  equippedMap,
+  equippedSprites,
+  toUiItem,
+} from './shared/avatar.js';
 
 const SKIN_TONES: { value: string; emoji: string }[] = [
   { value: 'porcelain', emoji: '🧑🏻' },
@@ -34,101 +49,223 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
   { value: 'deep', emoji: '🧑🏿' },
 ];
 
-const SLOTS: { value: ItemSlot; label: string }[] = [
-  { value: 'HAT', label: 'Hat' },
-  { value: 'GLASSES', label: 'Glasses' },
-  { value: 'TOP', label: 'Top' },
-  { value: 'BOTTOM', label: 'Bottom' },
-  { value: 'SHOES', label: 'Shoes' },
-  { value: 'ACCESSORY', label: 'Accessory' },
-  { value: 'PET', label: 'Pet' },
-  { value: 'BACKGROUND', label: 'Background' },
-  { value: 'FRAME', label: 'Frame' },
-];
-
 /**
- * Dressing room — live-rendered avatar + per-slot equip from the user's
- * inventory. Tap a slot to see owned items for it; tap an item to equip
- * (or "None" to unequip). "Surprise me" shuffles a random owned look.
+ * Dressing room (docs/08): `AvatarBuilder` (slot tabs + owned items with a
+ * live preview, saved in one go), the grouped `Inventory` with equip /
+ * unequip toggles, free skin-tone customisation, and try-on of a shop item
+ * (`?tryOn=<itemId>`) without buying. Renders from the offline asset cache
+ * when there's no connection (equipping needs one).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, IonHeader, IonToolbar, IonTitle, IonContent, AppBadge, AppButton, AppCard, AppSkeleton, AvatarRenderer, EmptyState, Icon],
+  imports: [
+    RouterLink,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    AppButton,
+    AppCard,
+    AppSkeleton,
+    AvatarBuilder,
+    AvatarRenderer,
+    Icon,
+    Inventory,
+    TranslatePipe,
+  ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Dressing room</ion-title>
+        <ion-title>{{ 'student.avatar.title' | translate }}</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      @if (loading()) {
-      <cdf-app-skeleton shape="rect" />
-      } @else {
-      <div class="stage">
-        <cdf-avatar-renderer [config]="avatar()?.config ?? null" [equipped]="equippedSprites()" [size]="180" [showLevelRing]="true" [level]="null" data-testid="dressing-avatar" />
-        <div class="stage__actions">
-          <cdf-app-button kind="secondary" size="sm" (buttonClick)="surprise()" data-testid="surprise-btn">
-            <cdf-icon name="sparkles" size="sm" /> Surprise me
-          </cdf-app-button>
-          <cdf-app-button kind="ghost" size="sm" [routerLink]="['/shop']">Browse shop</cdf-app-button>
-        </div>
-      </div>
+      <div class="av">
+        @if (loading()) {
+          <cdf-app-skeleton shape="rect" [height]="280" />
+        } @else {
+          @if (!online()) {
+            <p class="av__muted" role="status">
+              <cdf-icon name="cloud-offline" size="xs" />
+              {{ 'student.avatar.offline' | translate }}
+            </p>
+          }
 
-      <!-- Free customization: skin tone -->
-      <h3 class="muted">Skin tone</h3>
-      <div class="tones" data-testid="skin-tones">
-        @for (t of skinTones; track t.value) {
-        <button
-          class="tone"
-          [class.tone--active]="currentTone() === t.value"
-          [attr.data-tone]="t.value"
-          (click)="setSkinTone(t.value)"
-        >{{ t.emoji }}</button>
-        }
-      </div>
+          @if (tryOn(); as t) {
+            <cdf-app-card
+              padding="normal"
+              class="av__tryon"
+              data-testid="try-on-panel"
+            >
+              <div class="av__tryon-row">
+                <cdf-avatar-renderer
+                  [config]="avatar()?.config ?? null"
+                  [equipped]="tryOnSprites()"
+                  [size]="140"
+                />
+                <div>
+                  <h2>
+                    {{
+                      'student.avatar.tryingOn' | translate: { name: t.name }
+                    }}
+                  </h2>
+                  <p class="av__muted">
+                    {{ 'student.avatar.tryOnHint' | translate }}
+                  </p>
+                  <div class="av__actions">
+                    <cdf-app-button
+                      kind="primary"
+                      size="sm"
+                      [routerLink]="['/shop']"
+                      data-testid="try-on-shop"
+                    >
+                      {{ 'student.avatar.backToShop' | translate }}
+                    </cdf-app-button>
+                    <cdf-app-button
+                      kind="ghost"
+                      size="sm"
+                      (buttonClick)="clearTryOn()"
+                    >
+                      {{ 'student.avatar.stopTryOn' | translate }}
+                    </cdf-app-button>
+                  </div>
+                </div>
+              </div>
+            </cdf-app-card>
+          }
 
-      <!-- Slot picker -->
-      <div class="filters" data-testid="slot-picker">
-        @for (s of slots; track s.value) {
-        <button class="chip" [class.chip--active]="slot() === s.value" (click)="slot.set(s.value)">{{ s.label }}</button>
-        }
-      </div>
+          <section aria-labelledby="av-builder">
+            <h2 id="av-builder" class="av__sr">
+              {{ 'student.avatar.builderTitle' | translate }}
+            </h2>
+            <cdf-avatar-builder
+              data-testid="avatar-builder"
+              [items]="owned()"
+              [equipped]="equipped()"
+              [config]="avatar()?.config ?? null"
+              [saving]="saving()"
+              (save)="save($event)"
+            />
+          </section>
 
-      <h3 class="muted">{{ slotLabel() }} — owned</h3>
-      <div class="grid" data-testid="owned-grid">
-        <cdf-app-card padding="normal" class="item" (click)="equip(null)">
-          <div class="item__sprite">∅</div>
-          <span>None</span>
-        </cdf-app-card>
-        @for (it of ownedForSlot(); track it.item.id) {
-        <cdf-app-card padding="normal" class="item" [class.item--on]="it.equipped" [attr.data-item-id]="it.item.id" (click)="equip(it.item.id)">
-          <div class="item__sprite" [style.background]="swatch(it.item.spriteAssetId)">{{ glyph(it.item.spriteAssetId) }}</div>
-          <span>{{ it.item.name }}</span>
-          @if (it.equipped) { <cdf-app-badge variant="success" [subtle]="true">On</cdf-app-badge> }
-        </cdf-app-card>
-        }
-        @if (ownedForSlot().length === 0) {
-        <cdf-empty-state icon="cart" title="Nothing in this slot" description="Buy items in the shop to fill it." />
+          <section aria-labelledby="av-tone" class="av__section">
+            <h2 id="av-tone">{{ 'student.avatar.skinTone' | translate }}</h2>
+            <div
+              class="av__tones"
+              role="radiogroup"
+              aria-labelledby="av-tone"
+              data-testid="skin-tones"
+            >
+              @for (tone of skinTones; track tone.value) {
+                <button
+                  type="button"
+                  role="radio"
+                  class="av__tone"
+                  [attr.aria-checked]="currentTone() === tone.value"
+                  [attr.aria-label]="
+                    'student.avatar.tones.' + tone.value | translate
+                  "
+                  [attr.data-tone]="tone.value"
+                  [disabled]="!online()"
+                  (click)="setSkinTone(tone.value)"
+                >
+                  <span aria-hidden="true">{{ tone.emoji }}</span>
+                </button>
+              }
+            </div>
+          </section>
+
+          <section aria-labelledby="av-inventory" class="av__section">
+            <div class="av__head">
+              <h2 id="av-inventory">
+                {{ 'student.avatar.inventory' | translate }}
+              </h2>
+              <a routerLink="/shop" class="av__link">{{
+                'student.avatar.browseShop' | translate
+              }}</a>
+            </div>
+            <cdf-inventory
+              data-testid="inventory"
+              [items]="owned()"
+              [busyId]="busyId()"
+              (equip)="equipOne($event, true)"
+              (unequip)="equipOne($event, false)"
+            />
+          </section>
         }
       </div>
-      }
     </ion-content>
   `,
   styles: [
     `
-      .stage { display: flex; flex-direction: column; align-items: center; gap: var(--cdf-space-2); margin-bottom: var(--cdf-space-3); }
-      .stage__actions { display: flex; gap: var(--cdf-space-2); }
-      .muted { color: var(--cdf-color-text-muted); }
-      .tones { display: flex; gap: 6px; margin-bottom: var(--cdf-space-2); }
-      .tone { font-size: 26px; line-height: 1; border: 2px solid transparent; border-radius: 50%; background: var(--cdf-color-surface-2, #eef1f6); width: 44px; height: 44px; }
-      .tone--active { border-color: var(--cdf-color-primary, #5b8def); }
-      .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--cdf-space-2); }
-      .chip { flex: 0 0 auto; border: 1px solid var(--cdf-color-border, #ccc); background: transparent; border-radius: 16px; padding: 4px 12px; font-size: 13px; }
-      .chip--active { background: var(--cdf-color-primary, #5b8def); color: #fff; border-color: transparent; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--cdf-space-2); }
-      .item { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
-      .item--on { outline: 2px solid var(--cdf-color-primary, #5b8def); }
-      .item__sprite { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 28px; background: var(--cdf-color-surface-2, #eef1f6); }
+      .av {
+        max-width: 1024px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--cdf-space-4);
+      }
+      h2 {
+        margin: 0 0 var(--cdf-space-2);
+        font-size: var(--cdf-font-size-md);
+      }
+      .av__sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      .av__muted {
+        color: var(--cdf-color-text-muted);
+        font-size: var(--cdf-font-size-sm);
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .av__tryon-row {
+        display: flex;
+        gap: var(--cdf-space-3);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .av__actions {
+        display: flex;
+        gap: var(--cdf-space-2);
+        flex-wrap: wrap;
+      }
+      .av__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .av__link {
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+        font-size: var(--cdf-font-size-sm);
+      }
+      .av__tones {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .av__tone {
+        font-size: 26px;
+        line-height: 1;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        background: var(--cdf-color-surface-2, rgba(0, 0, 0, 0.05));
+        cursor: pointer;
+      }
+      .av__tone[aria-checked='true'] {
+        border-color: var(--cdf-color-primary);
+      }
+      .av__tone:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
     `,
   ],
 })
@@ -136,27 +273,34 @@ export class AvatarPage {
   private readonly items = inject(ItemsClient);
   private readonly downloads = inject(DownloadService);
   private readonly network = inject(NetworkStatusService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly toast = inject(AppToastService);
+  private readonly telemetry = inject(TelemetryService);
 
-  protected readonly slots = SLOTS;
   protected readonly skinTones = SKIN_TONES;
+  protected readonly online = this.network.online;
   protected readonly loading = signal(true);
+  protected readonly saving = signal(false);
+  protected readonly busyId = signal<string | null>(null);
   protected readonly avatar = signal<AvatarResponse | null>(null);
   protected readonly inventory = signal<InventoryItem[]>([]);
-  protected readonly slot = signal<ItemSlot>('HAT');
+  protected readonly tryOn = signal<ShopItem | null>(null);
 
-  protected readonly currentTone = computed(() => (this.avatar()?.config?.['skinTone'] as string | undefined) ?? null);
-
-  protected readonly equippedSprites = computed<Partial<Record<AvatarSlot, AvatarSprite>>>(() => {
-    const out: Partial<Record<AvatarSlot, AvatarSprite>> = {};
-    const eq = this.avatar()?.equipped ?? {};
-    for (const [s, ref] of Object.entries(eq)) {
-      if (ref) out[s as AvatarSlot] = { spriteAssetId: ref.spriteAssetId, name: ref.name, rarity: ref.rarity };
-    }
-    return out;
-  });
-
-  protected readonly ownedForSlot = computed(() => this.inventory().filter((i) => i.item.slot === this.slot()));
-  protected readonly slotLabel = computed(() => SLOTS.find((s) => s.value === this.slot())?.label ?? '');
+  protected readonly owned = computed<UiShopItem[]>(() =>
+    this.inventory().map((i) =>
+      toUiItem(i.item, { owned: true, equipped: i.equipped }),
+    ),
+  );
+  protected readonly equipped = computed<EquippedMap>(() =>
+    equippedMap(this.avatar()),
+  );
+  protected readonly tryOnSprites = computed(() =>
+    equippedSprites(this.avatar(), this.tryOn()),
+  );
+  protected readonly currentTone = computed(
+    () => (this.avatar()?.config?.['skinTone'] as string | undefined) ?? null,
+  );
 
   constructor() {
     void this.load();
@@ -164,81 +308,102 @@ export class AvatarPage {
 
   private async load(): Promise<void> {
     this.loading.set(true);
-    // Offline: render avatar + inventory from the prefetched cache.
     if (!this.network.online()) {
       await this.loadFromCache();
       this.loading.set(false);
       return;
     }
     try {
-      const [av, inv] = await Promise.all([this.items.avatar(), this.items.inventory()]);
+      const [av, inv] = await Promise.all([
+        this.items.avatar(),
+        this.items.inventory(),
+      ]);
       this.avatar.set(av);
       this.inventory.set(inv);
-      // Cache so the dressing room renders offline next time.
       void this.downloads.prefetchAssets({ avatar: av, inventory: inv });
-    } catch {
-      await this.loadFromCache();
+      await this.loadTryOn();
+    } catch (err) {
+      if (!(await this.loadFromCache())) this.toast.error(err);
     } finally {
       this.loading.set(false);
     }
   }
 
-  private async loadFromCache(): Promise<void> {
-    const cached = await this.downloads.getCachedAssets();
-    if (cached) {
-      this.avatar.set(cached.avatar as AvatarResponse);
-      this.inventory.set((cached.inventory as InventoryItem[]) ?? []);
+  private async loadFromCache(): Promise<boolean> {
+    const cached = await this.downloads.getCachedAssets().catch(() => null);
+    if (!cached) return false;
+    this.avatar.set(cached.avatar as AvatarResponse);
+    this.inventory.set((cached.inventory as InventoryItem[]) ?? []);
+    return true;
+  }
+
+  /** `?tryOn=<itemId>` from the shop: preview without buying. */
+  private async loadTryOn(): Promise<void> {
+    const id = this.route.snapshot.queryParamMap.get('tryOn');
+    if (!id) return;
+    try {
+      const shop = await this.items.shop();
+      this.tryOn.set(shop.find((i) => i.id === id) ?? null);
+    } catch (err) {
+      this.toast.error(err);
     }
   }
 
-  /** Free customization — persists AvatarConfig and live-updates the renderer. */
+  protected clearTryOn(): void {
+    this.tryOn.set(null);
+    void this.router.navigate([], { queryParams: {}, replaceUrl: true });
+  }
+
+  /** AvatarBuilder "Save": apply every changed slot. */
+  protected async save(next: EquippedMap): Promise<void> {
+    const changes = changedSlots(this.equipped(), next);
+    if (changes.length === 0) return;
+    this.saving.set(true);
+    try {
+      for (const c of changes) {
+        this.avatar.set(await this.items.equip(c.slot, c.itemId));
+        if (c.itemId) this.telemetry.track('item_equip', { itemId: c.itemId });
+      }
+      await this.refreshInventory();
+      this.toast.show({ message: 'student.avatar.saved', kind: 'success' });
+    } catch (err) {
+      this.toast.error(err);
+      await this.refreshInventory();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async equipOne(item: UiShopItem, on: boolean): Promise<void> {
+    this.busyId.set(item.id);
+    try {
+      this.avatar.set(await this.items.equip(item.slot, on ? item.id : null));
+      if (on) this.telemetry.track('item_equip', { itemId: item.id });
+      await this.refreshInventory();
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
   protected async setSkinTone(tone: string): Promise<void> {
-    const config = { ...(this.avatar()?.config ?? {}), skinTone: tone };
-    // Optimistic local update so the avatar changes instantly.
+    const previous = this.avatar();
+    const config = { ...(previous?.config ?? {}), skinTone: tone };
     this.avatar.update((a) => (a ? { ...a, config } : a));
     try {
-      const av = await this.items.saveConfig(config);
-      this.avatar.set(av);
-    } catch {
-      /* surfaced by interceptor; optimistic value stays */
+      this.avatar.set(await this.items.saveConfig(config));
+    } catch (err) {
+      this.avatar.set(previous);
+      this.toast.error(err);
     }
-  }
-
-  protected async equip(itemId: string | null): Promise<void> {
-    try {
-      const av = await this.items.equip(this.slot(), itemId);
-      this.avatar.set(av);
-      await this.refreshInventory();
-    } catch {
-      /* surfaced by interceptor */
-    }
-  }
-
-  /** Shuffle a random owned item (or none) into each slot. */
-  protected async surprise(): Promise<void> {
-    const bySlot = new Map<ItemSlot, InventoryItem[]>();
-    for (const i of this.inventory()) {
-      const arr = bySlot.get(i.item.slot) ?? [];
-      arr.push(i);
-      bySlot.set(i.item.slot, arr);
-    }
-    for (const [slot, arr] of bySlot) {
-      // +1 so "none" is also a possible roll.
-      const pick = arr[Math.floor(Math.random() * (arr.length + 1))];
-      const av = await this.items.equip(slot, pick ? pick.item.id : null);
-      this.avatar.set(av);
-    }
-    await this.refreshInventory();
   }
 
   private async refreshInventory(): Promise<void> {
-    this.inventory.set(await this.items.inventory());
-  }
-
-  protected glyph(token: string): string {
-    return token.startsWith('emoji:') ? token.slice(6) : '';
-  }
-  protected swatch(token: string): string {
-    return token.startsWith('color:') ? token.slice(6) : '';
+    try {
+      this.inventory.set(await this.items.inventory());
+    } catch (err) {
+      this.toast.error(err);
+    }
   }
 }

@@ -1,51 +1,10 @@
 // Public surface of @codify/ui-core. Pure TS; no DOM, no Angular.
-// See docs/03-shared-libraries.md.
+// See docs/03-shared-libraries.md. Each module is also published as its own
+// entry point (`@codify/ui-core/format`, `/level`, `/validate`, `/color`,
+// `/random`) so consumers can import only what they need.
 
-// Format
-export {
-  formatCurrency,
-  formatInstallmentAmount,
-  type FormatCurrencyOptions,
-} from './lib/format/currency.js';
-export {
-  formatXp,
-  formatCoins,
-  formatCompact,
-  formatMultiplier,
-} from './lib/format/numbers.js';
-export {
-  formatDuration,
-  type DurationUnit,
-  type FormattedDuration,
-} from './lib/format/duration.js';
-export { formatRelative } from './lib/format/relative.js';
-
-// Level
-export {
-  xpForLevel,
-  levelFromXp,
-  xpToNextLevel,
-  levelProgress,
-  levelProgressPct,
-  tierForLevel,
-  type LevelTier,
-} from './lib/level/level.js';
-
-// Validate
-export {
-  Email,
-  Slug,
-  LocaleCode,
-  Currency,
-  HexColor,
-  DisplayName,
-} from './lib/validate/primitives.js';
-
-// Color
-export {
-  getContrastingTextColor,
-  contrastRatio,
-} from './lib/color/contrast.js';
-
-// Random
-export { mulberry32, pickSeeded } from './lib/random/seeded.js';
+export * from './lib/format/index.js';
+export * from './lib/level/index.js';
+export * from './lib/validate/index.js';
+export * from './lib/color/index.js';
+export * from './lib/random/index.js';

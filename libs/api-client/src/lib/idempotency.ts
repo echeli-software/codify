@@ -43,7 +43,10 @@ export function withIdempotency(
  * `Math.random()` v4 for SSR / very old environments.
  */
 export function uuidV4(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID();
   }
   // Fallback — non-cryptographic, used only if native API is unavailable.

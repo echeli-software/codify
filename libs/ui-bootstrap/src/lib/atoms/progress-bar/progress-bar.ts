@@ -1,22 +1,37 @@
-import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  computed,
+  input,
+} from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 
-export type ProgressBarVariant = 'primary' | 'success' | 'warning' | 'danger' | 'xp';
+export type ProgressBarVariant =
+  | 'primary'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'xp';
 export type ProgressBarSize = 'sm' | 'md' | 'lg';
 
 @Component({
   selector: 'cdf-progress-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div
       class="cdf-progress"
       [class]="cssClass()"
       role="progressbar"
-      [attr.aria-label]="label()"
+      [attr.aria-label]="label() ?? ('ui.progress.label' | translate)"
       [attr.aria-valuenow]="indeterminate() ? null : pct()"
       [attr.aria-valuemin]="indeterminate() ? null : 0"
       [attr.aria-valuemax]="indeterminate() ? null : 100"
     >
-      <div class="cdf-progress__bar" [style.width.%]="indeterminate() ? null : pct()"></div>
+      <div
+        class="cdf-progress__bar"
+        [style.width.%]="indeterminate() ? null : pct()"
+      ></div>
     </div>
   `,
   styleUrl: './progress-bar.scss',
@@ -38,7 +53,10 @@ export class ProgressBar {
   });
 
   protected readonly cssClass = computed(() => {
-    const cls = [`cdf-progress--${this.variant()}`, `cdf-progress--${this.size()}`];
+    const cls = [
+      `cdf-progress--${this.variant()}`,
+      `cdf-progress--${this.size()}`,
+    ];
     if (this.indeterminate()) cls.push('cdf-progress--indeterminate');
     return cls.join(' ');
   });

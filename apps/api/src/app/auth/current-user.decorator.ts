@@ -1,4 +1,8 @@
-import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
+import {
+  createParamDecorator,
+  type ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import type { ApiUser } from './auth.types.js';
 
@@ -12,9 +16,9 @@ export const CurrentUser = createParamDecorator(
   (_: unknown, ctx: ExecutionContext): ApiUser => {
     const req = ctx.switchToHttp().getRequest<Request>();
     if (!req.user) {
-      throw new Error(
-        'CurrentUser used on a route without RolesGuard or a public route',
-      );
+      // A @Public() route (or one the guard didn't cover) reached a handler
+      // that needs a user: answer 401, never a 500.
+      throw new UnauthorizedException('Authentication required');
     }
     return req.user;
   },

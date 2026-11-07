@@ -9,7 +9,8 @@
   border-radius: var(--cdf-radius-circle);
   overflow: hidden;
   font-weight: var(--cdf-font-weight-semibold);
-  color: var(--cdf-color-text);
+  // Background is a light generated pastel in both themes.
+  color: var(--cdf-color-ink);
   flex-shrink: 0;
   position: relative;
 

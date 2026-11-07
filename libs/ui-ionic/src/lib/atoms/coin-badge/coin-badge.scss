@@ -10,25 +10,39 @@
 :host([data-size='sm']) {
   font-size: var(--cdf-font-size-sm);
 
-  .cdf-coin-badge__icon { width: 10px; height: 10px; }
+  .cdf-coin-badge__icon {
+    width: 10px;
+    height: 10px;
+  }
 }
 
 :host([data-size='md']) {
   font-size: var(--cdf-font-size-base);
 
-  .cdf-coin-badge__icon { width: 12px; height: 12px; }
+  .cdf-coin-badge__icon {
+    width: 12px;
+    height: 12px;
+  }
 }
 
 :host([data-size='lg']) {
   font-size: var(--cdf-font-size-lg);
 
-  .cdf-coin-badge__icon { width: 16px; height: 16px; }
+  .cdf-coin-badge__icon {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .cdf-coin-badge__icon {
   display: inline-block;
   border-radius: var(--cdf-radius-circle);
-  background: radial-gradient(circle at 30% 30%, #ffe98a 0%, var(--cdf-color-coin) 60%, #b67000 100%);
+  background: radial-gradient(
+    circle at 30% 30%,
+    #ffe98a 0%,
+    var(--cdf-color-coin) 60%,
+    #b67000 100%
+  );
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.08),
     0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -41,12 +55,15 @@
 }
 
 :host([data-tone='gain']) {
-  color: var(--cdf-color-success);
+  color: var(--cdf-color-success-text);
 }
 
 :host([data-tone='large']) {
   font-size: var(--cdf-font-size-2xl);
   font-weight: var(--cdf-font-weight-bold);
 
-  .cdf-coin-badge__icon { width: 24px; height: 24px; }
+  .cdf-coin-badge__icon {
+    width: 24px;
+    height: 24px;
+  }
 }

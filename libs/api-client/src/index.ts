@@ -6,7 +6,11 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 
 // Typed clients
 export { MeClient } from './lib/me.client.js';
-export { UsersClient } from './lib/users.client.js';
+export {
+  UsersClient,
+  type UserListQuery,
+  type UserSubscriptionFilter,
+} from './lib/users.client.js';
 export { DevicesClient, type DevicePlatform } from './lib/devices.client.js';
 export {
   CertificatesClient,
@@ -58,6 +62,9 @@ export {
   type StreakInfo,
   type CompletedQuest,
   type UnlockedBadge,
+  type CompleteLessonBody,
+  type CompleteLessonOptions,
+  type CompleteLessonConflictCode,
 } from './lib/progress.client.js';
 export {
   GamificationClient,
@@ -104,6 +111,11 @@ export {
   type SubmitResult,
   type AdminExercise,
   type CreateExerciseBody,
+  type ExerciseLanguage,
+  type ExerciseVerdict,
+  type SubmissionStatus,
+  type SubmissionView,
+  isSubmissionFinal,
 } from './lib/exercises.client.js';
 export {
   AiPromptsClient,
@@ -113,6 +125,8 @@ export {
   type GradeResult,
   type AdminAiPrompt,
   type AiPromptBody,
+  type AiPromptPreview,
+  type AiPromptRateLimitCode,
 } from './lib/ai-prompts.client.js';
 export {
   ScenariosClient,
@@ -141,10 +155,65 @@ export {
   type MySubscriptionResponse,
   type CheckoutSessionResponse,
   type LessonAccess,
+  type SubscriptionSource,
+  type AdminSubscriptionView,
+  type ChangeSubscriptionBody,
+  type GrantSubscriptionBody,
+  type AdminCancelBody,
+} from './lib/billing.client.js';
+export { type UpdatePlanPriceBody } from './lib/plans.client.js';
+export type {
+  PaymentProviderKind,
+  PaymentStatus,
+  PaymentView,
+  AdminPaymentView,
+  PaymentPage,
+  StripeStatus,
 } from './lib/billing.client.js';
 
+// Engagement area additions (gamification config, leagues, shop, referrals, translations)
+export type {
+  ListMultipliersQuery,
+  RewardAmount,
+  GamificationConfigValues,
+  GamificationConfigKey,
+  GamificationConfigEntry,
+  GamificationConfigPatch,
+} from './lib/gamification.client.js';
+export type { PurchaseResponse } from './lib/items.client.js';
+export type {
+  LeagueTier,
+  LastWeekResult,
+  RolloverSummary,
+  FriendInvite,
+  AcceptInviteResult,
+} from './lib/leagues.client.js';
+export {
+  ReferralsClient,
+  type ReferralSummary,
+  type ClaimReferralResult,
+} from './lib/referrals.client.js';
+export {
+  TranslationsClient,
+  TRANSLATION_FALLBACK_HEADER,
+  type ContentLocale,
+  type TranslatableEntityType,
+  type TranslationStatus,
+  type TranslationRow,
+  type ListTranslationsQuery,
+  type TranslationUpsert,
+  type CompletenessCounts,
+  type TranslationCompleteness,
+  type ResolvedField,
+  type ResolvedTranslations,
+} from './lib/translations.client.js';
+
 // Idempotency helpers
-export { withIdempotency, IDEMPOTENCY_TOKEN, uuidV4 } from './lib/idempotency.js';
+export {
+  withIdempotency,
+  IDEMPOTENCY_TOKEN,
+  uuidV4,
+} from './lib/idempotency.js';
 
 // Error mapping
 export {
@@ -162,3 +231,105 @@ export type {
   AdminUserListResponse,
   HealthResponse,
 } from './lib/types.js';
+
+// Lesson content delivery: offline bundle + lesson versions.
+export type {
+  LessonMeta,
+  LessonOfflineBundle,
+  LessonVersion,
+  LessonContentIssue,
+} from './lib/lessons.client.js';
+
+// Quizzes, enrollments, uploads, analytics.
+export {
+  QuizzesClient,
+  type QuizAttemptResult,
+  type QuizAttemptSummary,
+  type QuizQuestionFeedback,
+} from './lib/quizzes.client.js';
+export {
+  EnrollmentsClient,
+  type EnrollmentSource,
+  type EnrollmentView,
+  type MyEnrollment,
+  type GrantEnrollmentBody,
+} from './lib/enrollments.client.js';
+export {
+  AssetsClient,
+  type AssetKind,
+  type AssetView,
+  type AssetPage,
+  type PresignedUpload,
+} from './lib/assets.client.js';
+export {
+  AnalyticsClient,
+  type AnalyticsBatch,
+  type AnalyticsEventInput,
+  type AnalyticsSummaryRow,
+} from './lib/analytics.client.js';
+export {
+  OpsClient,
+  type LedgerDriftMismatch,
+  type LedgerDriftReport,
+} from './lib/ops.client.js';
+export {
+  AdminOpsClient,
+  filenameFromDisposition,
+  type AuditEntry,
+  type CursorPage,
+  type AdminDashboard,
+  type AdminDashboardKpis,
+  type TeacherDashboardKpis,
+  type DashboardTopCourse,
+  type DashboardDropOffLesson,
+  type AdminSearchHit,
+  type AdminSearchHitType,
+  type AdminSearchResults,
+  type AuditQuery,
+  type AuditExport,
+  type AdminLeagueTier,
+  type LeagueSnapshot,
+  type LeagueDetail,
+  type UserInventoryEntry,
+  type GrantItemResult,
+  type LedgerType,
+  type LedgerEntry,
+  type LedgerPage,
+  type BadgeTestResult,
+  type ItemCategoryAdmin,
+} from './lib/admin-ops.client.js';
+
+// Account lifecycle + privacy (docs/14 §13) and feature flags (docs/10 §9).
+export {
+  AccountClient,
+  ACCOUNT_DELETED,
+  ACCOUNT_SUSPENDED,
+  EXPORT_RATE_LIMITED,
+  type AccountStatus,
+  type AccountStatusView,
+  type AdminAccountStatusView,
+  type ModerationResult,
+  type DeleteAccountResult,
+  type AccountExport,
+} from './lib/account.client.js';
+export {
+  FlagsClient,
+  FEATURE_DISABLED,
+  type FlagEvaluation,
+  type FeatureFlag,
+  type FeatureFlagValue,
+  type CreateFeatureFlagBody,
+  type UpdateFeatureFlagBody,
+} from './lib/flags.client.js';
+
+// Notification inbox + preferences (docs/05 Notifications, docs/10 §3).
+export {
+  NotificationsClient,
+  type NotificationKind,
+  type NotificationAction,
+  type InboxNotification,
+  type InboxPage,
+  type KindPreference,
+  type NotificationPreferences,
+  type UpdateNotificationPreferencesBody,
+} from './lib/notifications.client.js';

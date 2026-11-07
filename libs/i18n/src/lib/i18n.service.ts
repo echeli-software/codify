@@ -21,36 +21,95 @@ import {
   type LocaleMeta,
 } from './locales.js';
 
+import {
+  ContentTranslationService,
+  type ContentEntityType,
+  type ContentLookupOptions,
+} from './content-translation.js';
+import { LOCALE_PERSISTENCE } from './persistence.js';
+
 const STORAGE_KEY = 'codify.locale';
 
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly translate = inject(TranslateService);
+  private readonly content = inject(ContentTranslationService);
+  private readonly persistence = inject(LOCALE_PERSISTENCE, { optional: true });
   private readonly _current = signal<Locale>(DEFAULT_LOCALE);
+  private requestSeq = 0;
 
   /** Current locale. Reactive. */
   readonly currentLocale = this._current.asReadonly();
   /** Read-only list of supported locales for the language switcher. */
-  readonly availableLocales: readonly LocaleMeta[] = SUPPORTED_LOCALES.map((c) => LOCALE_META[c]);
+  readonly availableLocales: readonly LocaleMeta[] = SUPPORTED_LOCALES.map(
+    (c) => LOCALE_META[c],
+  );
   /** Convenience: meta for the current locale. */
   readonly currentMeta = computed(() => LOCALE_META[this._current()]);
 
-  init(): void {
+  /**
+   * Picks the initial locale and loads its strings. Runs in an app
+   * initializer: the returned promise resolves once `t()` can translate
+   * synchronously (immediately when the strings were preloaded).
+   */
+  init(): Promise<void> {
     this.translate.addLangs([...SUPPORTED_LOCALES]);
     this.translate.setFallbackLang(DEFAULT_LOCALE);
     const initial = this.detectInitial();
-    this.applyLocale(initial);
+    return this.applyLocale(initial);
   }
 
-  setLocale(locale: Locale): void {
-    if (!SUPPORTED_LOCALES.includes(locale)) return;
-    this.applyLocale(locale);
+  /**
+   * Switches locale. The switch (signal, `<html lang>`) is applied once the
+   * locale's strings are loaded — synchronously when they already are.
+   */
+  setLocale(locale: Locale): Promise<void> {
+    if (!SUPPORTED_LOCALES.includes(locale)) return Promise.resolve();
     this.persist(locale);
+    return this.applyLocale(locale);
+  }
+
+  /**
+   * User-initiated switch (LanguageSwitcher): applies the locale locally,
+   * then persists it server-side through the optional `LOCALE_PERSISTENCE`.
+   * Resolves once the remote save settles; never rejects.
+   */
+  async changeLocale(locale: Locale): Promise<void> {
+    if (!SUPPORTED_LOCALES.includes(locale)) return;
+    await this.setLocale(locale);
+    if (!this.persistence) return;
+    try {
+      await this.persistence.persist(locale);
+    } catch {
+      // Remote save failed — the local choice (localStorage) still holds.
+    }
   }
 
   /** Translate a key with optional ICU params. Synchronous instant lookup. */
   t(key: string, params?: Record<string, unknown>): string {
     return this.translate.instant(key, params) as string;
+  }
+
+  /**
+   * Content translation for the current locale (docs/03). Signal-backed:
+   * call it inside a template / computed and it re-renders once the batch
+   * lands. Returns `opts.fallback` (or '') until then / when missing.
+   */
+  tContent(
+    entityType: ContentEntityType,
+    entityId: string | null | undefined,
+    field: string,
+    opts: ContentLookupOptions = {},
+  ): string {
+    return (
+      this.content.translate(
+        entityType,
+        entityId,
+        field,
+        opts.locale ?? this._current(),
+        opts.fallback ?? null,
+      ) ?? ''
+    );
   }
 
   /**
@@ -68,9 +127,28 @@ export class I18nService {
     return pickLocale(candidates);
   }
 
-  private applyLocale(locale: Locale): void {
+  private applyLocale(locale: Locale): Promise<void> {
+    const request = ++this.requestSeq;
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        // A later setLocale() wins over a slower earlier load.
+        if (request === this.requestSeq) this.commitLocale(locale);
+        resolve();
+      };
+      // Emits synchronously when the strings are already loaded.
+      this.translate.use(locale).subscribe({
+        complete: done,
+        error: (err: unknown) => {
+          // Keep the current locale (ngx-translate did not switch either).
+          console.error(`[i18n] could not load ${locale} strings`, err);
+          resolve();
+        },
+      });
+    });
+  }
+
+  private commitLocale(locale: Locale): void {
     this._current.set(locale);
-    this.translate.use(locale);
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('lang', locale);
       document.documentElement.setAttribute('dir', LOCALE_META[locale].dir);

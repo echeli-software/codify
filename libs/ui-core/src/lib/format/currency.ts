@@ -44,3 +44,39 @@ export function formatInstallmentAmount(
   const per = Math.round(totalCents / count);
   return formatCurrency(per, currency, locale);
 }
+
+export interface FormatInstallmentsInput {
+  totalCents: number;
+  count: number;
+  currency: string;
+  locale: string;
+}
+
+export interface FormattedInstallments {
+  /** Normalised installment count (≥ 1). */
+  count: number;
+  /** Formatted per-installment amount, e.g. "R$ 39,90". */
+  perInstallment: string;
+  /** Formatted total, e.g. "R$ 478,80". */
+  total: string;
+}
+
+/**
+ * docs/03 `formatInstallments({ totalCents, count, currency, locale })` —
+ * returns the pieces the i18n sentence (`billing.installments`) needs.
+ */
+export function formatInstallments(
+  input: FormatInstallmentsInput,
+): FormattedInstallments {
+  const count = input.count > 0 ? Math.floor(input.count) : 1;
+  return {
+    count,
+    perInstallment: formatInstallmentAmount(
+      input.totalCents,
+      count,
+      input.currency,
+      input.locale,
+    ),
+    total: formatCurrency(input.totalCents, input.currency, input.locale),
+  };
+}

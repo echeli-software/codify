@@ -1,0 +1,108 @@
+:host {
+  display: block;
+}
+
+.cdf-media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-3);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cdf-space-3);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-md);
+    font-weight: var(--cdf-font-weight-semibold);
+    color: var(--cdf-color-text);
+  }
+
+  &__filter {
+    width: 180px;
+  }
+
+  &__state {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    margin: 0;
+    padding: var(--cdf-space-4);
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-sm);
+    border: 1px dashed var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--cdf-space-3);
+    margin: 0;
+    padding: var(--cdf-space-1);
+    list-style: none;
+    border-radius: var(--cdf-radius-md);
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-1);
+    padding: var(--cdf-space-1);
+    border: 2px solid transparent;
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface);
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--cdf-color-border);
+    }
+
+    &[aria-selected='true'] {
+      border-color: var(--cdf-color-primary);
+      background: var(--cdf-color-primary-subtle);
+    }
+  }
+
+  &__thumb,
+  &__file {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--cdf-radius-sm);
+    object-fit: cover;
+    background: var(--cdf-color-surface-elev);
+  }
+
+  &__file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__name {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__foot {
+    display: flex;
+    justify-content: center;
+    min-height: var(--cdf-space-8);
+
+    &:empty {
+      display: none;
+    }
+  }
+}

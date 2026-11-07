@@ -19,7 +19,8 @@
     font-size: var(--cdf-font-size-sm);
     cursor: pointer;
     transition:
-      background-color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard),
+      background-color var(--cdf-motion-duration-fast)
+        var(--cdf-motion-easing-standard),
       color var(--cdf-motion-duration-fast) var(--cdf-motion-easing-standard);
 
     &:hover {
@@ -46,5 +47,11 @@
   &__ellipsis {
     color: var(--cdf-color-text-muted);
     padding: 0 var(--cdf-space-1);
+  }
+
+  &__status {
+    color: var(--cdf-color-text-muted);
+    font-size: var(--cdf-font-size-sm);
+    padding: 0 var(--cdf-space-2);
   }
 }

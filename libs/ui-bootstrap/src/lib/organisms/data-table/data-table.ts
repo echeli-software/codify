@@ -11,6 +11,7 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { TranslatePipe } from '@codify/i18n';
 import { Checkbox } from '../../atoms/checkbox/checkbox.js';
 import { FormsModule } from '@angular/forms';
 import { Icon } from '../../atoms/icon/icon.js';
@@ -49,7 +50,7 @@ export class DataTableCell {
 @Component({
   selector: 'cdf-data-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NgTemplateOutlet, Checkbox, Icon],
+  imports: [FormsModule, NgTemplateOutlet, Checkbox, Icon, TranslatePipe],
   template: `
     <div class="cdf-table-wrap">
       <table class="cdf-table">
@@ -58,7 +59,9 @@ export class DataTableCell {
             @if (selectable()) {
               <th class="cdf-table__select">
                 <cdf-checkbox
-                  [(ngModel)]="allSelected"
+                  [ariaLabel]="'ui.dataTable.selectAll' | translate"
+                  [indeterminate]="someSelected()"
+                  [ngModel]="allSelected()"
                   (ngModelChange)="onToggleAll($event)"
                 />
               </th>
@@ -94,7 +97,11 @@ export class DataTableCell {
               </th>
             }
             @if (rowActions()) {
-              <th class="cdf-table__actions">&nbsp;</th>
+              <th class="cdf-table__actions">
+                <span class="visually-hidden">{{
+                  'ui.dataTable.actions' | translate
+                }}</span>
+              </th>
             }
           </tr>
         </thead>
@@ -105,6 +112,10 @@ export class DataTableCell {
               @if (selectable()) {
                 <td class="cdf-table__select">
                   <cdf-checkbox
+                    [ariaLabel]="
+                      'ui.dataTable.selectRow'
+                        | translate: { index: $index + 1 }
+                    "
                     [ngModel]="isSelected(trackBy()(row))"
                     (ngModelChange)="onToggleRow(trackBy()(row), $event)"
                   />
@@ -148,7 +159,7 @@ export class DataTableCell {
                   (rowActions() ? 1 : 0)
                 "
               >
-                {{ emptyMessage() }}
+                {{ emptyMessage() ?? ('ui.dataTable.empty' | translate) }}
               </td>
             </tr>
           }
@@ -166,7 +177,7 @@ export class DataTable<T> {
     (row) => (row as unknown as { id: string | number }).id,
   );
   readonly selectable = input(false);
-  readonly emptyMessage = input('No items.');
+  readonly emptyMessage = input<string | null>(null);
   /** Optional row-actions template projected via `<ng-template #actions let-row>…</ng-template>`. */
   readonly rowActions = input<TemplateRef<unknown> | null>(null);
 
@@ -190,6 +201,12 @@ export class DataTable<T> {
     const all = this.rows();
     if (all.length === 0) return false;
     return all.every((r) => this.selected().has(this.trackBy()(r)));
+  });
+
+  protected readonly someSelected = computed(() => {
+    const ids = this.rows().map((r) => this.trackBy()(r));
+    const picked = ids.filter((id) => this.selected().has(id)).length;
+    return picked > 0 && picked < ids.length;
   });
 
   protected cellTplFor(key: string): TemplateRef<unknown> | null {

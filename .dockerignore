@@ -1,0 +1,59 @@
+# Build context for apps/*/Dockerfile (context = repository root).
+# Keep it to sources + manifests; dependencies are installed inside the image.
+
+# VCS / editor / agent state
+.git
+.github
+.vscode
+.idea
+.claude
+.cursor
+*.md
+!README.md
+
+# Dependencies & build output (rebuilt in the image)
+node_modules
+**/node_modules
+dist
+**/dist
+tmp
+out-tsc
+coverage
+test-output
+storybook-static
+.angular
+.nx/cache
+.nx/workspace-data
+.sass-cache
+
+# Native shells (built by mobile.yml, never part of a server image)
+apps/student/android
+apps/student/ios
+apps/student/fastlane
+
+# Secrets — never in an image layer
+.env
+.env.*
+!.env.example
+prisma/.env
+*.pem
+*.key
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+
+# Infra code other than the build helpers the Dockerfiles use
+# (infra/docker and infra/web stay in the context; listed explicitly rather
+# than via `!` re-includes of an excluded parent).
+infra/terraform
+infra/judge0
+infra/coolify
+infra/observability
+infra/deploy
+infra/storybook
+
+# Load / probe tooling
+tools/load
+BROWSER-TESTS.md
+docs

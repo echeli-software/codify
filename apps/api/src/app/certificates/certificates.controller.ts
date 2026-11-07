@@ -1,17 +1,34 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { IsString, Length } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { Public } from '../auth/public.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { CertificatesService, renderCertificateSvg, type CertificateView, type ReferralView } from './certificates.service.js';
+import {
+  CertificatesService,
+  renderCertificateSvg,
+  type CertificateView,
+} from './certificates.service.js';
 
 class ClaimDto {
-  @IsString() @Length(1, 64)
+  @IsString()
+  @Length(1, 64)
   courseId!: string;
 }
 
+/**
+ * Certificates of completion. (Referral endpoints moved to the referrals
+ * module — `GET /me/referral` keeps its path and response shape.)
+ */
 @Controller()
 export class CertificatesController {
   constructor(private readonly certs: CertificatesService) {}
@@ -20,7 +37,10 @@ export class CertificatesController {
 
   @Roles('STUDENT')
   @Post('certificates/claim')
-  claim(@CurrentUser() actor: ApiUser, @Body() body: ClaimDto): Promise<CertificateView> {
+  claim(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: ClaimDto,
+  ): Promise<CertificateView> {
     return this.certs.claim(actor.userId, body.courseId);
   }
 
@@ -30,25 +50,23 @@ export class CertificatesController {
     return this.certs.listMine(actor.userId);
   }
 
-  @Roles('STUDENT')
-  @Get('me/referral')
-  referral(@CurrentUser() actor: ApiUser): Promise<ReferralView> {
-    const base = process.env['STUDENT_APP_URL'] ?? 'https://codify.app';
-    return this.certs.getReferral(actor.userId, base);
-  }
-
   // ─── Public verification ──────────────────────────────────────────────
 
   @Public()
   @Get('certificates/:serial')
-  async verify(@Param('serial') serial: string): Promise<{ valid: boolean } & Partial<CertificateView>> {
+  async verify(
+    @Param('serial') serial: string,
+  ): Promise<{ valid: boolean } & Partial<CertificateView>> {
     const cert = await this.certs.verify(serial);
     return cert ? { valid: true, ...cert } : { valid: false };
   }
 
   @Public()
   @Get('certificates/:serial/image.svg')
-  async image(@Param('serial') serial: string, @Res() res: Response): Promise<void> {
+  async image(
+    @Param('serial') serial: string,
+    @Res() res: Response,
+  ): Promise<void> {
     const cert = await this.certs.verify(serial);
     if (!cert) throw new NotFoundException('Certificate not found');
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');

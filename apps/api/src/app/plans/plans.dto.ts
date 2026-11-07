@@ -11,16 +11,20 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 const PERIODS = ['MONTHLY', 'ANNUAL'] as const;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const STORE_PRODUCT_PATTERN = /^[A-Za-z0-9._:-]*$/;
 
 /** A price line on a plan. `(currency, period)` is unique within a plan. */
 export class PlanPriceInputDto {
-  @Matches(CURRENCY_PATTERN, { message: 'currency must be a 3-letter ISO-4217 code' })
+  @Matches(CURRENCY_PATTERN, {
+    message: 'currency must be a 3-letter ISO-4217 code',
+  })
   currency!: string;
 
   @IsInt()
@@ -36,12 +40,51 @@ export class PlanPriceInputDto {
   @Min(2)
   @Max(12)
   maxInstallments?: number;
+
+  /** App Store / Play product id sold through RevenueCat (docs/17-mobile). */
+  @IsOptional()
+  @IsString()
+  @Length(0, 120)
+  @Matches(STORE_PRODUCT_PATTERN, {
+    message:
+      'storeProductId may only contain a-z, A-Z, 0-9, ".", "_", "-", ":"',
+  })
+  storeProductId?: string;
+}
+
+/**
+ * Patch a price line. Amount / currency / period are immutable (Stripe
+ * prices are) — remove and re-add the price to change them. An empty
+ * `storeProductId` clears it; `maxInstallments: null` disables parcelamento.
+ */
+export class UpdatePlanPriceDto {
+  @IsOptional()
+  @IsString()
+  @Length(0, 120)
+  @Matches(STORE_PRODUCT_PATTERN, {
+    message:
+      'storeProductId may only contain a-z, A-Z, 0-9, ".", "_", "-", ":"',
+  })
+  storeProductId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(2)
+  @Max(12)
+  maxInstallments?: number | null;
 }
 
 export class CreatePlanDto {
   @IsString()
   @Length(2, 40)
-  @Matches(SLUG_PATTERN, { message: 'slug must be kebab-case (a-z, 0-9, hyphen), 2-40 chars' })
+  @Matches(SLUG_PATTERN, {
+    message: 'slug must be kebab-case (a-z, 0-9, hyphen), 2-40 chars',
+  })
   slug!: string;
 
   @IsString()
@@ -98,7 +141,9 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsString()
   @Length(2, 40)
-  @Matches(SLUG_PATTERN, { message: 'slug must be kebab-case (a-z, 0-9, hyphen), 2-40 chars' })
+  @Matches(SLUG_PATTERN, {
+    message: 'slug must be kebab-case (a-z, 0-9, hyphen), 2-40 chars',
+  })
   slug?: string;
 
   @IsOptional()
@@ -158,6 +203,11 @@ export class ListPlansQueryDto {
   @IsOptional()
   @IsString()
   courseId?: string;
+
+  /** Content locale for name/description/tagline (docs/11 §3); defaults to Accept-Language. */
+  @IsOptional()
+  @IsIn(['pt-BR', 'en-US'])
+  locale?: 'pt-BR' | 'en-US';
 }
 
 export interface PlanPriceResponse {
@@ -168,6 +218,7 @@ export interface PlanPriceResponse {
   maxInstallments: number | null;
   isActive: boolean;
   stripePriceId: string | null;
+  storeProductId: string | null;
 }
 
 export interface PlanResponse {

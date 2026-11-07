@@ -20,18 +20,22 @@ import { Icon } from '../icon/icon.js';
         [checked]="checked()"
         [disabled]="disabled()"
         [attr.aria-describedby]="describedBy() || null"
+        [attr.aria-label]="ariaLabel()"
+        [indeterminate]="indeterminate()"
         (change)="onChangeEvent($event)"
         (blur)="onBlur()"
       />
       <span class="cdf-checkbox__box" aria-hidden="true">
         @if (checked()) {
-        <cdf-icon name="check" size="xs" />
+          <cdf-icon name="check" size="xs" />
+        } @else if (indeterminate()) {
+          <cdf-icon name="minus" size="xs" />
         }
       </span>
       @if (label()) {
-      <span class="cdf-checkbox__label">{{ label() }}</span>
+        <span class="cdf-checkbox__label">{{ label() }}</span>
       } @else {
-      <ng-content />
+        <ng-content />
       }
     </label>
   `,
@@ -47,6 +51,10 @@ import { Icon } from '../icon/icon.js';
 export class Checkbox implements ControlValueAccessor {
   readonly label = input<string | null>(null);
   readonly describedBy = input<string | null>(null);
+  /** Accessible name for label-less checkboxes (e.g. table row selection). */
+  readonly ariaLabel = input<string | null>(null);
+  /** Mixed state (e.g. "select all" when only some rows are selected). */
+  readonly indeterminate = input(false);
 
   protected readonly checked = signal(false);
   protected readonly disabled = signal(false);

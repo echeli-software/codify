@@ -2,6 +2,10 @@ import type { Preview } from '@storybook/angular';
 import { applicationConfig } from '@storybook/angular';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { provideI18n } from '@codify/i18n';
+import { preloadAllTranslations } from '@codify/i18n/testing';
+
+// Stories render synchronously with every namespace (apps load lazily).
+preloadAllTranslations();
 
 // Global SCSS is loaded via the `styles` option on the Storybook target in
 // libs/ui-bootstrap/project.json (Storybook's webpack sass-loader doesn't
@@ -11,9 +15,9 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     a11y: {
-      // Surface axe violations in the addon panel; do not block stories yet —
-      // fix as we iterate per docs/03 §"Done when".
-      test: 'todo',
+      // docs/03 "A11y checks pass": violations fail `nx test-storybook`
+      // (test-runner + axe, light and dark — see .storybook/test-runner.ts).
+      test: 'error',
     },
     controls: {
       matchers: {
@@ -23,7 +27,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ['Atoms', 'Molecules', 'Organisms'],
+        order: ['Foundations', 'Atoms', 'Molecules', 'Organisms'],
       },
     },
   },

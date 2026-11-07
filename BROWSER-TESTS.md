@@ -10,16 +10,24 @@ roadmap (Phases 0–13) is implemented; this exercises the user-facing surfaces.
 
 ## Services & URLs
 
-| What | URL |
-|---|---|
-| Student app | http://localhost:4201 |
-| Admin app | http://localhost:4202 |
-| API health | http://localhost:3000/api/health |
-| Public landing | http://localhost:4201/welcome |
-| Certificate verify | http://localhost:4201/verify |
+| What               | URL                              |
+| ------------------ | -------------------------------- |
+| Student app        | http://localhost:4201            |
+| Admin app          | http://localhost:4202            |
+| API health         | http://localhost:3000/api/health |
+| Public landing     | http://localhost:4201/welcome    |
+| Certificate verify | http://localhost:4201/verify     |
 
 All three should be running. If a page is blank, hard-refresh (the dev server
 recompiles on first hit). Use Chrome; open DevTools for the offline tests.
+
+> **Note on deployed environments:** the same checklist can be walked on a PR's
+> preview (`https://pr-<n>.codify-student-staging.pages.dev` /
+> `https://pr-<n>.codify-admin-staging.pages.dev`, commented on the PR by
+> `preview.yml`) or on staging (`staging.codify.app`, `admin.staging.codify.app`).
+> Those builds talk to the staging API with real Clerk sign-in and production
+> security headers (CSP, COOP/COEP), so dev-only affordances — the role picker,
+> `dev-token-*`, `POST /billing/dev/complete-checkout` — are not available there.
 
 **Demo content:** a course named **“Codify Demo”** was seeded with one of every
 lesson type (reading, exercise, AI prompt, scenario), all free. Find it via the
@@ -64,10 +72,12 @@ Open **Codify Demo** and do each lesson. Each completion should fire a reward
 animation (XP + coins fly up) and mark the lesson done.
 
 ### 3a. Reading
+
 - [ ] Open **“Welcome (reading)”** → formatted text renders.
 - [ ] Tap **Mark as complete** → reward animation; lesson shows Completed.
 
 ### 3b. Exercise (auto-graded code)
+
 - [ ] Open **“Sum two numbers (exercise)”** → a code editor with starter code.
 - [ ] Click **Run** (starter is empty) → visible tests show as **FAIL**.
 - [ ] Replace the body so it returns `a + b`, e.g.
@@ -77,17 +87,19 @@ animation (XP + coins fly up) and mark the lesson done.
 - [ ] (Optional) Submit `while(true){}` → caught as **TIMEOUT** (sandbox kills it).
 
 ### 3c. AI prompt (rubric-graded)
+
 - [ ] Open **“Explain error handling (AI-graded)”** → prompt + a rubric checklist.
 - [ ] Submit a weak answer (e.g. “use try it”) → low score, criteria show ✗.
 - [ ] Wait ~3s, then submit a strong answer such as:
-      *“In JavaScript you handle errors with a try/catch block: risky code goes
+      _“In JavaScript you handle errors with a try/catch block: risky code goes
       in try and the catch clause receives the Error so you can react. It
       matters because an unhandled error can crash the program or leave the user
-      stuck; catching lets you recover gracefully.”*
+      stuck; catching lets you recover gracefully.”_
 - [ ] → **Passed**, the rubric items light up green, reward animation.
 - [ ] Submit the exact same answer again → served from **cache** (a “cached” tag).
 
 ### 3d. Scenario (branching dialogue)
+
 - [ ] Open **“The angry customer (scenario)”** → a dialogue bubble + choice buttons.
 - [ ] Choose **“Apologise and investigate”** → advances to the next node.
 - [ ] Choose **“Offer a refund or reship”** → **Scenario complete**, outcome
@@ -193,6 +205,7 @@ Use Chrome DevTools → Network → **Offline**.
 ---
 
 ### If something is broken
+
 - Blank page → hard refresh; check the relevant server log:
   `/tmp/codify-api.log`, `/tmp/codify-student.log`, `/tmp/codify-admin.log`.
 - API 500s → check `/tmp/codify-api.log`.

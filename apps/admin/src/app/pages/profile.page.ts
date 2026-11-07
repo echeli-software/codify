@@ -18,20 +18,21 @@ import {
   KeyValueList,
   Select,
   ThemeService,
+  type KeyValueRow,
   type SelectOption,
   type ThemeMode,
 } from '@codify/ui-bootstrap';
 import { AuthService } from '@codify/auth';
-import { I18nService, type Locale } from '@codify/i18n';
-import { MeClient, ProblemDetailsError } from '@codify/api-client';
+import { I18nService, TranslatePipe, type Locale } from '@codify/i18n';
+import { MeClient } from '@codify/api-client';
+import { AdminErrors } from '../core/errors';
 
 /**
- * Admin Profile page — display name + locale + theme + role + email + sign
- * out. Mirrors the student profile but uses ui-bootstrap chrome since
- * staff-side runs in the admin design system.
- *
- * The signed-in user is sourced from AuthService; edits go through
- * `updateProfile()` so the topbar avatar in ShellPage reflects them.
+ * Admin profile — display name, UI language, theme and identity. In Clerk
+ * mode account security (email, password, MFA) is managed in Clerk's own
+ * profile modal (`openUserProfile()`); the language switch goes through
+ * `I18nService.changeLocale`, which persists to `PATCH /me` via
+ * LOCALE_PERSISTENCE.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,106 +46,112 @@ import { MeClient, ProblemDetailsError } from '@codify/api-client';
     Input,
     KeyValueList,
     Select,
+    TranslatePipe,
   ],
   template: `
-    <div class="profile-page">
-      <header class="profile-page__header">
-        <h1>Profile</h1>
-        <p class="text-muted">Display name, language, and appearance.</p>
+    <div class="admin-page admin-page--narrow">
+      <header class="page-head">
+        <div>
+          <h1>{{ 'admin.profile.title' | translate }}</h1>
+          <p class="muted">{{ 'admin.profile.subtitle' | translate }}</p>
+        </div>
       </header>
 
       @if (user(); as u) {
-      <section class="card">
-        <header class="profile-hero">
-          <cdf-avatar [name]="u.displayName" size="lg" />
-          <div>
-            <h2>{{ u.displayName }}</h2>
-            <p class="muted">{{ u.email }}</p>
-            <cdf-badge variant="info" [subtle]="true">{{ u.role }}</cdf-badge>
+        <section class="admin-card">
+          <header class="profile-hero">
+            <cdf-avatar [name]="u.displayName" size="lg" />
+            <div>
+              <h2>{{ u.displayName }}</h2>
+              <p class="muted small">{{ u.email }}</p>
+              <cdf-badge variant="info" [subtle]="true">{{
+                'admin.roles.' + u.role | translate
+              }}</cdf-badge>
+            </div>
+          </header>
+          @if (clerkMode) {
+            <div class="form-actions">
+              <cdf-button kind="secondary" (click)="openAccount()">
+                <cdf-icon name="user-circle" size="sm" />
+                {{ 'admin.profile.manageAccount' | translate }}
+              </cdf-button>
+            </div>
+          }
+        </section>
+
+        <section class="admin-card">
+          <h3>{{ 'admin.profile.account' | translate }}</h3>
+          <div class="form-grid form-grid--2">
+            <cdf-form-field
+              [label]="'admin.profile.displayName' | translate"
+              controlId="profile-name"
+              [error]="nameError()"
+            >
+              <cdf-input
+                inputId="profile-name"
+                [(ngModel)]="displayNameModel"
+                [invalid]="!!nameError()"
+              />
+            </cdf-form-field>
+            <cdf-form-field
+              [label]="'admin.profile.language' | translate"
+              controlId="profile-locale"
+            >
+              <cdf-select
+                inputId="profile-locale"
+                [options]="localeOptions"
+                [ngModel]="i18n.currentLocale()"
+                (ngModelChange)="onLocaleChange($event)"
+              />
+            </cdf-form-field>
           </div>
-        </header>
-      </section>
+          <div class="form-actions">
+            <cdf-button
+              kind="primary"
+              [loading]="saving()"
+              [disabled]="displayNameModel.trim() === u.displayName"
+              (click)="saveName()"
+            >
+              {{ 'admin.common.save' | translate }}
+            </cdf-button>
+            @if (status(); as s) {
+              <span class="muted small" role="status">{{
+                'admin.profile.status.' + s | translate
+              }}</span>
+            }
+          </div>
+        </section>
 
-      <section class="card">
-        <h3>Account</h3>
-        <cdf-form-field label="Display name">
-          <cdf-input
-            [(ngModel)]="displayNameModel"
-            (ngModelChange)="onDisplayNameChange($event)"
-          />
-        </cdf-form-field>
+        <section class="admin-card">
+          <h3>{{ 'admin.profile.appearance' | translate }}</h3>
+          <cdf-form-field
+            [label]="'admin.profile.theme' | translate"
+            [help]="'admin.profile.themeHelp' | translate"
+            controlId="profile-theme"
+          >
+            <cdf-select
+              inputId="profile-theme"
+              [options]="themeOptions()"
+              [ngModel]="themeService.mode()"
+              (ngModelChange)="onThemeChange($event)"
+            />
+          </cdf-form-field>
+        </section>
 
-        <cdf-form-field label="Language" style="margin-top: 12px;">
-          <cdf-select
-            [options]="localeOptions"
-            [ngModel]="localeModel()"
-            (ngModelChange)="onLocaleChange($event)"
-          />
-        </cdf-form-field>
-
-        @if (savedLabel()) {
-        <p class="profile-saved">
-          <cdf-icon name="check-circle" size="sm" /> {{ savedLabel() }}
-        </p>
-        }
-        @if (apiSyncStatus() === 'syncing') {
-        <p class="profile-sync profile-sync--syncing">Syncing with server…</p>
-        }
-        @if (apiSyncStatus() === 'offline') {
-        <p class="profile-sync profile-sync--offline">
-          API offline — changes saved locally.
-        </p>
-        }
-      </section>
-
-      <section class="card">
-        <h3>Appearance</h3>
-        <cdf-form-field label="Theme" hint="System follows your OS preference.">
-          <cdf-select
-            [options]="themeOptions"
-            [ngModel]="themeService.mode()"
-            (ngModelChange)="onThemeChange($event)"
-          />
-        </cdf-form-field>
-      </section>
-
-      <section class="card">
-        <h3>Identity</h3>
-        <cdf-key-value-list
-          [rows]="identityRows()"
-        />
-        <div style="margin-top: 12px; display:flex; gap:8px;">
-          <cdf-button kind="danger" (click)="signOut()">Sign out</cdf-button>
-        </div>
-      </section>
+        <section class="admin-card">
+          <h3>{{ 'admin.profile.identity' | translate }}</h3>
+          <cdf-key-value-list [rows]="identityRows()" />
+          <div class="form-actions">
+            <cdf-button kind="danger" (click)="signOut()">
+              {{ 'admin.shell.signOut' | translate }}
+            </cdf-button>
+          </div>
+        </section>
       }
     </div>
   `,
   styles: [
     `
-      :host {
-        display: block;
-        max-width: 720px;
-        margin: 0 auto;
-      }
-      .profile-page__header h1 {
-        margin: 0;
-        font-size: var(--cdf-font-size-xl);
-      }
-      .profile-page__header p {
-        margin: 4px 0 var(--cdf-space-4);
-      }
-      .card {
-        background: var(--cdf-color-surface);
-        border: 1px solid var(--cdf-color-border);
-        border-radius: var(--cdf-radius-md);
-        padding: var(--cdf-space-4);
-        margin-bottom: var(--cdf-space-4);
-      }
-      .card h3 {
-        margin: 0 0 var(--cdf-space-3);
-        font-size: var(--cdf-font-size-md);
-      }
       .profile-hero {
         display: flex;
         align-items: center;
@@ -153,140 +160,118 @@ import { MeClient, ProblemDetailsError } from '@codify/api-client';
           margin: 0;
           font-size: var(--cdf-font-size-lg);
         }
-      }
-      .muted {
-        color: var(--cdf-color-text-muted);
-        font-size: 13px;
-        margin: 0 0 4px;
-      }
-      .profile-saved {
-        margin: var(--cdf-space-2) 0 0;
-        color: var(--cdf-color-success);
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .profile-sync {
-        margin: var(--cdf-space-2) 0 0;
-        font-size: 13px;
-      }
-      .profile-sync--syncing {
-        color: var(--cdf-color-text-muted);
-      }
-      .profile-sync--offline {
-        color: var(--cdf-color-warning);
+        p {
+          margin: 0 0 4px;
+        }
       }
     `,
   ],
 })
 export class ProfilePage {
   private readonly auth = inject(AuthService);
-  private readonly i18n = inject(I18nService);
+  protected readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
-  private readonly meClient = inject(MeClient);
+  private readonly me = inject(MeClient);
+  private readonly errors = inject(AdminErrors);
   protected readonly themeService = inject(ThemeService);
 
+  protected readonly clerkMode = this.auth.mode === 'clerk';
   protected readonly user = computed(() => this.auth.user());
   protected displayNameModel = '';
-  protected readonly apiSyncStatus = signal<'idle' | 'syncing' | 'offline'>('idle');
+  protected readonly saving = signal(false);
+  protected readonly nameError = signal<string | null>(null);
+  protected readonly status = signal<'saved' | 'languageSaved' | null>(null);
 
   protected readonly localeOptions: SelectOption<Locale>[] =
-    this.i18n.availableLocales.map((m) => ({ value: m.code, label: m.nativeName }));
+    this.i18n.availableLocales.map((m) => ({
+      value: m.code,
+      label: m.nativeName,
+    }));
 
-  protected readonly themeOptions: SelectOption<ThemeMode>[] = [
-    { value: 'system', label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-  ];
+  protected readonly themeOptions = computed<SelectOption<ThemeMode>[]>(() => {
+    this.i18n.currentLocale();
+    return (['system', 'light', 'dark'] as const).map((m) => ({
+      value: m,
+      label: this.i18n.t(`admin.profile.themes.${m}`),
+    }));
+  });
 
-  protected readonly localeModel = computed<Locale>(
-    () => (this.user()?.locale as Locale | undefined) ?? this.i18n.currentLocale(),
-  );
-
-  protected readonly identityRows = computed(() => {
+  protected readonly identityRows = computed<KeyValueRow[]>(() => {
+    this.i18n.currentLocale();
     const u = this.user();
     if (!u) return [];
     return [
-      { key: 'User ID', value: u.id },
-      { key: 'Email', value: u.email },
-      { key: 'Role', value: u.role },
-      { key: 'Locale', value: u.locale ?? '—' },
+      { key: this.i18n.t('admin.profile.userId'), value: u.id },
+      { key: this.i18n.t('admin.profile.email'), value: u.email },
+      {
+        key: this.i18n.t('admin.profile.role'),
+        value: this.i18n.t(`admin.roles.${u.role}`),
+      },
+      { key: this.i18n.t('admin.profile.locale'), value: u.locale ?? '—' },
     ];
   });
 
-  protected readonly savedLabel = signal<string | null>(null);
-  private savedTimer: ReturnType<typeof setTimeout> | null = null;
-
   constructor() {
+    let seeded = false;
     effect(() => {
       const u = this.user();
-      if (u) this.displayNameModel = u.displayName;
+      if (u && !seeded) {
+        seeded = true;
+        this.displayNameModel = u.displayName;
+      }
     });
     void this.syncFromApi();
   }
 
-  /** Pull /api/me on mount; fall back silently when API offline. */
+  /** Pull the server profile (display name / locale) on open. */
   private async syncFromApi(): Promise<void> {
-    this.apiSyncStatus.set('syncing');
     try {
-      const me = await this.meClient.me();
+      const me = await this.me.me();
       this.auth.updateProfile({
         displayName: me.displayName,
         locale: me.locale,
       });
-      if (me.locale && me.locale !== this.i18n.currentLocale()) {
-        this.i18n.setLocale(me.locale as Locale);
-      }
-      this.apiSyncStatus.set('idle');
+      this.displayNameModel = me.displayName;
     } catch (err) {
-      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
-      this.apiSyncStatus.set('offline');
+      this.errors.toast(err, 'admin.errors.loadFailed');
     }
   }
 
-  protected onDisplayNameChange(value: string): void {
-    const next = value.trim();
-    if (!next) return;
-    this.auth.updateProfile({ displayName: next });
-    this.flashSaved('Display name saved');
-    void this.persistToApi({ displayName: next });
-  }
-
-  /** Best-effort PATCH /api/me. */
-  private async persistToApi(patch: {
-    displayName?: string;
-    locale?: string;
-  }): Promise<void> {
+  protected async saveName(): Promise<void> {
+    const next = this.displayNameModel.trim();
+    if (!next) {
+      this.nameError.set(this.i18n.t('admin.common.required'));
+      return;
+    }
+    this.nameError.set(null);
+    this.saving.set(true);
     try {
-      await this.meClient.update(patch);
-      this.apiSyncStatus.set('idle');
+      const me = await this.me.update({ displayName: next });
+      this.auth.updateProfile({ displayName: me.displayName });
+      this.status.set('saved');
     } catch (err) {
-      if (err instanceof ProblemDetailsError && err.isUnauthorized) return;
-      this.apiSyncStatus.set('offline');
+      this.nameError.set(this.errors.message(err, 'admin.errors.saveFailed'));
+    } finally {
+      this.saving.set(false);
     }
   }
 
-  protected onLocaleChange(value: Locale | null): void {
-    if (!value) return;
-    this.i18n.setLocale(value);
-    this.auth.updateProfile({ locale: value });
-    this.flashSaved('Language updated');
-    void this.persistToApi({ locale: value });
+  protected async onLocaleChange(value: Locale | null): Promise<void> {
+    if (!value || value === this.i18n.currentLocale()) return;
+    await this.i18n.changeLocale(value);
+    this.status.set('languageSaved');
   }
 
   protected onThemeChange(mode: ThemeMode | null): void {
     if (mode) this.themeService.setMode(mode);
   }
 
-  protected signOut(): void {
-    this.auth.signOut();
-    void this.router.navigateByUrl('/login');
+  protected openAccount(): void {
+    this.auth.openUserProfile();
   }
 
-  private flashSaved(label: string): void {
-    this.savedLabel.set(label);
-    if (this.savedTimer) clearTimeout(this.savedTimer);
-    this.savedTimer = setTimeout(() => this.savedLabel.set(null), 1800);
+  protected async signOut(): Promise<void> {
+    await this.auth.signOut();
+    void this.router.navigateByUrl('/login');
   }
 }

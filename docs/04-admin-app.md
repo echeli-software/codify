@@ -4,11 +4,11 @@ Angular SPA at `admin.codify.app`. Bootstrap-themed via `ui-bootstrap` + tokens.
 
 ## 1. Roles & permissions
 
-| Role | Authoring | Catalog ops | Billing | Users | Items / Shop | Promotions / Multipliers | Audit |
-|---|---|---|---|---|---|---|---|
-| `TEACHER` | Own courses only | View own | – | View own course enrollments (anonymized) | – | View own course-level multipliers | View own actions |
-| `SUPPORT` | – | View | View, refund (capped) | View, suspend, manual coin grant (capped) | View | – | View |
-| `ADMIN` | All | All | All | All | All | All | All |
+| Role      | Authoring        | Catalog ops | Billing               | Users                                     | Items / Shop | Promotions / Multipliers          | Audit            |
+| --------- | ---------------- | ----------- | --------------------- | ----------------------------------------- | ------------ | --------------------------------- | ---------------- |
+| `TEACHER` | Own courses only | View own    | –                     | View own course enrollments (anonymized)  | –            | View own course-level multipliers | View own actions |
+| `SUPPORT` | –                | View        | View, refund (capped) | View, suspend, manual coin grant (capped) | View         | –                                 | View             |
+| `ADMIN`   | All              | All         | All                   | All                                       | All          | All                               | All              |
 
 Permissions enforced server-side. Client uses `*codifyIfRole` directive for UI gating only.
 
@@ -41,12 +41,14 @@ Sidebar
 ## 3. Screens
 
 ### Dashboard
+
 - KPI cards (admin scope): WAU, MAU, paid conversions this week, active subscriptions, MRR (BRL), top 5 courses by completion.
 - Teacher scope: own course enrollments today, top lessons by drop-off, pending translations.
 - Recent audit activity (last 20 actions).
 - Coolify deploy status indicator (read-only, off `GITHUB_API` build webhook last result).
 
 ### Catalog → Courses (list)
+
 - DataTable: cover, title (in admin's locale), author, status, categories chips, lesson count, published date, actions menu.
 - Filters: status, category, author, "has missing translations".
 - Bulk actions: publish, archive, change category.
@@ -80,17 +82,20 @@ Tabs:
 7. **Audit** — last 100 actions on this course.
 
 ### Catalog → Categories
+
 - Simple list. Slug, color token, icon, sortOrder.
 - Reorder by drag.
 - Click → edit translations + assign to plans (matrix view).
 
 ### Catalog → Promotions
+
 - All multipliers across the catalog, filterable by kind / time window.
 - Calendar view (week/month) showing active windows for `CAMPAIGN` and `COURSE_PROMO`.
 - Quick "Activate now for 24h" button on rows.
 - Effective preview: pick a user + lesson, show resolver breakdown (`PREMIUM_DEFAULT × COURSE_PROMO × STREAK_TIER = 6.0x`). Drives trust in the system.
 
 ### Plans
+
 - List: name, all-access flag, prices in BRL/USD, billing period, included categories chips, active toggle, sortOrder.
 - Detail tabs:
   - **Basics**: name, slug, all-access, sortOrder.
@@ -99,6 +104,7 @@ Tabs:
   - **Translations**.
 
 ### Shop → Items
+
 - DataTable: thumbnail, slug, slot, category, rarity, costCoins, requiredLevel, premiumOnly badge, drop window, active toggle.
 - Detail:
   - Sprite upload (`AssetPicker`, accepts SVG, validates dimensions and slot anchor).
@@ -108,24 +114,29 @@ Tabs:
 - "Schedule limited drop" wizard: pick items, set window, set notification copy.
 
 ### Shop → Item Categories
+
 - Slug, sortOrder, translations. Used for shop filtering in student.
 
 ### Gamification → Badges
+
 - List + create. Each badge: slug, icon, hidden flag, rule JSON (with helper builder for common rules).
 - "Test" button: pick a user, simulate, see if the badge would unlock.
 - Translations.
 
 ### Gamification → Quest Templates
+
 - List: kind, target, params, rewards, active.
 - Detail: rewards (xp + coins), kind-specific config (e.g. `categorySlug` for `CATEGORY_LESSON_COUNT`).
 - "Daily mix" planner: define how many quests per day are drawn from this pool and at what weight.
 
 ### Gamification → Leagues
+
 - Configuration of tier promotion/relegation thresholds.
 - This week's snapshot: leagues per tier, member count, p50/p95 weekly XP.
 - Drill into any league → list members + ranks.
 
 ### Users
+
 - DataTable with filters (role, locale, country, last seen, subscription status).
 - Detail tabs:
   - **Profile**: read-only (Clerk-managed), avatar preview, level, XP, coin balance, current streak.
@@ -134,30 +145,34 @@ Tabs:
   - **Inventory**: items owned; manual grant (with audit reason).
   - **Coin / XP ledger**: paged transactions with delta + balance after.
   - **Manual grant**: form (amount, source = `ADMIN_GRANT`, reason). Rate-limited per admin/day.
-  - **Suspend / unsuspend**: writes Clerk + sets `User.deletedAt` on hard delete.
+  - **Suspend / unsuspend**: sets `User.suspendedAt` + a staff-only reason (the API then refuses the account with `ACCOUNT_SUSPENDED`); ADMIN and SUPPORT, SUPPORT only for student/teacher accounts; audited. Shown with the account's deletion / purge state and its payments in `<cdf-user-account-panel>` (see docs/14 §13.1). When Clerk is configured (`CLERK_SECRET_KEY`) the user is also banned / unbanned at Clerk (Backend API `POST /v1/users/{id}/ban` / `/unban`; users without a Clerk id — dev tokens — are skipped). A Clerk failure keeps the local change, is audited as `user.idp_sync_failed` and shows a warning toast.
   - **Audit**: actions performed on this user.
 
 ### Translations
+
 - Workspace view: pick locale → pick entity type → list of entities with translation completeness % and per-field status (missing/outdated/done).
 - Inline editor side-by-side with source locale.
 - "Outdated" flag set when source content changed after last translation.
 - Bulk export/import as CSV or JSON for outsourced translation.
 
 ### Analytics
+
 - Cross-cutting dashboards: retention curves, league participation, shop revenue (coins spent), MRR, churn cohort.
 - Read-only — built on top of the API's analytics endpoints (precomputed nightly).
 
 ### Audit
+
 - Filter by actor, action, entity type, time. Export.
 
 ### Settings
+
 - Branding (color tokens overridable per environment for staging visibility).
 - Default coin rates and `PREMIUM_DEFAULT` multiplier value (writes a `Multiplier` row).
 - Streak tier thresholds and bonuses.
 - Notification template defaults.
 - Locale enable/disable.
-- Stripe connection status; webhook URL display + signing secret rotation.
-- Feature flags (e.g. `leagues.enabled`, `shop.enabled`).
+- Stripe connection status; webhook URL display + signing secret rotation. (Implemented as a read-only card: whether `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `REVENUECAT_WEBHOOK_AUTH` are set, plus the webhook endpoint; rotation happens in the Stripe dashboard + deployment environment.)
+- Feature flags (e.g. `leagues.enabled`, `shop.enabled`): table + create/edit (enabled, active, rollout %, holdout %, weighted variants, surface, description) + delete with confirm; ADMIN only. See docs/10 §9.
 
 ## 4. Layout & responsive
 
@@ -169,6 +184,12 @@ Tabs:
 
 - Reactive forms with zod validation via a shared `zodControlAdapter`.
 - Autosave on lesson editor (5s debounce, visible "Saved at HH:MM:SS").
+  Implemented in `core/autosave.ts`: every edit restarts the 5 s timer; no
+  autosave while the title is empty or while the API's last content
+  rejection (`issues`) still applies; edits made during an in-flight save
+  stay dirty and get their own autosave; the unsaved-changes guard follows
+  `dirty`. The status line shows Saving… / Saved at HH:MM:SS (locale time) /
+  paused / failed.
 - All other forms: explicit save with optimistic UI + rollback on error.
 - Unsaved-changes guard on route navigation.
 
@@ -176,6 +197,12 @@ Tabs:
 
 - Top-bar global search (Cmd/Ctrl-K). Searches courses, lessons, users, items, badges by name + slug.
 - Initial: Postgres `tsvector` + `tsquery` per entity. Migrate to Meilisearch if latency or relevance becomes a problem.
+- Shipped: `GET /api/admin/search?q=` (2–100 chars, staff) — case-insensitive
+  substring (`ILIKE`) on course/lesson titles (ContentTranslation, any locale)
+  and slugs, user email/name, item and badge name/slug, plus exact ids; ≤ 5
+  hits per type. Scope by role: TEACHER own courses + lessons; SUPPORT
+  courses + users; ADMIN everything. The palette (`core/search-palette.ts`)
+  is a modal combobox: ↑/↓, Enter opens, Esc closes, focus returns.
 
 ## 7. Theming & accessibility
 
@@ -188,14 +215,47 @@ Tabs:
 - Page view tracking (route + role + locale).
 - Feature events: `course.created`, `lesson.published`, `multiplier.created`, `user.suspended`, `coins.granted`, `translation.completed`.
 - All admin actions also emit `AuditLog` rows server-side.
+- Implementation (`core/telemetry.ts`): events go through the analytics ingest
+  (`POST /api/analytics/events`, platform `admin-web`) in batches of ≤ 20 or
+  every 5 s, never awaited by the UI; a failed batch is dropped. Every event
+  carries `role` + `locale`. Names are snake_case (ingest rule):
+  `admin_page_view {route}` (route pattern, e.g. `/users/:id`),
+  `course_created`, `course_published` (lessons go live with their course —
+  there is no lesson-level publish, so this stands in for `lesson.published`),
+  `multiplier_created`, `user_suspended`, `coins_granted`,
+  `translation_completed {count}`. Feature events come from an HTTP
+  interceptor on successful mutations, so every page reports them.
 
 ## 9. Empty / error states
 
 - Every list has an `EmptyState` with a primary CTA ("+ New course").
 - Every async area has skeletons during load and a typed error state with retry.
-- Permission-denied states explain *which role* would be required.
+- Permission-denied states explain _which role_ would be required.
 
-## 10. Out of scope (initial)
+## 10. Admin operations API
+
+All under `/api/admin`, RFC 7807 errors, mutations audited.
+
+| Method + path                                                        | Roles                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /dashboard`                                                     | ADMIN, SUPPORT, TEACHER                      | `{ scope, generatedAt, weekStart, admin, teacher, recentActivity[20] }`. Admin: `wau`/`mau` (distinct students with `lastSeenAt` or an analytics event in 7/30 d), `paidConversionsThisWeek` (users whose first non-admin-grant subscription past trial/checkout was created since UTC Monday), `activeSubscriptions` (paid sources, ACTIVE + PAST_DUE), `trialingSubscriptions`, `mrr { currency: 'BRL', amountCents, excludedSubscriptions }` (BRL plan price for the subscription's period — store product price, else inferred from period length; annual ÷ 12; plans without a BRL price are excluded and counted, no FX), `topCourses` (published, by learners who completed every lesson). Teacher: `enrollmentsToday` (UTC day) + per course, `topDropOffLessons` (last 30 d: learners with `lesson_open` vs Progress), `pendingTranslations` (missing + outdated fields). Recent activity: teachers see only their own. |
+| `GET /search?q=`                                                     | staff                                        | See §6.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `GET /audit?actorId&action&entityType&entityId&from&to&cursor&limit` | ADMIN, SUPPORT, TEACHER (own actions forced) | `action` is a prefix match; keyset cursor; `{ items, nextCursor }`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `GET /audit/export` (same filters)                                   | same                                         | `text/csv`, newest first, capped at 10 000 rows; `X-Export-Rows`, `X-Export-Truncated`. Formula-leading cells are prefixed with `'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `GET /leagues/snapshot?weekStart=`                                   | ADMIN                                        | Per tier: leagues, members, p50/p95 weekly XP (nearest rank); cohorts; `rules` (zone sizes from `@codify/domain`, rewards from GamificationConfig `league.promotionReward` / `league.rank1Reward`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `GET /leagues/:id`                                                   | ADMIN                                        | Members ranked as the rollover ranks them, projected `zone`, stored `finalRank`/`promoted`/`demoted`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /users/:id/items`                                               | ADMIN, SUPPORT                               | Inventory with `equipped`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `POST /users/:id/items { itemId, reason }`                           | ADMIN                                        | Grants with `ADMIN_GRANT` (201, audited `user.item_grant`); already owned → 200 `{ alreadyOwned: true }`, nothing written.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `GET /users/:id/ledger?type=coins\|xp&cursor&limit`                  | ADMIN, SUPPORT                               | `{ type, balance, items: [{ delta, balanceAfter, source, multiplier, refType, refId }], nextCursor }`. XP `balanceAfter` is the running journal sum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `POST /badges/:id/test { userId }`                                   | ADMIN                                        | `{ wouldUnlock, alreadyEarned, awardedAt, badgeActive, mode, clauses[], events, metrics }` from the badge engine; awards nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `GET/POST /item-categories`, `PATCH/DELETE /item-categories/:slug`   | ADMIN                                        | Slug immutable; delete refused with `ITEM_CATEGORY_IN_USE` while items reference it. Names are single-locale (ItemCategory is not a TranslatableEntity).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+
+`GET /api/users` also accepts `locale`, `lastSeenFrom`, `lastSeenTo` (ISO)
+and `subscriptionStatus` (a SubscriptionStatus, or `NONE` = never
+subscribed). There is no country column, so the "country" filter is not
+offered.
+
+## 11. Out of scope (initial)
 
 - Multi-author collaboration on a single lesson (locking only — last write wins with autosave conflict warning).
 - Course bundling separate from plans (consider after launch).

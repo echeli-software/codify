@@ -6,42 +6,87 @@
 
 :root {
   // Primary
-  --ion-color-primary:           var(--cdf-color-primary);
-  --ion-color-primary-rgb:       124, 77, 255;
-  --ion-color-primary-contrast:  var(--cdf-color-primary-on);
+  --ion-color-primary: var(--cdf-color-primary);
+  --ion-color-primary-rgb: 124, 77, 255;
+  --ion-color-primary-contrast: var(--cdf-color-primary-on);
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade:     var(--cdf-color-primary-active);
-  --ion-color-primary-tint:      var(--cdf-color-primary-hover);
+  --ion-color-primary-shade: var(--cdf-color-primary-active);
+  --ion-color-primary-tint: var(--cdf-color-primary-hover);
 
   // Secondary = Codify accent
-  --ion-color-secondary:         var(--cdf-color-accent);
-  --ion-color-secondary-rgb:     245, 158, 11;
+  --ion-color-secondary: var(--cdf-color-accent);
+  --ion-color-secondary-rgb: 245, 158, 11;
   --ion-color-secondary-contrast: var(--cdf-color-accent-on);
   --ion-color-secondary-contrast-rgb: 17, 24, 39;
-  --ion-color-secondary-shade:   var(--cdf-color-accent-hover);
-  --ion-color-secondary-tint:    var(--cdf-color-accent);
+  --ion-color-secondary-shade: var(--cdf-color-accent-hover);
+  --ion-color-secondary-tint: var(--cdf-color-accent);
 
-  // Success / warning / danger
-  --ion-color-success:           var(--cdf-color-success);
-  --ion-color-warning:           var(--cdf-color-warning);
-  --ion-color-danger:            var(--cdf-color-danger);
+  // Success / warning / danger — with token "on" colours as contrast so
+  // solid Ionic fills (badges, buttons) keep ≥ 4.5:1 text.
+  --ion-color-success: var(--cdf-color-success);
+  --ion-color-success-contrast: var(--cdf-color-success-on);
+  --ion-color-success-shade: var(--cdf-color-success);
+  --ion-color-success-tint: var(--cdf-color-success);
+  --ion-color-warning: var(--cdf-color-warning);
+  --ion-color-warning-contrast: var(--cdf-color-warning-on);
+  --ion-color-warning-shade: var(--cdf-color-warning);
+  --ion-color-warning-tint: var(--cdf-color-warning);
+  --ion-color-danger: var(--cdf-color-danger);
+  --ion-color-danger-contrast: var(--cdf-color-danger-on);
+  --ion-color-danger-shade: var(--cdf-color-danger);
+  --ion-color-danger-tint: var(--cdf-color-danger);
+
+  // Tertiary = info; medium = muted text (used by ghost / secondary buttons
+  // as their text colour, so it must read on bg and surfaces).
+  --ion-color-tertiary: var(--cdf-color-info);
+  --ion-color-tertiary-contrast: var(--cdf-color-info-on);
+  --ion-color-tertiary-shade: var(--cdf-color-info);
+  --ion-color-tertiary-tint: var(--cdf-color-info);
+  --ion-color-medium: var(--cdf-color-text-muted);
+  --ion-color-medium-contrast: var(--cdf-color-bg);
+  --ion-color-medium-shade: var(--cdf-color-text);
+  --ion-color-medium-tint: var(--cdf-color-text-muted);
 
   // Background + text
-  --ion-background-color:        var(--cdf-color-bg);
-  --ion-background-color-rgb:    249, 250, 251;
-  --ion-text-color:              var(--cdf-color-text);
-  --ion-text-color-rgb:          17, 24, 39;
+  --ion-background-color: var(--cdf-color-bg);
+  --ion-background-color-rgb: 249, 250, 251;
+  --ion-text-color: var(--cdf-color-text);
+  --ion-text-color-rgb: 17, 24, 39;
 
   // Item / card surfaces
-  --ion-item-background:         var(--cdf-color-surface);
-  --ion-card-background:         var(--cdf-color-surface);
-  --ion-toolbar-background:      var(--cdf-color-surface-elev);
+  --ion-item-background: var(--cdf-color-surface);
+  --ion-card-background: var(--cdf-color-surface);
+  --ion-toolbar-background: var(--cdf-color-surface-elev);
 
   // Border
-  --ion-border-color:            var(--cdf-color-border);
+  --ion-border-color: var(--cdf-color-border);
 
   // Font
-  --ion-font-family:             var(--cdf-font-family-sans);
+  --ion-font-family: var(--cdf-font-family-sans);
+}
+
+// Ionic derives translucent text/background shades from the *-rgb vars;
+// flip them with the theme so dark mode stays legible.
+@mixin ionic-dark-rgb {
+  --ion-background-color-rgb: 3, 7, 18;
+  --ion-text-color-rgb: 249, 250, 251;
+  --ion-color-primary-rgb: 167, 139, 250;
+  --ion-color-primary-contrast-rgb: 3, 7, 18;
+}
+
+:root.theme-dark {
+  @include ionic-dark-rgb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) {
+    @include ionic-dark-rgb;
+  }
+}
+
+ion-segment-button {
+  --color: var(--cdf-color-text-muted);
+  --color-checked: var(--cdf-color-primary-text);
 }
 
 // ─── Overlays (action-sheet / alert / popover / modal) ──────────────────
@@ -50,20 +95,20 @@
 // with low-contrast button text against a dark background.
 
 ion-action-sheet {
-  --background:                   var(--cdf-color-surface-elev);
-  --color:                        var(--cdf-color-text);
-  --button-background:            var(--cdf-color-surface-elev);
-  --button-background-activated:  var(--cdf-color-primary-subtle);
-  --button-background-hover:      var(--cdf-color-primary-subtle);
-  --button-background-selected:   var(--cdf-color-primary-subtle);
-  --button-color:                 var(--cdf-color-text);
-  --button-color-activated:       var(--cdf-color-primary);
-  --button-color-selected:        var(--cdf-color-primary);
+  --background: var(--cdf-color-surface-elev);
+  --color: var(--cdf-color-text);
+  --button-background: var(--cdf-color-surface-elev);
+  --button-background-activated: var(--cdf-color-primary-subtle);
+  --button-background-hover: var(--cdf-color-primary-subtle);
+  --button-background-selected: var(--cdf-color-primary-subtle);
+  --button-color: var(--cdf-color-text);
+  --button-color-activated: var(--cdf-color-primary);
+  --button-color-selected: var(--cdf-color-primary);
 }
 
 ion-alert {
-  --background:                   var(--cdf-color-surface-elev);
-  --backdrop-opacity:              0.5;
+  --background: var(--cdf-color-surface-elev);
+  --backdrop-opacity: 0.5;
 }
 ion-alert .alert-title,
 ion-alert .alert-sub-title,
@@ -80,10 +125,10 @@ ion-alert .alert-button.sc-ion-alert-ios {
 }
 
 ion-popover {
-  --background:                   var(--cdf-color-surface-elev);
-  --color:                        var(--cdf-color-text);
+  --background: var(--cdf-color-surface-elev);
+  --color: var(--cdf-color-text);
 }
 
 ion-modal {
-  --background:                   var(--cdf-color-bg);
+  --background: var(--cdf-color-bg);
 }

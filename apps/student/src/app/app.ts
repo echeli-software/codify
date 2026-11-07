@@ -1,32 +1,34 @@
-import { Component, effect, inject } from '@angular/core';
-import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
-import { AuthService } from '@codify/auth';
-import { NativePlatformService } from './native/native-platform.service.js';
+import { Component, Injector, afterNextRender, inject } from '@angular/core';
+import { IonicRoot } from './platform/ionic-root.component.js';
 
 /**
- * Root of the student app: just the Ionic shell. Page-level chrome
- * (IonHeader / IonContent / tabs / sidebar) lives in each route component
- * so per-route layout choices stay local.
+ * Root of the student app. The Ionic shell (`ion-app`, root outlet, toast
+ * host) is a deferred block so Ionic loads as its own chunk right after
+ * bootstrap instead of weighing on the initial bundle — see
+ * `platform/ionic-root.component.ts`. Page-level chrome lives in each route
+ * component.
  *
- * On the native shell we register for push once the user is authenticated
- * (no-op on web). See /docs/17-mobile.md §Push.
+ * After the first render the platform services (session lifecycle,
+ * offline sync, telemetry, PWA updates, native hooks) start from a lazy
+ * chunk — see `platform/boot.ts`.
  */
 @Component({
-  imports: [IonApp, IonRouterOutlet],
+  imports: [IonicRoot],
   selector: 'app-root',
-  template: `<ion-app><ion-router-outlet /></ion-app>`,
+  template: `@defer (on immediate) {
+    <cdf-ionic-root />
+  }`,
 })
 export class App {
-  private readonly auth = inject(AuthService);
-  private readonly native = inject(NativePlatformService);
-  private pushRequested = false;
+  private readonly injector = inject(Injector);
 
   constructor() {
-    effect(() => {
-      if (this.auth.isAuthenticated() && !this.pushRequested) {
-        this.pushRequested = true;
-        void this.native.registerForPush();
-      }
+    afterNextRender(() => {
+      import('./platform/boot')
+        .then((m) => m.startPlatform(this.injector))
+        .catch((err: unknown) =>
+          console.error('[boot] platform start failed', err),
+        );
     });
   }
 }

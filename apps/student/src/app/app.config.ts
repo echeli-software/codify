@@ -1,14 +1,29 @@
 import {
   ApplicationConfig,
+  isDevMode,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideIonicAngular } from '@ionic/angular/standalone';
-import { provideI18n } from '@codify/i18n';
+import { provideServiceWorker } from '@angular/service-worker';
+import {
+  LOCALE_PERSISTENCE,
+  SHARED_NAMESPACES,
+  provideI18n,
+} from '@codify/i18n';
+import {
+  STUDENT_PLATFORM_STRINGS,
+  STUDENT_STRINGS,
+} from '@codify/i18n/student';
 import { authInterceptor, provideAuth } from '@codify/auth';
 import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
+import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
 import { appRoutes } from './app.routes';
+import { provideLazyContentTranslationSource } from './platform/lazy-providers';
+import { StudentLocalePersistence } from './platform/locale-persistence';
+import { isNativeRuntime } from './platform/runtime';
+import { accountStateInterceptor } from './pages/account/account-state';
+import { translationFallbackInterceptor } from './platform/translation-fallback.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -18,16 +33,42 @@ export const appConfig: ApplicationConfig = {
       // Order matters: auth first attaches the Bearer token, then the
       // api-client wrapper interceptors layer locale + idempotency +
       // problem-details remapping.
-      withInterceptors([authInterceptor(), ...apiClientInterceptors()]),
+      // accountStateInterceptor routes 403 ACCOUNT_DELETED / _SUSPENDED to
+      // the restore / suspended screens (docs/14 §13).
+      withInterceptors([
+        authInterceptor(),
+        ...apiClientInterceptors(),
+        accountStateInterceptor,
+        // docs/11 §3: one-time toast when content falls back to another locale.
+        translationFallbackInterceptor,
+      ]),
     ),
-    provideIonicAngular({
-      // Use platform-aware mode (Material on Android, iOS-native on iOS,
-      // iOS by default in browser — closest to "native feel" target per
-      // docs/05-student-app §1).
-      mode: 'md',
+    // Ionic (mode 'md') is configured by the lazily-loaded IonicRoot
+    // (platform/ionic-root.component.ts), not here — keeps @ionic/* out of
+    // the initial bundle.
+    provideAuth({
+      apiBaseUrl: API_BASE_URL,
+      clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
     }),
-    provideAuth(),
-    provideApiClient({ baseUrl: 'http://localhost:3000/api' }),
-    provideI18n(),
+    provideApiClient({ baseUrl: API_BASE_URL }),
+    // Only the string files the student app renders (no admin strings).
+    provideI18n({
+      namespaces: [
+        ...SHARED_NAMESPACES,
+        STUDENT_STRINGS,
+        STUDENT_PLATFORM_STRINGS,
+      ],
+    }),
+    // docs/11 §6: persist the chosen locale on the user (PATCH /me).
+    { provide: LOCALE_PERSISTENCE, useExisting: StudentLocalePersistence },
+    // docs/11 §3: content translations — API online, downloads offline.
+    provideLazyContentTranslationSource(),
+    // PWA (docs/16 §6): app shell precached by the Angular service worker,
+    // wrapped by codify-sw.js which also serves downloaded images offline.
+    // Production web builds only — the native shell bundles the app itself.
+    provideServiceWorker('codify-sw.js', {
+      enabled: !isDevMode() && !isNativeRuntime(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

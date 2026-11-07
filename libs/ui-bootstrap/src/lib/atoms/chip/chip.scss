@@ -1,0 +1,102 @@
+:host {
+  display: inline-flex;
+}
+
+.cdf-chip {
+  --chip-bg: var(--cdf-color-surface);
+  --chip-fg: var(--cdf-color-text);
+  --chip-border: var(--cdf-color-border);
+
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--cdf-radius-pill);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border: 1px solid var(--chip-border);
+  font-size: var(--cdf-font-size-sm);
+  line-height: 1;
+
+  &__main {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    padding: var(--cdf-space-1) var(--cdf-space-3);
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    border-radius: inherit;
+  }
+
+  &--sm &__main {
+    padding: 2px var(--cdf-space-2);
+    font-size: var(--cdf-font-size-xs);
+  }
+
+  &--selectable &__main {
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &--removable &__main {
+    padding-inline-end: var(--cdf-space-1);
+  }
+
+  &__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-end: var(--cdf-space-1);
+    padding: 2px;
+    border: 0;
+    border-radius: var(--cdf-radius-circle);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--cdf-color-border);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &--primary {
+    --chip-bg: var(--cdf-color-primary-subtle);
+    --chip-fg: var(--cdf-color-primary-active);
+    --chip-border: transparent;
+  }
+
+  &--success {
+    --chip-border: var(--cdf-color-success);
+  }
+
+  &--warning {
+    --chip-border: var(--cdf-color-warning);
+  }
+
+  &--danger {
+    --chip-border: var(--cdf-color-danger);
+  }
+
+  &--selected {
+    --chip-bg: var(--cdf-color-primary);
+    --chip-fg: var(--cdf-color-primary-on);
+    --chip-border: var(--cdf-color-primary);
+  }
+
+  &--disabled {
+    opacity: 0.55;
+
+    button {
+      cursor: not-allowed;
+    }
+  }
+}

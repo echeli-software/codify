@@ -1,0 +1,100 @@
+# Fastlane lanes for the Codify student app (Capacitor shell around the PWA).
+# Run from apps/student:  fastlane <platform> <lane>
+# Driven by .github/workflows/mobile.yml; every credential arrives via ENV.
+
+default_platform(:android)
+
+# ─── Android ──────────────────────────────────────────────────────────────────
+platform :android do
+  desc "Upload a signed release bundle to Play Console internal testing"
+  lane :internal do
+    # Plain Ruby in a lane runs inside ./fastlane, so resolve relative to it.
+    aab = File.expand_path(ENV.fetch("AAB_PATH", "../android/app/build/outputs/bundle/release/app-release.aab"))
+    UI.user_error!("AAB not found at #{aab}") unless File.exist?(aab)
+
+    upload_to_play_store(
+      track: "internal",
+      aab: aab,
+      json_key_data: ENV.fetch("PLAY_SERVICE_ACCOUNT_JSON"),
+      # The app's first build must be uploaded manually in Play Console;
+      # afterwards CI releases straight to internal testers.
+      release_status: ENV.fetch("PLAY_RELEASE_STATUS", "completed"),
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Promote the latest internal build to production (manual, after QA)"
+  lane :promote do
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to: "production",
+      json_key_data: ENV.fetch("PLAY_SERVICE_ACCOUNT_JSON"),
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
+
+# ─── iOS ──────────────────────────────────────────────────────────────────────
+platform :ios do
+  before_all do
+    setup_ci if ENV["CI"] # temporary keychain for match on GitHub runners
+  end
+
+  def asc_api_key
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_P8"),
+      is_key_content_base64: ENV["ASC_KEY_P8_BASE64"] == "true",
+      in_house: false,
+    )
+  end
+
+  desc "Build, sign (match) and upload to TestFlight"
+  lane :beta do
+    api_key = asc_api_key
+
+    match(type: "appstore", readonly: true, api_key: api_key)
+
+    project = "ios/App/App.xcodeproj"
+    increment_build_number(
+      xcodeproj: project,
+      build_number: ENV.fetch("BUILD_NUMBER") { latest_testflight_build_number(api_key: api_key) + 1 },
+    )
+    if ENV["VERSION_NAME"] && !ENV["VERSION_NAME"].empty?
+      increment_version_number(xcodeproj: project, version_number: ENV["VERSION_NAME"])
+    end
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: project,
+      team_id: ENV["APPLE_TEAM_ID"],
+      bundle_identifier: ENV.fetch("APP_IDENTIFIER", "app.codify.student"),
+      profile_name: "match AppStore #{ENV.fetch('APP_IDENTIFIER', 'app.codify.student')}",
+      code_sign_identity: "iPhone Distribution",
+      targets: ["App"],
+    )
+
+    build_app(
+      workspace: "ios/App/App.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build/ios",
+      clean: true,
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+    )
+  end
+end

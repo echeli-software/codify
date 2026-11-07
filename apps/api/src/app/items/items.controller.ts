@@ -21,6 +21,7 @@ import {
   CreateItemCategoryDto,
   CreateItemDto,
   EquipDto,
+  PurchaseDto,
   SaveAvatarConfigDto,
   ShopQueryDto,
   UpdateItemDto,
@@ -30,6 +31,8 @@ import {
   type PurchaseResponse,
   type ShopItem,
 } from './items.dto.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
+import { RequireFeature } from '../flags/feature.guard.js';
 
 /**
  * Shop + inventory + avatar (student) and item/category management (admin).
@@ -44,25 +47,38 @@ export class ItemsController {
   // ─── Student ───────────────────────────────────────────────────────────
 
   @Roles('STUDENT')
+  @RequireFeature('shop.enabled')
   @Get('shop')
-  shop(@CurrentUser() actor: ApiUser, @Query() query: ShopQueryDto): Promise<ShopItem[]> {
+  shop(
+    @CurrentUser() actor: ApiUser,
+    @Query() query: ShopQueryDto,
+  ): Promise<ShopItem[]> {
     return this.items.shop(actor.userId, query);
   }
 
+  @RewardThrottle()
   @Roles('STUDENT')
+  @RequireFeature('shop.enabled')
   @Post('shop/:id/purchase')
   @HttpCode(201)
   async purchase(
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
+    @Body() body: PurchaseDto,
     @Req() req: Request,
   ): Promise<PurchaseResponse> {
-    const res = await this.items.purchase(actor.userId, id);
+    const res = await this.items.purchase(actor.userId, id, {
+      equip: body?.equip,
+    });
     void this.audit.record(actor, {
       action: 'shop.purchase',
       entity: 'Item',
       entityId: id,
-      diff: { costCoins: res.item.costCoins, balanceAfter: res.coins },
+      diff: {
+        costCoins: res.item.costCoins,
+        balanceAfter: res.coins,
+        equipped: res.equipped,
+      },
       ip: req.ip ?? null,
       userAgent: (req.headers['user-agent'] as string) ?? null,
     });
@@ -83,13 +99,19 @@ export class ItemsController {
 
   @Roles('STUDENT')
   @Put('avatar/config')
-  saveConfig(@CurrentUser() actor: ApiUser, @Body() body: SaveAvatarConfigDto): Promise<AvatarResponse> {
+  saveConfig(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: SaveAvatarConfigDto,
+  ): Promise<AvatarResponse> {
     return this.items.saveConfig(actor.userId, body.config);
   }
 
   @Roles('STUDENT')
   @Put('avatar/equip')
-  equip(@CurrentUser() actor: ApiUser, @Body() body: EquipDto): Promise<AvatarResponse> {
+  equip(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: EquipDto,
+  ): Promise<AvatarResponse> {
     return this.items.equip(actor.userId, body.slot, body.itemId ?? null);
   }
 
@@ -115,22 +137,56 @@ export class ItemsController {
 
   @Roles('ADMIN')
   @Post('items')
-  async createItem(@CurrentUser() actor: ApiUser, @Body() body: CreateItemDto): Promise<ItemResponse> {
+  async createItem(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: CreateItemDto,
+  ): Promise<ItemResponse> {
     const created = await this.items.createItem(body);
-    void this.audit.record(actor, { action: 'item.create', entity: 'Item', entityId: created.id, diff: { ...body } });
+    void this.audit.record(actor, {
+      action: 'item.create',
+      entity: 'Item',
+      entityId: created.id,
+      diff: { ...body },
+    });
     return created;
   }
 
   @Roles('ADMIN')
   @Patch('items/:id')
-  updateItem(@Param('id') id: string, @Body() body: UpdateItemDto): Promise<ItemResponse> {
-    return this.items.updateItem(id, body);
+  async updateItem(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+    @Body() body: UpdateItemDto,
+  ): Promise<ItemResponse> {
+    const updated = await this.items.updateItem(id, body);
+    void this.audit.record(actor, {
+      action: 'item.update',
+      entity: 'Item',
+      entityId: id,
+      diff: { ...body },
+    });
+    return updated;
   }
 
   @Roles('ADMIN')
   @Delete('items/:id')
   @HttpCode(204)
-  async removeItem(@Param('id') id: string): Promise<void> {
+  async removeItem(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<void> {
     await this.items.deleteItem(id);
+    void this.audit.record(actor, {
+      action: 'item.delete',
+      entity: 'Item',
+      entityId: id,
+    });
+  }
+
+  /** Announce limited drops that just went live (also run by the job). */
+  @Roles('ADMIN')
+  @Post('admin/items/drops/announce')
+  announceDrops(): Promise<{ drops: number; pushed: number }> {
+    return this.items.announceDrops();
   }
 }

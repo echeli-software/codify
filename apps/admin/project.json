@@ -18,9 +18,17 @@
           {
             "glob": "**/*",
             "input": "apps/admin/public"
+          },
+          {
+            "glob": "editor.main.css",
+            "input": "node_modules/monaco-editor/min/vs/editor",
+            "output": "monaco"
           }
         ],
-        "styles": ["apps/admin/src/styles.scss"]
+        "styles": ["apps/admin/src/styles.scss"],
+        "loader": {
+          ".ttf": "file"
+        }
       },
       "configurations": {
         "production": {

@@ -703,8 +703,17 @@ enum NotificationKind {
   PROMO
   BILLING
   SYSTEM
+  WELCOME
+  WEEKLY_RECAP
+  REACTIVATION
 }
 
+/// One row per notification per channel (docs/10 §3 "Implementation").
+/// IN_APP rows are the inbox: payload { title, body, deepLink, action?: { type, ref? }, data? },
+/// sentAt = created, readAt set by the student. PUSH rows are the push delivery log:
+/// payload { title, body, deepLink, inAppId }, scheduledFor while deferred past quiet hours,
+/// sentAt once delivered (the "fewer like this" and 14/week caps count these). EMAIL rows:
+/// payload { subject, body, deepLink, provider, providerId }, sentAt once accepted by the provider.
 model Notification {
   id        String              @id @default(dbgenerated("uuid_generate_v7()"))
   userId    String
@@ -717,8 +726,22 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime            @default(now())
 
+  @@index([userId, channel, createdAt])
   @@index([userId, readAt])
   @@index([scheduledFor])
+}
+
+/// Per-kind delivery settings. No row = defaults (push + email on, PROMO push off).
+/// SYSTEM / BILLING are always on. fewerLevel: 0 normal, 1 ≤ 1 push / 2 days, 2 ≤ 1 push / 7 days.
+model NotificationPreference {
+  userId       String
+  kind         NotificationKind
+  pushEnabled  Boolean  @default(true)
+  emailEnabled Boolean  @default(true)
+  fewerLevel   Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([userId, kind])
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -832,7 +855,7 @@ model ContentTranslation {
 /// Server-side feature flags. Read-mostly; changes audited.
 model FeatureFlag {
   key       String   @id /// e.g. "leagues.enabled", "shop.enabled"
-  value     Json     /// { enabled: bool, rolloutPct?: int, variants?: any }
+  value     Json     /// { enabled: bool, rolloutPct?: 0-100, holdoutPct?: 0-100, variants?: { key: weight }, surface?: string } — evaluation: docs/10 §9
   isActive  Boolean  @default(true)
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -886,29 +909,37 @@ model IdempotencyRecord {
 ## Notes on contentious decisions
 
 ### `ContentTranslation` polymorphism
+
 Prisma doesn't model polymorphic associations natively. We accept the awkward "many nullable FKs" approach because we want cascade deletes when an entity disappears. Day-to-day reads use `(entityType, entityId, locale)` queries that bypass the relations entirely. We could go to a fully unstructured `(entityType, entityId)` with no FK, but cascade cleanup would then need a periodic job — worse trade-off.
 
 ### Denormalized `CoinTransaction.balanceAfter`
+
 The ledger is the source of truth. `balanceAfter` is a write-side denormalization so reading the current balance is `SELECT balanceAfter FROM CoinTransaction WHERE userId = ? ORDER BY createdAt DESC LIMIT 1` instead of `SUM(delta)`. Recompute jobs verify drift nightly and emit an alert if mismatched.
 
 ### Why not store XP balance similarly?
+
 We do — implicitly. The student's current XP is `SUM(amount) FROM XpEvent`. If this becomes hot, we add `User.xpTotal` and update transactionally. Premature for now.
 
 ### `Streak.lastActivityDate` is in the user's local TZ
+
 Streaks reset based on the user's perceived "day". Storing in UTC means a São Paulo user who learns at 23:30 BRT and 00:30 BRT the next day would lose their streak across UTC-day boundaries. We normalize to the user's TZ at write time.
 
 ### `Multiplier` table
+
 Configurable multipliers live as rows. The multiplier resolver (see [07-gamification.md](./07-gamification.md)) is the single place that combines them for any reward event. This is what enables "4x coins on this specific lesson" without code changes.
 
 ### `IdempotencyRecord` table vs Redis-only
+
 Postgres is authoritative; Redis is a hot-path cache. On a write: Postgres unique constraint on `key` is the source of truth — duplicate keys fail there. Redis is populated optimistically for fast lookups but a Redis miss falls back to Postgres. If Redis-write succeeds and Postgres-write fails, the request fails (caller retries with same key); if Postgres succeeds and Redis fails, a background tickle re-populates Redis. The unique constraint guarantees no double-execution regardless of cache state.
 
 ### `Asset` model
+
 Every catalog entity (`Course.coverAssetId`, lesson images via `LessonDoc`, `Item.spriteAssetId`/`thumbnailAssetId`, `Badge.iconAssetId`) references asset IDs. Centralizing them in `Asset` lets us enforce existence on save, dedupe by `sha256`, run R2 cleanup on delete, and store SVG-sanitization metadata in one place.
 
 ## Indexing strategy
 
 Beyond the indexes declared inline:
+
 - `XpEvent (userId, createdAt DESC)` — feed query for "your recent activity".
 - `CoinTransaction (userId, createdAt DESC)` — same.
 - `Progress (userId, completedAt DESC) WHERE completedAt IS NOT NULL` — partial index, used for streak calculation and "today's lessons".

@@ -1,5 +1,5 @@
 import nx from '@nx/eslint-plugin';
-import baseConfig from '../../eslint.config.mjs';
+import baseConfig, { noRawTemplateTextOptions } from '../../eslint.config.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -42,8 +42,26 @@ export default [
     },
   },
   {
+    // docs/11 §11 — library templates never ship raw user-visible text.
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      'codify/no-raw-template-text': ['error', noRawTemplateTextOptions],
+    },
+  },
+  {
+    // Storybook demo hosts (`sb-*`) render sample content, not product UI.
+    // Test hosts in specs likewise render fixtures.
+    files: ['**/*.stories.ts/*.html', '**/*.spec.ts/*.html'],
+    rules: { 'codify/no-raw-template-text': 'off' },
+  },
+  {
+    // Lesson authoring organisms are owned by the Content stream and are
+    // translated there; keep them visible as warnings until then.
+    files: [
+      '**/organisms/{lesson-block-editor,lesson-block-renderer,block-toolbar,block-menu}/**/*.html',
+    ],
+    rules: {
+      'codify/no-raw-template-text': ['warn', noRawTemplateTextOptions],
+    },
   },
 ];

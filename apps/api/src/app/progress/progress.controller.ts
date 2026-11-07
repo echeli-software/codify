@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -12,20 +13,27 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ProgressService } from './progress.service.js';
-import type {
-  CompleteLessonResponse,
-  CourseProgressResponse,
+import {
+  CompleteLessonDto,
+  type CompleteLessonResponse,
+  type CourseProgressResponse,
 } from './progress.dto.js';
+import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
 
 /**
  * Lesson completions + per-course progress view.
  *
  *   POST /api/lessons/:id/complete  — record completion (STUDENT only).
+ *     Body (optional): { clientTimestamp?: ISO-8601 } — offline queue time;
+ *       400 (code CLIENT_TIMESTAMP_IN_FUTURE / _TOO_OLD) when > 5 min ahead
+ *       or > 72 h old.
  *     - 201 on first completion
- *     - 200 on idempotent replay (same row returned)
+ *     - 409 code LESSON_ALREADY_COMPLETED on replay (original progress + totals)
+ *     - 409 code LESSON_COMPLETES_VIA_OWN_FLOW for EXERCISE / AI_PROMPT /
+ *       SCENARIO / CAPSTONE lessons, QUIZ_REQUIRES_GRADING for QUIZ lessons
+ *       with quiz blocks
  *     - 404 if lesson missing / course not PUBLISHED
  *     - 402 if lesson is paid and the student has no entitlement
- *       (Phase 6 will replace this with Enrollment-aware logic).
  *
  *   GET  /api/courses/:id/progress  — list this user's completions in
  *     that course, plus totalLessons / completedLessons.
@@ -37,19 +45,23 @@ export class ProgressController {
     private readonly audit: AuditService,
   ) {}
 
+  @RewardThrottle()
   @Roles('STUDENT')
   @Post('lessons/:id/complete')
   @HttpCode(201)
   async complete(
     @CurrentUser() actor: ApiUser,
     @Param('id') lessonId: string,
+    @Body() body: CompleteLessonDto,
     @Req() req: Request,
   ): Promise<CompleteLessonResponse> {
     // Service throws ConflictException on duplicate so the controller
     // path here only runs for first-time completions — keeping the
     // 201 + audit-emission semantics clean.
     const { progress, totals, reward, questsCompleted, badgesUnlocked } =
-      await this.progress.complete(actor, lessonId);
+      await this.progress.complete(actor, lessonId, {
+        clientTimestamp: body?.clientTimestamp,
+      });
     void this.audit.record(actor, {
       action: 'lesson.complete',
       entity: 'Lesson',

@@ -5,8 +5,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { ContentTranslation, Course, CourseStatus, Prisma } from '@prisma/client';
+import type {
+  ContentTranslation,
+  Course,
+  CourseStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { noteTranslationFallback } from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type {
   CourseDetail,
@@ -96,7 +102,9 @@ export class CoursesService {
           select: { id: true, courseId: true },
         })
       : [];
-    const moduleIdToCourseId = new Map(courseModules.map((m) => [m.id, m.courseId]));
+    const moduleIdToCourseId = new Map(
+      courseModules.map((m) => [m.id, m.courseId]),
+    );
     const lessonGroups = courseModules.length
       ? await this.prisma.lesson.groupBy({
           by: ['moduleId'],
@@ -111,9 +119,22 @@ export class CoursesService {
     for (const g of lessonGroups) {
       const cid = moduleIdToCourseId.get(g.moduleId);
       if (!cid) continue;
-      lessonCountByCourseId.set(cid, (lessonCountByCourseId.get(cid) ?? 0) + g._count._all);
+      lessonCountByCourseId.set(
+        cid,
+        (lessonCountByCourseId.get(cid) ?? 0) + g._count._all,
+      );
     }
 
+    const covers = await this.coverUrls(rows.map((r) => r.coverAssetId));
+    for (const r of rows)
+      if (
+        fellBack(
+          translations.filter((t) => t.entityId === r.id),
+          locale,
+          r.sourceLocale,
+        )
+      )
+        noteTranslationFallback(r.sourceLocale);
     return {
       items: rows.map((r) =>
         toListItem(
@@ -121,13 +142,23 @@ export class CoursesService {
           translations.filter((t) => t.entityId === r.id),
           locale,
           lessonCountByCourseId.get(r.id) ?? 0,
+          covers,
         ),
       ),
       total,
     };
   }
 
-  async getDetail(idOrSlug: string, locale: string): Promise<CourseDetail> {
+  /**
+   * Course detail. STUDENTs (and unauthenticated callers, if the route is
+   * ever made public) only see PUBLISHED courses — drafts and archived
+   * courses 404 exactly like a missing course.
+   */
+  async getDetail(
+    actor: ApiUser | undefined,
+    idOrSlug: string,
+    locale: string,
+  ): Promise<CourseDetail> {
     const where = isUuid(idOrSlug)
       ? { id: idOrSlug, deletedAt: null }
       : { slug: idOrSlug, deletedAt: null };
@@ -155,6 +186,12 @@ export class CoursesService {
       },
     });
     if (!course) throw new NotFoundException('Course not found');
+    const isStaff =
+      actor?.role === 'ADMIN' ||
+      actor?.role === 'TEACHER' ||
+      actor?.role === 'SUPPORT';
+    if (!isStaff && course.status !== 'PUBLISHED')
+      throw new NotFoundException('Course not found');
 
     const courseTranslations = await this.prisma.contentTranslation.findMany({
       where: { entityType: 'COURSE', entityId: course.id },
@@ -164,14 +201,21 @@ export class CoursesService {
     const childTranslations = await this.prisma.contentTranslation.findMany({
       where: {
         OR: [
-          moduleIds.length ? { entityType: 'MODULE', entityId: { in: moduleIds } } : undefined,
-          lessonIds.length ? { entityType: 'LESSON', entityId: { in: lessonIds } } : undefined,
+          moduleIds.length
+            ? { entityType: 'MODULE', entityId: { in: moduleIds } }
+            : undefined,
+          lessonIds.length
+            ? { entityType: 'LESSON', entityId: { in: lessonIds } }
+            : undefined,
         ].filter(Boolean) as Prisma.ContentTranslationWhereInput[],
         field: { in: ['title'] },
       },
     });
 
-    const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
+    const totalLessons = course.modules.reduce(
+      (sum, m) => sum + m.lessons.length,
+      0,
+    );
     const list = toListItem(
       {
         ...course,
@@ -180,13 +224,20 @@ export class CoursesService {
       courseTranslations,
       locale,
       totalLessons,
+      await this.coverUrls([course.coverAssetId]),
     );
 
     const modules: CourseModuleSummary[] = course.modules.map((m) => ({
       id: m.id,
       order: m.order,
-      title: pickTitle(childTranslations, 'MODULE', m.id, locale, course.sourceLocale)
-        ?? `Module ${m.order + 1}`,
+      title:
+        pickTitle(
+          childTranslations,
+          'MODULE',
+          m.id,
+          locale,
+          course.sourceLocale,
+        ) ?? `Module ${m.order + 1}`,
       lessons: m.lessons.map((l) => ({
         id: l.id,
         order: l.order,
@@ -194,17 +245,38 @@ export class CoursesService {
         isFree: l.isFree,
         estimatedMinutes: l.estimatedMinutes,
         title:
-          pickTitle(childTranslations, 'LESSON', l.id, locale, course.sourceLocale) ??
-          `Lesson ${l.order + 1}`,
+          pickTitle(
+            childTranslations,
+            'LESSON',
+            l.id,
+            locale,
+            course.sourceLocale,
+          ) ?? `Lesson ${l.order + 1}`,
       })),
     }));
+
+    // docs/11 §3: tell the client when any title fell back to the source.
+    if (
+      fellBack(
+        [...courseTranslations, ...childTranslations],
+        locale,
+        course.sourceLocale,
+      )
+    )
+      noteTranslationFallback(course.sourceLocale);
 
     return { ...list, modules };
   }
 
-  async create(actor: ApiUser, input: CreateCourseDto): Promise<CourseListItem> {
-    const existing = await this.prisma.course.findUnique({ where: { slug: input.slug } });
+  async create(
+    actor: ApiUser,
+    input: CreateCourseDto,
+  ): Promise<CourseListItem> {
+    const existing = await this.prisma.course.findUnique({
+      where: { slug: input.slug },
+    });
     if (existing) throw new ConflictException('Slug already in use');
+    if (input.coverAssetId) await this.assertCoverAsset(input.coverAssetId);
 
     const sourceLocale = input.sourceLocale ?? 'pt-BR';
     const created = await this.prisma.$transaction(async (tx) => {
@@ -216,6 +288,7 @@ export class CoursesService {
           status: 'DRAFT',
           difficulty: input.difficulty ?? 1,
           estimatedMinutes: input.estimatedMinutes ?? 60,
+          coverAssetId: input.coverAssetId ?? null,
         },
       });
       await tx.contentTranslation.create({
@@ -257,23 +330,32 @@ export class CoursesService {
     id: string,
     patch: UpdateCourseDto,
   ): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
       throw new ForbiddenException('Teachers can only edit their own courses');
     }
     if (patch.slug && patch.slug !== target.slug) {
-      const dupe = await this.prisma.course.findUnique({ where: { slug: patch.slug } });
+      const dupe = await this.prisma.course.findUnique({
+        where: { slug: patch.slug },
+      });
       if (dupe) throw new ConflictException('Slug already in use');
     }
+    if (patch.coverAssetId) await this.assertCoverAsset(patch.coverAssetId);
 
     await this.prisma.$transaction(async (tx) => {
       const data: Prisma.CourseUpdateInput = {};
       if (patch.slug) data.slug = patch.slug;
-      if (typeof patch.difficulty === 'number') data.difficulty = patch.difficulty;
+      if (typeof patch.difficulty === 'number')
+        data.difficulty = patch.difficulty;
       if (typeof patch.estimatedMinutes === 'number')
         data.estimatedMinutes = patch.estimatedMinutes;
-      if (typeof patch.isCapstone === 'boolean') data.isCapstone = patch.isCapstone;
+      if (typeof patch.isCapstone === 'boolean')
+        data.isCapstone = patch.isCapstone;
+      if (patch.coverAssetId !== undefined)
+        data.coverAssetId = patch.coverAssetId;
 
       if (Object.keys(data).length > 0) {
         await tx.course.update({ where: { id }, data });
@@ -336,38 +418,59 @@ export class CoursesService {
   }
 
   async publish(actor: ApiUser, id: string): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only publish their own courses');
+      throw new ForbiddenException(
+        'Teachers can only publish their own courses',
+      );
     }
     if (target.status === 'PUBLISHED') {
       throw new BadRequestException('Already published');
     }
     await this.prisma.course.update({
       where: { id },
-      data: { status: 'PUBLISHED', publishedAt: target.publishedAt ?? new Date() },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: target.publishedAt ?? new Date(),
+      },
     });
     return this.getById(id, target.sourceLocale);
   }
 
   async archive(actor: ApiUser, id: string): Promise<CourseListItem> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only archive their own courses');
+      throw new ForbiddenException(
+        'Teachers can only archive their own courses',
+      );
     }
-    await this.prisma.course.update({ where: { id }, data: { status: 'ARCHIVED' } });
+    await this.prisma.course.update({
+      where: { id },
+      data: { status: 'ARCHIVED' },
+    });
     return this.getById(id, target.sourceLocale);
   }
 
   async softDelete(actor: ApiUser, id: string): Promise<void> {
-    const target = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const target = await this.prisma.course.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!target) throw new NotFoundException('Course not found');
     if (actor.role === 'TEACHER' && target.authorId !== actor.userId) {
-      throw new ForbiddenException('Teachers can only delete their own courses');
+      throw new ForbiddenException(
+        'Teachers can only delete their own courses',
+      );
     }
-    await this.prisma.course.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.course.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   private async getById(id: string, locale: string): Promise<CourseListItem> {
@@ -389,7 +492,45 @@ export class CoursesService {
     const lessonCount = await this.prisma.lesson.count({
       where: { deletedAt: null, module: { courseId: id } },
     });
-    return toListItem(course as never, translations, locale, lessonCount);
+    return toListItem(
+      course as never,
+      translations,
+      locale,
+      lessonCount,
+      await this.coverUrls([course.coverAssetId]),
+    );
+  }
+
+  /** id → URL for the confirmed cover assets among `ids`. */
+  private async coverUrls(
+    ids: (string | null)[],
+  ): Promise<Map<string, string>> {
+    const wanted = [...new Set(ids.filter((v): v is string => !!v))];
+    if (!wanted.length) return new Map();
+    const assets = await this.prisma.asset.findMany({
+      where: { id: { in: wanted }, confirmed: true },
+      select: { id: true, url: true },
+    });
+    return new Map(assets.map((a) => [a.id, a.url]));
+  }
+
+  /** A cover must be an uploaded (confirmed) image or cover asset. */
+  private async assertCoverAsset(id: string): Promise<void> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id },
+      select: { confirmed: true, kind: true, mimeType: true },
+    });
+    if (
+      !asset ||
+      !asset.confirmed ||
+      !(asset.kind === 'IMAGE' || asset.kind === 'COVER') ||
+      !asset.mimeType.startsWith('image/')
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_COVER_ASSET',
+        message: 'coverAssetId must be a confirmed image asset',
+      });
+    }
   }
 }
 
@@ -404,8 +545,13 @@ function toListItem(
   translations: ContentTranslation[],
   locale: string,
   lessonCount: number,
+  covers: Map<string, string>,
 ): CourseListItem {
-  const resolved = pickTitleAndDescription(translations, locale, c.sourceLocale);
+  const resolved = pickTitleAndDescription(
+    translations,
+    locale,
+    c.sourceLocale,
+  );
   return {
     id: c.id,
     slug: c.slug,
@@ -413,6 +559,8 @@ function toListItem(
     difficulty: c.difficulty,
     estimatedMinutes: c.estimatedMinutes,
     isCapstone: c.isCapstone,
+    coverAssetId: c.coverAssetId ?? null,
+    coverUrl: (c.coverAssetId && covers.get(c.coverAssetId)) || null,
     sourceLocale: c.sourceLocale,
     publishedAt: c.publishedAt?.toISOString() ?? null,
     createdAt: c.createdAt.toISOString(),
@@ -432,7 +580,9 @@ function pickTitleAndDescription(
   locale: string,
   sourceLocale: string,
 ): ResolvedTitle {
-  const titleAtLocale = translations.find((t) => t.field === 'title' && t.locale === locale);
+  const titleAtLocale = translations.find(
+    (t) => t.field === 'title' && t.locale === locale,
+  );
   const titleAtSource = translations.find(
     (t) => t.field === 'title' && t.locale === sourceLocale,
   );
@@ -451,6 +601,32 @@ function pickTitleAndDescription(
   };
 }
 
+/**
+ * True when some field has source-locale text but no translation in
+ * `locale` (→ the response serves source text; `X-Translation-Fallback`).
+ */
+function fellBack(
+  translations: Pick<
+    ContentTranslation,
+    'entityType' | 'entityId' | 'field' | 'locale' | 'value'
+  >[],
+  locale: string,
+  sourceLocale: string,
+): boolean {
+  if (locale === sourceLocale) return false;
+  const translated = new Set(
+    translations
+      .filter((t) => t.locale === locale && t.value)
+      .map((t) => `${t.entityType}|${t.entityId}|${t.field}`),
+  );
+  return translations.some(
+    (t) =>
+      t.locale === sourceLocale &&
+      !!t.value &&
+      !translated.has(`${t.entityType}|${t.entityId}|${t.field}`),
+  );
+}
+
 function pickTitle(
   translations: ContentTranslation[],
   entityType: 'COURSE' | 'MODULE' | 'LESSON',
@@ -459,7 +635,10 @@ function pickTitle(
   sourceLocale: string,
 ): string | null {
   const matching = translations.filter(
-    (t) => t.entityType === entityType && t.entityId === entityId && t.field === 'title',
+    (t) =>
+      t.entityType === entityType &&
+      t.entityId === entityId &&
+      t.field === 'title',
   );
   if (matching.length === 0) return null;
   const atLocale = matching.find((t) => t.locale === locale);
@@ -486,5 +665,7 @@ async function upsertTranslation(
 }
 
 function isUuid(s: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    s,
+  );
 }

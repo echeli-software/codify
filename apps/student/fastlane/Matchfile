@@ -1,0 +1,13 @@
+# fastlane match — iOS signing certificates + provisioning profiles live in a
+# private, encrypted git repo (docs/13 §4). CI only ever reads (readonly).
+#   MATCH_GIT_URL               private repo, e.g. git@github.com:<org>/codify-certificates.git
+#   MATCH_GIT_BASIC_AUTHORIZATION base64("user:token") for HTTPS access from CI
+#   MATCH_PASSWORD              encryption passphrase for the repo
+# Bootstrap once from a Mac:  fastlane match appstore  (see infra/README.md → Mobile)
+
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+type("appstore")
+app_identifier([ENV.fetch("APP_IDENTIFIER", "app.codify.student")])
+team_id(ENV["APPLE_TEAM_ID"])
+readonly(true)

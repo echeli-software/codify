@@ -3,17 +3,17 @@ import type { Request } from 'express';
 import { Public } from '../auth/public.decorator.js';
 import { WebhookService } from './webhook.service.js';
 import { RevenueCatWebhookService } from './revenuecat-webhook.service.js';
+import type { WebhookResult } from './webhook-idempotency.js';
+import { NoThrottle } from '../common/throttling/throttle.decorators.js';
+
+type RawRequest = Request & { rawBody?: Buffer };
 
 /**
  * Store webhook receivers. Both are public (the stores call them
  * unauthenticated by our session) — security comes from per-provider
- * verification: Stripe signature for /stripe, the configured Authorization
- * secret for /revenuecat.
- *
- * NOTE: real Stripe signature verification needs the *raw* request body.
- * Production wires an express.raw() middleware for this path and reads
- * `req.rawBody`; here (dev provider) we re-serialize the parsed body since
- * the dev provider doesn't verify signatures.
+ * verification: the Stripe signature for /stripe (over the exact raw bytes,
+ * `req.rawBody`, which needs `rawBody: true` on the Nest app), the
+ * configured Authorization secret for /revenuecat.
  */
 @Controller('webhooks')
 export class WebhookController {
@@ -23,28 +23,30 @@ export class WebhookController {
   ) {}
 
   @Public()
+  @NoThrottle()
   @Post('stripe')
   @HttpCode(200)
-  async stripe(
+  stripe(
     @Body() body: unknown,
     @Headers('stripe-signature') signature: string | undefined,
-    @Req() req: Request & { rawBody?: string | Buffer },
-  ): Promise<{ received: boolean; duplicate: boolean; handled: boolean }> {
-    const raw = req.rawBody
-      ? req.rawBody.toString()
-      : JSON.stringify(body ?? {});
-    return this.webhooks.handleStripe(raw, signature);
+    @Req() req: RawRequest,
+  ): Promise<WebhookResult> {
+    // Stripe mode 400s without req.rawBody; dev re-serializes the parsed body.
+    return this.webhooks.handleStripe(req.rawBody, body, signature);
   }
 
   @Public()
+  @NoThrottle()
   @Post('revenuecat')
   @HttpCode(200)
-  async revenuecatWebhook(
+  revenuecatWebhook(
     @Body() body: unknown,
     @Headers('authorization') authHeader: string | undefined,
-    @Req() req: Request & { rawBody?: string | Buffer },
-  ): Promise<{ received: boolean; duplicate: boolean; handled: boolean }> {
-    const raw = req.rawBody ? req.rawBody.toString() : JSON.stringify(body ?? {});
+    @Req() req: RawRequest,
+  ): Promise<WebhookResult> {
+    const raw = req.rawBody
+      ? req.rawBody.toString('utf8')
+      : JSON.stringify(body ?? {});
     return this.revenuecat.handle(raw, authHeader);
   }
 }

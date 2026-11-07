@@ -1,0 +1,161 @@
+// Grafana Alloy on every droplet (docs/13 §12): ships Docker container logs
+// (the API's pino JSON included) to Grafana Cloud Loki and host + container
+// metrics to Grafana Cloud Prometheus.
+//
+// Required env (infra/observability/docker-compose.yml passes them through):
+//   CODIFY_ENV                prod | staging
+//   GRAFANA_LOKI_URL          https://logs-prod-XXX.grafana.net/loki/api/v1/push
+//   GRAFANA_LOKI_USER         Loki instance id (numeric)
+//   GRAFANA_PROM_URL          https://prometheus-prod-XX.grafana.net/api/prom/push
+//   GRAFANA_PROM_USER         Prometheus instance id (numeric)
+//   GRAFANA_CLOUD_API_KEY     Grafana Cloud access policy token (logs:write, metrics:write)
+
+logging {
+	level  = "info"
+	format = "logfmt"
+}
+
+// ── Logs ──────────────────────────────────────────────────────────────────────
+
+discovery.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "30s"
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	// Compose service (Coolify, judge0, observability stacks all use compose).
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	// Coolify labels its containers with the resource name.
+	rule {
+		source_labels = ["__meta_docker_container_label_coolify_name"]
+		target_label  = "coolify_resource"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_log_stream"]
+		target_label  = "stream"
+	}
+}
+
+loki.source.docker "containers" {
+	host          = "unix:///var/run/docker.sock"
+	targets       = discovery.relabel.containers.output
+	relabel_rules = discovery.relabel.containers.rules
+	forward_to    = [loki.process.pino.receiver]
+}
+
+loki.process "pino" {
+	// Health probes are noise.
+	stage.drop {
+		expression          = ".*\"url\":\"/api/health\".*"
+		drop_counter_reason = "healthcheck"
+	}
+
+	// pino emits one JSON object per line: {"level":30,"time":…,"msg":…,"req":{…}}.
+	// Non-JSON lines (nginx, Judge0, Redis) pass through untouched.
+	stage.json {
+		expressions = {
+			level   = "",
+			msg     = "",
+			context = "",
+			req_id  = "req.id",
+		}
+	}
+
+	// pino numeric levels → names, used as the `level` label.
+	stage.template {
+		source   = "level_name"
+		template = "{{ $l := printf \"%v\" .level }}{{ if eq $l \"10\" }}trace{{ else if eq $l \"20\" }}debug{{ else if eq $l \"30\" }}info{{ else if eq $l \"40\" }}warn{{ else if eq $l \"50\" }}error{{ else if eq $l \"60\" }}fatal{{ else if eq $l \"<no value>\" }}{{ else }}{{ $l }}{{ end }}"
+	}
+
+	stage.labels {
+		values = {
+			level = "level_name",
+		}
+	}
+
+	// Keep high-cardinality fields out of labels; expose them as structured metadata.
+	stage.structured_metadata {
+		values = {
+			req_id  = "req_id",
+			context = "context",
+		}
+	}
+
+	forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_LOKI_USER")
+			password = sys.env("GRAFANA_CLOUD_API_KEY")
+		}
+	}
+
+	external_labels = {
+		env  = sys.env("CODIFY_ENV"),
+		host = constants.hostname,
+	}
+}
+
+// ── Metrics ───────────────────────────────────────────────────────────────────
+
+prometheus.exporter.unix "host" {
+	rootfs_path = "/host/root"
+	procfs_path = "/host/proc"
+	sysfs_path  = "/host/sys"
+
+	filesystem {
+		mount_points_exclude = "^/(dev|proc|run|sys|var/lib/docker/.+)($|/)"
+	}
+}
+
+prometheus.exporter.cadvisor "containers" {
+	docker_host      = "unix:///var/run/docker.sock"
+	storage_duration = "5m"
+}
+
+prometheus.scrape "host" {
+	targets         = array.concat(prometheus.exporter.unix.host.targets, prometheus.exporter.cadvisor.containers.targets)
+	scrape_interval = "60s"
+	forward_to      = [prometheus.relabel.instance.receiver]
+}
+
+prometheus.relabel "instance" {
+	rule {
+		target_label = "instance"
+		replacement  = constants.hostname
+	}
+
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_PROM_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_PROM_USER")
+			password = sys.env("GRAFANA_CLOUD_API_KEY")
+		}
+	}
+
+	external_labels = {
+		env = sys.env("CODIFY_ENV"),
+	}
+}

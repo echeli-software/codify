@@ -6,6 +6,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { Icon, type IconName } from '../../atoms/icon/icon.js';
 import { AppButton } from '../../atoms/app-button/app-button.js';
 
@@ -27,49 +28,48 @@ export interface OnboardingSlide {
 @Component({
   selector: 'cdf-onboarding-carousel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, AppButton],
+  imports: [Icon, AppButton, TranslatePipe],
   template: `
     <section
       class="cdf-onboarding"
       role="region"
-      aria-roledescription="carousel"
-      aria-label="Onboarding"
+      [attr.aria-roledescription]="'ui.onboarding.carousel' | translate"
+      [attr.aria-label]="'ui.onboarding.label' | translate"
     >
       <div class="cdf-onboarding__top">
-        <cdf-app-button
-          kind="link"
-          size="sm"
-          (buttonClick)="skipped.emit()"
-        >
-          Skip
+        <cdf-app-button kind="link" size="sm" (buttonClick)="skipped.emit()">
+          {{ 'common.skip' | translate }}
         </cdf-app-button>
       </div>
 
       <div class="cdf-onboarding__viewport">
         @for (slide of slides(); track slide.id; let i = $index) {
-        <article
-          class="cdf-onboarding__slide"
-          role="group"
-          [attr.aria-roledescription]="'slide'"
-          [attr.aria-label]="(i + 1) + ' of ' + slides().length"
-          [attr.aria-hidden]="i !== current()"
-          [class.cdf-onboarding__slide--active]="i === current()"
-        >
-          <div class="cdf-onboarding__art">
-            <cdf-icon [name]="slide.icon" size="xl" />
+          <div
+            class="cdf-onboarding__slide"
+            role="group"
+            [attr.aria-roledescription]="'ui.onboarding.slide' | translate"
+            [attr.aria-label]="
+              'ui.onboarding.slideOf'
+                | translate: { index: i + 1, total: slides().length }
+            "
+            [attr.aria-hidden]="i !== current()"
+            [class.cdf-onboarding__slide--active]="i === current()"
+          >
+            <div class="cdf-onboarding__art">
+              <cdf-icon [name]="slide.icon" size="xl" />
+            </div>
+            <h2 class="cdf-onboarding__title">{{ slide.title }}</h2>
+            <p class="cdf-onboarding__body">{{ slide.body }}</p>
           </div>
-          <h2 class="cdf-onboarding__title">{{ slide.title }}</h2>
-          <p class="cdf-onboarding__body">{{ slide.body }}</p>
-        </article>
         }
       </div>
 
       <ol class="cdf-onboarding__dots" aria-hidden="true">
         @for (slide of slides(); track slide.id; let i = $index) {
-        <li
-          class="cdf-onboarding__dot"
-          [class.cdf-onboarding__dot--active]="i === current()"
-        ></li>
+          <li
+            class="cdf-onboarding__dot"
+            [class.cdf-onboarding__dot--active]="i === current()"
+          ></li>
         }
       </ol>
 
@@ -80,16 +80,20 @@ export interface OnboardingSlide {
           [disabled]="current() === 0"
           (buttonClick)="prev()"
         >
-          Back
+          {{ 'common.back' | translate }}
         </cdf-app-button>
         @if (isLast()) {
-        <cdf-app-button kind="primary" size="md" (buttonClick)="completed.emit()">
-          Get started
-        </cdf-app-button>
+          <cdf-app-button
+            kind="primary"
+            size="md"
+            (buttonClick)="completed.emit()"
+          >
+            {{ 'ui.onboarding.getStarted' | translate }}
+          </cdf-app-button>
         } @else {
-        <cdf-app-button kind="primary" size="md" (buttonClick)="next()">
-          Next
-        </cdf-app-button>
+          <cdf-app-button kind="primary" size="md" (buttonClick)="next()">
+            {{ 'common.next' | translate }}
+          </cdf-app-button>
         }
       </div>
     </section>

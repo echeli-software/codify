@@ -1,57 +1,93 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import {
-  Button,
-  FormField,
-  Icon,
-  Input,
-} from '@codify/ui-bootstrap';
-import { AuthService, type UserRole } from '@codify/auth';
+  ChangeDetectionStrategy,
+  Component,
+  type ElementRef,
+  type OnDestroy,
+  afterNextRender,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormField, Icon, Input } from '@codify/ui-bootstrap';
+import { I18nService, TranslatePipe } from '@codify/i18n';
+import { AuthService, safeRedirect, type UserRole } from '@codify/auth';
 
-const ROLES: { role: UserRole; label: string; description: string }[] = [
-  { role: 'ADMIN', label: 'Admin', description: 'Full administrative access.' },
-  { role: 'TEACHER', label: 'Teacher', description: 'Author + edit own courses.' },
-  { role: 'SUPPORT', label: 'Support', description: 'Read-only across the catalog.' },
-  { role: 'STUDENT', label: 'Student', description: 'Will be denied — admin app is staff-only.' },
-];
+const ROLES: readonly UserRole[] = ['ADMIN', 'TEACHER', 'SUPPORT', 'STUDENT'];
+
+const DEFAULT_TARGET = '/dashboard';
 
 /**
- * Dev-only login page for the admin app. Real auth lands in Phase 4b
- * with Clerk; this is a one-click role flip backed by AuthService stub
- * mode so dev work isn't blocked.
+ * Admin login. With Clerk configured (`provideAuth({ clerkPublishableKey })`)
+ * it mounts Clerk's sign-in; otherwise it shows the dev role picker backed
+ * by AuthService dev mode. Either way it returns to `?redirect=` (in-app
+ * paths only) once signed in.
  *
  * Per docs/04, the admin app is staff-only — STUDENT role is included
- * in the picker so we can verify the guard rejects it, not because it's
- * a valid sign-in target.
+ * in the dev picker so we can verify the guard rejects it, not because
+ * it's a valid sign-in target.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, Button, FormField, Icon, Input],
+  imports: [FormsModule, FormField, Icon, Input, TranslatePipe],
   template: `
     <div class="login-shell">
       <header class="login-shell__header">
         <cdf-icon name="gear" size="lg" />
         <div>
-          <h1>Codify · Admin</h1>
-          <p class="text-muted mb-0">Sign in to manage content and analytics.</p>
+          <h1>{{ 'admin.login.title' | translate }}</h1>
+          <p class="text-muted mb-0">
+            {{ 'admin.login.subtitle' | translate }}
+          </p>
         </div>
       </header>
 
-      <cdf-form-field label="Display name (optional)">
-        <cdf-input [(ngModel)]="displayName" placeholder="Maria Souza" />
-      </cdf-form-field>
-
-      <ul class="role-list">
-        @for (r of roles; track r.role) {
-        <li>
-          <button type="button" class="role-btn" (click)="signIn(r.role)">
-            <span class="role-btn__name">{{ r.label }}</span>
-            <span class="role-btn__desc">{{ r.description }}</span>
-          </button>
-        </li>
+      @if (clerkMode) {
+        <div
+          #clerkSignIn
+          class="clerk-sign-in"
+          data-testid="clerk-sign-in"
+        ></div>
+        @if (clerkError(); as msg) {
+          <p class="text-danger mb-0" role="alert">{{ msg }}</p>
         }
-      </ul>
+      } @else {
+        <cdf-form-field
+          [label]="'admin.login.displayName' | translate"
+          controlId="login-display-name"
+        >
+          <cdf-input
+            inputId="login-display-name"
+            [(ngModel)]="displayName"
+            [placeholder]="'admin.login.displayNamePlaceholder' | translate"
+          />
+        </cdf-form-field>
+
+        <p class="muted small mb-0" id="dev-picker-label">
+          {{ 'admin.login.devPicker' | translate }}
+        </p>
+        <ul class="role-list" aria-labelledby="dev-picker-label">
+          @for (r of roles; track r) {
+            <li>
+              <button
+                type="button"
+                class="role-btn"
+                [attr.data-role]="r"
+                (click)="signIn(r)"
+              >
+                <span class="role-btn__name">{{
+                  'admin.roles.' + r | translate
+                }}</span>
+                <span class="role-btn__desc">{{
+                  'admin.login.roleDesc.' + r | translate
+                }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </div>
   `,
   styles: [
@@ -84,6 +120,11 @@ const ROLES: { role: UserRole; label: string; description: string }[] = [
           font-size: var(--cdf-font-size-lg);
           font-weight: 700;
         }
+      }
+      .clerk-sign-in {
+        display: flex;
+        justify-content: center;
+        min-height: 320px;
       }
       .role-list {
         list-style: none;
@@ -121,17 +162,51 @@ const ROLES: { role: UserRole; label: string; description: string }[] = [
     `,
   ],
 })
-export class LoginPage {
+export class LoginPage implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(I18nService);
   protected readonly roles = ROLES;
+  protected readonly clerkMode = this.auth.mode === 'clerk';
+  protected readonly clerkError = signal<string | null>(null);
   protected displayName = '';
+  private readonly clerkHost =
+    viewChild<ElementRef<HTMLDivElement>>('clerkSignIn');
+  private mountedNode: HTMLDivElement | null = null;
+
+  constructor() {
+    if (!this.clerkMode) return;
+    // Clerk sign-in completes asynchronously; leave once the session (and
+    // the API role) resolves — also covers arriving here already signed in.
+    effect(() => {
+      if (this.auth.isAuthenticated())
+        void this.router.navigateByUrl(this.target());
+    });
+    afterNextRender(() => {
+      const node = this.clerkHost()?.nativeElement;
+      if (!node) return;
+      this.mountedNode = node;
+      this.auth.mountSignIn(node, { redirectUrl: this.target() }).catch(() => {
+        this.clerkError.set(this.i18n.t('admin.login.clerkUnavailable'));
+      });
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.mountedNode) this.auth.unmountSignIn(this.mountedNode);
+  }
 
   protected signIn(role: UserRole): void {
     const name = this.displayName.trim();
     this.auth.signInAs(role, name ? { displayName: name } : {});
-    const target =
-      new URL(window.location.href).searchParams.get('redirect') ?? '/playground';
-    void this.router.navigateByUrl(target);
+    void this.router.navigateByUrl(this.target());
+  }
+
+  private target(): string {
+    return safeRedirect(
+      this.route.snapshot.queryParamMap.get('redirect'),
+      DEFAULT_TARGET,
+    );
   }
 }

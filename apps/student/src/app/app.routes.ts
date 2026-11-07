@@ -1,7 +1,19 @@
 import { Route } from '@angular/router';
 import { authGuard } from '@codify/auth';
+import {
+  growthLinkGuard,
+  rootRedirectGuard,
+} from './pages/shared/route-guards.js';
+import { featureGuard } from './platform/feature-flags.service.js';
 
 export const appRoutes: Route[] = [
+  // `/` — Today when signed in, the public landing otherwise.
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [rootRedirectGuard],
+    children: [],
+  },
   {
     path: 'login',
     loadComponent: () => import('./pages/login.page').then((m) => m.LoginPage),
@@ -9,20 +21,69 @@ export const appRoutes: Route[] = [
   // Public marketing + certificate verification — outside the auth shell.
   {
     path: 'welcome',
-    loadComponent: () => import('./pages/marketing.page').then((m) => m.MarketingPage),
+    loadComponent: () =>
+      import('./pages/marketing.page').then((m) => m.MarketingPage),
+  },
+  {
+    path: 'pricing',
+    loadComponent: () =>
+      import('./pages/pricing.page').then((m) => m.PricingPage),
+  },
+  {
+    path: 'features',
+    loadComponent: () =>
+      import('./pages/features.page').then((m) => m.FeaturesPage),
   },
   {
     path: 'verify',
-    loadComponent: () => import('./pages/certificate-verify.page').then((m) => m.CertificateVerifyPage),
+    loadComponent: () =>
+      import('./pages/certificate-verify.page').then(
+        (m) => m.CertificateVerifyPage,
+      ),
   },
   {
     path: 'verify/:serial',
-    loadComponent: () => import('./pages/certificate-verify.page').then((m) => m.CertificateVerifyPage),
+    loadComponent: () =>
+      import('./pages/certificate-verify.page').then(
+        (m) => m.CertificateVerifyPage,
+      ),
   },
   {
     path: 'forbidden',
     loadComponent: () =>
       import('./pages/forbidden.page').then((m) => m.ForbiddenPage),
+  },
+  // Growth links (docs/18): the code is stored before the auth check so it
+  // survives sign-up, then claimed once signed in.
+  {
+    path: 'r/:code',
+    canActivate: [growthLinkGuard(['referral', 'invite'])],
+    data: { kind: 'referral' },
+    loadComponent: () =>
+      import('./pages/growth-link.page').then((m) => m.GrowthLinkPage),
+  },
+  {
+    path: 'invite/:code',
+    canActivate: [growthLinkGuard(['invite'])],
+    data: { kind: 'invite' },
+    loadComponent: () =>
+      import('./pages/growth-link.page').then((m) => m.GrowthLinkPage),
+  },
+  // Account lifecycle (docs/14 §13): outside the shell — the API refuses
+  // every other route for a deleted / suspended account.
+  {
+    path: 'account/restore',
+    canActivate: [authGuard()],
+    loadComponent: () =>
+      import('./pages/account/restore.page').then((m) => m.AccountRestorePage),
+  },
+  {
+    path: 'account/suspended',
+    canActivate: [authGuard()],
+    loadComponent: () =>
+      import('./pages/account/suspended.page').then(
+        (m) => m.AccountSuspendedPage,
+      ),
   },
   {
     path: '',
@@ -38,6 +99,11 @@ export const appRoutes: Route[] = [
         path: 'catalog',
         loadComponent: () =>
           import('./pages/catalog.page').then((m) => m.CatalogPage),
+      },
+      {
+        path: 'my-courses',
+        loadComponent: () =>
+          import('./pages/my-courses.page').then((m) => m.MyCoursesPage),
       },
       {
         path: 'courses/:slug',
@@ -56,6 +122,7 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'shop',
+        canActivate: [featureGuard('shop.enabled')],
         loadComponent: () =>
           import('./pages/shop.page').then((m) => m.ShopPage),
       },
@@ -71,11 +138,15 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'league',
-        loadComponent: () => import('./pages/league.page').then((m) => m.LeaguePage),
+        canActivate: [featureGuard('leagues.enabled')],
+        loadComponent: () =>
+          import('./pages/league.page').then((m) => m.LeaguePage),
       },
       {
         path: 'friends',
-        loadComponent: () => import('./pages/friends.page').then((m) => m.FriendsPage),
+        canActivate: [featureGuard('friends.enabled')],
+        loadComponent: () =>
+          import('./pages/friends.page').then((m) => m.FriendsPage),
       },
       {
         path: 'u/:id',
@@ -85,17 +156,36 @@ export const appRoutes: Route[] = [
       {
         path: 'billing/success',
         loadComponent: () =>
-          import('./pages/billing-success.page').then((m) => m.BillingSuccessPage),
+          import('./pages/billing-success.page').then(
+            (m) => m.BillingSuccessPage,
+          ),
       },
       {
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile.page').then((m) => m.ProfilePage),
-        // Profile is student-facing — but Support / Admin should not be
-        // funneled here from the role tabs. Leaving open to all roles for
-        // now; tighten in Phase 4b when admin app gets its own profile.
+      },
+      {
+        path: 'settings/privacy',
+        loadComponent: () =>
+          import('./pages/settings/privacy.page').then((m) => m.PrivacyPage),
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./pages/notifications/notifications.page').then(
+            (m) => m.NotificationsPage,
+          ),
+      },
+      {
+        path: 'settings/notifications',
+        loadComponent: () =>
+          import('./pages/notifications/notification-settings.page').then(
+            (m) => m.NotificationSettingsPage,
+          ),
       },
       { path: '', pathMatch: 'full', redirectTo: 'today' },
     ],
   },
+  { path: '**', redirectTo: '' },
 ];

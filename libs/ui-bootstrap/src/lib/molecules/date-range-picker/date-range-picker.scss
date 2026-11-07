@@ -1,0 +1,100 @@
+:host {
+  display: block;
+}
+
+.cdf-range {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+
+  &__legend {
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-medium);
+    color: var(--cdf-color-text);
+    margin-bottom: var(--cdf-space-2);
+  }
+
+  &__fields {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--cdf-space-2);
+    flex-wrap: wrap;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-1);
+    flex: 1 1 180px;
+  }
+
+  &__label {
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__input {
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text);
+    background: var(--cdf-color-surface);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    color-scheme: inherit;
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--cdf-color-primary);
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &[aria-invalid='true'] {
+      border-color: var(--cdf-color-danger);
+    }
+  }
+
+  &__sep {
+    padding-bottom: var(--cdf-space-2);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__clear,
+  &__preset {
+    padding: var(--cdf-space-1) var(--cdf-space-2);
+    font: inherit;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-primary-text);
+    background: transparent;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-pill);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--cdf-color-primary-subtle);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &__clear {
+    margin-bottom: var(--cdf-space-1);
+  }
+
+  &__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-1);
+    margin-top: var(--cdf-space-2);
+  }
+
+  &__error {
+    margin: var(--cdf-space-2) 0 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-danger-text);
+  }
+}

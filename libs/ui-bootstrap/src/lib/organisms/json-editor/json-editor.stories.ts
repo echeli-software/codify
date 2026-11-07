@@ -12,4 +12,9 @@ const meta: Meta<JsonEditor> = {
 export default meta;
 type Story = StoryObj<JsonEditor>;
 
-export const Default: Story = { args: { rows: 8, validate: true } };
+export const Default: Story = {
+  args: { rows: 8, validate: true, ariaLabel: 'Badge rule (JSON)' },
+};
+export const Compact: Story = {
+  args: { rows: 4, validate: false, ariaLabel: 'Exercise tests (JSON)' },
+};

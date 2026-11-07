@@ -34,6 +34,18 @@ import {
   phosphorArrowClockwise,
   phosphorTrophy,
   phosphorGift,
+  phosphorMinus,
+  phosphorUploadSimple,
+  phosphorImage,
+  phosphorCalendarBlank,
+  phosphorCrop,
+  phosphorMagnifyingGlassPlus,
+  phosphorMagnifyingGlassMinus,
+  phosphorFile,
+  phosphorFolderOpen,
+  phosphorCoins,
+  phosphorLock,
+  phosphorStar,
 } from '@ng-icons/phosphor-icons/regular';
 
 /**
@@ -70,6 +82,18 @@ export const ICON_NAMES = [
   'arrow-clockwise',
   'trophy',
   'gift',
+  'minus',
+  'upload',
+  'image',
+  'calendar',
+  'crop',
+  'zoom-in',
+  'zoom-out',
+  'file',
+  'folder-open',
+  'coins',
+  'lock',
+  'star',
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -102,6 +126,18 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
   'arrow-clockwise': 'phosphorArrowClockwise',
   trophy: 'phosphorTrophy',
   gift: 'phosphorGift',
+  minus: 'phosphorMinus',
+  upload: 'phosphorUploadSimple',
+  image: 'phosphorImage',
+  calendar: 'phosphorCalendarBlank',
+  crop: 'phosphorCrop',
+  'zoom-in': 'phosphorMagnifyingGlassPlus',
+  'zoom-out': 'phosphorMagnifyingGlassMinus',
+  file: 'phosphorFile',
+  'folder-open': 'phosphorFolderOpen',
+  coins: 'phosphorCoins',
+  lock: 'phosphorLock',
+  star: 'phosphorStar',
 };
 
 @Component({
@@ -138,9 +174,26 @@ const NAME_TO_PHOSPHOR: Record<IconName, string> = {
       phosphorArrowClockwise,
       phosphorTrophy,
       phosphorGift,
+      phosphorMinus,
+      phosphorUploadSimple,
+      phosphorImage,
+      phosphorCalendarBlank,
+      phosphorCrop,
+      phosphorMagnifyingGlassPlus,
+      phosphorMagnifyingGlassMinus,
+      phosphorFile,
+      phosphorFolderOpen,
+      phosphorCoins,
+      phosphorLock,
+      phosphorStar,
     }),
   ],
-  template: `<ng-icon [name]="phosphorName()" [size]="sizePx()" [attr.aria-label]="label() || null" [attr.role]="label() ? 'img' : null" />`,
+  template: `<ng-icon
+    [name]="phosphorName()"
+    [size]="sizePx()"
+    [attr.aria-label]="label() || null"
+    [attr.role]="label() ? 'img' : null"
+  />`,
   styleUrl: './icon.scss',
 })
 export class Icon {
@@ -149,7 +202,9 @@ export class Icon {
   /** Accessible label. Omit for purely decorative icons. */
   readonly label = input<string | null>(null);
 
-  protected readonly phosphorName = computed(() => NAME_TO_PHOSPHOR[this.name()]);
+  protected readonly phosphorName = computed(
+    () => NAME_TO_PHOSPHOR[this.name()],
+  );
   protected readonly sizePx = computed(() => {
     const s = this.size();
     if (s === 'xs') return '12';

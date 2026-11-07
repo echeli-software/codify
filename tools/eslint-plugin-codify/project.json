@@ -1,0 +1,17 @@
+{
+  "name": "eslint-plugin-codify",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "tools/eslint-plugin-codify",
+  "tags": ["scope:tooling"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "inputs": ["{projectRoot}/**/*"],
+      "cache": true,
+      "options": {
+        "command": "node --test tools/eslint-plugin-codify/rules.spec.mjs"
+      }
+    }
+  }
+}

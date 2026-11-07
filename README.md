@@ -66,3 +66,38 @@ docs/                       Specs (see index above)
 - Every project emits declarations into its own `dist/` (never a shared `dist/out-tsc`), otherwise `ui-bootstrap` and `ui-ionic` overwrite each other's `index.d.ts`.
 
 Storybook configs (`.storybook/tsconfig.json`) are not composite projects and are intentionally left out of the `tsc --build` graph; stories are still linted and compiled by the Storybook build.
+
+## Deploy & operations
+
+Hosting, pipelines and runbooks are specified in [docs/13-deployment.md](./docs/13-deployment.md) (§9 CI/CD, §16 configuration reference, §17 verification) and set up step by step in [`infra/README.md`](./infra/README.md). Component/library ownership and review rules: [docs/19-component-ownership.md](./docs/19-component-ownership.md).
+
+| Event                    | Workflow                                 | Result                                                                                                                                                 |
+| ------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pull request             | `ci.yml`, `preview.yml`, `storybook.yml` | lint/test/typecheck/build, migrations + API smoke on Postgres, image build; preview URLs for both apps commented on the PR; Storybooks tested with axe |
+| Push to default branch   | `staging.yml`                            | API image → migrate staging → Coolify → smoke; admin + student to staging Pages                                                                        |
+| Tag `v*`                 | `release.yml`                            | approval in the `production` environment → migrate prod → Coolify → smoke → Pages → GitHub release                                                     |
+| Tag `mobile-v*` / manual | `mobile.yml`                             | signed Android bundle → Play internal testing; iOS → TestFlight                                                                                        |
+
+Workflows skip (with a job summary) whenever their secrets aren't configured, so forks stay green.
+
+Common operations:
+
+```bash
+# API container (repo root as context)
+docker build -f apps/api/Dockerfile -t codify-api .
+docker run --rm -e DATABASE_URL=... codify-api prisma migrate deploy   # migrations
+docker run --rm -p 3000:3000 -e DATABASE_URL=... codify-api            # server (/api/health)
+
+# Frontend production build for a given API (+ Cloudflare Pages _headers)
+bash infra/web/build-frontend.sh student https://api.staging.codify.app/api pages
+
+# Ledger drift check against any database
+DATABASE_URL=postgresql://... node tools/scripts/drift-check.mjs
+
+# Load checks (API must be running; dev tokens → non-production API)
+API_URL=http://localhost:3000/api node tools/load/league-sharding.mjs --users=1000
+API_URL=http://localhost:3000/api node tools/load/submissions-p95.mjs
+API_URL=http://localhost:3000/api node tools/load/ai-grading-p95.mjs
+```
+
+Infrastructure as code: `infra/terraform` (DigitalOcean droplets, firewalls, Managed Postgres; Cloudflare DNS, TLS, WAF, rate limits, Pages), `infra/judge0` (sandbox host), `infra/coolify` (api + worker + redis), `infra/observability` (Grafana Alloy, Sentry, uptime). Dependency updates: Renovate (`renovate.json`, weekly, grouped).

@@ -1,0 +1,117 @@
+:host {
+  display: block;
+  max-width: 720px;
+}
+
+.cdf-mult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-4);
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-3);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cdf-space-1);
+    flex: 1 1 200px;
+    min-width: 0;
+
+    &--narrow {
+      flex: 0 1 140px;
+    }
+  }
+
+  &__label {
+    font-size: var(--cdf-font-size-sm);
+    font-weight: var(--cdf-font-weight-medium);
+    color: var(--cdf-color-text);
+  }
+
+  &__input {
+    width: 100%;
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    font: inherit;
+    font-size: var(--cdf-font-size-base);
+    color: var(--cdf-color-text);
+    background: var(--cdf-color-surface);
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--cdf-color-primary);
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &[aria-invalid='true'] {
+      border-color: var(--cdf-color-danger);
+    }
+  }
+
+  &__value {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    font-weight: var(--cdf-font-weight-semibold);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-4);
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+      width: 100%;
+      margin-bottom: var(--cdf-space-1);
+    }
+  }
+
+  &__radio {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-text);
+    cursor: pointer;
+
+    input {
+      accent-color: var(--cdf-color-primary);
+    }
+  }
+
+  &__hint {
+    margin: calc(-1 * var(--cdf-space-3)) 0 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-danger-text);
+  }
+
+  &__summary {
+    margin: 0;
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-primary-subtle);
+    color: var(--cdf-color-text);
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--cdf-space-2);
+  }
+}

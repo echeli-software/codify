@@ -1,4 +1,9 @@
-import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiGradingModule } from './ai-grading/ai-grading.module.js';
@@ -17,14 +22,31 @@ import { LeaguesModule } from './leagues/leagues.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { EngagementModule } from './engagement/engagement.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProgressModule } from './progress/progress.module.js';
 import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { UsersModule } from './users/users.module.js';
+import { QuizzesModule } from './quizzes/quizzes.module.js';
+import { EnrollmentsModule } from './enrollments/enrollments.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { AssetsModule } from './assets/assets.module.js';
+import { ReferralsModule } from './referrals/referrals.module.js';
+import { TranslationsModule } from './translations/translations.module.js';
+
+import { AppConfigModule } from './config/config.module.js';
+import { PlatformModule } from './common/platform.module.js';
+import { OpsModule } from './ops/ops.module.js';
+import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
+import { AccountModule } from './account/account.module.js';
+import { FlagsModule } from './flags/flags.module.js';
 
 @Module({
   imports: [
+    // Cron jobs (league rollover, streak reminders, quest assignment, drift
+    // check) register with @Cron in their own services.
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     AuditModule,
@@ -42,9 +64,23 @@ import { UsersModule } from './users/users.module.js';
     ModulesModule,
     LessonsModule,
     NotificationsModule,
+    EngagementModule,
     PlansModule,
     ProgressModule,
     ScenariosModule,
+    QuizzesModule,
+    EnrollmentsModule,
+    AnalyticsModule,
+    AssetsModule,
+    ReferralsModule,
+    TranslationsModule,
+
+    AppConfigModule,
+    PlatformModule,
+    OpsModule,
+    AdminOpsModule,
+    AccountModule,
+    FlagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

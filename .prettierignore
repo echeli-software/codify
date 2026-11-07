@@ -8,3 +8,7 @@
 
 # pnpm owns the lockfile format
 pnpm-lock.yaml
+
+# Capacitor native projects (generated config + synced web build)
+apps/student/android
+apps/student/ios

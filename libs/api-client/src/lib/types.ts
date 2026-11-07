@@ -32,6 +32,8 @@ export interface UpdateMeBody {
   quietHoursStart?: number;
   quietHoursEnd?: number;
   marketingEmailOptIn?: boolean;
+  /** `true` marks first-run onboarding finished (sets `onboardedAt` once). */
+  onboarded?: boolean;
 }
 
 export interface AdminUserListItem {
@@ -53,4 +55,6 @@ export interface HealthResponse {
   status: 'ok' | 'degraded';
   uptimeSeconds: number;
   database: 'up' | 'down';
+  /** `not_configured` when the API runs without REDIS_URL (dev only). */
+  redis?: 'up' | 'down' | 'not_configured';
 }

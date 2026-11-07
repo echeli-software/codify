@@ -1,0 +1,10 @@
+# Fastlane Appfile — identifiers for the Codify student app (Capacitor).
+# Values come from the environment so nothing account-specific is committed;
+# mobile.yml exports them from GitHub secrets/variables.
+
+app_identifier(ENV.fetch("APP_IDENTIFIER", "app.codify.student")) # iOS bundle id
+apple_id(ENV["APPLE_ID"])                                          # optional when using an App Store Connect API key
+team_id(ENV["APPLE_TEAM_ID"])                                      # Developer Portal team
+itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"])                      # App Store Connect team (if different)
+
+package_name(ENV.fetch("ANDROID_PACKAGE_NAME", "app.codify.student")) # Play Console package

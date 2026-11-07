@@ -23,12 +23,25 @@ export interface LocaleMeta {
 }
 
 export const LOCALE_META: Record<Locale, LocaleMeta> = {
-  'pt-BR': { code: 'pt-BR', nativeName: 'Português (Brasil)', defaultCurrency: 'BRL', dir: 'ltr' },
-  'en-US': { code: 'en-US', nativeName: 'English (US)', defaultCurrency: 'USD', dir: 'ltr' },
+  'pt-BR': {
+    code: 'pt-BR',
+    nativeName: 'Português (Brasil)',
+    defaultCurrency: 'BRL',
+    dir: 'ltr',
+  },
+  'en-US': {
+    code: 'en-US',
+    nativeName: 'English (US)',
+    defaultCurrency: 'USD',
+    dir: 'ltr',
+  },
 };
 
 export function isLocale(value: unknown): value is Locale {
-  return typeof value === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' &&
+    (SUPPORTED_LOCALES as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -40,7 +53,9 @@ export function pickLocale(candidates: readonly string[]): Locale {
     if (isLocale(candidate)) return candidate;
     // Match the language portion: "pt-PT" → "pt-BR"; "en-GB" → "en-US".
     const lang = candidate.split('-')[0]?.toLowerCase();
-    const match = SUPPORTED_LOCALES.find((l) => l.toLowerCase().startsWith(lang + '-'));
+    const match = SUPPORTED_LOCALES.find((l) =>
+      l.toLowerCase().startsWith(lang + '-'),
+    );
     if (match) return match;
   }
   return DEFAULT_LOCALE;

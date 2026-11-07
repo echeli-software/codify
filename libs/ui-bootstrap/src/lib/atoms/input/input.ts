@@ -8,7 +8,14 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
-export type InputType = 'text' | 'email' | 'url' | 'password' | 'search' | 'tel' | 'number';
+export type InputType =
+  | 'text'
+  | 'email'
+  | 'url'
+  | 'password'
+  | 'search'
+  | 'tel'
+  | 'number';
 export type InputSize = 'sm' | 'md' | 'lg';
 
 /**
@@ -29,6 +36,8 @@ export type InputSize = 'sm' | 'md' | 'lg';
       [placeholder]="placeholder()"
       [attr.aria-invalid]="invalid() || null"
       [attr.aria-describedby]="describedBy() || null"
+      [attr.aria-label]="ariaLabel()"
+      [id]="inputId() ?? null"
       [attr.autocomplete]="autocomplete()"
       [attr.inputmode]="inputmode()"
       [attr.maxlength]="maxLength()"
@@ -53,10 +62,22 @@ export class Input implements ControlValueAccessor {
   readonly invalid = input(false);
   readonly autocomplete = input<string | null>(null);
   readonly inputmode = input<
-    'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search' | null
+    | 'none'
+    | 'text'
+    | 'tel'
+    | 'url'
+    | 'email'
+    | 'numeric'
+    | 'decimal'
+    | 'search'
+    | null
   >(null);
   readonly maxLength = input<number | null>(null);
   readonly describedBy = input<string | null>(null);
+  /** Accessible name when no `<label for>` points at the control. */
+  readonly ariaLabel = input<string | null>(null);
+  /** Id for the native input (pair with `<label for>` / FormField). */
+  readonly inputId = input<string | null>(null);
 
   protected readonly value = signal('');
   protected readonly disabled = signal(false);

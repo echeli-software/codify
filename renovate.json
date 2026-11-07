@@ -1,0 +1,98 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "timezone": "America/Sao_Paulo",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 8,
+  "prHourlyLimit": 4,
+  "rangeStrategy": "auto",
+  "labels": ["dependencies"],
+  "postUpdateOptions": ["pnpmDedupe"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "description": "Major upgrades are manual and scheduled (docs/14 §16): open the PR but never automerge",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major"]
+    },
+    {
+      "description": "Angular framework + CLI + tooling move together",
+      "groupName": "angular",
+      "matchPackageNames": [
+        "@angular/**",
+        "@angular-devkit/**",
+        "@schematics/angular",
+        "angular-eslint",
+        "jest-preset-angular"
+      ]
+    },
+    {
+      "description": "Nx plugins must match the nx version exactly",
+      "groupName": "nx",
+      "matchPackageNames": ["nx", "@nx/**"]
+    },
+    {
+      "description": "NestJS packages",
+      "groupName": "nestjs",
+      "matchPackageNames": ["@nestjs/**", "nestjs-pino"]
+    },
+    {
+      "description": "Prisma CLI, client and driver adapter must share a version",
+      "groupName": "prisma",
+      "matchPackageNames": ["prisma", "@prisma/**"]
+    },
+    {
+      "description": "Tiptap: every extension must resolve to the same @tiptap/core (see .npmrc) — pinned and updated together",
+      "groupName": "tiptap",
+      "matchPackageNames": ["@tiptap/**"],
+      "rangeStrategy": "pin",
+      "automerge": false
+    },
+    {
+      "description": "Storybook packages",
+      "groupName": "storybook",
+      "matchPackageNames": ["storybook", "@storybook/**"]
+    },
+    {
+      "description": "Capacitor core + platforms + plugins",
+      "groupName": "capacitor",
+      "matchPackageNames": ["@capacitor/**", "@revenuecat/purchases-capacitor"]
+    },
+    {
+      "description": "Ionic",
+      "groupName": "ionic",
+      "matchPackageNames": ["@ionic/**", "ionicons"]
+    },
+    {
+      "description": "Automerge patch updates of dev-only dependencies once CI is green",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "GitHub Actions: grouped; workflows reference major versions (e.g. actions/checkout@v4)",
+      "groupName": "github-actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "Base images in Dockerfiles / compose",
+      "groupName": "docker images",
+      "matchManagers": ["dockerfile", "docker-compose"]
+    },
+    {
+      "description": "Terraform providers",
+      "groupName": "terraform",
+      "matchManagers": ["terraform"]
+    }
+  ]
+}

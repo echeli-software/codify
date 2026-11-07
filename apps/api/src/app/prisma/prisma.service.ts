@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
@@ -14,15 +19,22 @@ import { PrismaPg } from '@prisma/adapter-pg';
  * read the same env via `prisma.config.ts`.
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    super({
-      adapter: new PrismaPg({
-        connectionString: process.env['DATABASE_URL'] ?? '',
-      }),
-    });
+    const connectionString = process.env['DATABASE_URL']?.trim();
+    if (!connectionString) {
+      // Never fall back to an empty string: pg would silently try a local
+      // socket with the OS user, which masks a missing config in deploys.
+      throw new Error(
+        'DATABASE_URL is not set — the API cannot connect to Postgres.',
+      );
+    }
+    super({ adapter: new PrismaPg({ connectionString }) });
   }
 
   async onModuleInit(): Promise<void> {

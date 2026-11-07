@@ -1,0 +1,115 @@
+:host {
+  display: block;
+}
+
+.cdf-board {
+  border: 1px solid var(--cdf-color-border);
+  border-radius: var(--cdf-radius-lg);
+  background: var(--cdf-color-surface);
+  overflow: hidden;
+  color: var(--cdf-color-text);
+
+  &__viewport {
+    width: 100%;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 2.5rem auto 1fr auto auto auto;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    padding: 0 var(--cdf-space-3);
+    border-bottom: 1px solid var(--cdf-color-border);
+    box-sizing: border-box;
+
+    &[data-zone='promote'] {
+      box-shadow: inset 3px 0 0 var(--cdf-color-success);
+    }
+
+    &[data-zone='demote'] {
+      box-shadow: inset 3px 0 0 var(--cdf-color-danger);
+    }
+
+    &--me {
+      background: var(--cdf-color-primary-subtle);
+      font-weight: var(--cdf-font-weight-semibold);
+
+      // Tinted row: zone labels fall back to the text colour (icon keeps the hue).
+      .cdf-board__zone {
+        color: var(--cdf-color-text);
+      }
+    }
+  }
+
+  &__rank {
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--cdf-font-weight-bold);
+    text-align: center;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__avatar {
+    display: inline-flex;
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__me-tag {
+    margin-inline-start: var(--cdf-space-1);
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__xp {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--cdf-font-size-sm);
+    color: var(--cdf-color-xp-text);
+  }
+
+  &__zone {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: var(--cdf-font-size-xs);
+
+    &--promote {
+      color: var(--cdf-color-success-text);
+    }
+
+    &--demote {
+      color: var(--cdf-color-danger-text);
+    }
+  }
+
+  &__zone-text {
+    @media (max-width: 479px) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+  }
+
+  &__pinned {
+    border-top: 2px solid var(--cdf-color-border);
+    background: var(--cdf-color-surface-elev);
+  }
+
+  &__pinned-label {
+    display: block;
+    padding: var(--cdf-space-1) var(--cdf-space-3) 0;
+    font-size: var(--cdf-font-size-xs);
+    color: var(--cdf-color-text-muted);
+  }
+}

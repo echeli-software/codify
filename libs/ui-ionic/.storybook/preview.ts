@@ -3,6 +3,10 @@ import { applicationConfig } from '@storybook/angular';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular/standalone';
 import { provideI18n } from '@codify/i18n';
+import { preloadAllTranslations } from '@codify/i18n/testing';
+
+// Stories render synchronously with every namespace (apps load lazily).
+preloadAllTranslations();
 
 // Global SCSS is loaded via the `styles` option on the Storybook target in
 // libs/ui-ionic/project.json (Storybook's webpack sass-loader doesn't
@@ -11,7 +15,7 @@ import { provideI18n } from '@codify/i18n';
 const preview: Preview = {
   parameters: {
     layout: 'padded',
-    a11y: { test: 'todo' },
+    a11y: { test: 'error' },
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -20,7 +24,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ['Atoms', 'Molecules', 'Organisms', 'Demo'],
+        order: ['Foundations', 'Atoms', 'Molecules', 'Organisms', 'Demo'],
       },
     },
   },
@@ -43,7 +47,10 @@ const preview: Preview = {
     applicationConfig({
       providers: [
         provideRouter([{ path: '**', children: [] }], withHashLocation()),
-        provideIonicAngular({ mode: 'md' }),
+        // No enter/leave animations: overlays (modals, toasts) render in
+        // their final state, so the a11y check never measures contrast
+        // mid-fade against the page behind them.
+        provideIonicAngular({ mode: 'md', animated: false }),
         provideI18n(),
       ],
     }),

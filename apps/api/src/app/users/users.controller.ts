@@ -1,15 +1,16 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
@@ -17,9 +18,11 @@ import { AuditService } from '../audit/audit.service.js';
 import { UsersService } from './users.service.js';
 import {
   UpdateMeDto,
+  UserListFiltersDto,
   type AdminUserListItem,
   type MeResponse,
 } from './users.dto.js';
+import { IntRangePipe } from '../common/int-range.pipe.js';
 
 @Controller('users')
 export class UsersController {
@@ -29,10 +32,43 @@ export class UsersController {
   @Roles('ADMIN', 'SUPPORT')
   @Get()
   async list(
-    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @Query('skip', new DefaultValuePipe(0), new IntRangePipe(0)) skip: number,
+    @Query('take', new DefaultValuePipe(20), new IntRangePipe(1, 100))
+    take: number,
+    @Query('q') q?: string,
+    @Query('role') role?: string,
+    @Query() filters: UserListFiltersDto = {},
   ): Promise<{ items: AdminUserListItem[]; total: number }> {
-    return this.users.listForAdmin({ skip, take: Math.min(take, 100) });
+    if (q !== undefined && (typeof q !== 'string' || q.length > 120)) {
+      throw new BadRequestException('q must be at most 120 characters');
+    }
+    if (
+      role !== undefined &&
+      !(Object.values(UserRole) as string[]).includes(role)
+    ) {
+      throw new BadRequestException(
+        `role must be one of ${Object.values(UserRole).join(', ')}`,
+      );
+    }
+    const lastSeenFrom = filters.lastSeenFrom
+      ? new Date(filters.lastSeenFrom)
+      : undefined;
+    const lastSeenTo = filters.lastSeenTo
+      ? new Date(filters.lastSeenTo)
+      : undefined;
+    if (lastSeenFrom && lastSeenTo && lastSeenFrom > lastSeenTo) {
+      throw new BadRequestException('lastSeenFrom must be before lastSeenTo');
+    }
+    return this.users.listForAdmin({
+      skip,
+      take,
+      q: q || undefined,
+      role: role as UserRole | undefined,
+      locale: filters.locale || undefined,
+      lastSeenFrom,
+      lastSeenTo,
+      subscriptionStatus: filters.subscriptionStatus,
+    });
   }
 
   /** Detail view — Admin/Support only. */

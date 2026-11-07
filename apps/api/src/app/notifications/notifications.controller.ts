@@ -1,11 +1,32 @@
-import { Body, Controller, Delete, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { DevicesService } from './devices.service.js';
-import { StreakReminderService, type StreakReminderResult } from './streak-reminder.service.js';
+import {
+  StreakReminderService,
+  type StreakReminderResult,
+} from './streak-reminder.service.js';
 import { RegisterDeviceDto } from './notifications.dto.js';
-import { PUSH_PROVIDER, type PushProvider, DevPushProvider } from './push.provider.js';
+import {
+  PUSH_PROVIDER,
+  type PushProvider,
+  DevPushProvider,
+} from './push.provider.js';
+import {
+  DevEmailProvider,
+  EMAIL_PROVIDER,
+  type EmailProvider,
+} from '../email/email.provider.js';
 
 @Controller()
 export class NotificationsController {
@@ -13,6 +34,7 @@ export class NotificationsController {
     private readonly devices: DevicesService,
     private readonly reminders: StreakReminderService,
     @Inject(PUSH_PROVIDER) private readonly push: PushProvider,
+    @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
   ) {}
 
   // ─── Device tokens (student app registers on login) ──────────────────────
@@ -40,7 +62,7 @@ export class NotificationsController {
   @Roles('ADMIN')
   @Post('notifications/streak-reminder/run')
   runStreakReminders(): Promise<StreakReminderResult> {
-    return this.reminders.run();
+    return this.reminders.run({ mode: 'manual' });
   }
 
   /** Dev-only: inspect what the DevPushProvider captured (verification aid). */
@@ -51,5 +73,15 @@ export class NotificationsController {
       return { mode: 'dev', messages: this.push.recent(token) };
     }
     return { mode: this.push.mode, messages: [] };
+  }
+
+  /** Dev-only: inspect what the DevEmailProvider captured (verification aid). */
+  @Roles('ADMIN')
+  @Get('notifications/dev/emails')
+  devEmails(@Query('to') to?: string) {
+    if (this.email instanceof DevEmailProvider) {
+      return { mode: 'dev', emails: this.email.recent(to) };
+    }
+    return { mode: this.email.mode, emails: [] };
   }
 }

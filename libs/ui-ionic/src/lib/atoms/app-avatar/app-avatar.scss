@@ -6,7 +6,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--cdf-color-text);
+    // Generated pastel background in both themes → fixed dark ink.
+    color: var(--cdf-color-ink);
     font-weight: var(--cdf-font-weight-semibold);
 
     img {
@@ -17,11 +18,31 @@
   }
 }
 
-:host([data-size='xs']) ion-avatar { width: 20px; height: 20px; font-size: 9px; }
-:host([data-size='sm']) ion-avatar { width: 28px; height: 28px; font-size: 11px; }
-:host([data-size='md']) ion-avatar { width: 36px; height: 36px; font-size: 13px; }
-:host([data-size='lg']) ion-avatar { width: 48px; height: 48px; font-size: 16px; }
-:host([data-size='xl']) ion-avatar { width: 72px; height: 72px; font-size: 24px; }
+:host([data-size='xs']) ion-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+:host([data-size='sm']) ion-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+:host([data-size='md']) ion-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+:host([data-size='lg']) ion-avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+:host([data-size='xl']) ion-avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 24px;
+}
 
 .visually-hidden {
   position: absolute;

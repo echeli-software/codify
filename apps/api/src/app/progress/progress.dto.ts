@@ -1,9 +1,10 @@
 /**
  * DTOs for /api/lessons/:id/complete and /api/courses/:id/progress.
- * No body validation needed on POST — the act of POSTing the completion
- * is the entire request. We reserve a body for Phase 5b offline queue
- * (clientTimestamp etc).
+ * The POST body is optional; the offline queue (docs/16 §7) sends the
+ * device time of the completion so the streak credits the right local day.
  */
+
+import { IsISO8601, IsOptional } from 'class-validator';
 
 import type { RewardResult } from '../gamification/gamification.types.js';
 import type { CompletedQuest } from '../gamification/quests.service.js';
@@ -41,4 +42,11 @@ export interface CourseProgressResponse {
   totalLessons: number;
   completedLessons: number;
   items: ProgressItem[];
+}
+
+export class CompleteLessonDto {
+  /** ISO-8601 device time of the completion (offline sync). ≤ 5 min ahead, ≤ 72 h old. */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  clientTimestamp?: string;
 }

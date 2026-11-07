@@ -53,9 +53,17 @@ export class DevPushProvider implements PushProvider {
       this.ring.push({ ...m, at: new Date().toISOString() });
       if (this.ring.length > RING_SIZE) this.ring.shift();
     }
-    const invalidTokens = messages.filter((m) => m.token.startsWith('invalid-')).map((m) => m.token);
-    this.logger.log(`[dev] captured ${messages.length - invalidTokens.length} push(es), ${invalidTokens.length} invalid`);
-    return { sent: messages.length - invalidTokens.length, failed: invalidTokens.length, invalidTokens };
+    const invalidTokens = messages
+      .filter((m) => m.token.startsWith('invalid-'))
+      .map((m) => m.token);
+    this.logger.log(
+      `[dev] captured ${messages.length - invalidTokens.length} push(es), ${invalidTokens.length} invalid`,
+    );
+    return {
+      sent: messages.length - invalidTokens.length,
+      failed: invalidTokens.length,
+      invalidTokens,
+    };
   }
 
   /** Recent captured deliveries (newest last), optionally filtered by token. */

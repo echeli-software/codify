@@ -1,31 +1,33 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { TranslatePipe } from '@codify/i18n';
 import { Button, EmptyState } from '@codify/ui-bootstrap';
 import { AuthService } from '@codify/auth';
-import { inject } from '@angular/core';
 
 /**
- * Shown when the authGuard refuses access to the protected admin shell.
- * Most common path: a STUDENT-role account hit /playground — bounce them
- * with a sign-out affordance so they can re-auth as a staff role.
+ * Shown when the authGuard refuses access to the protected admin shell —
+ * typically a STUDENT account. Offers sign-out so staff can re-authenticate.
  */
 @Component({
-  imports: [Button, EmptyState, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [Button, EmptyState, RouterLink, TranslatePipe],
   template: `
-    <div class="forbidden-shell">
+    <main class="forbidden-shell">
       <cdf-empty-state
         icon="x-circle"
-        title="Access denied"
-        description="The admin app is for staff only. Your account doesn't have the required role."
+        [title]="'admin.forbidden.title' | translate"
+        [description]="'admin.forbidden.description' | translate"
       >
-        <div style="display:flex; gap:8px;">
+        <div class="row-actions">
           <cdf-button kind="primary" (click)="signOutAndRedirect()">
-            Sign out
+            {{ 'admin.shell.signOut' | translate }}
           </cdf-button>
-          <cdf-button kind="ghost" routerLink="/login">Back to login</cdf-button>
+          <cdf-button kind="ghost" routerLink="/login">
+            {{ 'admin.forbidden.backToLogin' | translate }}
+          </cdf-button>
         </div>
       </cdf-empty-state>
-    </div>
+    </main>
   `,
   styles: [
     `
@@ -50,8 +52,8 @@ export class ForbiddenPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  protected signOutAndRedirect(): void {
-    this.auth.signOut();
+  protected async signOutAndRedirect(): Promise<void> {
+    await this.auth.signOut();
     void this.router.navigateByUrl('/login');
   }
 }

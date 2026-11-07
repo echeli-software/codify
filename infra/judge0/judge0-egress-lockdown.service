@@ -1,0 +1,12 @@
+[Unit]
+Description=Block new outbound connections from Judge0 Docker networks
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/judge0-egress-lockdown.sh
+
+[Install]
+WantedBy=multi-user.target

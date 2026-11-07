@@ -14,13 +14,19 @@
   box-shadow: var(--cdf-shadow-2);
 
   &__mult {
-    color: var(--cdf-color-premium);
+    color: var(--cdf-color-premium-text);
     font-weight: var(--cdf-font-weight-semibold);
   }
 }
 
 :host([data-tone='level-up']) .cdf-reward {
-  background: linear-gradient(135deg, var(--cdf-color-primary-subtle), var(--cdf-color-surface-elev));
+  background: linear-gradient(
+    135deg,
+    var(--cdf-color-primary-subtle),
+    var(--cdf-color-surface-elev)
+  );
   border-color: var(--cdf-color-primary);
-  box-shadow: 0 0 0 1px var(--cdf-color-primary), 0 8px 24px rgba(124, 77, 255, 0.25);
+  box-shadow:
+    0 0 0 1px var(--cdf-color-primary),
+    0 8px 24px rgba(124, 77, 255, 0.25);
 }

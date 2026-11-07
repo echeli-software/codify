@@ -2,55 +2,135 @@ import {
   Component,
   ChangeDetectionStrategy,
   ElementRef,
+  computed,
   inject,
+  input,
+  signal,
   viewChild,
+  type OnInit,
 } from '@angular/core';
 import type { Meta, StoryObj } from '@storybook/angular';
 import {
   CoinService,
   CoinTarget,
+  MotionAndSoundService,
+  OverlayHostService,
   RewardOrchestrator,
+  SoundService,
   XpService,
+  type BadgeUnlockOverlay as BadgeOverlayState,
+  type LevelUpOverlay,
+  type RewardKind,
+  type RewardPayload,
 } from '@codify/gamification-engine';
+import { levelFromXp } from '@codify/ui-core';
 import { AppButton } from '../atoms/app-button/app-button.js';
 import { AppCard } from '../atoms/app-card/app-card.js';
-import { CoinBadge } from '../atoms/coin-badge/coin-badge.js';
+import { CoinCounter } from '../molecules/coin-counter/coin-counter.js';
+import { RewardToast } from '../molecules/reward-toast/reward-toast.js';
 import { XpBar } from '../molecules/xp-bar/xp-bar.js';
 import { LevelUpModal } from '../organisms/level-up-modal/level-up-modal.js';
 import { BadgeUnlockOverlay } from '../organisms/badge-unlock-overlay/badge-unlock-overlay.js';
-import {
-  OverlayHostService,
-  type LevelUpOverlay,
-  type BadgeUnlockOverlay as BadgeOverlayState,
-} from '@codify/gamification-engine';
-import { computed } from '@angular/core';
+
+/** Fixed seed → coin trails and confetti replay identically every run. */
+const DEMO_SEED = 20261007;
+
+/** One canned server response per RewardKind (deltas + breakdown). */
+const SCENARIOS: Record<
+  RewardKind,
+  Omit<RewardPayload, 'kind' | 'totals' | 'sourceEl'>
+> = {
+  lessonComplete: {
+    canonical: {
+      xp: 40,
+      coins: 10,
+      multiplier: 2,
+      breakdown: [
+        { source: 'base', xp: 20, coins: 5 },
+        { source: 'PREMIUM_DEFAULT', multiplier: 2 },
+      ],
+    },
+  },
+  quizPass: {
+    canonical: {
+      xp: 72,
+      coins: 18,
+      multiplier: 2.4,
+      breakdown: [
+        { source: 'base', xp: 30, coins: 8 },
+        { source: 'PREMIUM_DEFAULT', multiplier: 2 },
+        { source: 'STREAK_TIER', multiplier: 1.2 },
+      ],
+    },
+  },
+  exercisePass: { canonical: { xp: 75, coins: 25 } },
+  aiPromptComplete: { canonical: { xp: 30, coins: 8 } },
+  scenarioComplete: { canonical: { xp: 35, coins: 12 } },
+  dailyQuestComplete: { canonical: { xp: 50, coins: 20 } },
+  streakMilestone: {
+    canonical: { xp: 100, coins: 50 },
+    badgesUnlocked: [
+      {
+        id: 'streak-7',
+        name: 'Week Warrior',
+        icon: 'flame',
+        description: 'Held a 7-day learning streak.',
+      },
+    ],
+  },
+  levelUp: { canonical: { xp: 200, coins: 50 } },
+  badgeUnlock: {
+    canonical: { xp: 0, coins: 25 },
+    badgesUnlocked: [
+      {
+        id: 'first-quiz',
+        name: 'Quiz Whiz',
+        icon: 'ribbon',
+        description: 'Passed your first quiz.',
+      },
+    ],
+  },
+  leaguePromotion: {
+    canonical: { xp: 0, coins: 100 },
+    badgesUnlocked: [
+      {
+        id: 'league-silver',
+        name: 'Silver League',
+        icon: 'podium',
+        description: 'Promoted to Silver.',
+      },
+    ],
+  },
+  mysteryChestOpen: { canonical: { xp: 15, coins: 120 } },
+};
+
+const KINDS = Object.keys(SCENARIOS) as RewardKind[];
 
 /**
- * Storybook-only host: mounts overlay state from `OverlayHostService` into
- * the actual modals. Mirrors `apps/student/src/app/reward-overlays.component`
- * but lives here so the catalog reviewer can see overlays fire end-to-end.
+ * Storybook-only host for `OverlayHostService` (mirrors the student app's
+ * RewardOverlays component) so overlays fire end-to-end.
  */
 @Component({
-  selector: 'cdf-overlay-host-sb',
+  selector: 'sb-overlay-host',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LevelUpModal, BadgeUnlockOverlay],
   template: `
     @if (levelUp(); as lu) {
-    <cdf-level-up-modal
-      [open]="true"
-      [newLevel]="lu.info.newLevel"
-      [xpForNext]="lu.info.xpForNextLevel ?? null"
-      (dismissed)="dismiss()"
-    />
+      <cdf-level-up-modal
+        [open]="true"
+        [newLevel]="lu.info.newLevel"
+        [xpForNext]="lu.info.xpForNextLevel ?? null"
+        (dismissed)="dismiss()"
+      />
     }
     @if (badge(); as b) {
-    <cdf-badge-unlock-overlay
-      [open]="true"
-      [name]="b.badge.name"
-      [icon]="b.badge.icon"
-      [description]="b.badge.description ?? null"
-      (dismissed)="dismiss()"
-    />
+      <cdf-badge-unlock-overlay
+        [open]="true"
+        [name]="b.badge.name"
+        [icon]="b.badge.icon"
+        [description]="b.badge.description ?? null"
+        (dismissed)="dismiss()"
+      />
     }
   `,
 })
@@ -70,103 +150,185 @@ class OverlayHostSb {
 }
 
 /**
- * Self-contained demo for the RewardOrchestrator. Buttons trigger each
- * reward kind so a reviewer can watch the full sequence (haptic →
- * coin-fly → counter tween → overlay) end-to-end.
+ * docs/03 "A standalone RewardOrchestrator demo page plays each reward kind
+ * on demand". Every RewardKind has a button; payloads carry server-style
+ * `totals` (canonical), the seed is fixed so animations replay identically,
+ * and the toggles exercise reduced-motion (toast instead of overlays) and
+ * the persisted sound setting.
  */
 @Component({
-  selector: 'cdf-reward-orchestrator-demo',
+  selector: 'sb-reward-orchestrator-demo',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AppButton, AppCard, CoinBadge, XpBar, CoinTarget, OverlayHostSb],
+  imports: [
+    AppButton,
+    AppCard,
+    CoinCounter,
+    XpBar,
+    RewardToast,
+    CoinTarget,
+    OverlayHostSb,
+  ],
   template: `
     <cdf-app-card padding="spacious">
-      <header style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px;">
+      <header class="sb-demo__head">
         <cdf-xp-bar [xp]="xp.displayed()" />
-        <cdf-coin-badge cdfCoinTarget [value]="coins.displayed()" size="md" [showLabel]="true" />
+        <cdf-coin-counter
+          cdfCoinTarget
+          [value]="coins.displayed()"
+          [animate]="false"
+        />
       </header>
 
-      <div #anchor style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;">
-        <cdf-app-button kind="primary" (buttonClick)="grant('lessonComplete', 25, 10)">
-          +25 XP / +10 coins
-        </cdf-app-button>
-        <cdf-app-button kind="primary" (buttonClick)="grant('quizPass', 50, 15)">
-          Quiz pass (+50/+15)
-        </cdf-app-button>
-        <cdf-app-button kind="primary" (buttonClick)="grant('exercisePass', 75, 25)">
-          Exercise pass (+75/+25)
-        </cdf-app-button>
-        <cdf-app-button kind="secondary" (buttonClick)="levelUp()">
-          Trigger level-up
-        </cdf-app-button>
-        <cdf-app-button kind="secondary" (buttonClick)="badge()">
-          Trigger badge unlock
-        </cdf-app-button>
-        <cdf-app-button kind="ghost" (buttonClick)="reset()">
-          Reset balances
-        </cdf-app-button>
+      <div #anchor class="sb-demo__grid">
+        @for (kind of kinds; track kind) {
+          <cdf-app-button
+            [kind]="
+              kind === 'levelUp' || kind === 'badgeUnlock'
+                ? 'secondary'
+                : 'primary'
+            "
+            (buttonClick)="grant(kind, $event)"
+          >
+            {{ kind }}
+          </cdf-app-button>
+        }
+        <cdf-app-button kind="ghost" (buttonClick)="burst($event)"
+          >3× lessonComplete (collapses)</cdf-app-button
+        >
+        <cdf-app-button kind="ghost" (buttonClick)="reset()"
+          >Reset balances</cdf-app-button
+        >
       </div>
 
-      <p style="margin: 16px 0 0; color: var(--cdf-color-text-muted); font-size: 13px;">
-        Click any reward — counters tween up, coins fly to the top-right
-        badge, level-up + badge overlays cover the screen on demand.
-      </p>
-    </cdf-app-card>
+      <div class="sb-demo__toggles">
+        <label
+          ><input
+            type="checkbox"
+            [checked]="reduced()"
+            (change)="setReduced($any($event.target).checked)"
+          />
+          Reduced motion</label
+        >
+        <label
+          ><input
+            type="checkbox"
+            [checked]="sound.soundEnabled()"
+            (change)="sound.setSoundEnabled($any($event.target).checked)"
+          />
+          Sound</label
+        >
+      </div>
 
-    <cdf-overlay-host-sb />
+      <div class="sb-demo__toast" aria-live="polite">
+        @if (orchestrator.toast(); as t) {
+          <cdf-reward-toast
+            [xp]="t.xp"
+            [coins]="t.coins"
+            [multiplier]="t.multiplier"
+            [tone]="t.levelUp ? 'level-up' : 'plain'"
+          />
+          <p class="sb-demo__text">{{ t.text }}</p>
+        }
+      </div>
+    </cdf-app-card>
+    <sb-overlay-host />
   `,
+  styles: [
+    `
+      .sb-demo__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .sb-demo__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 8px;
+      }
+      .sb-demo__toggles {
+        display: flex;
+        gap: 16px;
+        margin-top: 16px;
+        font-size: 14px;
+      }
+      .sb-demo__toast {
+        min-height: 64px;
+        margin-top: 16px;
+      }
+      .sb-demo__text {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: var(--cdf-color-text-muted);
+      }
+    `,
+  ],
 })
-class RewardOrchestratorDemo {
+class RewardOrchestratorDemo implements OnInit {
+  readonly reducedMotion = input(false);
+
   protected readonly xp = inject(XpService);
   protected readonly coins = inject(CoinService);
-  private readonly orchestrator = inject(RewardOrchestrator);
-
+  protected readonly orchestrator = inject(RewardOrchestrator);
+  protected readonly sound = inject(SoundService);
+  private readonly motion = inject(MotionAndSoundService);
+  protected readonly kinds = KINDS;
+  protected readonly reduced = signal(false);
   protected readonly anchor = viewChild('anchor', { read: ElementRef });
 
-  constructor() {
-    this.orchestrator.reconcile({ totalXp: 100, coins: 50 });
+  ngOnInit(): void {
+    this.orchestrator.useSeed(DEMO_SEED);
+    this.setReduced(this.reducedMotion());
+    this.reset();
   }
 
-  protected grant(
-    kind: 'lessonComplete' | 'quizPass' | 'exercisePass',
-    xp: number,
-    coins: number,
-  ): void {
+  protected setReduced(on: boolean): void {
+    this.reduced.set(on);
+    this.motion.setMotionPref(on ? 'off' : 'on');
+  }
+
+  protected grant(kind: RewardKind, ev?: MouseEvent): void {
+    const scenario = SCENARIOS[kind];
+    const totalXp = this.xp.actual() + scenario.canonical.xp;
+    const sourceEl =
+      (ev?.currentTarget as HTMLElement | undefined) ??
+      (this.anchor()?.nativeElement as HTMLElement | null) ??
+      null;
+    const newLevel = levelFromXp(totalXp);
     void this.orchestrator.grant({
       kind,
-      canonical: { xp, coins },
-      sourceEl: (this.anchor()?.nativeElement as HTMLElement | undefined) ?? null,
+      ...scenario,
+      // Simulated server snapshot — canonical totals win over deltas.
+      totals: {
+        totalXp,
+        coins: this.coins.actual() + scenario.canonical.coins,
+      },
+      levelUp:
+        kind === 'levelUp' || newLevel > levelFromXp(this.xp.actual())
+          ? {
+              newLevel: Math.max(newLevel, levelFromXp(this.xp.actual()) + 1),
+              xpForNextLevel: 350,
+            }
+          : null,
+      sourceEl,
     });
   }
 
-  protected levelUp(): void {
-    void this.orchestrator.grant({
-      kind: 'levelUp',
-      canonical: { xp: 200, coins: 50 },
-      levelUp: { newLevel: this.xp.level() + 1, xpForNextLevel: 350 },
-      sourceEl: (this.anchor()?.nativeElement as HTMLElement | undefined) ?? null,
-    });
-  }
-
-  protected badge(): void {
-    void this.orchestrator.grant({
-      kind: 'badgeUnlock',
-      canonical: { xp: 0, coins: 25 },
-      badgesUnlocked: [
-        {
-          id: 'streak-7',
-          name: 'Week Warrior',
-          icon: 'flame',
-          description: 'Held a 7-day learning streak.',
-        },
-      ],
-      sourceEl: (this.anchor()?.nativeElement as HTMLElement | undefined) ?? null,
-    });
+  protected burst(ev: MouseEvent): void {
+    // Three events inside the 800 ms window → one celebration.
+    this.grant('lessonComplete', ev);
+    setTimeout(() => this.grant('lessonComplete', ev), 150);
+    setTimeout(() => this.grant('lessonComplete', ev), 300);
   }
 
   protected reset(): void {
-    this.orchestrator.reconcile({ totalXp: 100, coins: 50 });
-    this.xp.snap();
-    this.coins.snap();
+    this.orchestrator.reconcile({
+      totalXp: 100,
+      coins: 50,
+      streakDays: 6,
+      freezesAvailable: 1,
+    });
   }
 }
 
@@ -178,8 +340,7 @@ const meta: Meta<RewardOrchestratorDemo> = {
 export default meta;
 type Story = StoryObj<RewardOrchestratorDemo>;
 
-export const Playground: Story = {
-  render: () => ({
-    template: `<cdf-reward-orchestrator-demo />`,
-  }),
-};
+export const Playground: Story = { args: { reducedMotion: false } };
+
+/** prefers-reduced-motion: no coin-fly / confetti / overlays — a toast carries level-up + badges. */
+export const ReducedMotion: Story = { args: { reducedMotion: true } };

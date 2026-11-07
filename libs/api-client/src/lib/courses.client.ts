@@ -5,7 +5,13 @@ import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
 
 export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-export type LessonType = 'READING' | 'QUIZ' | 'EXERCISE' | 'AI_PROMPT' | 'SCENARIO';
+export type LessonType =
+  | 'READING'
+  | 'QUIZ'
+  | 'EXERCISE'
+  | 'AI_PROMPT'
+  | 'SCENARIO'
+  | 'CAPSTONE';
 
 export interface CourseListItem {
   id: string;
@@ -13,6 +19,10 @@ export interface CourseListItem {
   status: CourseStatus;
   difficulty: number;
   estimatedMinutes: number;
+  isCapstone: boolean;
+  coverAssetId: string | null;
+  /** Public URL of the cover image, or null. */
+  coverUrl: string | null;
   sourceLocale: string;
   publishedAt: string | null;
   createdAt: string;
@@ -67,10 +77,18 @@ export interface CreateCourseBody {
   sourceLocale?: string;
   difficulty?: number;
   estimatedMinutes?: number;
+  /** Confirmed IMAGE/COVER asset id. */
+  coverAssetId?: string;
   categoryIds?: string[];
 }
 
-export type UpdateCourseBody = Partial<CreateCourseBody>;
+export type UpdateCourseBody = Partial<
+  Omit<CreateCourseBody, 'coverAssetId'>
+> & {
+  isCapstone?: boolean;
+  /** `null` removes the cover. */
+  coverAssetId?: string | null;
+};
 
 @Injectable({ providedIn: 'root' })
 export class CoursesClient {
@@ -83,7 +101,9 @@ export class CoursesClient {
       if (v !== undefined && v !== null) params = params.set(k, String(v));
     }
     return firstValueFrom(
-      this.http.get<CourseListResponse>(`${this.config.baseUrl}/courses`, { params }),
+      this.http.get<CourseListResponse>(`${this.config.baseUrl}/courses`, {
+        params,
+      }),
     );
   }
 

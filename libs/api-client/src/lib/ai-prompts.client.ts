@@ -3,7 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
-import type { RewardResult, CompletedQuest, UnlockedBadge } from './progress.client.js';
+import type {
+  RewardResult,
+  CompletedQuest,
+  UnlockedBadge,
+} from './progress.client.js';
 
 export interface RubricCriterion {
   id: string;
@@ -24,6 +28,8 @@ export interface CriterionResult {
 export interface StudentAiPrompt {
   id: string;
   lessonId: string;
+  /** AI_PROMPT, or CAPSTONE (capstone projects reuse the AI-prompt machinery). */
+  lessonType: 'AI_PROMPT' | 'CAPSTONE';
   promptText: string;
   contextText: string | null;
   passThreshold: number;
@@ -44,6 +50,23 @@ export interface GradeResult {
   questsCompleted?: CompletedQuest[];
   badgesUnlocked?: UnlockedBadge[];
 }
+
+export interface AiPromptPreview {
+  scorePct: number;
+  passed: boolean;
+  gradedBy: 'HEURISTIC' | 'LLM';
+  results: CriterionResult[];
+}
+
+/**
+ * 429 bodies from POST /ai-prompts/:id/submit carry `code` + `retryAfter`
+ * (seconds, also in the Retry-After header): AI_SUBMIT_COOLDOWN (1 / 3 s
+ * per prompt), AI_RATE_LIMIT_MINUTE (5 / min), AI_RATE_LIMIT_DAY (60 / day).
+ */
+export type AiPromptRateLimitCode =
+  | 'AI_SUBMIT_COOLDOWN'
+  | 'AI_RATE_LIMIT_MINUTE'
+  | 'AI_RATE_LIMIT_DAY';
 
 export interface AdminAiPrompt {
   id: string;
@@ -72,23 +95,55 @@ export class AiPromptsClient {
 
   // Student
   forLesson(lessonId: string): Promise<StudentAiPrompt> {
-    return firstValueFrom(this.http.get<StudentAiPrompt>(`${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt`));
+    return firstValueFrom(
+      this.http.get<StudentAiPrompt>(
+        `${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt`,
+      ),
+    );
   }
   submit(id: string, response: string): Promise<GradeResult> {
-    return firstValueFrom(this.http.post<GradeResult>(`${this.base}/ai-prompts/${encodeURIComponent(id)}/submit`, { response }, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.post<GradeResult>(
+        `${this.base}/ai-prompts/${encodeURIComponent(id)}/submit`,
+        { response },
+        { context: withIdempotency() },
+      ),
+    );
   }
 
   // Admin
   create(lessonId: string, body: AiPromptBody): Promise<AdminAiPrompt> {
-    return firstValueFrom(this.http.post<AdminAiPrompt>(`${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt`, body, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.post<AdminAiPrompt>(
+        `${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt`,
+        body,
+        { context: withIdempotency() },
+      ),
+    );
   }
   update(id: string, body: Partial<AiPromptBody>): Promise<AdminAiPrompt> {
-    return firstValueFrom(this.http.patch<AdminAiPrompt>(`${this.base}/ai-prompts/${encodeURIComponent(id)}`, body, { context: withIdempotency() }));
+    return firstValueFrom(
+      this.http.patch<AdminAiPrompt>(
+        `${this.base}/ai-prompts/${encodeURIComponent(id)}`,
+        body,
+        { context: withIdempotency() },
+      ),
+    );
   }
   getByLesson(lessonId: string): Promise<AdminAiPrompt | null> {
-    return firstValueFrom(this.http.get<AdminAiPrompt | null>(`${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt/admin`));
+    return firstValueFrom(
+      this.http.get<AdminAiPrompt | null>(
+        `${this.base}/lessons/${encodeURIComponent(lessonId)}/ai-prompt/admin`,
+      ),
+    );
   }
-  preview(id: string, response: string): Promise<{ scorePct: number; passed: boolean; results: CriterionResult[] }> {
-    return firstValueFrom(this.http.post<{ scorePct: number; passed: boolean; results: CriterionResult[] }>(`${this.base}/ai-prompts/${encodeURIComponent(id)}/preview`, { response }, { context: withIdempotency() }));
+  preview(id: string, response: string): Promise<AiPromptPreview> {
+    return firstValueFrom(
+      this.http.post<AiPromptPreview>(
+        `${this.base}/ai-prompts/${encodeURIComponent(id)}/preview`,
+        { response },
+        { context: withIdempotency() },
+      ),
+    );
   }
 }

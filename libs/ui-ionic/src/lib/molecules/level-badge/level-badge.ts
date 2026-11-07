@@ -4,6 +4,7 @@ import {
   computed,
   input,
 } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { tierForLevel, type LevelTier } from '@codify/ui-core';
 
 const TIER_CLASS: Record<LevelTier, string> = {
@@ -28,12 +29,24 @@ const TIER_CLASS: Record<LevelTier, string> = {
 @Component({
   selector: 'cdf-level-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   host: {
     '[attr.data-size]': 'size()',
     '[attr.data-tier]': 'tierClass()',
   },
   template: `
-    <span class="cdf-level-badge" role="img" [attr.aria-label]="ariaLabel()">
+    <span
+      class="cdf-level-badge"
+      role="img"
+      [attr.aria-label]="
+        'ui.level.aria'
+          | translate
+            : {
+                level: level(),
+                tier: ('ui.tier.' + resolvedTier() | translate),
+              }
+      "
+    >
       <span class="cdf-level-badge__num">{{ level() }}</span>
     </span>
   `,
@@ -48,8 +61,7 @@ export class LevelBadge {
   protected readonly resolvedTier = computed<LevelTier>(
     () => this.tier() ?? tierForLevel(this.level()),
   );
-  protected readonly tierClass = computed(() => TIER_CLASS[this.resolvedTier()]);
-  protected readonly ariaLabel = computed(
-    () => `Level ${this.level()}, ${this.resolvedTier().toLowerCase()} tier`,
+  protected readonly tierClass = computed(
+    () => TIER_CLASS[this.resolvedTier()],
   );
 }

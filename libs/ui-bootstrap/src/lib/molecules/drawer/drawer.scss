@@ -1,0 +1,114 @@
+.cdf-drawer {
+  position: fixed;
+  z-index: var(--cdf-z-drawer);
+  display: flex;
+  flex-direction: column;
+  background: var(--cdf-color-surface-elev);
+  color: var(--cdf-color-text);
+  box-shadow: var(--cdf-shadow-4);
+  animation: cdf-drawer-in var(--cdf-motion-duration-slow)
+    var(--cdf-motion-easing-decelerate);
+
+  &--start,
+  &--end {
+    top: 0;
+    bottom: 0;
+    width: min(100vw, var(--drawer-width));
+  }
+
+  &--start {
+    inset-inline-start: 0;
+    --drawer-from: -100%;
+  }
+
+  &--end {
+    inset-inline-end: 0;
+    --drawer-from: 100%;
+  }
+
+  &--bottom {
+    inset-inline: 0;
+    bottom: 0;
+    max-height: 85vh;
+    border-radius: var(--cdf-radius-lg) var(--cdf-radius-lg) 0 0;
+    animation-name: cdf-drawer-up;
+  }
+
+  &--sm {
+    --drawer-width: 320px;
+  }
+
+  &--md {
+    --drawer-width: 440px;
+  }
+
+  &--lg {
+    --drawer-width: 640px;
+  }
+
+  &__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--cdf-z-drawer) - 1);
+    background: rgba(3, 7, 18, 0.45);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cdf-space-3);
+    padding: var(--cdf-space-4) var(--cdf-space-5);
+    border-bottom: 1px solid var(--cdf-color-border);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-lg);
+    font-weight: var(--cdf-font-weight-semibold);
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--cdf-space-5);
+  }
+
+  &__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-3) var(--cdf-space-5);
+    border-top: 1px solid var(--cdf-color-border);
+
+    &:empty {
+      display: none;
+    }
+  }
+}
+
+@keyframes cdf-drawer-in {
+  from {
+    transform: translateX(var(--drawer-from, 100%));
+  }
+}
+
+@keyframes cdf-drawer-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+[dir='rtl'] .cdf-drawer--start {
+  --drawer-from: 100%;
+}
+
+[dir='rtl'] .cdf-drawer--end {
+  --drawer-from: -100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdf-drawer {
+    animation: none;
+  }
+}

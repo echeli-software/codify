@@ -18,4 +18,11 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
+  // Roadmap acceptance: ui-core stays at 100% — every run enforces it.
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts'],
+  coverageReporters: ['text-summary'],
+  coverageThreshold: {
+    global: { statements: 100, branches: 100, functions: 100, lines: 100 },
+  },
 };

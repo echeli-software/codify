@@ -1,11 +1,17 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import { TranslatePipe } from '@codify/i18n';
 import { IonList, IonItem, IonLabel } from '@ionic/angular/standalone';
 import { Icon, type IconName } from '../../atoms/icon/icon.js';
 import { CoinBadge } from '../../atoms/coin-badge/coin-badge.js';
 import { XpBadge } from '../../atoms/xp-badge/xp-badge.js';
 import { AppProgressBar } from '../../atoms/app-progress-bar/app-progress-bar.js';
 
-export type DailyQuestKind = 'lesson-count' | 'category-lesson-count' | 'xp-amount' | 'streak-maintain' | 'exercise-pass';
+export type DailyQuestKind =
+  | 'lesson-count'
+  | 'category-lesson-count'
+  | 'xp-amount'
+  | 'streak-maintain'
+  | 'exercise-pass';
 
 export interface DailyQuest {
   id: string;
@@ -50,38 +56,42 @@ const KIND_ICON: Record<DailyQuestKind, IconName> = {
     CoinBadge,
     XpBadge,
     AppProgressBar,
+    TranslatePipe,
   ],
   template: `
     <ion-list inset="true">
       @for (quest of quests(); track quest.id) {
-      <ion-item
-        class="cdf-quest"
-        [class.cdf-quest--done]="quest.completed"
-      >
-        <cdf-icon
-          slot="start"
-          [name]="quest.completed ? 'check-circle' : iconFor(quest.kind)"
-          size="md"
-        />
-        <ion-label>
-          <h3>{{ quest.title }}</h3>
-          <p class="cdf-quest__progress-row">
-            <span class="cdf-quest__count">{{ quest.progress }} / {{ quest.target }}</span>
-          </p>
-          <cdf-app-progress-bar
-            [value]="pct(quest)"
-            [variant]="quest.completed ? 'success' : 'primary'"
-            size="sm"
-            label="Quest progress"
+        <ion-item class="cdf-quest" [class.cdf-quest--done]="quest.completed">
+          <cdf-icon
+            slot="start"
+            [name]="quest.completed ? 'check-circle' : iconFor(quest.kind)"
+            size="md"
           />
-        </ion-label>
-        <div slot="end" class="cdf-quest__rewards">
-          @if (quest.xpReward > 0) {
-          <cdf-xp-badge [value]="quest.xpReward" size="sm" [showLabel]="false" />
-          }
-          <cdf-coin-badge [value]="quest.coinReward" size="sm" />
-        </div>
-      </ion-item>
+          <ion-label>
+            <h3>{{ quest.title }}</h3>
+            <p class="cdf-quest__progress-row">
+              <span class="cdf-quest__count"
+                >{{ quest.progress }} / {{ quest.target }}</span
+              >
+            </p>
+            <cdf-app-progress-bar
+              [value]="pct(quest)"
+              [variant]="quest.completed ? 'success' : 'primary'"
+              size="sm"
+              [label]="'ui.quests.progress' | translate: { title: quest.title }"
+            />
+          </ion-label>
+          <div slot="end" class="cdf-quest__rewards">
+            @if (quest.xpReward > 0) {
+              <cdf-xp-badge
+                [value]="quest.xpReward"
+                size="sm"
+                [showLabel]="false"
+              />
+            }
+            <cdf-coin-badge [value]="quest.coinReward" size="sm" />
+          </div>
+        </ion-item>
       }
     </ion-list>
   `,

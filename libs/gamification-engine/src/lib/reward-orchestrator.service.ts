@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { CoinService } from './state/coin.service.js';
 import { XpService } from './state/xp.service.js';
 import { StreakService } from './state/streak.service.js';
@@ -8,7 +8,18 @@ import { HapticsService } from './haptics.service.js';
 import { OverlayHostService } from './overlay/overlay-host.service.js';
 import { coinFly } from './animation/coin-fly.directive.js';
 import { confettiBurst } from './animation/confetti.js';
-import type { HapticIntensity, RewardKind, RewardPayload, RewardServerState } from './types.js';
+import type {
+  BadgeRef,
+  HapticIntensity,
+  LevelUpInfo,
+  RewardBreakdownEntry,
+  RewardGrantResult,
+  RewardKind,
+  RewardMultiplierPart,
+  RewardPayload,
+  RewardServerState,
+  RewardToastEvent,
+} from './types.js';
 
 const HAPTIC_FOR: Record<RewardKind, HapticIntensity> = {
   lessonComplete: 'medium',
@@ -24,35 +35,57 @@ const HAPTIC_FOR: Record<RewardKind, HapticIntensity> = {
   mysteryChestOpen: 'heavy',
 };
 
-const QUEUE_COLLAPSE_MS = 800;
-const COUNTER_TWEEN_MS = 600;
+/** Rewards arriving within this window of the FIRST queued one collapse. */
+export const REWARD_COLLAPSE_WINDOW_MS = 800;
+/** Counter tween length (docs/07 §11 T+400ms → ~T+1000ms). */
+export const COUNTER_TWEEN_MS = 600;
+/** Reduced motion: "counters increment by simple ease in 200ms". */
+export const REDUCED_TWEEN_MS = 200;
+
+const MULTIPLIER_LABELS: Record<string, { label: string; key: string }> = {
+  PREMIUM_DEFAULT: { label: 'premium', key: 'gamification.multiplier.premium' },
+  STREAK_TIER: { label: 'streak', key: 'gamification.multiplier.streakTier' },
+  COURSE_PROMO: {
+    label: 'course promo',
+    key: 'gamification.multiplier.coursePromo',
+  },
+  LESSON_PROMO: {
+    label: 'lesson promo',
+    key: 'gamification.multiplier.lessonPromo',
+  },
+  CAMPAIGN: { label: 'event', key: 'gamification.multiplier.campaign' },
+};
 
 interface QueuedItem {
   payload: RewardPayload;
-  enqueuedAt: number;
-  resolve: () => void;
+  resolve: (result: RewardGrantResult) => void;
 }
 
 /**
  * The single client-side entry point for every reward animation. Other
- * code MUST NOT poke `XpService.set()`, `CoinService.set()`, or any
- * animation primitive directly — it must call `grant(payload)` here.
+ * code MUST NOT poke `XpService` / `CoinService` / `StreakService` mutators
+ * or animation primitives directly — it calls `grant(payload)` here
+ * (enforced by the `codify/rewards-through-orchestrator` lint rule).
  *
  * Timeline (per docs/07-gamification §11):
- *   T+0    haptic
- *   T+50ms coin trail (sourceEl → coin counter)
- *   T+200ms xp sparkles (sourceEl → xp bar) — folded into counter tween for v1
- *   T+400ms counter increments tween (canonical totals)
- *   T+600ms reward toast slide-in (caller renders the toast; we just emit)
- *   T+1100ms level-up overlay (if any)
- *   T+1100ms (or after level-up) badge overlay (if any)
+ *   T+0     haptic (strongest of the cluster)
+ *   T+0     coin trail (sourceEl → coin counter) + one SFX
+ *   T+50ms  counters tween to the server's canonical totals
+ *   then    reward toast event (`toast` signal) — caller renders it
+ *   then    level-up overlay, then badge overlays (queued; not awaited by
+ *           `grant()` — use `result.overlays` to wait for dismissal)
  *
- * RewardQueue: events within `QUEUE_COLLAPSE_MS` of each other collapse
- * into a single celebration cluster. The orchestrator picks the strongest
- * haptic + sound and runs the visuals once with summed canonical totals.
+ * RewardQueue: the collapse window opens at the FIRST queued event and
+ * closes `REWARD_COLLAPSE_WINDOW_MS` later (not a trailing debounce, so a
+ * steady stream can't postpone celebrations forever). Everything queued in
+ * that window plays as one cluster.
  *
- * `prefers-reduced-motion`: skip coin-fly + confetti; still tween counters
- * (faster) and still show overlays (no entrance animation).
+ * `prefers-reduced-motion` (or the user's motion toggle): no coin-fly, no
+ * confetti, no overlays — counters ease in 200ms and the toast carries the
+ * level-up / badge lines instead (`replacesOverlays: true`).
+ *
+ * Deterministic replays: `useSeed(n)` makes coin-fly + confetti particle
+ * plans reproducible (ui-core `mulberry32`).
  */
 @Injectable({ providedIn: 'root' })
 export class RewardOrchestrator {
@@ -65,144 +98,308 @@ export class RewardOrchestrator {
   private readonly overlays = inject(OverlayHostService);
 
   private queue: QueuedItem[] = [];
-  private flushTimer: ReturnType<typeof setTimeout> | null = null;
-  private currentRun: Promise<void> = Promise.resolve();
+  private windowTimer: ReturnType<typeof setTimeout> | null = null;
+  private runChain: Promise<void> = Promise.resolve();
+  private overlayChain: Promise<void> = Promise.resolve();
+  private seed: number | null = null;
+  private runIndex = 0;
+  private toastSeq = 0;
+
+  private readonly toastSig = signal<RewardToastEvent | null>(null);
+  /** Latest reward toast (one per orchestration run). */
+  readonly toast = this.toastSig.asReadonly();
+
+  /** Make particle animations reproducible; `null` restores `Math.random`. */
+  useSeed(seed: number | null): void {
+    this.seed = seed;
+    this.runIndex = 0;
+  }
 
   /**
    * Reconcile the canonical server state immediately, without animation.
-   * Used on app boot or after a sync-from-server. RewardOrchestrator owns
-   * this call so all state-mutation paths funnel through one place.
+   * Used on app boot or after a sync-from-server: both `actual` and
+   * `displayed` jump to the server values (cancelling any running tween).
    */
   reconcile(state: RewardServerState): void {
-    if (typeof state.totalXp === 'number') this.xp.setActual(state.totalXp);
-    if (typeof state.coins === 'number') this.coins.setActual(state.coins);
-    this.streaks.set({
-      currentDays: state.streakDays,
-      freezes: state.freezesAvailable,
-    });
+    if (typeof state.totalXp === 'number') {
+      this.xp.setActual(state.totalXp);
+      this.xp.snap();
+    }
+    if (typeof state.coins === 'number') {
+      this.coins.setActual(state.coins);
+      this.coins.snap();
+    }
+    this.applyStreak(state);
   }
 
   /**
-   * Plays the reward animation sequence. Resolves once the visuals are
-   * complete (counters tweened, overlays dismissed). Multiple grants
-   * within `QUEUE_COLLAPSE_MS` collapse into one cluster.
+   * Queue a reward celebration. Resolves once the counters reached the
+   * canonical totals and the toast was emitted — NOT after overlays are
+   * dismissed (await `result.overlays` for that). Never rejects.
    */
-  grant(payload: RewardPayload): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.queue.push({ payload, enqueuedAt: Date.now(), resolve });
-      this.scheduleFlush();
+  grant(payload: RewardPayload): Promise<RewardGrantResult> {
+    return new Promise<RewardGrantResult>((resolve) => {
+      this.queue.push({ payload, resolve });
+      if (!this.windowTimer) {
+        this.windowTimer = setTimeout(
+          () => this.flush(),
+          REWARD_COLLAPSE_WINDOW_MS,
+        );
+      }
     });
   }
 
-  private scheduleFlush(): void {
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = setTimeout(() => this.flush(), QUEUE_COLLAPSE_MS);
+  /** Close the collapse window now (e.g. before navigating away). */
+  flushNow(): void {
+    if (this.windowTimer) clearTimeout(this.windowTimer);
+    this.flush();
   }
 
   private flush(): void {
-    this.flushTimer = null;
+    this.windowTimer = null;
     const batch = this.queue;
     this.queue = [];
     if (batch.length === 0) return;
-    this.currentRun = this.currentRun.then(() => this.run(batch));
+    this.runChain = this.runChain.then(() => this.run(batch));
   }
 
   private async run(batch: QueuedItem[]): Promise<void> {
-    const collapsed = collapse(batch.map((b) => b.payload));
-
-    // 1. Haptic — strongest from batch.
-    const intensity = pickIntensity(collapsed.kinds);
-    await this.haptics.impact(intensity).catch(() => undefined);
-
+    const c = collapse(batch.map((b) => b.payload));
     const reduced = this.motion.reducedMotion();
+    const seed = this.seed === null ? null : this.seed + this.runIndex++ * 7919;
 
-    // 2. Coin fly — only if we have a sourceEl AND coins > 0 AND motion allowed.
-    if (!reduced && collapsed.sourceEl && collapsed.canonical.coins > 0) {
-      void coinFly(collapsed.sourceEl, Math.min(8, Math.max(3, Math.floor(collapsed.canonical.coins / 5))));
-      await delay(50);
+    // Canonical targets: server totals win; deltas are only a fallback for
+    // payloads that predate `totals`.
+    const targetXp = c.totals?.totalXp ?? this.xp.actual() + c.xp;
+    const targetCoins = c.totals?.coins ?? this.coins.actual() + c.coins;
+    const toast = this.buildToast(c, reduced);
+    let overlays: Promise<void> = Promise.resolve();
+
+    try {
+      void this.haptics.impact(pickIntensity(c.kinds)).catch(() => undefined);
+      void this.sound.play(strongestKind(c.kinds)).catch(() => undefined);
+
+      if (!reduced && c.sourceEl && targetCoins > this.coins.displayed()) {
+        const n = Math.min(7, Math.max(3, Math.floor(c.coins / 5)));
+        void coinFly(c.sourceEl, n, { seed }).catch(() => undefined);
+        await delay(50);
+      }
+
+      this.xp.setActual(targetXp);
+      this.coins.setActual(targetCoins);
+      if (c.totals) this.applyStreak(c.totals);
+
+      const ms = reduced ? REDUCED_TWEEN_MS : COUNTER_TWEEN_MS;
+      await Promise.all([
+        this.xp.tweenTo(targetXp, ms),
+        this.coins.tweenTo(targetCoins, ms),
+      ]);
+
+      this.toastSig.set(toast);
+      if (!reduced && (c.levelUp || c.badges.length > 0)) {
+        overlays = this.queueOverlays(c.levelUp, c.badges, seed);
+      }
+    } catch (err) {
+      // A failing animation must never wedge the queue or leave the
+      // counters off the canonical totals.
+      this.xp.setActual(targetXp);
+      this.xp.snap();
+      this.coins.setActual(targetCoins);
+      this.coins.snap();
+      this.toastSig.set(toast);
+      if (typeof console !== 'undefined')
+        console.warn('[RewardOrchestrator] run failed', err);
     }
 
-    // 3. Counter tweens (XP + coins) to the canonical totals.
-    const targetXp = this.xp.actual() + collapsed.canonical.xp;
-    const targetCoins = this.coins.actual() + collapsed.canonical.coins;
-    this.xp.setActual(targetXp);
-    this.coins.setActual(targetCoins);
+    const result: RewardGrantResult = {
+      totals: { totalXp: targetXp, coins: targetCoins },
+      toast,
+      overlays,
+    };
+    for (const item of batch) item.resolve(result);
+  }
 
-    const tweenMs = reduced ? 200 : COUNTER_TWEEN_MS;
-    await Promise.all([
-      this.xp.tweenTo(targetXp, tweenMs),
-      this.coins.tweenTo(targetCoins, tweenMs),
-    ]);
-
-    // 4. Sound — single SFX for the cluster.
-    void this.sound.play(strongestKind(collapsed.kinds));
-
-    // 5. Level-up overlay (if any).
-    const levelUp = collapsed.levelUp;
-    if (levelUp) {
-      if (!reduced) {
+  private queueOverlays(
+    levelUp: LevelUpInfo | null,
+    badges: BadgeRef[],
+    seed: number | null,
+  ): Promise<void> {
+    const play = async () => {
+      const burst = (count: number, offset: number) => {
         const cx = typeof window !== 'undefined' ? window.innerWidth / 2 : 200;
         const cy = typeof window !== 'undefined' ? window.innerHeight / 3 : 200;
-        void confettiBurst({ x: cx, y: cy });
+        void confettiBurst({
+          x: cx,
+          y: cy,
+          count,
+          seed: seed === null ? null : seed + offset,
+        }).catch(() => undefined);
+      };
+      if (levelUp) {
+        burst(60, 1);
+        await this.overlays.showLevelUp(levelUp);
       }
-      await this.overlays.showLevelUp(levelUp);
-    }
-
-    // 6. Badge overlays (sequential).
-    for (const badge of collapsed.badgesUnlocked) {
-      if (!reduced) {
-        const cx = typeof window !== 'undefined' ? window.innerWidth / 2 : 200;
-        const cy = typeof window !== 'undefined' ? window.innerHeight / 3 : 200;
-        void confettiBurst({ x: cx, y: cy, count: 40 });
+      let i = 2;
+      for (const badge of badges) {
+        burst(40, i++);
+        await this.overlays.showBadgeUnlock(badge);
       }
-      await this.overlays.showBadgeUnlock(badge);
-    }
+    };
+    this.overlayChain = this.overlayChain.then(play).catch(() => undefined);
+    return this.overlayChain;
+  }
 
-    // 7. Resolve every promise in the batch.
-    for (const item of batch) item.resolve();
+  private applyStreak(state: RewardServerState): void {
+    this.streaks.set({
+      currentDays: state.streakDays,
+      freezes: state.freezesAvailable,
+      bestDays: state.bestDays,
+    });
+  }
+
+  private buildToast(c: CollapsedPayload, reduced: boolean): RewardToastEvent {
+    const parts = multiplierParts(c.breakdown);
+    const replacesOverlays =
+      reduced && (c.levelUp !== null || c.badges.length > 0);
+    const segments: string[] = [];
+    if (c.xp > 0) segments.push(`+${c.xp} XP`);
+    if (c.coins > 0)
+      segments.push(`+${c.coins} ${c.coins === 1 ? 'coin' : 'coins'}`);
+    let text = segments.join(' · ');
+    const factors = parts.length
+      ? parts.map((p) => `${formatFactor(p.value)} ${p.label}`).join(' × ')
+      : c.multiplier && c.multiplier > 1
+        ? formatFactor(c.multiplier)
+        : '';
+    if (factors) text += `${text ? ' ' : ''}(×${factors})`;
+    if (replacesOverlays) {
+      const extra: string[] = [];
+      if (c.levelUp) extra.push(`Level ${c.levelUp.newLevel}!`);
+      for (const b of c.badges) extra.push(`Badge unlocked: ${b.name}`);
+      text = [text, ...extra].filter(Boolean).join(' · ');
+    }
+    return {
+      id: ++this.toastSeq,
+      kinds: c.kinds,
+      xp: c.xp,
+      coins: c.coins,
+      multiplier: c.multiplier,
+      parts,
+      text,
+      levelUp: c.levelUp,
+      badges: c.badges,
+      replacesOverlays,
+    };
   }
 }
 
 interface CollapsedPayload {
   kinds: RewardKind[];
-  canonical: { xp: number; coins: number };
-  levelUp: import('./types.js').LevelUpInfo | null;
-  badgesUnlocked: import('./types.js').BadgeRef[];
+  xp: number;
+  coins: number;
+  multiplier: number | null;
+  breakdown: RewardBreakdownEntry[];
+  totals: RewardServerState | null;
+  levelUp: LevelUpInfo | null;
+  badges: BadgeRef[];
   sourceEl: HTMLElement | null;
 }
 
-function collapse(payloads: RewardPayload[]): CollapsedPayload {
+/** Fold a window of payloads into one celebration. Exported for tests. */
+export function collapse(payloads: RewardPayload[]): CollapsedPayload {
   const out: CollapsedPayload = {
     kinds: [],
-    canonical: { xp: 0, coins: 0 },
+    xp: 0,
+    coins: 0,
+    multiplier: null,
+    breakdown: [],
+    totals: null,
     levelUp: null,
-    badgesUnlocked: [],
+    badges: [],
     sourceEl: null,
   };
-  for (const p of payloads) {
+  let totalsAt = -Infinity;
+  payloads.forEach((p, index) => {
     out.kinds.push(p.kind);
-    out.canonical.xp += p.canonical.xp;
-    out.canonical.coins += p.canonical.coins;
-    if (p.levelUp) out.levelUp = p.levelUp; // keep the latest
-    if (p.badgesUnlocked) out.badgesUnlocked.push(...p.badgesUnlocked);
+    out.xp += Math.max(0, p.canonical.xp);
+    out.coins += Math.max(0, p.canonical.coins);
+    if (typeof p.canonical.multiplier === 'number') {
+      out.multiplier = Math.max(out.multiplier ?? 0, p.canonical.multiplier);
+    }
+    if (p.canonical.breakdown?.length) out.breakdown = p.canonical.breakdown;
+    if (p.totals) {
+      // Latest server snapshot wins (by server timestamp, else arrival).
+      const at = p.serverTimestamp ? Date.parse(p.serverTimestamp) : index;
+      const stamp = Number.isNaN(at) ? index : at;
+      if (stamp >= totalsAt) {
+        out.totals = { ...(out.totals ?? {}), ...p.totals };
+        totalsAt = stamp;
+      } else {
+        out.totals = { ...p.totals, ...out.totals };
+      }
+    }
+    if (
+      p.levelUp &&
+      (!out.levelUp || p.levelUp.newLevel > out.levelUp.newLevel)
+    ) {
+      out.levelUp = p.levelUp;
+    }
+    for (const b of p.badgesUnlocked ?? []) {
+      if (!out.badges.some((x) => x.id === b.id)) out.badges.push(b);
+    }
     if (!out.sourceEl && p.sourceEl) out.sourceEl = p.sourceEl;
-  }
+  });
   return out;
 }
 
-function pickIntensity(kinds: RewardKind[]): HapticIntensity {
-  let best: HapticIntensity = 'light';
-  const order: Record<HapticIntensity, number> = { light: 0, medium: 1, heavy: 2 };
-  for (const k of kinds) {
-    const intensity = HAPTIC_FOR[k];
-    if (order[intensity] > order[best]) best = intensity;
+/** Multiplier factors (> 1) from a breakdown, labelled for the toast. */
+export function multiplierParts(
+  breakdown: readonly RewardBreakdownEntry[],
+): RewardMultiplierPart[] {
+  const parts: RewardMultiplierPart[] = [];
+  for (const entry of breakdown) {
+    if (typeof entry.multiplier !== 'number' || entry.multiplier === 1)
+      continue;
+    const known = MULTIPLIER_LABELS[entry.source];
+    parts.push({
+      source: entry.source,
+      value: entry.multiplier,
+      label:
+        known?.label ??
+        entry.source
+          .replace(/[-_]multiplier$/i, '')
+          .replace(/[-_]+/g, ' ')
+          .toLowerCase(),
+      labelKey: known?.key ?? 'gamification.multiplier.label',
+    });
   }
+  return parts;
+}
+
+function formatFactor(v: number): string {
+  return String(Math.round(v * 100) / 100);
+}
+
+function pickIntensity(kinds: RewardKind[]): HapticIntensity {
+  const order: Record<HapticIntensity, number> = {
+    light: 0,
+    medium: 1,
+    heavy: 2,
+  };
+  let best: HapticIntensity = 'light';
+  for (const k of kinds)
+    if (order[HAPTIC_FOR[k]] > order[best]) best = HAPTIC_FOR[k];
   return best;
 }
 
 function strongestKind(kinds: RewardKind[]): RewardKind {
-  // Prefer level-up > badge > streak > everything else.
-  const priority: RewardKind[] = ['levelUp', 'badgeUnlock', 'streakMilestone', 'leaguePromotion'];
+  const priority: RewardKind[] = [
+    'levelUp',
+    'badgeUnlock',
+    'leaguePromotion',
+    'streakMilestone',
+    'mysteryChestOpen',
+  ];
   for (const p of priority) if (kinds.includes(p)) return p;
   return kinds[kinds.length - 1] ?? 'lessonComplete';
 }

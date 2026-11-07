@@ -14,7 +14,13 @@ import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { CreateLessonDto, UpdateLessonDto, type LessonResponse } from './lessons.dto.js';
+import {
+  CreateLessonDto,
+  UpdateLessonDto,
+  type LessonOfflineBundle,
+  type LessonResponse,
+  type LessonVersion,
+} from './lessons.dto.js';
 import { LessonsService } from './lessons.service.js';
 
 /**
@@ -28,12 +34,34 @@ export class LessonsController {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * Students: 404 for unpublished courses, 402 `{ reason, requiredPlans }`
+   * without content when they lack access, quiz answers stripped otherwise.
+   */
   @Get('lessons/:id')
   detail(
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
   ): Promise<LessonResponse> {
     return this.lessons.getById(actor, id);
+  }
+
+  /** Offline download payload (docs/16 §5). Same gating as GET /lessons/:id. */
+  @Get('lessons/:id/offline-bundle')
+  offlineBundle(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<LessonOfflineBundle> {
+    return this.lessons.offlineBundle(actor, id);
+  }
+
+  /** `[{ lessonId, updatedAt }]` so downloads re-fetch only changed lessons. */
+  @Get('courses/:id/lesson-versions')
+  lessonVersions(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') courseId: string,
+  ): Promise<LessonVersion[]> {
+    return this.lessons.lessonVersions(actor, courseId);
   }
 
   @Roles('ADMIN', 'TEACHER')
@@ -75,7 +103,8 @@ export class LessonsController {
       // not the full doc; full history lives in a future revisions table.
       diff: {
         ...body,
-        contentJson: body.contentJson !== undefined ? '[contentJson]' : undefined,
+        contentJson:
+          body.contentJson !== undefined ? '[contentJson]' : undefined,
       },
       ip: req.ip ?? null,
       userAgent: (req.headers['user-agent'] as string) ?? null,

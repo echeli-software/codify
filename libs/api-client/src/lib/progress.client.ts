@@ -66,6 +66,30 @@ export interface CompleteLessonResponse {
   badgesUnlocked?: UnlockedBadge[];
 }
 
+/** POST /lessons/:id/complete body. */
+export interface CompleteLessonBody {
+  /**
+   * Device time of an offline completion (ISO-8601), so the streak credits
+   * the right local day. Server rejects > 5 min ahead or > 72 h old (400).
+   */
+  clientTimestamp?: string;
+}
+
+export interface CompleteLessonOptions {
+  clientTimestamp?: string;
+}
+
+/**
+ * `code` values on 409 responses from POST /lessons/:id/complete:
+ *   - LESSON_ALREADY_COMPLETED: replay; body carries the original progress + totals
+ *   - LESSON_COMPLETES_VIA_OWN_FLOW: EXERCISE / AI_PROMPT / SCENARIO / CAPSTONE lesson
+ *   - QUIZ_REQUIRES_GRADING: QUIZ lesson with quiz blocks — submit answers instead
+ */
+export type CompleteLessonConflictCode =
+  | 'LESSON_ALREADY_COMPLETED'
+  | 'LESSON_COMPLETES_VIA_OWN_FLOW'
+  | 'QUIZ_REQUIRES_GRADING';
+
 export interface CourseProgressResponse {
   courseId: string;
   totalLessons: number;
@@ -97,11 +121,14 @@ export class ProgressClient {
   complete(
     lessonId: string,
     clientEventId?: string,
+    opts: CompleteLessonOptions = {},
   ): Promise<CompleteLessonResponse> {
+    const body: CompleteLessonBody = {};
+    if (opts.clientTimestamp) body.clientTimestamp = opts.clientTimestamp;
     return firstValueFrom(
       this.http.post<CompleteLessonResponse>(
         `${this.config.baseUrl}/lessons/${encodeURIComponent(lessonId)}/complete`,
-        {},
+        body,
         { context: withIdempotency(undefined, clientEventId) },
       ),
     );

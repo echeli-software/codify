@@ -7,7 +7,12 @@ import {
 } from '@angular/core';
 import { IonButton, IonSpinner } from '@ionic/angular/standalone';
 
-export type AppButtonKind = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
+export type AppButtonKind =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'danger'
+  | 'link';
 export type AppButtonSize = 'sm' | 'md' | 'lg';
 export type AppButtonType = 'button' | 'submit' | 'reset';
 
@@ -51,11 +56,14 @@ const SIZE_TO_ION: Record<AppButtonSize, 'small' | 'default' | 'large'> = {
       [expand]="fullWidth() ? 'block' : null"
       [disabled]="disabled() || loading()"
       [attr.aria-busy]="loading() || null"
+      [attr.aria-label]="ariaLabel()"
+      [attr.aria-expanded]="ariaExpanded()"
+      [attr.aria-controls]="ariaControls()"
       [strong]="kind() === 'primary'"
       (click)="onClick($event)"
     >
       @if (loading()) {
-      <ion-spinner slot="start" name="dots" />
+        <ion-spinner slot="start" name="dots" aria-hidden="true" />
       }
       <ng-content />
     </ion-button>
@@ -69,6 +77,11 @@ export class AppButton {
   readonly disabled = input(false);
   readonly loading = input(false);
   readonly fullWidth = input(false);
+  /** Accessible name — required for icon-only buttons. */
+  readonly ariaLabel = input<string | null>(null);
+  /** Disclosure state for buttons that open a sheet / menu. */
+  readonly ariaExpanded = input<boolean | null>(null);
+  readonly ariaControls = input<string | null>(null);
 
   readonly buttonClick = output<MouseEvent>();
 

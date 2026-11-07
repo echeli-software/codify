@@ -12,7 +12,11 @@ interface RGB {
 function parseHex(hex: string): RGB | null {
   let h = hex.trim();
   if (h.startsWith('#')) h = h.slice(1);
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (h.length !== 6) return null;
   const num = parseInt(h, 16);
   if (Number.isNaN(num)) return null;

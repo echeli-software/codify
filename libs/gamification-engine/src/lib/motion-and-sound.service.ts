@@ -3,7 +3,8 @@ import { Injectable, signal, computed, type Signal } from '@angular/core';
 const MOTION_KEY = 'codify.motion';
 const SOUND_KEY = 'codify.sound';
 
-type Pref = 'on' | 'off' | 'system';
+export type MotionSoundPref = 'on' | 'off' | 'system';
+type Pref = MotionSoundPref;
 
 /**
  * Single source of truth for "should we animate" and "should we play sound".
@@ -19,8 +20,12 @@ type Pref = 'on' | 'off' | 'system';
  */
 @Injectable({ providedIn: 'root' })
 export class MotionAndSoundService {
-  private readonly motionPrefSig = signal<Pref>(this.readPref(MOTION_KEY) ?? 'system');
-  private readonly soundPrefSig = signal<Pref>(this.readPref(SOUND_KEY) ?? 'system');
+  private readonly motionPrefSig = signal<Pref>(
+    this.readPref(MOTION_KEY) ?? 'system',
+  );
+  private readonly soundPrefSig = signal<Pref>(
+    this.readPref(SOUND_KEY) ?? 'system',
+  );
   private readonly osPrefersReducedMotion = signal(this.readOsReducedMotion());
 
   /** True when animations should be skipped or simplified. */
@@ -32,7 +37,9 @@ export class MotionAndSoundService {
   });
 
   /** True when sound should NOT play. */
-  readonly soundMuted: Signal<boolean> = computed(() => this.soundPrefSig() === 'off');
+  readonly soundMuted: Signal<boolean> = computed(
+    () => this.soundPrefSig() === 'off',
+  );
 
   constructor() {
     this.bindOsMediaQuery();
@@ -57,7 +64,11 @@ export class MotionAndSoundService {
   }
 
   private readOsReducedMotion(): boolean {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    )
+      return false;
     try {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     } catch {
@@ -66,15 +77,22 @@ export class MotionAndSoundService {
   }
 
   private bindOsMediaQuery(): void {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    )
+      return;
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-      const handler = (e: MediaQueryListEvent) => this.osPrefersReducedMotion.set(e.matches);
+      const handler = (e: MediaQueryListEvent) =>
+        this.osPrefersReducedMotion.set(e.matches);
       // addEventListener is the modern API; older Safari needs addListener.
       if ('addEventListener' in mq) {
         mq.addEventListener('change', handler);
       } else {
-        (mq as unknown as { addListener: (h: typeof handler) => void }).addListener(handler);
+        (
+          mq as unknown as { addListener: (h: typeof handler) => void }
+        ).addListener(handler);
       }
     } catch {
       /* no-op */

@@ -5,7 +5,13 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import type { Certificate } from '@prisma/client';
-import { formatSerial, isCourseComplete } from '@codify/domain';
+import {
+  encodeSerial,
+  isCourseComplete,
+  isValidSerial,
+  normalizeSerial,
+  SERIAL_ENTROPY_BYTES,
+} from '@codify/domain';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 
@@ -16,12 +22,6 @@ export interface CertificateView {
   isCapstone: boolean;
   issuedAt: string;
   courseId: string;
-}
-
-export interface ReferralView {
-  code: string;
-  shareUrl: string;
-  referredCount: number;
 }
 
 @Injectable()
@@ -101,62 +101,25 @@ export class CertificatesService {
     return certs.map((c) => this.toView(c));
   }
 
-  /** Public verification by serial. */
+  /**
+   * Public verification by serial. Accepts both the legacy CDFY-XXXX-XXXX
+   * and the current 80-bit CDFY-XXXX-XXXX-XXXX-XXXX format; input is
+   * normalized (case, whitespace, O/I typos) before lookup.
+   */
   async verify(serial: string): Promise<CertificateView | null> {
+    const normalized = normalizeSerial(serial);
+    if (!isValidSerial(normalized)) return null;
     const cert = await this.prisma.certificate.findUnique({
-      where: { serial },
+      where: { serial: normalized },
     });
     return cert ? this.toView(cert) : null;
   }
 
-  // ─── Referrals ──────────────────────────────────────────────────────────
-
-  async getReferral(userId: string, appBaseUrl: string): Promise<ReferralView> {
-    let user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { referralCode: true },
-    });
-    if (!user.referralCode) {
-      // Generate lazily; retry on the unlikely unique collision.
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const code = this.newReferralCode();
-        try {
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: { referralCode: code },
-          });
-          user = { referralCode: code };
-          break;
-        } catch (err) {
-          if (isUniqueViolation(err)) continue;
-          throw err;
-        }
-      }
-    }
-    const code = user.referralCode!;
-    const referredCount = await this.prisma.user.count({
-      where: { referredById: userId },
-    });
-    return {
-      code,
-      shareUrl: `${appBaseUrl.replace(/\/$/, '')}/r/${code}`,
-      referredCount,
-    };
-  }
-
   // ─── Helpers ────────────────────────────────────────────────────────────
 
+  /** 80 bits from the CSPRNG → CDFY-XXXX-XXXX-XXXX-XXXX. */
   private newSerial(): string {
-    return formatSerial(randomBytes(8).toString('hex'));
-  }
-
-  private newReferralCode(): string {
-    return randomBytes(5)
-      .toString('hex')
-      .toUpperCase()
-      .replace(/[^0-9A-HJ-NP-Z]/g, '')
-      .slice(0, 8)
-      .padEnd(6, '0');
+    return encodeSerial(randomBytes(SERIAL_ENTROPY_BYTES));
   }
 
   private async resolveCourseTitle(

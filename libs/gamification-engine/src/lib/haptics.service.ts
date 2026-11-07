@@ -1,66 +1,86 @@
-import { Injectable } from '@angular/core';
+import { Injectable, InjectionToken, inject } from '@angular/core';
 import type { HapticIntensity } from './types.js';
 
 /**
- * Thin wrapper around `Capacitor/Haptics` that no-ops on web (or when
- * the plugin isn't bundled). Imported lazily so the web bundle stays
- * lean and so a missing plugin never breaks orchestration.
- *
- * Web-vibration fallback: when `navigator.vibrate` is available (Android
- * Chrome), we use it with intensity-mapped durations. iOS Safari has no
- * web-vibrate, so it stays silent — Capacitor takes over inside the
- * native shell.
+ * Pluggable haptics backend. The student app's native shell may provide
+ * one backed by `@capacitor/haptics`; when absent we look for the plugin
+ * the Capacitor runtime registers on `window.Capacitor.Plugins.Haptics`
+ * (no module import, no `eval`/`new Function` — CSP-safe) and finally fall
+ * back to `navigator.vibrate`.
+ */
+export interface HapticsAdapter {
+  impact(intensity: HapticIntensity): Promise<void> | void;
+}
+
+export const HAPTICS_ADAPTER = new InjectionToken<HapticsAdapter>(
+  'HAPTICS_ADAPTER',
+);
+
+interface CapacitorHapticsPlugin {
+  impact(opts: { style: string }): Promise<void>;
+}
+
+const STYLE: Record<HapticIntensity, string> = {
+  light: 'LIGHT',
+  medium: 'MEDIUM',
+  heavy: 'HEAVY',
+};
+
+const VIBRATE_MS: Record<HapticIntensity, number> = {
+  light: 10,
+  medium: 20,
+  heavy: 30,
+};
+
+/**
+ * Thin haptics wrapper: Capacitor on device, `navigator.vibrate` on
+ * Android Chrome, silent elsewhere. Never throws.
  */
 @Injectable({ providedIn: 'root' })
 export class HapticsService {
-  private capacitorImpactPromise: Promise<((style: string) => Promise<void>) | null> | null = null;
+  private readonly adapter = inject(HAPTICS_ADAPTER, { optional: true });
 
   async impact(intensity: HapticIntensity): Promise<void> {
-    const capacitorImpact = await this.getCapacitorImpact();
-    if (capacitorImpact) {
-      const style = intensity === 'light' ? 'Light' : intensity === 'heavy' ? 'Heavy' : 'Medium';
-      try {
-        await capacitorImpact(style);
-        return;
-      } catch {
-        /* fall through to web vibrate */
-      }
-    }
-    this.webVibrate(intensity);
-  }
-
-  private webVibrate(intensity: HapticIntensity): void {
-    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
-    const ms = intensity === 'light' ? 10 : intensity === 'heavy' ? 30 : 20;
     try {
-      navigator.vibrate(ms);
-    } catch {
-      /* permission denied — ignore */
-    }
-  }
-
-  private getCapacitorImpact(): Promise<((style: string) => Promise<void>) | null> {
-    if (this.capacitorImpactPromise) return this.capacitorImpactPromise;
-    this.capacitorImpactPromise = (async () => {
-      try {
-        // Plugin is optional — when bundled into the Capacitor shell this
-        // resolves to the real implementation; on web (or before install)
-        // it's missing, so we wrap in `Function` to keep TS quiet and let
-        // bundlers skip the unresolved specifier.
-        const dynamicImport = new Function('s', 'return import(s)') as (
-          s: string,
-        ) => Promise<unknown>;
-        const mod = (await dynamicImport('@capacitor/haptics').catch(() => null)) as
-          | { Haptics?: { impact: (opts: { style: string }) => Promise<void> } }
-          | null;
-        if (!mod) return null;
-        const haptics = mod.Haptics;
-        if (!haptics?.impact) return null;
-        return (style: string) => haptics.impact({ style });
-      } catch {
-        return null;
+      if (this.adapter) {
+        await this.adapter.impact(intensity);
+        return;
       }
-    })();
-    return this.capacitorImpactPromise;
+      const plugin = capacitorHaptics();
+      if (plugin) {
+        await plugin.impact({ style: STYLE[intensity] });
+        return;
+      }
+    } catch {
+      /* fall through to web vibrate */
+    }
+    webVibrate(intensity);
+  }
+}
+
+function capacitorHaptics(): CapacitorHapticsPlugin | null {
+  const cap = (
+    globalThis as {
+      Capacitor?: {
+        isNativePlatform?: () => boolean;
+        Plugins?: { Haptics?: CapacitorHapticsPlugin };
+      };
+    }
+  ).Capacitor;
+  if (!cap?.isNativePlatform?.()) return null;
+  const plugin = cap.Plugins?.Haptics;
+  return typeof plugin?.impact === 'function' ? plugin : null;
+}
+
+function webVibrate(intensity: HapticIntensity): void {
+  if (
+    typeof navigator === 'undefined' ||
+    typeof navigator.vibrate !== 'function'
+  )
+    return;
+  try {
+    navigator.vibrate(VIBRATE_MS[intensity]);
+  } catch {
+    /* permission denied — ignore */
   }
 }
