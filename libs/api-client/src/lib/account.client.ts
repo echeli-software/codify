@@ -27,6 +27,15 @@ export interface AdminAccountStatusView extends AccountStatusView {
   purgedAt: string | null;
 }
 
+/**
+ * Suspend / unsuspend response. `warning` is set when the local change
+ * succeeded but mirroring it at the identity provider (Clerk ban / unban)
+ * failed — the suspension still holds (the API enforces it).
+ */
+export type ModerationResult = AdminAccountStatusView & {
+  warning?: { code: 'IDP_SYNC_FAILED'; message: string };
+};
+
 /** POST /me/delete response. */
 export interface DeleteAccountResult extends AccountStatusView {
   /** Web subscriptions set to end at period end (no further charges). */
@@ -110,9 +119,9 @@ export class AccountClient {
   }
 
   /** ADMIN/SUPPORT (SUPPORT: student/teacher accounts only). Audited. */
-  suspend(userId: string, reason: string): Promise<AdminAccountStatusView> {
+  suspend(userId: string, reason: string): Promise<ModerationResult> {
     return firstValueFrom(
-      this.http.post<AdminAccountStatusView>(
+      this.http.post<ModerationResult>(
         `${this.config.baseUrl}/admin/users/${encodeURIComponent(userId)}/suspend`,
         { reason },
       ),
@@ -120,9 +129,9 @@ export class AccountClient {
   }
 
   /** ADMIN/SUPPORT. Audited. */
-  unsuspend(userId: string): Promise<AdminAccountStatusView> {
+  unsuspend(userId: string): Promise<ModerationResult> {
     return firstValueFrom(
-      this.http.post<AdminAccountStatusView>(
+      this.http.post<ModerationResult>(
         `${this.config.baseUrl}/admin/users/${encodeURIComponent(userId)}/unsuspend`,
         {},
       ),

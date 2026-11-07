@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
 import { AccountExportService } from './account-export.service.js';
 import { AccountPurgeService } from './account-purge.service.js';
 import {
@@ -14,6 +15,8 @@ import { AccountService } from './account.service.js';
  * account-state.ts. BillingService comes from the global BillingModule.
  */
 @Module({
+  // ClerkService: suspensions are mirrored as Clerk bans.
+  imports: [AuthModule],
   controllers: [AccountController, AdminAccountController],
   providers: [AccountService, AccountExportService, AccountPurgeService],
   exports: [AccountService],

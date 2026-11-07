@@ -429,9 +429,13 @@ export class UserAccountPanelComponent {
     if (!ok) return;
     this.busy.set(true);
     try {
-      this.status.set(await this.account.suspend(this.userId(), reason));
+      const res = await this.account.suspend(this.userId(), reason);
+      this.status.set(res);
       this.reason = '';
       this.toast.success(this.i18n.t('admin.account.suspended'));
+      // Saved here, but the Clerk ban failed (audited server-side).
+      if (res.warning)
+        this.toast.warn(this.i18n.t('admin.account.idpSyncFailed'));
     } catch (err) {
       this.errors.toast(err, 'admin.errors.actionFailed');
     } finally {
@@ -448,8 +452,11 @@ export class UserAccountPanelComponent {
     if (!ok) return;
     this.busy.set(true);
     try {
-      this.status.set(await this.account.unsuspend(this.userId()));
+      const res = await this.account.unsuspend(this.userId());
+      this.status.set(res);
       this.toast.success(this.i18n.t('admin.account.unsuspended'));
+      if (res.warning)
+        this.toast.warn(this.i18n.t('admin.account.idpUnbanFailed'));
     } catch (err) {
       this.errors.toast(err, 'admin.errors.actionFailed');
     } finally {

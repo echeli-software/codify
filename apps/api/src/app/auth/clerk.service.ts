@@ -25,6 +25,20 @@ export interface ClerkUserJson {
 
 const MAX_DISPLAY_NAME = 80;
 
+/** Clerk Backend API base (ban / unban are plain HTTP calls). */
+export const CLERK_API_URL = 'https://api.clerk.com';
+
+/** Clerk user ids look like `user_2abc…`; dev-token users (`dev-…`) have none. */
+export function isClerkUserId(id: string | null | undefined): id is string {
+  return !!id && /^user_[A-Za-z0-9]+$/.test(id);
+}
+
+/** Outcome of mirroring a suspension onto the Clerk user. */
+export type ClerkBanResult =
+  | { status: 'synced' }
+  | { status: 'skipped'; reason: 'not_configured' | 'no_clerk_id' }
+  | { status: 'failed'; error: string };
+
 export function buildDisplayName(parts: {
   firstName?: string | null;
   lastName?: string | null;
@@ -157,6 +171,52 @@ export class ClerkService implements OnModuleInit {
       type: evt.type,
       data: evt.data as unknown as Record<string, unknown>,
     };
+  }
+
+  /**
+   * Ban (`banned: true`) or unban a user at Clerk — `POST /v1/users/{id}/ban`
+   * / `/unban` on the Backend API with the secret key — so a suspended user
+   * can't sign in and their sessions are revoked (docs/14 §13). Never
+   * throws: without a secret key, or for users with no Clerk id (dev
+   * tokens), it is skipped; HTTP / network errors come back as `failed`.
+   */
+  async setBanned(
+    clerkUserId: string | null | undefined,
+    banned: boolean,
+  ): Promise<ClerkBanResult> {
+    const secretKey = this.config.get('CLERK_SECRET_KEY');
+    if (!secretKey) {
+      this.logger.debug(
+        `Clerk not configured — skipping ${banned ? 'ban' : 'unban'} of ${clerkUserId ?? '(none)'}`,
+      );
+      return { status: 'skipped', reason: 'not_configured' };
+    }
+    if (!isClerkUserId(clerkUserId)) {
+      this.logger.debug(
+        `No Clerk user id (${clerkUserId ?? 'none'}) — skipping ${banned ? 'ban' : 'unban'}`,
+      );
+      return { status: 'skipped', reason: 'no_clerk_id' };
+    }
+    const url = `${CLERK_API_URL}/v1/users/${encodeURIComponent(clerkUserId)}/${banned ? 'ban' : 'unban'}`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) return { status: 'synced' };
+      const body = await res.text().catch(() => '');
+      const error = `Clerk ${banned ? 'ban' : 'unban'} failed: HTTP ${res.status}${body ? ` ${body.slice(0, 300)}` : ''}`;
+      this.logger.warn(`${error} (user ${clerkUserId})`);
+      return { status: 'failed', error };
+    } catch (err) {
+      const error = `Clerk ${banned ? 'ban' : 'unban'} failed: ${(err as Error).message}`;
+      this.logger.warn(`${error} (user ${clerkUserId})`);
+      return { status: 'failed', error };
+    }
   }
 
   /**

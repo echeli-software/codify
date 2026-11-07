@@ -2,7 +2,8 @@
   "admin": {
     "shell": {
       "brand": "Codify · Admin",
-      "signOut": "Sair"
+      "signOut": "Sair",
+      "accountMenu": "Conta e preferências"
     },
     "nav": {
       "group": {
@@ -1280,7 +1281,9 @@
         "statusFailed": "Falhou",
         "statusRefunded": "Reembolsado",
         "statusPartiallyRefunded": "Reembolso parcial"
-      }
+      },
+      "idpSyncFailed": "Suspensão salva, mas o provedor de login não foi atualizado — as sessões do usuário no Clerk podem continuar ativas até nova tentativa.",
+      "idpUnbanFailed": "Reativação salva, mas o provedor de login não foi atualizado — o usuário ainda pode estar impedido de entrar."
     }
   }
 }

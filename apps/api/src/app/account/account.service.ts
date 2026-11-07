@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { ApiUser } from '../auth/auth.types.js';
+import { ClerkService, type ClerkBanResult } from '../auth/clerk.service.js';
 import { BillingService } from '../billing/billing.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -77,6 +78,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
+    private readonly clerk: ClerkService,
   ) {}
 
   async status(userId: string, now = new Date()): Promise<AccountStatusView> {
@@ -182,6 +184,7 @@ export class AccountService {
   ): Promise<{
     before: AdminAccountStatusView;
     after: AdminAccountStatusView;
+    identityProvider: ClerkBanResult;
   }> {
     const before = await this.adminStatus(userId, now);
     this.assertMayModerate(actor, before);
@@ -194,7 +197,12 @@ export class AccountService {
     });
     // Suspended accounts get no pushes.
     await this.prisma.deviceToken.deleteMany({ where: { userId } });
-    return { before, after: await this.adminStatus(userId, now) };
+    const after = await this.adminStatus(userId, now);
+    return {
+      before,
+      after,
+      identityProvider: await this.syncClerkBan(userId, true),
+    };
   }
 
   async unsuspend(
@@ -204,6 +212,7 @@ export class AccountService {
   ): Promise<{
     before: AdminAccountStatusView;
     after: AdminAccountStatusView;
+    identityProvider: ClerkBanResult;
   }> {
     const before = await this.adminStatus(userId, now);
     this.assertMayModerate(actor, before);
@@ -211,7 +220,33 @@ export class AccountService {
       where: { id: userId },
       data: { suspendedAt: null, suspendedReason: null },
     });
-    return { before, after: await this.adminStatus(userId, now) };
+    const after = await this.adminStatus(userId, now);
+    return {
+      before,
+      after,
+      identityProvider: await this.syncClerkBan(userId, false),
+    };
+  }
+
+  /**
+   * Mirror the local suspension at the identity provider (Clerk ban /
+   * unban). Runs after the local change is committed and never throws: a
+   * Clerk outage must not undo a suspension (the auth middleware enforces
+   * `suspendedAt` on every request regardless).
+   */
+  private async syncClerkBan(
+    userId: string,
+    banned: boolean,
+  ): Promise<ClerkBanResult> {
+    try {
+      const row = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { clerkId: true },
+      });
+      return await this.clerk.setBanned(row?.clerkId, banned);
+    } catch (err) {
+      return { status: 'failed', error: (err as Error).message };
+    }
   }
 
   private assertMayModerate(

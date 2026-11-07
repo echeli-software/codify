@@ -88,8 +88,15 @@ function setup(users: Partial<UserRow>[]) {
       store: [{ id: 'sub-ios', planName: 'Pro', source: 'APPLE_IAP' }],
     })),
   };
-  const svc = new AccountService(prisma as never, billing as never);
-  return { svc, rows, prisma, billing, deviceTokens };
+  const clerk = {
+    setBanned: jest.fn(async () => ({ status: 'synced' as const })),
+  };
+  const svc = new AccountService(
+    prisma as never,
+    billing as never,
+    clerk as never,
+  );
+  return { svc, rows, prisma, billing, deviceTokens, clerk };
 }
 
 const actor = (userId: string, role: ApiUser['role'] = 'STUDENT'): ApiUser => ({
@@ -206,5 +213,40 @@ describe('AccountService', () => {
     expect(un.before.suspendedReason).toBe('abuse');
     expect(un.after).toMatchObject({ status: 'active', suspendedReason: null });
     expect(rows[0].suspendedAt).toBeNull();
+  });
+
+  it('mirrors suspend / unsuspend as a Clerk ban / unban', async () => {
+    const { svc, clerk } = setup([
+      { role: 'STUDENT', clerkId: 'user_abc' } as Partial<UserRow>,
+      { role: 'ADMIN' },
+    ]);
+    const s1 = await svc.suspend(actor('u2', 'ADMIN'), 'u1', 'spam', now);
+    expect(clerk.setBanned).toHaveBeenLastCalledWith('user_abc', true);
+    expect(s1.identityProvider).toEqual({ status: 'synced' });
+    await svc.unsuspend(actor('u2', 'ADMIN'), 'u1', now);
+    expect(clerk.setBanned).toHaveBeenLastCalledWith('user_abc', false);
+  });
+
+  it('keeps the local suspension when Clerk fails', async () => {
+    const { svc, clerk, rows } = setup([
+      { role: 'STUDENT', clerkId: 'user_abc' } as Partial<UserRow>,
+      { role: 'ADMIN' },
+    ]);
+    clerk.setBanned.mockResolvedValueOnce({
+      status: 'failed',
+      error: 'HTTP 500',
+    } as never);
+    const res = await svc.suspend(actor('u2', 'ADMIN'), 'u1', 'spam', now);
+    expect(res.after.status).toBe('suspended');
+    expect(rows[0].suspendedAt).toEqual(now);
+    expect(res.identityProvider).toEqual({
+      status: 'failed',
+      error: 'HTTP 500',
+    });
+    // A thrown error is contained too.
+    clerk.setBanned.mockRejectedValueOnce(new Error('boom'));
+    const un = await svc.unsuspend(actor('u2', 'ADMIN'), 'u1', now);
+    expect(un.after.status).toBe('active');
+    expect(un.identityProvider).toEqual({ status: 'failed', error: 'boom' });
   });
 });

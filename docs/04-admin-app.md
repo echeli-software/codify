@@ -134,7 +134,7 @@ Tabs:
   - **Inventory**: items owned; manual grant (with audit reason).
   - **Coin / XP ledger**: paged transactions with delta + balance after.
   - **Manual grant**: form (amount, source = `ADMIN_GRANT`, reason). Rate-limited per admin/day.
-  - **Suspend / unsuspend**: sets `User.suspendedAt` + a staff-only reason (the API then refuses the account with `ACCOUNT_SUSPENDED`); ADMIN and SUPPORT, SUPPORT only for student/teacher accounts; audited. Shown with the account's deletion / purge state and its payments in `<cdf-user-account-panel>` (see docs/14 §13.1). Banning the user in Clerk is not wired yet.
+  - **Suspend / unsuspend**: sets `User.suspendedAt` + a staff-only reason (the API then refuses the account with `ACCOUNT_SUSPENDED`); ADMIN and SUPPORT, SUPPORT only for student/teacher accounts; audited. Shown with the account's deletion / purge state and its payments in `<cdf-user-account-panel>` (see docs/14 §13.1). When Clerk is configured (`CLERK_SECRET_KEY`) the user is also banned / unbanned at Clerk (Backend API `POST /v1/users/{id}/ban` / `/unban`; users without a Clerk id — dev tokens — are skipped). A Clerk failure keeps the local change, is audited as `user.idp_sync_failed` and shows a warning toast.
   - **Audit**: actions performed on this user.
 
 ### Translations

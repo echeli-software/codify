@@ -68,6 +68,7 @@ describe('UserAccountPanelComponent', () => {
       }),
     };
     const confirm = { open: jest.fn().mockResolvedValue(true) };
+    const toast = { success: jest.fn(), error: jest.fn(), warn: jest.fn() };
     await TestBed.configureTestingModule({
       imports: [Host],
       providers: [
@@ -75,10 +76,7 @@ describe('UserAccountPanelComponent', () => {
         { provide: AccountClient, useValue: account },
         { provide: BillingClient, useValue: billing },
         { provide: ConfirmDialogService, useValue: confirm },
-        {
-          provide: ToastService,
-          useValue: { success: jest.fn(), error: jest.fn() },
-        },
+        { provide: ToastService, useValue: toast },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(Host);
@@ -86,8 +84,8 @@ describe('UserAccountPanelComponent', () => {
     await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
     const panel = // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fixture.debugElement.children[0].componentInstance as any;
-    return { fixture, panel, account, billing, confirm };
+      fixture.debugElement.children[0].componentInstance as any;
+    return { fixture, panel, account, billing, confirm, toast };
   }
 
   it('loads status and payments for the user', async () => {
@@ -125,5 +123,21 @@ describe('UserAccountPanelComponent', () => {
     await panel.unsuspend();
     expect(account.unsuspend).toHaveBeenCalledWith('u1');
     expect(panel.status().status).toBe('active');
+  });
+
+  it('warns when the identity provider ban failed', async () => {
+    const { panel, account, toast } = await setup();
+    account.suspend.mockResolvedValueOnce(
+      status({
+        status: 'suspended',
+        suspendedAt: '2026-11-07T12:00:00.000Z',
+        suspendedReason: 'spam',
+        warning: { code: 'IDP_SYNC_FAILED', message: 'HTTP 500' },
+      } as never),
+    );
+    panel.reason = 'Spam in friend requests';
+    await panel.suspend(new Event('submit'));
+    expect(panel.status().status).toBe('suspended');
+    expect(toast.warn).toHaveBeenCalledWith(expect.stringContaining('Clerk'));
   });
 });

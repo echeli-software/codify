@@ -308,6 +308,7 @@ export {
   type AccountStatus,
   type AccountStatusView,
   type AdminAccountStatusView,
+  type ModerationResult,
   type DeleteAccountResult,
   type AccountExport,
 } from './lib/account.client.js';

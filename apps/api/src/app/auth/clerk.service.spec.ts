@@ -4,7 +4,9 @@ import { AppConfigService } from '../config/app-config.service.js';
 import { parseEnv } from '../config/env.schema.js';
 import {
   ClerkService,
+  CLERK_API_URL,
   buildDisplayName,
+  isClerkUserId,
   profileFromClerkJson,
 } from './clerk.service.js';
 
@@ -146,5 +148,68 @@ describe('ClerkService', () => {
     expect(() => new ClerkService(prod).onModuleInit()).toThrow(
       'CLERK_SECRET_KEY',
     );
+  });
+});
+
+describe('ClerkService.setBanned (HTTP mocked)', () => {
+  let fetchMock: jest.SpyInstance;
+  beforeEach(() => {
+    fetchMock = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchMock.mockRestore());
+
+  const svc = () => new ClerkService(cfg({ CLERK_SECRET_KEY: 'sk_test_x' }));
+
+  it('recognises Clerk user ids only', () => {
+    expect(isClerkUserId('user_2abcDEF')).toBe(true);
+    expect(isClerkUserId('dev-student')).toBe(false);
+    expect(isClerkUserId('purged-123')).toBe(false);
+    expect(isClerkUserId(null)).toBe(false);
+  });
+
+  it('POSTs /v1/users/{id}/ban and /unban with the secret key', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    await expect(svc().setBanned('user_abc', true)).resolves.toEqual({
+      status: 'synced',
+    });
+    await expect(svc().setBanned('user_abc', false)).resolves.toEqual({
+      status: 'synced',
+    });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      `${CLERK_API_URL}/v1/users/user_abc/ban`,
+      `${CLERK_API_URL}/v1/users/user_abc/unban`,
+    ]);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['Authorization']).toBe(
+      'Bearer sk_test_x',
+    );
+  });
+
+  it('reports HTTP and network failures without throwing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('{"errors":[{"code":"resource_not_found"}]}', {
+        status: 404,
+      }),
+    );
+    const res = await svc().setBanned('user_abc', true);
+    expect(res).toMatchObject({ status: 'failed' });
+    expect((res as { error: string }).error).toContain('HTTP 404');
+    fetchMock.mockRejectedValueOnce(new Error('ECONNRESET'));
+    await expect(svc().setBanned('user_abc', false)).resolves.toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('ECONNRESET'),
+    });
+  });
+
+  it('skips without a secret key or a Clerk id (dev tokens)', async () => {
+    await expect(
+      new ClerkService(cfg()).setBanned('user_abc', true),
+    ).resolves.toEqual({ status: 'skipped', reason: 'not_configured' });
+    await expect(svc().setBanned('dev-student', true)).resolves.toEqual({
+      status: 'skipped',
+      reason: 'no_clerk_id',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

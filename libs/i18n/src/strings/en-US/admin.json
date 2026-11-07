@@ -2,7 +2,8 @@
   "admin": {
     "shell": {
       "brand": "Codify · Admin",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "accountMenu": "Account and settings"
     },
     "nav": {
       "group": {
@@ -1280,7 +1281,9 @@
         "statusFailed": "Failed",
         "statusRefunded": "Refunded",
         "statusPartiallyRefunded": "Partially refunded"
-      }
+      },
+      "idpSyncFailed": "Suspension saved, but the sign-in provider could not be updated — the user's Clerk sessions may stay active until it is retried.",
+      "idpUnbanFailed": "Unsuspension saved, but the sign-in provider could not be updated — the user may still be blocked from signing in."
     }
   }
 }

@@ -14,6 +14,7 @@ import { Equals, IsString, MaxLength, MinLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
+import type { ClerkBanResult } from '../auth/clerk.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import {
@@ -44,6 +45,14 @@ export class SuspendUserDto {
   @MaxLength(500)
   reason!: string;
 }
+
+/**
+ * Suspend / unsuspend response: the staff view, plus `warning` when the
+ * local change succeeded but mirroring it at Clerk (ban / unban) failed.
+ */
+export type ModerationResult = AdminAccountStatusView & {
+  warning?: { code: 'IDP_SYNC_FAILED'; message: string };
+};
 
 function reqMeta(req: Request) {
   return {
@@ -177,8 +186,8 @@ export class AdminAccountController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: SuspendUserDto,
     @Req() req: Request,
-  ): Promise<AdminAccountStatusView> {
-    const { before, after } = await this.account.suspend(
+  ): Promise<ModerationResult> {
+    const { before, after, identityProvider } = await this.account.suspend(
       actor,
       id,
       body.reason.trim(),
@@ -199,7 +208,7 @@ export class AdminAccountController {
       },
       ...reqMeta(req),
     });
-    return after;
+    return this.withIdpOutcome(actor, req, id, 'ban', after, identityProvider);
   }
 
   @Roles('ADMIN', 'SUPPORT')
@@ -209,8 +218,11 @@ export class AdminAccountController {
     @CurrentUser() actor: ApiUser,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() req: Request,
-  ): Promise<AdminAccountStatusView> {
-    const { before, after } = await this.account.unsuspend(actor, id);
+  ): Promise<ModerationResult> {
+    const { before, after, identityProvider } = await this.account.unsuspend(
+      actor,
+      id,
+    );
     await this.audit.record(actor, {
       action: 'user.unsuspended',
       entity: 'User',
@@ -224,6 +236,39 @@ export class AdminAccountController {
       },
       ...reqMeta(req),
     });
-    return after;
+    return this.withIdpOutcome(
+      actor,
+      req,
+      id,
+      'unban',
+      after,
+      identityProvider,
+    );
+  }
+
+  /** A failed Clerk ban / unban is audited and surfaced as `warning`. */
+  private async withIdpOutcome(
+    actor: ApiUser,
+    req: Request,
+    userId: string,
+    op: 'ban' | 'unban',
+    view: AdminAccountStatusView,
+    outcome: ClerkBanResult,
+  ): Promise<ModerationResult> {
+    if (outcome.status !== 'failed') return view;
+    await this.audit.record(actor, {
+      action: 'user.idp_sync_failed',
+      entity: 'User',
+      entityId: userId,
+      diff: { op, error: outcome.error },
+      ...reqMeta(req),
+    });
+    return {
+      ...view,
+      warning: {
+        code: 'IDP_SYNC_FAILED',
+        message: `The account was ${op === 'ban' ? 'suspended' : 'unsuspended'} here, but the identity provider ${op} failed: ${outcome.error}`,
+      },
+    };
   }
 }
