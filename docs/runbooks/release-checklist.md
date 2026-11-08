@@ -165,6 +165,13 @@ from the public footer, the sign-in screen and Settings.
       plan.
 - [ ] The privacy policy also covers the date of birth, the IP-derived
       country, web push and promotional email (all added in Phase 14).
+- [ ] Decide how long guardian confirmations (`GuardianConsent`) are kept.
+      Today the account purge deletes them with the account; if they must
+      survive as consent records, the purge needs a change.
+- [ ] Accept or close the under-12 window: for the rest of a Clerk session
+      token's life (about 60 s) after an under-12 deletion, a new request
+      could create a fresh, empty account. The app signs out before making
+      another call (docs/14).
 - [ ] App Store privacy labels and Google Play data-safety form match the
       policy.
 
