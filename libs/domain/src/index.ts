@@ -9,3 +9,4 @@ export * from './lib/certificates.js';
 export * from './lib/streaks.js';
 export * from './lib/earning.js';
 export * from './lib/browser-exercise.js';
+export * from './lib/age.js';
