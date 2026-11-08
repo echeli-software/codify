@@ -389,7 +389,9 @@ export class OnboardingFlowComponent {
       void this.native.syncLocalReminder(minute);
       this.savingSchedule.set(false);
     }
-    this.telemetry.onboardingStep('schedule', {
+    // docs/05 §9 funnel event (step 4 of docs/10 §2).
+    this.telemetry.track('onboarding_step_complete', {
+      step: 'schedule',
       reminderMinute: minute,
       skipped: minute === null,
     });
