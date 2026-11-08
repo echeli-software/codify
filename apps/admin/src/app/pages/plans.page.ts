@@ -36,7 +36,10 @@ import {
   type PlanPrice,
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
+import { DirtyTracker } from '../core/dirty';
+import { LoadError } from '../core/load-error';
 import { EDIT_ROLES } from '../core/roles';
+import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
 
 interface PlanForm {
   id: string | null;
@@ -82,6 +85,7 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
     MoneyInput,
     Select,
     Skeleton,
+    LoadError,
     Toggle,
     TranslatePipe,
     LocalePipe,
@@ -105,7 +109,9 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
         }
       </header>
 
-      @if (loading()) {
+      @if (loadError(); as err) {
+        <cdf-admin-load-error [error]="err" (retry)="refresh()" />
+      } @else if (loading()) {
         <cdf-skeleton shape="rect" height="200px" />
       } @else {
         <section class="admin-card">
@@ -569,7 +575,7 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
     `,
   ],
 })
-export class PlansPage {
+export class PlansPage implements HasUnsavedChanges {
   private readonly plansClient = inject(PlansClient);
   private readonly categoriesClient = inject(CategoriesClient);
   private readonly toast = inject(ToastService);
@@ -582,6 +588,7 @@ export class PlansPage {
     this.auth.hasAnyRole(EDIT_ROLES.plans),
   );
   protected readonly loading = signal(true);
+  protected readonly loadError = signal<unknown>(null);
   protected readonly plans = signal<Plan[]>([]);
   protected readonly categories = signal<Category[]>([]);
   protected readonly assignments = signal<CategoryAssignments>({});
@@ -593,6 +600,9 @@ export class PlansPage {
   protected readonly syncResult = signal<Plan | null>(null);
   protected form: PlanForm = emptyPlanForm();
   protected priceDrafts: Record<string, PriceDraft> = {};
+  /** docs/04 §5: the plan form and the price-line drafts. */
+  private readonly formDirty = new DirtyTracker(() => this.form);
+  private readonly priceDirty = new DirtyTracker(() => this.priceDrafts);
   protected newPrice = {
     currency: 'BRL',
     period: 'MONTHLY' as BillingPeriod,
@@ -636,11 +646,45 @@ export class PlansPage {
   });
 
   constructor() {
+    warnOnUnload(() => this.hasUnsavedChanges());
     void this.refresh();
   }
 
-  private async refresh(): Promise<void> {
+  /**
+   * Unsaved work: an edited plan form or price line, or category matrix
+   * changes not yet saved (docs/04 §5). Read-only viewers never have any.
+   */
+  hasUnsavedChanges(): boolean {
+    if (!this.canEdit()) return false;
+    return (
+      this.changedPlanIds().length > 0 ||
+      (this.editing() &&
+        (this.formDirty.isDirty() || this.priceDirty.isDirty()))
+    );
+  }
+
+  /** Ask before an in-page switch throws away an edited plan form. */
+  private async confirmDiscard(): Promise<boolean> {
+    if (
+      !this.canEdit() ||
+      !this.editing() ||
+      (!this.formDirty.isDirty() && !this.priceDirty.isDirty())
+    )
+      return true;
+    const ok = await this.confirm.open({
+      title: this.i18n.t('admin.unsaved.title'),
+      message: this.i18n.t('admin.unsaved.message'),
+      confirmLabel: this.i18n.t('admin.unsaved.leave'),
+      cancelLabel: this.i18n.t('admin.unsaved.stay'),
+      confirmKind: 'danger',
+      icon: 'warning',
+    });
+    return ok === true;
+  }
+
+  protected async refresh(): Promise<void> {
     this.loading.set(true);
+    this.loadError.set(null);
     try {
       const [plans, cats] = await Promise.all([
         this.plansClient.list({ includeInactive: true }),
@@ -649,7 +693,7 @@ export class PlansPage {
       this.categories.set(cats.items);
       this.setPlans(plans.items);
     } catch (err) {
-      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      this.loadError.set(err);
     } finally {
       this.loading.set(false);
     }
@@ -686,18 +730,29 @@ export class PlansPage {
         },
       ]),
     );
+    this.priceDirty.mark();
   }
 
-  protected startCreate(): void {
+  protected async startCreate(): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
     this.selectedId.set(null);
+    this.priceDrafts = {};
+    this.priceDirty.mark();
     this.form = emptyPlanForm();
     this.errors.set({});
     this.formError.set(null);
     this.syncResult.set(null);
+    this.formDirty.mark();
     this.editing.set(true);
   }
 
-  protected select(p: Plan): void {
+  protected async select(p: Plan): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
+    this.open(p);
+  }
+
+  /** Load a plan into the form (and mark it clean). */
+  private open(p: Plan): void {
     this.selectedId.set(p.id);
     this.form = {
       id: p.id,
@@ -715,6 +770,7 @@ export class PlansPage {
     this.errors.set({});
     this.formError.set(null);
     this.syncResult.set(null);
+    this.formDirty.mark();
     this.editing.set(true);
   }
 
@@ -763,7 +819,7 @@ export class PlansPage {
         ? await this.plansClient.update(f.id, { ...body, isActive: f.isActive })
         : await this.plansClient.create(body);
       this.replacePlan(saved);
-      this.select(saved);
+      this.open(saved);
       this.toast.success(
         this.i18n.t('admin.plans.saved', { name: saved.name }),
       );

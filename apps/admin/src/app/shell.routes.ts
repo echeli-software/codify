@@ -110,6 +110,7 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'plans',
         canActivate: [sectionGuard('plans')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/plans.page').then((m) => m.PlansPage),
       },

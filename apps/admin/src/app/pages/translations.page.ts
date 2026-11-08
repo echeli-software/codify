@@ -44,6 +44,7 @@ import {
   type TranslationUpsert,
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
+import { LoadError } from '../core/load-error';
 import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
 import { EditorDocBinding } from '../core/editor-doc';
 
@@ -143,6 +144,7 @@ export function buildUpserts(
     SearchBar,
     Select,
     Skeleton,
+    LoadError,
     TranslatePipe,
     LocalePipe,
   ],
@@ -220,6 +222,8 @@ export function buildUpserts(
               </tbody>
             </table>
           </div>
+        } @else if (completenessError(); as err) {
+          <cdf-admin-load-error [error]="err" (retry)="loadCompleteness()" />
         } @else {
           <cdf-skeleton shape="rect" height="80px" />
         }
@@ -404,7 +408,9 @@ export function buildUpserts(
         }}
       </p>
 
-      @if (loading()) {
+      @if (loadError(); as err) {
+        <cdf-admin-load-error [error]="err" (retry)="reload()" />
+      } @else if (loading()) {
         <cdf-skeleton shape="rect" height="240px" />
       } @else if (rows().length === 0) {
         <cdf-empty-state
@@ -650,10 +656,12 @@ export class TranslationsPage implements HasUnsavedChanges {
   protected readonly rows = signal<TranslationRow[]>([]);
   protected readonly total = signal(0);
   protected readonly loading = signal(true);
+  protected readonly loadError = signal<unknown>(null);
   protected readonly saving = signal(false);
   protected readonly completeness = signal<TranslationCompleteness | null>(
     null,
   );
+  protected readonly completenessError = signal<unknown>(null);
   protected readonly openDoc = signal<string | null>(null);
   protected readonly format = signal<TranslationFileFormat>('csv');
   protected readonly formatOptions: SelectOption<TranslationFileFormat>[] = [
@@ -791,9 +799,14 @@ export class TranslationsPage implements HasUnsavedChanges {
     void this.load();
   }
 
+  protected reload(): void {
+    void this.load();
+  }
+
   private async load(): Promise<void> {
     const seq = ++this.seq;
     this.loading.set(true);
+    this.loadError.set(null);
     try {
       const res = await this.client.list({
         entityType: this.entityType() || undefined,
@@ -807,18 +820,21 @@ export class TranslationsPage implements HasUnsavedChanges {
       this.rows.set(res.items);
       this.total.set(res.total);
     } catch (err) {
-      if (seq === this.seq)
-        this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      if (seq === this.seq) this.loadError.set(err);
     } finally {
       if (seq === this.seq) this.loading.set(false);
     }
   }
 
-  private async loadCompleteness(): Promise<void> {
+  protected async loadCompleteness(): Promise<void> {
+    this.completenessError.set(null);
     try {
       this.completeness.set(await this.client.completeness());
     } catch (err) {
-      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      // Keep the last good report on a failed refresh; error only when
+      // there is nothing to show.
+      if (this.completeness() === null) this.completenessError.set(err);
+      else this.errorsSvc.toast(err, 'admin.errors.loadFailed');
     }
   }
 

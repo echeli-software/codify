@@ -43,6 +43,7 @@ import { AdminErrors } from '../core/errors';
 import { SLUG_PATTERN } from '../core/catalog';
 import { BadgeTestPanel } from '../shared/badge-test-panel';
 import { DirtyTracker } from '../core/dirty';
+import { LoadError } from '../core/load-error';
 import type { HasUnsavedChanges } from '../core/unsaved-changes';
 import { BadgeRuleBuilder } from './badge-rule-builder.component';
 
@@ -140,6 +141,7 @@ const DEFAULT_RULE = JSON.stringify(
     Input,
     Select,
     Skeleton,
+    LoadError,
     Toggle,
     TranslatePipe,
     LocalePipe,
@@ -187,7 +189,9 @@ const DEFAULT_RULE = JSON.stringify(
                 {{ 'admin.common.saveChanges' | translate }}
               </cdf-button>
             </header>
-            @if (config() === null) {
+            @if (configError(); as err) {
+              <cdf-admin-load-error [error]="err" (retry)="loadConfig()" />
+            } @else if (config() === null) {
               <cdf-skeleton shape="rect" height="200px" />
             } @else {
               <ul class="plain-list config-list">
@@ -284,92 +288,99 @@ const DEFAULT_RULE = JSON.stringify(
                 {{ 'admin.gamification.badges.new' | translate }}
               </cdf-button>
             </header>
-            <div class="table-scroll">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col">{{ 'admin.common.name' | translate }}</th>
-                    <th scope="col">
-                      {{ 'admin.gamification.badges.rule' | translate }}
-                    </th>
-                    <th scope="col" class="num">
-                      {{ 'admin.gamification.rewards' | translate }}
-                    </th>
-                    <th scope="col">
-                      <span class="visually-hidden">{{
-                        'admin.common.actions' | translate
-                      }}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (b of badges(); track b.id) {
+            @if (listsError(); as err) {
+              <cdf-admin-load-error [error]="err" (retry)="loadLists()" />
+            } @else if (!listsLoaded()) {
+              <cdf-skeleton shape="rect" height="160px" />
+            } @else {
+              <div class="table-scroll">
+                <table class="admin-table">
+                  <thead>
                     <tr>
-                      <td>
-                        <strong>{{ b.name }}</strong>
-                        <div class="mono muted">{{ b.slug }}</div>
-                        <span class="chip-row">
-                          @if (b.isHidden) {
-                            <cdf-badge variant="neutral" [subtle]="true">{{
-                              'admin.gamification.badges.hidden' | translate
-                            }}</cdf-badge>
-                          }
-                          @if (!b.isActive) {
-                            <cdf-badge variant="warning" [subtle]="true">{{
-                              'admin.common.inactive' | translate
-                            }}</cdf-badge>
-                          }
-                        </span>
-                      </td>
-                      <td>
-                        <code class="rule">{{ show(b.rule) }}</code>
-                      </td>
-                      <td class="num">
-                        {{
-                          'admin.gamification.rewardShort'
-                            | translate: { xp: b.xpReward, coins: b.coinReward }
-                        }}
-                      </td>
-                      <td>
-                        <div class="row-actions">
-                          <cdf-button
-                            kind="ghost"
-                            size="sm"
-                            (click)="openBadgeTest(b)"
-                            [attr.data-testid]="'test-badge-' + b.slug"
-                            >{{
-                              'admin.gamification.badges.test' | translate
-                            }}</cdf-button
-                          >
-                          <cdf-button
-                            kind="ghost"
-                            size="sm"
-                            (click)="editBadge(b)"
-                            >{{ 'admin.common.edit' | translate }}</cdf-button
-                          >
-                          <cdf-icon-button
-                            icon="trash"
-                            size="sm"
-                            kind="danger"
-                            [ariaLabel]="
-                              'admin.gamification.deleteAria'
-                                | translate: { name: b.name }
-                            "
-                            (click)="deleteBadge(b)"
-                          />
-                        </div>
-                      </td>
+                      <th scope="col">{{ 'admin.common.name' | translate }}</th>
+                      <th scope="col">
+                        {{ 'admin.gamification.badges.rule' | translate }}
+                      </th>
+                      <th scope="col" class="num">
+                        {{ 'admin.gamification.rewards' | translate }}
+                      </th>
+                      <th scope="col">
+                        <span class="visually-hidden">{{
+                          'admin.common.actions' | translate
+                        }}</span>
+                      </th>
                     </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="4" class="muted small">
-                        {{ 'admin.gamification.badges.empty' | translate }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    @for (b of badges(); track b.id) {
+                      <tr>
+                        <td>
+                          <strong>{{ b.name }}</strong>
+                          <div class="mono muted">{{ b.slug }}</div>
+                          <span class="chip-row">
+                            @if (b.isHidden) {
+                              <cdf-badge variant="neutral" [subtle]="true">{{
+                                'admin.gamification.badges.hidden' | translate
+                              }}</cdf-badge>
+                            }
+                            @if (!b.isActive) {
+                              <cdf-badge variant="warning" [subtle]="true">{{
+                                'admin.common.inactive' | translate
+                              }}</cdf-badge>
+                            }
+                          </span>
+                        </td>
+                        <td>
+                          <code class="rule">{{ show(b.rule) }}</code>
+                        </td>
+                        <td class="num">
+                          {{
+                            'admin.gamification.rewardShort'
+                              | translate
+                                : { xp: b.xpReward, coins: b.coinReward }
+                          }}
+                        </td>
+                        <td>
+                          <div class="row-actions">
+                            <cdf-button
+                              kind="ghost"
+                              size="sm"
+                              (click)="openBadgeTest(b)"
+                              [attr.data-testid]="'test-badge-' + b.slug"
+                              >{{
+                                'admin.gamification.badges.test' | translate
+                              }}</cdf-button
+                            >
+                            <cdf-button
+                              kind="ghost"
+                              size="sm"
+                              (click)="editBadge(b)"
+                              >{{ 'admin.common.edit' | translate }}</cdf-button
+                            >
+                            <cdf-icon-button
+                              icon="trash"
+                              size="sm"
+                              kind="danger"
+                              [ariaLabel]="
+                                'admin.gamification.deleteAria'
+                                  | translate: { name: b.name }
+                              "
+                              (click)="deleteBadge(b)"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="4" class="muted small">
+                          {{ 'admin.gamification.badges.empty' | translate }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
           </section>
         }
         @case ('quests') {
@@ -389,97 +400,105 @@ const DEFAULT_RULE = JSON.stringify(
             <p class="muted small">
               {{ 'admin.gamification.quests.help' | translate }}
             </p>
-            <div class="table-scroll">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col">
-                      {{ 'admin.gamification.quests.quest' | translate }}
-                    </th>
-                    <th scope="col">
-                      {{ 'admin.gamification.quests.kind' | translate }}
-                    </th>
-                    <th scope="col" class="num">
-                      {{ 'admin.gamification.quests.target' | translate }}
-                    </th>
-                    <th scope="col" class="num">
-                      {{ 'admin.gamification.quests.difficulty' | translate }}
-                    </th>
-                    <th scope="col" class="num">
-                      {{ 'admin.gamification.quests.weight' | translate }}
-                    </th>
-                    <th scope="col" class="num">
-                      {{ 'admin.gamification.rewards' | translate }}
-                    </th>
-                    <th scope="col">
-                      <span class="visually-hidden">{{
-                        'admin.common.actions' | translate
-                      }}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (q of quests(); track q.id) {
+            @if (listsError(); as err) {
+              <cdf-admin-load-error [error]="err" (retry)="loadLists()" />
+            } @else if (!listsLoaded()) {
+              <cdf-skeleton shape="rect" height="160px" />
+            } @else {
+              <div class="table-scroll">
+                <table class="admin-table">
+                  <thead>
                     <tr>
-                      <td>
-                        <strong>{{ q.title }}</strong>
-                        <div class="mono muted">{{ q.slug }}</div>
-                        @if (!q.isActive) {
-                          <cdf-badge variant="warning" [subtle]="true">{{
-                            'admin.common.inactive' | translate
-                          }}</cdf-badge>
-                        }
-                      </td>
-                      <td>
-                        {{
-                          'admin.gamification.questKinds.' + q.kind | translate
-                        }}
-                      </td>
-                      <td class="num">{{ q.target }}</td>
-                      <td class="num">
-                        {{
-                          'admin.gamification.difficulties.' + q.difficulty
-                            | translate
-                        }}
-                      </td>
-                      <td class="num">{{ q.weight ?? 1 }}</td>
-                      <td class="num">
-                        {{
-                          'admin.gamification.rewardShort'
-                            | translate: { xp: q.xpReward, coins: q.coinReward }
-                        }}
-                      </td>
-                      <td>
-                        <div class="row-actions">
-                          <cdf-button
-                            kind="ghost"
-                            size="sm"
-                            (click)="editQuest(q)"
-                            >{{ 'admin.common.edit' | translate }}</cdf-button
-                          >
-                          <cdf-icon-button
-                            icon="trash"
-                            size="sm"
-                            kind="danger"
-                            [ariaLabel]="
-                              'admin.gamification.deleteAria'
-                                | translate: { name: q.title }
-                            "
-                            (click)="deleteQuest(q)"
-                          />
-                        </div>
-                      </td>
+                      <th scope="col">
+                        {{ 'admin.gamification.quests.quest' | translate }}
+                      </th>
+                      <th scope="col">
+                        {{ 'admin.gamification.quests.kind' | translate }}
+                      </th>
+                      <th scope="col" class="num">
+                        {{ 'admin.gamification.quests.target' | translate }}
+                      </th>
+                      <th scope="col" class="num">
+                        {{ 'admin.gamification.quests.difficulty' | translate }}
+                      </th>
+                      <th scope="col" class="num">
+                        {{ 'admin.gamification.quests.weight' | translate }}
+                      </th>
+                      <th scope="col" class="num">
+                        {{ 'admin.gamification.rewards' | translate }}
+                      </th>
+                      <th scope="col">
+                        <span class="visually-hidden">{{
+                          'admin.common.actions' | translate
+                        }}</span>
+                      </th>
                     </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="7" class="muted small">
-                        {{ 'admin.gamification.quests.empty' | translate }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    @for (q of quests(); track q.id) {
+                      <tr>
+                        <td>
+                          <strong>{{ q.title }}</strong>
+                          <div class="mono muted">{{ q.slug }}</div>
+                          @if (!q.isActive) {
+                            <cdf-badge variant="warning" [subtle]="true">{{
+                              'admin.common.inactive' | translate
+                            }}</cdf-badge>
+                          }
+                        </td>
+                        <td>
+                          {{
+                            'admin.gamification.questKinds.' + q.kind
+                              | translate
+                          }}
+                        </td>
+                        <td class="num">{{ q.target }}</td>
+                        <td class="num">
+                          {{
+                            'admin.gamification.difficulties.' + q.difficulty
+                              | translate
+                          }}
+                        </td>
+                        <td class="num">{{ q.weight ?? 1 }}</td>
+                        <td class="num">
+                          {{
+                            'admin.gamification.rewardShort'
+                              | translate
+                                : { xp: q.xpReward, coins: q.coinReward }
+                          }}
+                        </td>
+                        <td>
+                          <div class="row-actions">
+                            <cdf-button
+                              kind="ghost"
+                              size="sm"
+                              (click)="editQuest(q)"
+                              >{{ 'admin.common.edit' | translate }}</cdf-button
+                            >
+                            <cdf-icon-button
+                              icon="trash"
+                              size="sm"
+                              kind="danger"
+                              [ariaLabel]="
+                                'admin.gamification.deleteAria'
+                                  | translate: { name: q.title }
+                              "
+                              (click)="deleteQuest(q)"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="7" class="muted small">
+                          {{ 'admin.gamification.quests.empty' | translate }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
           </section>
         }
         @case ('operations') {
@@ -913,8 +932,11 @@ export class GamificationPage implements HasUnsavedChanges {
   protected readonly tab = signal<Tab>('defaults');
   protected readonly busy = signal<string | null>(null);
   protected readonly config = signal<ConfigRow[] | null>(null);
+  protected readonly configError = signal<unknown>(null);
   protected readonly badges = signal<BadgeDef[]>([]);
   protected readonly quests = signal<QuestTemplateRow[]>([]);
+  protected readonly listsLoaded = signal(false);
+  protected readonly listsError = signal<unknown>(null);
 
   /** Translation keys can't contain dots: `multiplier.cap` → `multiplier_cap`. */
   protected configLabelKey(key: string): string {
@@ -1007,12 +1029,13 @@ export class GamificationPage implements HasUnsavedChanges {
     return row.shape.kind === 'fields' ? row.shape.fields : [];
   }
 
-  private async loadConfig(): Promise<void> {
+  protected async loadConfig(): Promise<void> {
+    this.configError.set(null);
+    this.config.set(null);
     try {
       this.config.set(this.toRows(await this.client.getConfig()));
     } catch (err) {
-      this.config.set([]);
-      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      this.configError.set(err);
     }
   }
 
@@ -1081,7 +1104,9 @@ export class GamificationPage implements HasUnsavedChanges {
 
   // ─── Badges / quests ──────────────────────────────────────────────────
 
-  private async loadLists(): Promise<void> {
+  protected async loadLists(): Promise<void> {
+    this.listsError.set(null);
+    this.listsLoaded.set(false);
     try {
       const [b, q] = await Promise.all([
         this.client.listBadges(true),
@@ -1089,8 +1114,9 @@ export class GamificationPage implements HasUnsavedChanges {
       ]);
       this.badges.set(b);
       this.quests.set(q);
+      this.listsLoaded.set(true);
     } catch (err) {
-      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      this.listsError.set(err);
     }
   }
 

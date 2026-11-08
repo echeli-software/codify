@@ -26,7 +26,7 @@ import {
   type UserListQuery,
   type UserSubscriptionFilter,
 } from '@codify/api-client';
-import { AdminErrors } from '../core/errors';
+import { LoadError } from '../core/load-error';
 
 const PAGE_SIZE = 25;
 
@@ -85,6 +85,7 @@ export function lastSeenRange(
     SearchBar,
     Select,
     Skeleton,
+    LoadError,
     TranslatePipe,
     LocalePipe,
   ],
@@ -160,7 +161,9 @@ export function lastSeenRange(
         }
       </p>
 
-      @if (loading()) {
+      @if (loadError(); as err) {
+        <cdf-admin-load-error [error]="err" (retry)="reload()" />
+      } @else if (loading()) {
         <cdf-skeleton shape="rect" height="240px" />
       } @else if (visible().length === 0) {
         <cdf-empty-state
@@ -249,10 +252,10 @@ export function lastSeenRange(
 })
 export class UsersPage {
   private readonly users = inject(UsersClient);
-  private readonly errorsSvc = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
 
   protected readonly loading = signal(true);
+  protected readonly loadError = signal<unknown>(null);
   protected readonly pageRows = signal<AdminUserListItem[]>([]);
   protected readonly total = signal(0);
   protected readonly page = signal(1);
@@ -327,9 +330,14 @@ export class UsersPage {
     void this.loadPage();
   }
 
+  protected reload(): void {
+    void this.loadPage();
+  }
+
   private async loadPage(): Promise<void> {
     const seq = ++this.seq;
     this.loading.set(true);
+    this.loadError.set(null);
     try {
       const role = this.role();
       const sub = this.subscription();
@@ -346,8 +354,7 @@ export class UsersPage {
       this.pageRows.set(res.items);
       this.total.set(res.total);
     } catch (err) {
-      if (seq === this.seq)
-        this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      if (seq === this.seq) this.loadError.set(err);
     } finally {
       if (seq === this.seq) this.loading.set(false);
     }
