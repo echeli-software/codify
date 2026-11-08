@@ -70,8 +70,12 @@ export interface QueuedScenarioComplete extends QueuedEventBase {
 /** Offline re-equip from owned items (docs/16 §3, LWW by clientTimestamp). */
 export interface QueuedAvatarEquip extends QueuedEventBase {
   kind: 'avatar_equip';
-  /** Latest change per slot; `itemId: null` unequips. */
-  slotChanges: { slot: string; itemId: string | null }[];
+  /**
+   * Latest change per slot; `itemId: null` unequips. `at` = when that
+   * slot was changed (epoch ms) — the slot's own LWW clock on replay;
+   * older queues without it use the event's `clientTimestamp`.
+   */
+  slotChanges: { slot: string; itemId: string | null; at?: number }[];
 }
 
 /** Offline avatar config edit (docs/16 §8, LWW by clientTimestamp). */

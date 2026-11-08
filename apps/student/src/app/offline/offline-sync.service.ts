@@ -196,14 +196,27 @@ export function estimatePending(
   return { xp, coins, lessons: ids.size, lessonIds: [...ids] };
 }
 
-/** Merge per-slot equip changes: the latest change of a slot wins. */
+type SlotChange = { slot: string; itemId: string | null; at?: number };
+
+/**
+ * Merge per-slot equip changes: the latest change of a slot wins. `at`
+ * (epoch ms) stamps the `next` changes with their own time, so each slot
+ * replays with the time it was changed — not the time of the last edit to
+ * any slot (docs/16 §8, LRN-2).
+ */
 export function mergeSlotChanges(
-  prev: readonly { slot: string; itemId: string | null }[],
+  prev: readonly SlotChange[],
   next: readonly { slot: string; itemId: string | null }[],
-): { slot: string; itemId: string | null }[] {
-  const map = new Map(prev.map((c) => [c.slot, c.itemId]));
-  for (const c of next) map.set(c.slot, c.itemId);
-  return [...map].map(([slot, itemId]) => ({ slot, itemId }));
+  at?: number,
+): SlotChange[] {
+  const map = new Map(prev.map((c) => [c.slot, c]));
+  for (const c of next)
+    map.set(c.slot, {
+      slot: c.slot,
+      itemId: c.itemId,
+      ...(at === undefined ? {} : { at }),
+    });
+  return [...map.values()];
 }
 
 export interface LessonReconciled {
@@ -542,8 +555,10 @@ export class OfflineSyncService {
 
   /**
    * Queue avatar equips made offline (re-equip from owned items only,
-   * docs/16 §3). Changes coalesce into one event per user (latest per
-   * slot); the server applies them last-write-wins by clientTimestamp.
+   * docs/16 §3), unequips (`itemId: null`) included. Changes coalesce
+   * into one event per user (latest per slot, each stamped with its own
+   * time); the server applies them per slot last-write-wins by that time,
+   * an unequip leaving a tombstone so an older equip cannot win later.
    */
   async queueAvatarEquip(
     changes: { slot: ItemSlot; itemId: string | null }[],
@@ -551,13 +566,14 @@ export class OfflineSyncService {
     const userId = this.requireUser();
     await this.ready;
     const prev = this.singleton<QueuedAvatarEquip>('avatar_equip', userId);
+    const now = Date.now();
     const ev: QueuedAvatarEquip = {
       kind: 'avatar_equip',
       clientEventId: prev?.clientEventId ?? newClientEventId(),
-      clientTimestamp: Date.now(),
+      clientTimestamp: now,
       userId,
       attempts: 0,
-      slotChanges: mergeSlotChanges(prev?.slotChanges ?? [], changes),
+      slotChanges: mergeSlotChanges(prev?.slotChanges ?? [], changes, now),
     };
     return this.enqueueAndKick(ev);
   }
@@ -933,8 +949,13 @@ export class OfflineSyncService {
         let last: AvatarResponse | null = null;
         let stale = false;
         for (const c of ev.slotChanges) {
+          // Each slot replays with its own change time (unless the server
+          // refused timestamps for this event — then none is sent).
           last = await this.items.equip(c.slot as ItemSlot, c.itemId, {
-            clientTimestamp,
+            clientTimestamp:
+              clientTimestamp && c.at !== undefined
+                ? new Date(c.at).toISOString()
+                : clientTimestamp,
             idempotencyKey: `${ev.clientEventId}:${c.slot}`,
           });
           stale ||= !!last.stale;

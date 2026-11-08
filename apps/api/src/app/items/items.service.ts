@@ -573,7 +573,9 @@ export class ItemsService {
   /**
    * Equip an owned item into its slot, or unequip when itemId is null.
    * With a `clientTimestamp` (offline queue) the change is last-write-wins
-   * against the slot's `EquippedItem.updatedAt` (`stale: true` when older).
+   * per slot (docs/16 §8, `stale: true` when it lost): an equip loses to a
+   * newer `EquippedItem.updatedAt` and to a newer unequip, which leaves an
+   * `AvatarSlotTombstone` behind. Live writes (no timestamp) always win.
    */
   async equip(
     userId: string,
@@ -582,17 +584,24 @@ export class ItemsService {
     clientTimestamp?: string | null,
   ): Promise<AvatarResponse> {
     const at = avatarWriteTime(clientTimestamp);
+    if (!itemId) return this.unequip(userId, slot, at, !!clientTimestamp);
     if (clientTimestamp) {
-      const row = await this.prisma.equippedItem.findUnique({
-        where: { userId_slot: { userId, slot } },
-        select: { updatedAt: true },
-      });
-      if (isStaleWrite(at, row?.updatedAt))
+      const where = { userId_slot: { userId, slot } };
+      const [row, tombstone] = await Promise.all([
+        this.prisma.equippedItem.findUnique({
+          where,
+          select: { updatedAt: true },
+        }),
+        this.prisma.avatarSlotTombstone.findUnique({
+          where,
+          select: { clearedAt: true },
+        }),
+      ]);
+      if (
+        isStaleWrite(at, row?.updatedAt) ||
+        isStaleWrite(at, tombstone?.clearedAt)
+      )
         return { ...(await this.getAvatar(userId)), stale: true };
-    }
-    if (!itemId) {
-      await this.prisma.equippedItem.deleteMany({ where: { userId, slot } });
-      return this.getAvatar(userId);
     }
     const owned = await this.prisma.userItem.findUnique({
       where: { userId_itemId: { userId, itemId } },
@@ -603,17 +612,61 @@ export class ItemsService {
       throw new BadRequestException(
         `Item belongs to slot ${owned.item.slot}, not ${slot}`,
       );
-    await this.prisma.equippedItem.upsert({
-      where: { userId_slot: { userId, slot } },
-      create: {
-        userId,
-        slot,
-        itemId,
-        ...(clientTimestamp ? { updatedAt: at } : {}),
-      },
-      update: { itemId, ...(clientTimestamp ? { updatedAt: at } : {}) },
-    });
+    await this.prisma.$transaction([
+      this.prisma.equippedItem.upsert({
+        where: { userId_slot: { userId, slot } },
+        create: {
+          userId,
+          slot,
+          itemId,
+          ...(clientTimestamp ? { updatedAt: at } : {}),
+        },
+        update: { itemId, ...(clientTimestamp ? { updatedAt: at } : {}) },
+      }),
+      // The equip supersedes an older unequip of the slot.
+      this.prisma.avatarSlotTombstone.deleteMany({
+        where: { userId, slot, clearedAt: { lte: at } },
+      }),
+    ]);
     return this.getAvatar(userId);
+  }
+
+  /**
+   * Empty a slot at `at`. The tombstone keeps the latest unequip time
+   * (max of the stored one and `at`) so an older queued equip replayed
+   * later loses. With `lww` (offline queue) the equipped row is removed
+   * only when it is not newer than `at`; otherwise the unequip is `stale`.
+   */
+  private async unequip(
+    userId: string,
+    slot: ItemSlot,
+    at: Date,
+    lww: boolean,
+  ): Promise<AvatarResponse> {
+    const where = { userId_slot: { userId, slot } };
+    const stale = await this.prisma.$transaction(async (tx) => {
+      const tombstone = await tx.avatarSlotTombstone.findUnique({
+        where,
+        select: { clearedAt: true },
+      });
+      if (!tombstone || tombstone.clearedAt.getTime() < at.getTime())
+        await tx.avatarSlotTombstone.upsert({
+          where,
+          create: { userId, slot, clearedAt: at },
+          update: { clearedAt: at },
+        });
+      const removed = await tx.equippedItem.deleteMany({
+        where: { userId, slot, ...(lww ? { updatedAt: { lte: at } } : {}) },
+      });
+      if (!lww || removed.count > 0) return false;
+      // Nothing removed: the slot was already empty, or a newer equip holds it.
+      return !!(await tx.equippedItem.findUnique({
+        where,
+        select: { updatedAt: true },
+      }));
+    });
+    const avatar = await this.getAvatar(userId);
+    return stale ? { ...avatar, stale: true } : avatar;
   }
 
   /**

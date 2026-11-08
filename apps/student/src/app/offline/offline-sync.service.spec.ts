@@ -528,6 +528,35 @@ describe('OfflineSyncService', () => {
       expect(svc.lastReconciled.avatar()?.stale).toBe(true);
     });
 
+    it('replays each queued slot change (unequips included) with its own time', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      const now = jest.spyOn(Date, 'now');
+      try {
+        now.mockReturnValue(Date.UTC(2026, 10, 8, 10, 0));
+        await svc.queueAvatarEquip([{ slot: 'HAT', itemId: null }]);
+        now.mockReturnValue(Date.UTC(2026, 10, 8, 10, 5));
+        await svc.queueAvatarEquip([{ slot: 'PET', itemId: 'p1' }]);
+      } finally {
+        now.mockRestore();
+      }
+      items.equip.mockResolvedValue({ config: null, equipped: {} });
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(
+        items.equip.mock.calls.map((c) => [
+          c[0],
+          c[1],
+          (c[2] as { clientTimestamp?: string }).clientTimestamp,
+        ]),
+      ).toEqual([
+        ['HAT', null, '2026-11-08T10:00:00.000Z'],
+        ['PET', 'p1', '2026-11-08T10:05:00.000Z'],
+      ]);
+    });
+
     it('queues preference updates offline (merged) and sends them as PATCH /me', async () => {
       const svc = await setup();
       online.set(false);
@@ -639,6 +668,20 @@ describe('OfflineSyncService', () => {
       ).toEqual([
         { slot: 'HAT', itemId: null },
         { slot: 'PET', itemId: 'p' },
+      ]);
+      // `at` stamps only the new changes; untouched slots keep theirs.
+      expect(
+        mergeSlotChanges(
+          [
+            { slot: 'HAT', itemId: 'a', at: 1 },
+            { slot: 'PET', itemId: 'p', at: 2 },
+          ],
+          [{ slot: 'HAT', itemId: null }],
+          5,
+        ),
+      ).toEqual([
+        { slot: 'HAT', itemId: null, at: 5 },
+        { slot: 'PET', itemId: 'p', at: 2 },
       ]);
     });
   });
