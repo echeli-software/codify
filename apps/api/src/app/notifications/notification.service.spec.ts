@@ -28,6 +28,8 @@ function setup(user: Record<string, unknown> | null = {}) {
         created.push(args);
         return { id: `row-${created.length}` };
       }),
+      // EMAIL log rows the PROMO email caps read (newest first).
+      findMany: jest.fn(async () => [] as { sentAt: Date }[]),
     },
   };
   const push = {
@@ -289,5 +291,114 @@ describe('NotificationService.sendToUser (PushService-shaped, billing)', () => {
         )
       ).status,
     ).toBe('sent');
+  });
+});
+
+describe('NotificationService.notify — PROMO (launch decision 2026-11)', () => {
+  const ADULT = new Date('1990-01-01T00:00:00Z');
+  const promo = {
+    kind: 'PROMO' as const,
+    title: 'Bonus event',
+    body: 'b',
+    emailLines: ['Bonus: 2x XP'],
+  };
+  const emailOnly = { channels: { inApp: false, push: false, email: true } };
+
+  it('sends nothing at all to a minor or a user without a date of birth', async () => {
+    for (const birthDate of [null, new Date('2011-06-01T00:00:00Z')]) {
+      const { svc, push, email, created } = setup({
+        birthDate,
+        marketingEmailOptIn: true,
+      });
+      const res = await svc.notify('u1', promo, {
+        now: NOW,
+        channels: { email: true },
+      });
+      expect(res).toMatchObject({
+        status: 'ok',
+        inAppId: null,
+        push: { status: 'disabled' },
+        email: { status: 'disabled' },
+      });
+      expect(created).toHaveLength(0);
+      expect(push.sendToUser).not.toHaveBeenCalled();
+      expect(email.send).not.toHaveBeenCalled();
+    }
+  });
+
+  it('emails an adult only with marketingEmailOptIn', async () => {
+    const no = setup({ birthDate: ADULT, marketingEmailOptIn: false });
+    expect(
+      (await no.svc.notify('u1', promo, { now: NOW, ...emailOnly })).email,
+    ).toEqual({ status: 'disabled' });
+    expect(no.email.send).not.toHaveBeenCalled();
+
+    const yes = setup({ birthDate: ADULT, marketingEmailOptIn: true });
+    const res = await yes.svc.notify('u1', promo, { now: NOW, ...emailOnly });
+    expect(res.email).toEqual({ status: 'sent', id: 'email-1' });
+    expect(res.inAppId).toBeNull();
+    expect(yes.email.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'PROMO',
+        title: 'Bonus event',
+        lines: ['Bonus: 2x XP'],
+      }),
+    );
+    expect(yes.created[0].data).toMatchObject({
+      channel: 'EMAIL',
+      kind: 'PROMO',
+    });
+  });
+
+  it('applies the campaign email caps: 2 per 7 days, 1 per 24 h', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const cases: [Date[], 'sent' | 'capped'][] = [
+      [[], 'sent'],
+      [[new Date(NOW.getTime() - 2 * day)], 'sent'],
+      [[new Date(NOW.getTime() - 3 * 60 * 60 * 1000)], 'capped'],
+      [
+        [new Date(NOW.getTime() - 2 * day), new Date(NOW.getTime() - 4 * day)],
+        'capped',
+      ],
+    ];
+    for (const [sent, expected] of cases) {
+      const { svc, prisma } = setup({
+        birthDate: ADULT,
+        marketingEmailOptIn: true,
+      });
+      prisma.notification.findMany.mockResolvedValueOnce(
+        sent.map((sentAt) => ({ sentAt })),
+      );
+      const res = await svc.notify('u1', promo, { now: NOW, ...emailOnly });
+      expect(res.email.status).toBe(expected);
+    }
+  });
+
+  it('a PROMO "fewer like this" window stretches the email gap', async () => {
+    const { svc, prisma } = setup({
+      birthDate: ADULT,
+      marketingEmailOptIn: true,
+      notificationPrefs: [{ kind: 'PROMO', emailEnabled: true, fewerLevel: 2 }],
+    });
+    prisma.notification.findMany.mockResolvedValueOnce([
+      { sentAt: new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000) },
+    ]);
+    expect(
+      (await svc.notify('u1', promo, { now: NOW, ...emailOnly })).email.status,
+    ).toBe('capped');
+  });
+
+  it('respects a switched-off PROMO email (unsubscribe link)', async () => {
+    const { svc, email } = setup({
+      birthDate: ADULT,
+      marketingEmailOptIn: true,
+      notificationPrefs: [
+        { kind: 'PROMO', emailEnabled: false, fewerLevel: 0 },
+      ],
+    });
+    expect(
+      (await svc.notify('u1', promo, { now: NOW, ...emailOnly })).email,
+    ).toEqual({ status: 'disabled' });
+    expect(email.send).not.toHaveBeenCalled();
   });
 });

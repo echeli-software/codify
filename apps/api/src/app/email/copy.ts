@@ -187,6 +187,79 @@ export function paymentReceivedCopy(
   );
 }
 
+export interface PromoEmailInput {
+  /** Multiplier value, e.g. 2 for "2x". */
+  value: number;
+  target: 'XP' | 'COINS' | 'BOTH';
+  /** Course title in the recipient's locale, for a course promo. */
+  courseTitle: string | null;
+  endsAt: Date | null;
+  /** Recipient's IANA zone for the end date (default São Paulo). */
+  timezone?: string | null;
+}
+
+/** Subject, intro and detail lines of the campaign email. */
+export interface PromoEmailCopy extends Copy {
+  lines: string[];
+}
+
+/**
+ * The campaign email (PROMO, marketing consent only — launch decision
+ * 2026-11): sent once at campaign start to adults who ticked "also by
+ * email". Rendered in the shared accessible layout (renderEmail) with the
+ * one-click unsubscribe footer.
+ */
+export function promoEmailCopy(
+  locale: string,
+  p: PromoEmailInput,
+): PromoEmailCopy {
+  const lang = copyLocale(locale);
+  const v = `${new Intl.NumberFormat(lang, { maximumFractionDigits: 2 }).format(p.value)}x`;
+  const what = pick(
+    locale,
+    { XP: 'XP', COINS: 'moedas', BOTH: 'XP e moedas' },
+    { XP: 'XP', COINS: 'coins', BOTH: 'XP and coins' },
+  )[p.target];
+  let ends: string | null = null;
+  if (p.endsAt) {
+    const fmt = (timeZone: string) =>
+      new Intl.DateTimeFormat(lang, {
+        timeZone,
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(p.endsAt as Date);
+    try {
+      ends = fmt(p.timezone || 'America/Sao_Paulo');
+    } catch {
+      ends = fmt('America/Sao_Paulo');
+    }
+  }
+  return pick<PromoEmailCopy>(
+    locale,
+    {
+      title: p.courseTitle
+        ? `Evento bônus: ${v} ${what} em ${p.courseTitle}`
+        : `Evento bônus: ${v} ${what} no Codify`,
+      body: p.courseTitle
+        ? `Começou agora: cada lição de ${p.courseTitle} rende ${v} ${what}. Uma lição curta já conta.`
+        : `Começou agora: suas lições rendem ${v} ${what}. Uma lição curta já conta.`,
+      lines: [`Bônus: ${v} ${what}`, ...(ends ? [`Termina: ${ends}`] : [])],
+    },
+    {
+      title: p.courseTitle
+        ? `Bonus event: ${v} ${what} on ${p.courseTitle}`
+        : `Bonus event: ${v} ${what} on Codify`,
+      body: p.courseTitle
+        ? `It just started: every ${p.courseTitle} lesson earns ${v} ${what}. One short lesson counts.`
+        : `It just started: your lessons earn ${v} ${what}. One short lesson counts.`,
+      lines: [`Bonus: ${v} ${what}`, ...(ends ? [`Ends: ${ends}`] : [])],
+    },
+  );
+}
+
 // ─── Email chrome ─────────────────────────────────────────────────────────
 
 const KIND_NAMES: Record<CopyLocale, Record<NotificationKind, string>> = {
@@ -256,7 +329,9 @@ export function emailChrome(
       cta: ctaPt[kind] ?? 'Abrir o Codify',
       reason: locked
         ? `Você recebe este email porque ele é necessário para sua conta (${name}).`
-        : `Você recebe este email porque os emails de ${name} estão ativados.`,
+        : kind === 'PROMO'
+          ? 'Você recebe este email porque escolheu receber avisos de eventos bônus por email.'
+          : `Você recebe este email porque os emails de ${name} estão ativados.`,
       unsubscribe: locked ? 'Gerenciar emails' : `Cancelar emails de ${name}`,
       settings: 'Preferências de notificação',
       brand: 'Codify',
@@ -265,7 +340,9 @@ export function emailChrome(
       cta: ctaEn[kind] ?? 'Open Codify',
       reason: locked
         ? `You get this email because it's required for your account (${name}).`
-        : `You get this email because ${name} emails are on.`,
+        : kind === 'PROMO'
+          ? 'You get this email because you chose to get bonus-event alerts by email.'
+          : `You get this email because ${name} emails are on.`,
       unsubscribe: locked ? 'Manage emails' : `Unsubscribe from ${name} emails`,
       settings: 'Notification settings',
       brand: 'Codify',

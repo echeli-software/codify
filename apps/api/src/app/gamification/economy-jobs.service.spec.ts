@@ -147,31 +147,35 @@ describe('EconomyJobsService.payWeeklyBonusPools (ECO-2)', () => {
   });
 });
 
-describe('EconomyJobsService.announcePromotions (ECO-6)', () => {
-  it('notifies PROMO opt-ins once per promotion', async () => {
-    const claimed = new Set<string>();
-    const prisma = {
-      multiplier: {
-        findMany: jest.fn(async () => [
-          {
-            id: 'm1',
-            kind: 'CAMPAIGN',
-            value: 2,
-            target: 'XP',
-            courseId: null,
-            endsAt: new Date('2026-11-09T02:59:00Z'),
-          },
-        ]),
-      },
-      contentTranslation: { findMany: jest.fn(async () => []) },
-      user: {
-        findMany: jest
-          .fn()
-          .mockResolvedValueOnce([{ id: 'u1' }])
-          .mockResolvedValue([]),
-      },
-      idempotencyRecord: {
-        create: jest.fn(async ({ data }: { data: { key: string } }) => {
+type PromoUser = {
+  id: string;
+  timezone?: string;
+  marketingEmailOptIn?: boolean;
+  notificationPrefs?: { pushEnabled: boolean; emailEnabled: boolean }[];
+};
+
+function promoSetup(users: PromoUser[]) {
+  const claimed = new Set<string>();
+  const prisma = {
+    multiplier: {
+      findMany: jest.fn(async () => [
+        {
+          id: 'm1',
+          kind: 'CAMPAIGN',
+          value: 2,
+          target: 'XP',
+          courseId: null,
+          endsAt: new Date('2026-11-09T02:59:00Z'),
+        },
+      ]),
+    },
+    contentTranslation: { findMany: jest.fn(async () => []) },
+    user: {
+      findMany: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]),
+    },
+    idempotencyRecord: {
+      create: jest.fn(
+        async ({ data }: { data: { key: string; scope: string } }) => {
           if (claimed.has(data.key)) {
             const { Prisma } = await import('@prisma/client');
             throw new Prisma.PrismaClientKnownRequestError('dup', {
@@ -181,45 +185,166 @@ describe('EconomyJobsService.announcePromotions (ECO-6)', () => {
           }
           claimed.add(data.key);
           return data;
-        }),
+        },
+      ),
+      deleteMany: jest.fn(async ({ where }: { where: { key: string } }) => {
+        claimed.delete(where.key);
+        return { count: 1 };
+      }),
+    },
+  };
+  const notifications = {
+    notify: jest.fn(
+      async (
+        _id: string,
+        _c: unknown,
+        o: { channels?: { email?: boolean; push?: boolean } },
+      ) => ({
+        status: 'ok',
+        inAppId: o.channels?.email ? null : 'n1',
+        push: { status: o.channels?.push === false ? 'not_requested' : 'sent' },
+        email: { status: o.channels?.email ? 'sent' : 'not_requested' },
+      }),
+    ),
+  };
+  const svc = new EconomyJobsService(
+    prisma as never,
+    {} as never,
+    notifications as never,
+  );
+  return { svc, prisma, notifications, claimed };
+}
+
+type NotifyCall = [
+  string,
+  (u: { locale: string }) => Record<string, unknown>,
+  { channels?: Record<string, boolean> },
+];
+
+describe('EconomyJobsService.announcePromotions (ECO-6)', () => {
+  it('notifies PROMO opt-ins once per promotion', async () => {
+    const { svc, prisma, notifications } = promoSetup([
+      {
+        id: 'u1',
+        notificationPrefs: [{ pushEnabled: true, emailEnabled: true }],
       },
-    };
-    const notifications = { notify: jest.fn(async () => ({ status: 'ok' })) };
-    const svc = new EconomyJobsService(
-      prisma as never,
-      {} as never,
-      notifications as never,
-    );
+    ]);
     expect(await svc.announcePromotions(NOW)).toEqual({
       promotions: 1,
       notified: 1,
+      emailed: 0,
     });
     const where = (
       prisma.user.findMany.mock.calls[0] as unknown as [
         { where: Record<string, unknown> },
       ]
     )[0].where;
-    expect(where['notificationPrefs']).toEqual({
-      some: { kind: 'PROMO', pushEnabled: true },
+    expect(where['OR']).toEqual([
+      { notificationPrefs: { some: { kind: 'PROMO', pushEnabled: true } } },
+      {
+        marketingEmailOptIn: true,
+        notificationPrefs: { none: { kind: 'PROMO', emailEnabled: false } },
+      },
+    ]);
+    // Adults only: born on or before 2008-11-07 (18 in every zone today).
+    expect(where['birthDate']).toEqual({
+      lte: new Date('2008-11-07T00:00:00Z'),
     });
-    const build = (
-      notifications.notify.mock.calls[0] as unknown as [
-        string,
-        (u: { locale: string }) => {
-          kind: string;
-          title: string;
-          action: unknown;
-        },
-      ]
-    )[1];
+    const [, build, opts] = notifications.notify.mock
+      .calls[0] as unknown as NotifyCall;
+    expect(opts.channels).toEqual({ email: false });
     expect(build({ locale: 'en-US' })).toMatchObject({
       kind: 'PROMO',
       title: 'Event: 2x XP!',
       action: null,
     });
     // Rerun: the (promotion, user) claim exists → no second notification.
-    prisma.user.findMany.mockResolvedValueOnce([{ id: 'u1' }]);
+    prisma.user.findMany.mockResolvedValueOnce([
+      {
+        id: 'u1',
+        notificationPrefs: [{ pushEnabled: true, emailEnabled: true }],
+      },
+    ]);
     expect((await svc.announcePromotions(NOW)).notified).toBe(0);
+  });
+
+  it('emails marketing opt-ins once, on its own claim, with the campaign template', async () => {
+    const { svc, prisma, notifications, claimed } = promoSetup([
+      // Push + email.
+      {
+        id: 'both',
+        marketingEmailOptIn: true,
+        notificationPrefs: [{ pushEnabled: true, emailEnabled: true }],
+      },
+      // Email only (no PROMO row: email defaults on, consent given).
+      { id: 'mail', marketingEmailOptIn: true, timezone: 'America/New_York' },
+      // Consent given but PROMO email switched off (unsubscribed).
+      {
+        id: 'unsub',
+        marketingEmailOptIn: true,
+        notificationPrefs: [{ pushEnabled: false, emailEnabled: false }],
+      },
+    ]);
+    expect(await svc.announcePromotions(NOW)).toEqual({
+      promotions: 1,
+      notified: 1,
+      emailed: 2,
+    });
+    expect([...claimed].sort()).toEqual([
+      'promo_announce:m1:both',
+      'promo_email:m1:both',
+      'promo_email:m1:mail',
+    ]);
+    expect(prisma.idempotencyRecord.create).toHaveBeenCalledWith({
+      data: {
+        key: 'promo_email:m1:mail',
+        scope: 'promo_email',
+        userId: 'mail',
+      },
+    });
+    const calls = notifications.notify.mock.calls as unknown as NotifyCall[];
+    const mail = calls.find((c) => c[0] === 'mail');
+    expect(mail?.[2].channels).toEqual({
+      inApp: false,
+      push: false,
+      email: true,
+    });
+    const content = mail?.[1]({ locale: 'pt-BR' });
+    expect(content).toMatchObject({
+      kind: 'PROMO',
+      title: 'Evento bônus: 2x XP no Codify',
+      deepLink: '/today',
+    });
+    expect(content?.['emailLines']).toEqual([
+      'Bônus: 2x XP',
+      expect.stringMatching(/^Termina: domingo, 8 de novembro/),
+    ]);
+    // Rerun: both claims exist → nothing more.
+    prisma.user.findMany.mockResolvedValueOnce([
+      {
+        id: 'both',
+        marketingEmailOptIn: true,
+        notificationPrefs: [{ pushEnabled: true, emailEnabled: true }],
+      },
+    ]);
+    expect(await svc.announcePromotions(NOW)).toMatchObject({
+      notified: 0,
+      emailed: 0,
+    });
+  });
+
+  it('releases the email claim when the send fails so the next run retries', async () => {
+    const { svc, notifications, claimed } = promoSetup([
+      { id: 'mail', marketingEmailOptIn: true },
+    ]);
+    notifications.notify.mockResolvedValueOnce({
+      status: 'ok',
+      inAppId: null,
+      push: { status: 'not_requested' },
+      email: { status: 'error' },
+    } as never);
+    expect((await svc.announcePromotions(NOW)).emailed).toBe(0);
+    expect(claimed.has('promo_email:m1:mail')).toBe(false);
   });
 
   it('copy names the course for course promos', () => {

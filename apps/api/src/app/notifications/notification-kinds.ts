@@ -60,6 +60,14 @@ export const FEWER_WINDOWS_MS: Record<number, number> = {
 };
 export const MAX_FEWER_LEVEL = 2;
 
+/**
+ * Campaign email caps (PROMO email, marketing consent only): at most 2
+ * per rolling 7 days and one per 24 h — or per the PROMO "fewer like
+ * this" window when that is longer. Counted from the EMAIL delivery log.
+ */
+export const PROMO_EMAILS_PER_WEEK = 2;
+export const PROMO_EMAIL_MIN_GAP_MS = 24 * 60 * 60 * 1000;
+
 export interface KindPreference {
   pushEnabled: boolean;
   emailEnabled: boolean;

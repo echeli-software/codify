@@ -2,8 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { NotificationKind, Prisma } from '@prisma/client';
 import { EmailService, isDeliverableAddress } from '../email/email.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { canReceiveMarketing } from './marketing-audience.js';
 import {
   EMAIL_KINDS,
+  FEWER_WINDOWS_MS,
+  PROMO_EMAILS_PER_WEEK,
+  PROMO_EMAIL_MIN_GAP_MS,
   PUSH_KINDS,
   defaultLink,
   resolvePreference,
@@ -61,6 +65,8 @@ export type EmailOutcome =
   | { status: 'disabled' }
   | { status: 'dormant' }
   | { status: 'no_address' }
+  /** PROMO email over its caps (2 / 7 days, 1 / 24 h). Dropped. */
+  | { status: 'capped' }
   | { status: 'error' };
 
 export interface NotifyResult {
@@ -70,6 +76,8 @@ export interface NotifyResult {
   push: PushOutcome;
   email: EmailOutcome;
 }
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const NOT_FOUND: NotifyResult = {
   status: 'user_not_found',
@@ -87,7 +95,11 @@ const NOT_FOUND: NotifyResult = {
  *   3. sends EMAIL for email kinds when the kind's email is on, logging the
  *      EMAIL row.
  * Dormant (90 days lapsed, docs/10 §13) and suspended users only get
- * BILLING (and SYSTEM) push/email. Copy is built per recipient locale.
+ * BILLING (and SYSTEM) push/email. PROMO (marketing) reaches known
+ * adults only — nothing at all, not even the inbox row, for a minor or a
+ * user without a date of birth — and PROMO email also needs
+ * `User.marketingEmailOptIn` and stays within the campaign email caps.
+ * Copy is built per recipient locale.
  * Never throws for delivery failures — the caller's flow must not fail
  * because a notification couldn't go out.
  */
@@ -115,7 +127,16 @@ export class NotificationService {
         deletedAt: true,
         suspendedAt: true,
         dormantAt: true,
-        notificationPrefs: { select: { kind: true, emailEnabled: true } },
+        marketingEmailOptIn: true,
+        birthDate: true,
+        timezone: true,
+        notificationPrefs: {
+          select: {
+            kind: true,
+            emailEnabled: true,
+            fewerLevel: true,
+          },
+        },
       },
     });
     if (!user || user.deletedAt) return NOT_FOUND;
@@ -130,6 +151,15 @@ export class NotificationService {
     const deepLink = safeDeepLink(c.deepLink) ?? defaults.deepLink;
     const action = c.action === undefined ? defaults.action : c.action;
     const now = opts.now ?? new Date();
+    // Marketing to a minor or an unknown age: nothing goes out (fail closed).
+    if (kind === 'PROMO' && !canReceiveMarketing(user, now)) {
+      return {
+        status: 'ok',
+        inAppId: null,
+        push: { status: 'disabled' },
+        email: { status: 'disabled' },
+      };
+    }
     const channels = { ...(c.channels ?? {}), ...(opts.channels ?? {}) };
     const restricted =
       (!!user.dormantAt || !!user.suspendedAt) &&
@@ -217,8 +247,15 @@ export class NotificationService {
       if (user.dormantAt && kind !== 'BILLING') email = { status: 'dormant' };
       else if (restricted) email = { status: 'dormant' };
       else if (!pref.emailEnabled) email = { status: 'disabled' };
+      else if (kind === 'PROMO' && !user.marketingEmailOptIn)
+        email = { status: 'disabled' };
       else if (!isDeliverableAddress(user.email))
         email = { status: 'no_address' };
+      else if (
+        kind === 'PROMO' &&
+        (await this.promoEmailCapped(userId, pref.fewerLevel, now))
+      )
+        email = { status: 'capped' };
       else
         email = await this.sendEmail(
           userId,
@@ -231,6 +268,32 @@ export class NotificationService {
     }
 
     return { status: 'ok', inAppId, push, email };
+  }
+
+  /** Campaign email caps, from the EMAIL delivery log. */
+  private async promoEmailCapped(
+    userId: string,
+    fewerLevel: number,
+    now: Date,
+  ): Promise<boolean> {
+    const recent = await this.prisma.notification.findMany({
+      where: {
+        userId,
+        kind: 'PROMO',
+        channel: 'EMAIL',
+        sentAt: { gte: new Date(now.getTime() - WEEK_MS) },
+      },
+      select: { sentAt: true },
+      orderBy: { sentAt: 'desc' },
+      take: PROMO_EMAILS_PER_WEEK,
+    });
+    if (recent.length >= PROMO_EMAILS_PER_WEEK) return true;
+    const gap = Math.max(
+      PROMO_EMAIL_MIN_GAP_MS,
+      FEWER_WINDOWS_MS[fewerLevel] ?? 0,
+    );
+    const last = recent[0]?.sentAt;
+    return !!last && last.getTime() > now.getTime() - gap;
   }
 
   private async sendEmail(

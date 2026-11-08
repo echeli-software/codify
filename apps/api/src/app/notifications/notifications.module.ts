@@ -22,6 +22,8 @@ import {
   createWebPushProvider,
 } from './web-push.provider.js';
 import { WebPushSubscriptionsService } from './web-push-subscriptions.service.js';
+import { PromoPromptController } from './promo-prompt.controller.js';
+import { PromoPromptService } from './promo-prompt.service.js';
 
 /**
  * Notifications: `NotificationService.notify` (the entry point — inbox row
@@ -29,7 +31,8 @@ import { WebPushSubscriptionsService } from './web-push-subscriptions.service.js
  * registry, push delivery (`PushService` — delivery rules, quiet-hours
  * deferral on the `push-deferred` BullMQ queue, Redis-tracked caps),
  * streak reminders + their hourly cron, browser web push (VAPID
- * subscriptions, delivered by PushService next to the native tokens).
+ * subscriptions, delivered by PushService next to the native tokens) and
+ * the one-time promotional-alerts prompt.
  */
 @Module({
   imports: [
@@ -37,7 +40,12 @@ import { WebPushSubscriptionsService } from './web-push-subscriptions.service.js
     EmailModule,
     BullModule.registerQueue({ name: PUSH_DEFERRED_QUEUE }),
   ],
-  controllers: [NotificationsController, InboxController, WebPushController],
+  controllers: [
+    NotificationsController,
+    InboxController,
+    WebPushController,
+    PromoPromptController,
+  ],
   providers: [
     DevicesService,
     PushService,
@@ -48,6 +56,7 @@ import { WebPushSubscriptionsService } from './web-push-subscriptions.service.js
     StreakReminderService,
     NotificationsScheduler,
     WebPushSubscriptionsService,
+    PromoPromptService,
     { provide: WEB_PUSH_PROVIDER, useFactory: () => createWebPushProvider() },
     {
       provide: PUSH_PROVIDER,

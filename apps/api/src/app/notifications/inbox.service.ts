@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,8 +22,17 @@ import {
   resolvePreference,
   type NotificationAction,
 } from './notification-kinds.js';
+import { canReceiveMarketing } from './marketing-audience.js';
 
 const DEFAULT_PAGE = 20;
+
+/** What the PROMO row of the preferences depends on. */
+export interface MarketingContext {
+  /** Known adult (`canReceiveMarketing`). */
+  eligible: boolean;
+  /** `User.marketingEmailOptIn` — explicit marketing-email consent. */
+  emailOptIn: boolean;
+}
 
 const LOCKED_ERROR = (kind: NotificationKind) =>
   new BadRequestException({
@@ -124,9 +134,16 @@ export class InboxService {
         pushWeeklyOptIn: true,
         reminderMinute: true,
         notificationPrefs: true,
+        birthDate: true,
+        timezone: true,
+        marketingEmailOptIn: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
+    const marketing: MarketingContext = {
+      eligible: canReceiveMarketing(user),
+      emailOptIn: user.marketingEmailOptIn,
+    };
     return {
       pushDailyCap: user.pushDailyCap,
       pushWeeklyOptIn: user.pushWeeklyOptIn,
@@ -135,6 +152,7 @@ export class InboxService {
         kindView(
           kind,
           user.notificationPrefs.find((p) => p.kind === kind),
+          marketing,
         ),
       ),
     };
@@ -165,6 +183,22 @@ export class InboxService {
     }
 
     const userData: Prisma.UserUpdateInput = {};
+    const promo = kinds.find((k) => k.kind === 'PROMO');
+    if (promo && (promo.pushEnabled === true || promo.emailEnabled === true)) {
+      const u = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { birthDate: true, timezone: true },
+      });
+      // Promotions are for known adults only (launch decision 2026-11).
+      if (!u || !canReceiveMarketing(u)) {
+        throw new ForbiddenException({
+          code: 'MARKETING_NOT_ALLOWED',
+          message: 'Promotional notifications are for adults only',
+        });
+      }
+      // Turning PROMO email on in Settings is the explicit consent.
+      if (promo.emailEnabled === true) userData.marketingEmailOptIn = true;
+    }
     if (body.pushDailyCap !== undefined)
       userData.pushDailyCap = body.pushDailyCap;
     if (body.pushWeeklyOptIn !== undefined)
@@ -209,16 +243,43 @@ export class InboxService {
   }
 }
 
+/**
+ * One kind's row of Settings → Notifications. PROMO depends on
+ * `marketing`: a minor / unknown age gets no PROMO channels at all (the
+ * app hides the row); for adults PROMO also has an email channel (the
+ * campaign email), shown on only with marketing-email consent.
+ */
 export function kindView(
   kind: NotificationKind,
   row:
     | { pushEnabled: boolean; emailEnabled: boolean; fewerLevel: number }
     | null
     | undefined,
+  marketing?: MarketingContext,
 ): KindPreferenceView {
+  const pref = resolvePreference(kind, row);
+  if (kind === 'PROMO' && marketing) {
+    if (!marketing.eligible) {
+      return {
+        kind,
+        ...pref,
+        pushEnabled: false,
+        emailEnabled: false,
+        locked: false,
+        channels: { push: false, email: false },
+      };
+    }
+    return {
+      kind,
+      ...pref,
+      emailEnabled: pref.emailEnabled && marketing.emailOptIn,
+      locked: false,
+      channels: { push: true, email: true },
+    };
+  }
   return {
     kind,
-    ...resolvePreference(kind, row),
+    ...pref,
     locked: LOCKED_KINDS.has(kind),
     channels: { push: PUSH_KINDS.has(kind), email: EMAIL_KINDS.has(kind) },
   };

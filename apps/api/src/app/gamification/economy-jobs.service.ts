@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { recordServerEvent } from '../notifications/server-analytics.js';
+import { marketingBirthDateCutoffDate } from '../notifications/marketing-audience.js';
+import { promoEmailCopy } from '../email/copy.js';
 import { GamificationService, toStreakState } from './gamification.service.js';
 import { ENGAGEMENT_CRONS, jobsEnabled } from './jobs.js';
 
@@ -27,7 +29,10 @@ export interface BonusPayoutSummary {
 
 export interface PromoAnnounceSummary {
   promotions: number;
+  /** Users who got the inbox entry + push. */
   notified: number;
+  /** Campaign emails sent. */
+  emailed: number;
 }
 
 /**
@@ -38,8 +43,8 @@ export interface PromoAnnounceSummary {
  *   - weekly bonus pool payout (hourly; acts once a week has closed): pays
  *     the coins the daily caps held back as WEEKLY_BONUS (docs/07 §5);
  *   - PROMO announcements (every 15 min): a campaign / course promo that
- *     just started notifies the users who opted into PROMO push (default
- *     off, docs/10 §3).
+ *     just started notifies the adults who opted into PROMO push (default
+ *     off, docs/10 §3) and emails those who gave marketing-email consent.
  */
 @Injectable()
 export class EconomyJobsService {
@@ -197,11 +202,17 @@ export class EconomyJobsService {
   // ─── PROMO announcements ────────────────────────────────────────────────
 
   /**
-   * Announce campaigns and course promos that started within the last 24 h
-   * to users who turned PROMO push on (it is off by default). One inbox
-   * entry + push per (promotion, user), claimed on an IdempotencyRecord so
-   * reruns and replicas never repeat it. Push rules (quiet hours, caps)
-   * still apply in PushService.
+   * Announce campaigns and course promos that started within the last 24 h:
+   *   - inbox entry + push to users who turned PROMO push on (off by
+   *     default);
+   *   - the campaign email to users with `marketingEmailOptIn` whose PROMO
+   *     email is not switched off.
+   * Known adults only (a date of birth 18+ years ago; no date → nothing).
+   * Each channel is claimed once per (promotion, user) on its own
+   * IdempotencyRecord (`promo_announce:` / `promo_email:`), so reruns and
+   * replicas never repeat it; a failed email releases its claim for the
+   * next run. Push rules (quiet hours, caps) apply in PushService, the
+   * campaign email caps and consent check in NotificationService.
    */
   async announcePromotions(
     now: Date = new Date(),
@@ -224,6 +235,8 @@ export class EconomyJobsService {
       },
     });
     let notified = 0;
+    let emailed = 0;
+    const adultCutoff = marketingBirthDateCutoffDate(now);
     for (const promo of promos) {
       // Course titles live in ContentTranslation (one row per locale).
       const titles = promo.courseId
@@ -249,45 +262,101 @@ export class EconomyJobsService {
             deletedAt: null,
             dormantAt: null,
             suspendedAt: null,
-            notificationPrefs: { some: { kind: 'PROMO', pushEnabled: true } },
+            // Adults only; a null birthDate never matches (fail closed).
+            birthDate: { lte: adultCutoff },
+            OR: [
+              {
+                notificationPrefs: {
+                  some: { kind: 'PROMO', pushEnabled: true },
+                },
+              },
+              {
+                marketingEmailOptIn: true,
+                notificationPrefs: {
+                  none: { kind: 'PROMO', emailEnabled: false },
+                },
+              },
+            ],
           },
-          select: { id: true },
+          select: {
+            id: true,
+            timezone: true,
+            marketingEmailOptIn: true,
+            notificationPrefs: {
+              where: { kind: 'PROMO' },
+              select: { pushEnabled: true, emailEnabled: true },
+            },
+          },
           orderBy: { id: 'asc' },
           take: BATCH,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         });
         if (users.length === 0) break;
+        const value = Number(promo.value);
+        const deepLink = promo.kind === 'COURSE_PROMO' ? '/catalog' : '/today';
         for (const u of users) {
-          if (!(await this.claim(`promo_announce:${promo.id}:${u.id}`, u.id)))
-            continue;
-          const value = Number(promo.value);
-          const res = await this.notifications.notify(
-            u.id,
-            ({ locale }) => ({
-              kind: 'PROMO',
-              ...promoCopy(locale, {
-                value,
-                target: promo.target,
-                courseTitle: titleFor(locale),
-                endsAt: promo.endsAt,
+          const pref = u.notificationPrefs?.[0];
+          const wantsPush = pref?.pushEnabled === true;
+          const wantsEmail =
+            u.marketingEmailOptIn && (pref?.emailEnabled ?? true);
+          if (
+            wantsPush &&
+            (await this.claim(`promo_announce:${promo.id}:${u.id}`, u.id))
+          ) {
+            const res = await this.notifications.notify(
+              u.id,
+              ({ locale }) => ({
+                kind: 'PROMO',
+                ...promoCopy(locale, {
+                  value,
+                  target: promo.target,
+                  courseTitle: titleFor(locale),
+                  endsAt: promo.endsAt,
+                }),
+                deepLink,
+                action: null,
+                data: {
+                  type: 'promo',
+                  multiplierId: promo.id,
+                  promoKind: promo.kind,
+                },
               }),
-              deepLink: promo.kind === 'COURSE_PROMO' ? '/catalog' : '/today',
-              action: null,
-              data: {
-                type: 'promo',
-                multiplierId: promo.id,
-                promoKind: promo.kind,
+              { now, channels: { email: false } },
+            );
+            if (res.status === 'ok') notified += 1;
+          }
+          const emailKey = `promo_email:${promo.id}:${u.id}`;
+          if (wantsEmail && (await this.claim(emailKey, u.id, 'promo_email'))) {
+            const res = await this.notifications.notify(
+              u.id,
+              ({ locale }) => {
+                const c = promoEmailCopy(locale, {
+                  value,
+                  target: promo.target,
+                  courseTitle: titleFor(locale),
+                  endsAt: promo.endsAt,
+                  timezone: u.timezone,
+                });
+                return {
+                  kind: 'PROMO',
+                  title: c.title,
+                  body: c.body,
+                  emailLines: c.lines,
+                  deepLink,
+                  action: null,
+                };
               },
-            }),
-            { now },
-          );
-          if (res.status === 'ok') notified += 1;
+              { now, channels: { inApp: false, push: false, email: true } },
+            );
+            if (res.email.status === 'sent') emailed += 1;
+            else if (res.email.status === 'error') await this.release(emailKey);
+          }
         }
         cursor = users[users.length - 1].id;
         if (users.length < BATCH) break;
       }
     }
-    return { promotions: promos.length, notified };
+    return { promotions: promos.length, notified, emailed };
   }
 
   @Cron(ENGAGEMENT_CRONS.promoAnnouncements, {
@@ -301,15 +370,28 @@ export class EconomyJobsService {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
-  private async claim(key: string, userId: string): Promise<boolean> {
+  private async claim(
+    key: string,
+    userId: string,
+    scope = 'promo_announce',
+  ): Promise<boolean> {
     try {
       await this.prisma.idempotencyRecord.create({
-        data: { key, scope: 'promo_announce', userId },
+        data: { key, scope, userId },
       });
       return true;
     } catch (err) {
       if (isUniqueViolation(err)) return false;
       throw err;
+    }
+  }
+
+  /** Give a claim back (the send failed) so the next run retries it. */
+  private async release(key: string): Promise<void> {
+    try {
+      await this.prisma.idempotencyRecord.deleteMany({ where: { key } });
+    } catch (err) {
+      this.logger.warn(`promo claim release failed: ${(err as Error).message}`);
     }
   }
 

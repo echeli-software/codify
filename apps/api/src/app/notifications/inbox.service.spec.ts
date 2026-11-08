@@ -19,7 +19,11 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function setup() {
+const ADULT = new Date('1990-05-01T00:00:00Z');
+
+function setup(
+  person: { birthDate?: Date | null; marketingEmailOptIn?: boolean } = {},
+) {
   const prefs = new Map<string, Record<string, unknown>>();
   const prisma = {
     notification: {
@@ -57,6 +61,9 @@ function setup() {
         pushDailyCap: null,
         pushWeeklyOptIn: false,
         reminderMinute: null,
+        birthDate: null,
+        marketingEmailOptIn: false,
+        ...person,
         notificationPrefs: [...prefs.values()],
       })),
       update: jest.fn(async () => ({})),
@@ -145,13 +152,15 @@ describe('InboxService', () => {
   });
 
   it('fills preference defaults (PROMO push off, locked kinds)', async () => {
-    const { svc } = setup();
+    const { svc } = setup({ birthDate: ADULT });
     const view = await svc.preferences('u1');
     expect(view.kinds).toHaveLength(11);
+    // PROMO email reads off until marketing-email consent is given.
     expect(view.kinds.find((k) => k.kind === 'PROMO')).toMatchObject({
       pushEnabled: false,
-      emailEnabled: true,
+      emailEnabled: false,
       locked: false,
+      channels: { push: true, email: true },
     });
     expect(view.kinds.find((k) => k.kind === 'BILLING')).toMatchObject({
       locked: true,
@@ -184,6 +193,53 @@ describe('InboxService', () => {
       emailEnabled: false,
       fewerLevel: 1,
     });
+  });
+
+  it('PROMO: no channels for a minor or an unknown age; email follows consent', async () => {
+    for (const birthDate of [null, new Date('2012-01-01T00:00:00Z')]) {
+      const { svc, prefs } = setup({ birthDate, marketingEmailOptIn: true });
+      prefs.set('PROMO', {
+        kind: 'PROMO',
+        pushEnabled: true,
+        emailEnabled: true,
+        fewerLevel: 0,
+      });
+      const promo = (await svc.preferences('u1')).kinds.find(
+        (k) => k.kind === 'PROMO',
+      );
+      expect(promo).toMatchObject({
+        pushEnabled: false,
+        emailEnabled: false,
+        channels: { push: false, email: false },
+      });
+    }
+    const { svc } = setup({ birthDate: ADULT, marketingEmailOptIn: true });
+    expect(
+      (await svc.preferences('u1')).kinds.find((k) => k.kind === 'PROMO'),
+    ).toMatchObject({ emailEnabled: true });
+  });
+
+  it('PROMO: only adults may turn it on; email on records the consent', async () => {
+    const minor = setup({ birthDate: null });
+    await expect(
+      minor.svc.updatePreferences('u1', {
+        kinds: [{ kind: 'PROMO', pushEnabled: true }],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'MARKETING_NOT_ALLOWED' } });
+    // Turning it off is always allowed.
+    await minor.svc.updatePreferences('u1', {
+      kinds: [{ kind: 'PROMO', pushEnabled: false }],
+    });
+
+    const adult = setup({ birthDate: ADULT });
+    await adult.svc.updatePreferences('u1', {
+      kinds: [{ kind: 'PROMO', emailEnabled: true }],
+    });
+    expect(adult.prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { marketingEmailOptIn: true },
+    });
+    expect(adult.prefs.get('PROMO')).toMatchObject({ emailEnabled: true });
   });
 
   it('rejects disabling locked kinds and duplicate kinds', async () => {
