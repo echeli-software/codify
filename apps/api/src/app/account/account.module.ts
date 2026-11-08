@@ -8,6 +8,7 @@ import {
   AdminAccountController,
 } from './account.controller.js';
 import { AccountService } from './account.service.js';
+import { UnderAgeDeletionService } from './under-age-deletion.service.js';
 
 /**
  * Account lifecycle + privacy (docs/14 §12–13): data export, self-service
@@ -20,7 +21,13 @@ import { AccountService } from './account.service.js';
   // NotificationsModule: SYSTEM notice on suspension (docs/10 §3).
   imports: [AuthModule, NotificationsModule],
   controllers: [AccountController, AdminAccountController],
-  providers: [AccountService, AccountExportService, AccountPurgeService],
-  exports: [AccountService],
+  providers: [
+    AccountService,
+    AccountExportService,
+    AccountPurgeService,
+    UnderAgeDeletionService,
+  ],
+  // UnderAgeDeletionService: under-12 dates of birth (users/birth-date).
+  exports: [AccountService, UnderAgeDeletionService],
 })
 export class AccountModule {}

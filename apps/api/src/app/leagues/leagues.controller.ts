@@ -184,13 +184,19 @@ export class FriendsController {
   }
 }
 
-/** Public profiles. */
+/**
+ * Public profiles. A minor's profile is visible to the user and their
+ * friends only; others get 404 like an unknown user (docs/14 "Minors").
+ */
 @Controller('users')
 export class ProfileController {
   constructor(private readonly profile: ProfileService) {}
 
   @Get(':id/profile')
-  get(@Param('id') id: string): Promise<PublicProfile> {
-    return this.profile.get(id);
+  get(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<PublicProfile> {
+    return this.profile.get(id, actor.userId);
   }
 }

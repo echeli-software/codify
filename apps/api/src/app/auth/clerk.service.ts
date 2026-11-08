@@ -220,6 +220,43 @@ export class ClerkService implements OnModuleInit {
   }
 
   /**
+   * Delete the user at Clerk (`DELETE /v1/users/{id}`), revoking every
+   * session — used when an account is removed at once for being under the
+   * minimum age (docs/14 "Minors"). Never throws; skipped without a secret
+   * key or a Clerk id, like `setBanned`. A 404 counts as done.
+   */
+  async deleteUser(
+    clerkUserId: string | null | undefined,
+  ): Promise<ClerkBanResult> {
+    const secretKey = this.config.get('CLERK_SECRET_KEY');
+    if (!secretKey) return { status: 'skipped', reason: 'not_configured' };
+    if (!isClerkUserId(clerkUserId))
+      return { status: 'skipped', reason: 'no_clerk_id' };
+    try {
+      const res = await fetch(
+        `${CLERK_API_URL}/v1/users/${encodeURIComponent(clerkUserId)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            Accept: 'application/json',
+          },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (res.ok || res.status === 404) return { status: 'synced' };
+      const body = await res.text().catch(() => '');
+      const error = `Clerk delete failed: HTTP ${res.status}${body ? ` ${body.slice(0, 300)}` : ''}`;
+      this.logger.warn(`${error} (user ${clerkUserId})`);
+      return { status: 'failed', error };
+    } catch (err) {
+      const error = `Clerk delete failed: ${(err as Error).message}`;
+      this.logger.warn(`${error} (user ${clerkUserId})`);
+      return { status: 'failed', error };
+    }
+  }
+
+  /**
    * Fetch email + display name for a first-seen subject from the Clerk
    * Backend API. Returns null when no secret key is configured (networkless
    * dev setups) or the lookup fails.

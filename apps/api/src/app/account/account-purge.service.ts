@@ -32,7 +32,9 @@ export interface PurgeSummary {
  *   auth identity no longer maps to it (a new sign-up gets a new account).
  * - Personal rows that are not accounting records are deleted: device
  *   tokens, notifications + preferences, friendships / requests / nudges,
- *   analytics events, certificates (they carry the recipient's name).
+ *   analytics events, certificates (they carry the recipient's name),
+ *   guardian confirmations (a parent's name + email). The date of birth
+ *   is cleared.
  * - User-authored content is blanked but the graded rows kept for course
  *   statistics: exercise code / output / per-test results, AI-prompt
  *   answers + rubric breakdowns.
@@ -114,6 +116,8 @@ export class AccountPurgeService {
           pushWeeklyOptIn: false,
           reminderMinute: null,
           suspendedReason: null,
+          // docs/14 "Minors": no date of birth survives the purge.
+          birthDate: null,
         },
       });
       if (claimed.count === 0) return false;
@@ -133,6 +137,8 @@ export class AccountPurgeService {
       });
       await tx.analyticsEvent.deleteMany({ where: mine });
       await tx.certificate.deleteMany({ where: mine });
+      // Guardian confirmations carry a third party's name + email.
+      await tx.guardianConsent.deleteMany({ where: mine });
       await tx.submission.updateMany({
         where: mine,
         data: { code: '', output: null, resultJson: Prisma.DbNull },

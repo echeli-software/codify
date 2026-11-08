@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { effectiveStreak, localDateKey } from '@codify/domain';
+import { effectiveStreak, isKnownAdult, localDateKey } from '@codify/domain';
 import { levelFromXp, tierForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
@@ -46,7 +46,12 @@ export interface PublicProfile {
   };
 }
 
-/** Read-only public profile (docs/15 Phase 9) — avatar, badges, level, stats. */
+/**
+ * Read-only public profile (docs/15 Phase 9) — avatar, badges, level, stats.
+ * A minor's profile (or one with no date of birth yet) is visible only to
+ * the user and their friends; anyone else gets the same 404 as an unknown
+ * user (docs/14 "Minors").
+ */
 @Injectable()
 export class ProfileService {
   constructor(
@@ -54,7 +59,7 @@ export class ProfileService {
     @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
-  async get(userId: string): Promise<PublicProfile> {
+  async get(userId: string, viewerId: string): Promise<PublicProfile> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
       select: {
@@ -64,9 +69,11 @@ export class ProfileService {
         avatarConfig: true,
         petName: true,
         timezone: true,
+        birthDate: true,
       },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user || !(await this.mayView(user, viewerId)))
+      throw new NotFoundException('User not found');
 
     const [
       equipped,
@@ -173,5 +180,20 @@ export class ProfileService {
         itemsOwned,
       },
     };
+  }
+
+  /** Adults' profiles are public; everyone else's only to self + friends. */
+  private async mayView(
+    user: { id: string; birthDate: Date | null; timezone: string },
+    viewerId: string,
+  ): Promise<boolean> {
+    if (user.id === viewerId || isKnownAdult(user)) return true;
+    const [a, b] =
+      user.id < viewerId ? [user.id, viewerId] : [viewerId, user.id];
+    const friendship = await this.prisma.friendship.findUnique({
+      where: { userAId_userBId: { userAId: a, userBId: b } },
+      select: { userAId: true },
+    });
+    return !!friendship;
   }
 }

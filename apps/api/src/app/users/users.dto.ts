@@ -13,6 +13,7 @@ import {
   ValidateIf,
   type ValidationOptions,
 } from 'class-validator';
+import { AGE_GROUP_FILTERS, type AgeGroupFilter } from './age-policy.js';
 
 /** True for any IANA zone (or alias such as "UTC") the runtime's Intl knows. */
 export function isValidTimeZone(value: unknown): boolean {
@@ -162,12 +163,21 @@ export interface MeResponse {
   theme: UserTheme | null;
   /** Onboarding goal (docs/05 "Recommended next"), null = none picked. */
   onboardingGoal: OnboardingGoal | null;
+  /**
+   * Date of birth (YYYY-MM-DD), the user's own data: on GET /me only —
+   * staff views leave it out and show `ageGroup` (docs/14 "Minors").
+   */
+  birthDate?: string | null;
+  /** 12–17 `minor`, 18+ `adult`, null = no date of birth given. */
+  ageGroup: 'minor' | 'adult' | null;
   /** ISO 3166-1 alpha-2 from the IP address (CF-IPCountry), null = unknown. */
   country: string | null;
 }
 
 export interface AdminUserListItem {
   id: string;
+  /** 12–17 `minor`, 18+ `adult`, null = not given (docs/14 "Minors"). */
+  ageGroup: 'minor' | 'adult' | null;
   email: string;
   displayName: string;
   role: 'STUDENT' | 'TEACHER' | 'SUPPORT' | 'ADMIN';
@@ -222,6 +232,11 @@ export class UserListFiltersDto {
   @IsOptional()
   @IsIn(SUBSCRIPTION_STATUS_FILTERS)
   subscriptionStatus?: (typeof SUBSCRIPTION_STATUS_FILTERS)[number];
+
+  /** `minor` (12–17), `adult` (18+) or `none` (no date of birth). */
+  @IsOptional()
+  @IsIn(AGE_GROUP_FILTERS)
+  ageGroup?: AgeGroupFilter;
 
   /** ISO 3166-1 alpha-2 (any case), or `NONE` for an unknown country. */
   @IsOptional()

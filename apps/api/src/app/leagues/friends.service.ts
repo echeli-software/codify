@@ -13,6 +13,7 @@ import { UserPushService } from '../gamification/user-push.service.js';
 import { ReferralsService } from '../referrals/referrals.service.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
 import { contentTitles, coursesCompleted } from './learner-stats.js';
+import { knownAdultWhere } from '../users/age-policy.js';
 
 const NUDGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -166,13 +167,20 @@ export class FriendsService {
   /**
    * Recent lesson completions and badge unlocks of the caller's friends
    * who opted in (`User.activityFeedOptIn`), newest first, last 14 days.
-   * Friends who didn't opt in never appear (docs/10 §5).
+   * Friends who didn't opt in never appear (docs/10 §5), nor do minors
+   * (or friends with no date of birth) even if they opted in earlier
+   * (docs/14 "Minors").
    */
   async activity(userId: string, limit = 20): Promise<ActivityFeedEntry[]> {
     const ids = await this.friendIds(userId);
     if (ids.length === 0) return [];
     const friends = await this.prisma.user.findMany({
-      where: { id: { in: ids }, activityFeedOptIn: true, deletedAt: null },
+      where: {
+        id: { in: ids },
+        activityFeedOptIn: true,
+        deletedAt: null,
+        ...knownAdultWhere(),
+      },
       select: { id: true, displayName: true },
     });
     if (friends.length === 0) return [];

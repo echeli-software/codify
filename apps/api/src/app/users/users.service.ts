@@ -13,6 +13,13 @@ import type {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadEquippedPet, petNameAlias } from '../items/pet-names.js';
+import { ageGroup, birthDateKey } from '@codify/domain';
+import {
+  AGE_SELECT,
+  ageGroupWhere,
+  assertAdultFor,
+  type AgeGroupFilter,
+} from './age-policy.js';
 import {
   COUNTRY_UNKNOWN,
   type AdminUserCountry,
@@ -40,6 +47,7 @@ const ME_FIELDS = {
   activityFeedOptIn: true,
   theme: true,
   onboardingGoal: true,
+  birthDate: true,
   country: true,
 } as const;
 
@@ -61,6 +69,16 @@ export class UsersService {
 
   async update(userId: string, patch: UpdateMeDto): Promise<MeResponse> {
     const { onboarded, petName, ...fields } = patch;
+    // docs/14 "Minors": these opt-ins are for known adults only.
+    if (fields.activityFeedOptIn || fields.marketingEmailOptIn) {
+      const age = (await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: AGE_SELECT,
+      })) ?? { birthDate: null };
+      if (fields.activityFeedOptIn) assertAdultFor(age, 'activityFeedOptIn');
+      if (fields.marketingEmailOptIn)
+        assertAdultFor(age, 'marketingEmailOptIn');
+    }
     // docs/04 Settings "Locale enable/disable": a disabled locale can't be picked.
     if (fields.locale && this.site) {
       const { locales } = await this.site.get();
@@ -115,6 +133,8 @@ export class UsersService {
     lastSeenFrom?: Date;
     lastSeenTo?: Date;
     subscriptionStatus?: SubscriptionStatusFilter;
+    /** docs/14 "Minors": minor | adult | none (not given). */
+    ageGroup?: AgeGroupFilter;
     /** ISO 3166-1 alpha-2 (upper case) or COUNTRY_UNKNOWN. */
     country?: string;
   }): Promise<{
@@ -135,6 +155,7 @@ export class UsersService {
           }
         : {}),
       ...subscriptionWhere(opts.subscriptionStatus),
+      ...ageGroupWhere(opts.ageGroup),
       ...(opts.country
         ? {
             country: opts.country === COUNTRY_UNKNOWN ? null : opts.country,
@@ -164,6 +185,8 @@ export class UsersService {
           locale: true,
           lastSeenAt: true,
           createdAt: true,
+          birthDate: true,
+          timezone: true,
           country: true,
         },
       }),
@@ -178,6 +201,7 @@ export class UsersService {
         locale: u.locale,
         lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
         createdAt: u.createdAt.toISOString(),
+        ageGroup: ageGroup(u),
         country: u.country ?? null,
       })),
       total,
@@ -211,7 +235,10 @@ export class UsersService {
       select: ME_FIELDS,
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withPetName(toMeResponse(user));
+    // Staff see the age group, never the date itself (docs/14 "Minors").
+    const detail = await this.withPetName(toMeResponse(user));
+    delete detail.birthDate;
+    return detail;
   }
 }
 
@@ -249,6 +276,8 @@ function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
     activityFeedOptIn: u.activityFeedOptIn,
     theme: (u.theme as MeResponse['theme']) ?? null,
     onboardingGoal: (u.onboardingGoal as MeResponse['onboardingGoal']) ?? null,
+    birthDate: birthDateKey(u.birthDate),
+    ageGroup: ageGroup(u),
     country: u.country ?? null,
   };
 }

@@ -213,3 +213,49 @@ describe('ClerkService.setBanned (HTTP mocked)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('ClerkService.deleteUser (HTTP mocked)', () => {
+  let fetchMock: jest.SpyInstance;
+  beforeEach(() => {
+    fetchMock = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchMock.mockRestore());
+
+  const svc = () => new ClerkService(cfg({ CLERK_SECRET_KEY: 'sk_test_x' }));
+
+  it('DELETEs /v1/users/{id}; a 404 (already gone) counts as done', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    await expect(svc().deleteUser('user_abc')).resolves.toEqual({
+      status: 'synced',
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${CLERK_API_URL}/v1/users/user_abc`);
+    expect(init.method).toBe('DELETE');
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 404 }));
+    await expect(svc().deleteUser('user_abc')).resolves.toEqual({
+      status: 'synced',
+    });
+  });
+
+  it('reports failures without throwing, and skips when it cannot call', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+    await expect(svc().deleteUser('user_abc')).resolves.toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('HTTP 500'),
+    });
+    fetchMock.mockRejectedValueOnce(new Error('ECONNRESET'));
+    await expect(svc().deleteUser('user_abc')).resolves.toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('ECONNRESET'),
+    });
+    fetchMock.mockClear();
+    await expect(
+      new ClerkService(cfg()).deleteUser('user_abc'),
+    ).resolves.toEqual({ status: 'skipped', reason: 'not_configured' });
+    await expect(svc().deleteUser('purged:1')).resolves.toEqual({
+      status: 'skipped',
+      reason: 'no_clerk_id',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

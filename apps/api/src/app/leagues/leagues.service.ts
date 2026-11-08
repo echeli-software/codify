@@ -13,6 +13,7 @@ import {
   nextTierAfter,
   previousWeekStart,
   promoteZoneSize,
+  isKnownAdult,
   type RollResult,
 } from '@codify/domain';
 import { levelFromXp } from '@codify/ui-core';
@@ -38,6 +39,12 @@ export interface LeagueMemberView {
   level: number;
   rank: number;
   isMe: boolean;
+  /**
+   * May the caller open this member's profile? False for minors (and
+   * members with no date of birth) who aren't the caller's friend — the
+   * row shows the name but must not link (docs/14 "Minors").
+   */
+  profileVisible: boolean;
   /** Avatar config + equipped items, so every row can render the avatar. */
   avatar: AvatarResponse;
 }
@@ -139,11 +146,20 @@ export class LeaguesService {
             displayName: true,
             totalXp: true,
             avatarConfig: true,
+            birthDate: true,
+            timezone: true,
           },
         },
       },
       orderBy: [{ weeklyXp: 'desc' }, { userId: 'asc' }],
     });
+    const friendships = await this.prisma.friendship.findMany({
+      where: { OR: [{ userAId: userId }, { userBId: userId }] },
+      select: { userAId: true, userBId: true },
+    });
+    const friends = new Set(
+      friendships.map((f) => (f.userAId === userId ? f.userBId : f.userAId)),
+    );
     // One query for the whole cohort's equipped items.
     const equipped = await this.prisma.equippedItem.findMany({
       where: { userId: { in: rows.map((r) => r.userId) } },
@@ -189,6 +205,8 @@ export class LeaguesService {
       level: levelFromXp(r.user.totalXp),
       rank: i + 1,
       isMe: r.userId === userId,
+      profileVisible:
+        r.userId === userId || friends.has(r.userId) || isKnownAdult(r.user),
       avatar: {
         config: (r.user.avatarConfig as Record<string, unknown> | null) ?? null,
         equipped: equippedByUser.get(r.userId) ?? {},

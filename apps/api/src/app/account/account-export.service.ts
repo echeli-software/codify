@@ -66,6 +66,7 @@ export class AccountExportService {
         reminderMinute: true,
         deletionRequestedAt: true,
         deletedAt: true,
+        birthDate: true,
         streak: {
           select: {
             currentDays: true,
@@ -351,6 +352,19 @@ export class AccountExportService {
       }),
     ]);
 
+    // Parent / guardian confirmations given for this account's checkouts.
+    const guardianConsents = await p.guardianConsent.findMany({
+      where,
+      orderBy: { confirmedAt: 'asc' },
+      select: {
+        guardianName: true,
+        guardianEmail: true,
+        purpose: true,
+        planPriceId: true,
+        confirmedAt: true,
+      },
+    });
+
     const friends = [
       ...friendshipsA.map((f) => ({ ...f.userB, since: f.since })),
       ...friendshipsB.map((f) => ({ ...f.userA, since: f.since })),
@@ -381,6 +395,7 @@ export class AccountExportService {
       notificationPreferences,
       certificates,
       analyticsEvents,
+      guardianConsents,
     };
   }
 }

@@ -75,6 +75,7 @@ export class UsersController {
       lastSeenFrom,
       lastSeenTo,
       subscriptionStatus: filters.subscriptionStatus,
+      ageGroup: filters.ageGroup,
       country: filters.country?.toUpperCase() || undefined,
     });
   }

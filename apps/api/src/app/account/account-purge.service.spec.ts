@@ -22,6 +22,7 @@ function fakeDb() {
     friendship: [],
     analyticsEvent: [],
     certificate: [],
+    guardianConsent: [],
     submission: [],
     aiSubmission: [],
     xpEvent: [],
@@ -89,6 +90,7 @@ function seed() {
       avatarConfig: { hair: 1 },
       referralCode: 'ANA1',
       quietHoursStart: 1320,
+      birthDate: new Date('2012-03-04T00:00:00Z'),
       deletedAt: old,
       deletionRequestedAt: old,
       purgedAt: null,
@@ -102,6 +104,7 @@ function seed() {
     db.t['notificationPreference'].push({ userId: id });
     db.t['analyticsEvent'].push({ userId: id });
     db.t['certificate'].push({ userId: id, recipientName: id });
+    db.t['guardianConsent'].push({ userId: id, guardianEmail: `p-${id}@x.io` });
     db.t['submission'].push({ userId: id, code: 'print(1)', output: 'x' });
     db.t['aiSubmission'].push({
       userId: id,
@@ -155,6 +158,7 @@ describe('AccountPurgeService', () => {
       avatarConfig: Prisma.DbNull,
       referralCode: null,
       quietHoursStart: null,
+      birthDate: null,
       purgedAt: now,
     });
     const of = (table: string, id: string) =>
@@ -165,6 +169,7 @@ describe('AccountPurgeService', () => {
       'notificationPreference',
       'analyticsEvent',
       'certificate',
+      'guardianConsent',
     ]) {
       expect(of(table, 'gone')).toHaveLength(0);
       expect(of(table, 'grace')).toHaveLength(1);
