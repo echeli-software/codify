@@ -9,6 +9,8 @@ import {
   type MasteryLevel,
   type SkillNodeState,
 } from './mastery.logic.js';
+import { ensureReviewCards } from './review-cards.js';
+import { GOLD_MIN_BOX, isDue } from './reviews.logic.js';
 
 export interface SkillNode {
   moduleId: string;
@@ -21,6 +23,16 @@ export interface SkillNode {
   prerequisiteModuleId: string | null;
 }
 
+/** Spaced-repetition review cards of the completed lessons (docs/10 §7). */
+export interface ReviewSummary {
+  /** Completed lessons with a review card (lessons with a quiz). */
+  cards: number;
+  /** Cards due now. */
+  due: number;
+  /** Cards in box ≥ 3 — GOLD needs all of them there. */
+  mastered: number;
+}
+
 export interface MasteryCourse {
   courseId: string;
   slug: string;
@@ -29,6 +41,7 @@ export interface MasteryCourse {
   lessonsCompleted: number;
   scorePct: number | null;
   mastery: MasteryLevel;
+  reviews: ReviewSummary;
   nodes: SkillNode[];
 }
 
@@ -43,12 +56,15 @@ export interface MasteryTopic {
   /** Average of the best quiz / exercise score per graded lesson. */
   scorePct: number | null;
   mastery: MasteryLevel;
+  reviews: ReviewSummary;
   courses: MasteryCourse[];
 }
 
 export interface MasteryView {
   topics: MasteryTopic[];
   totals: Record<MasteryLevel, number>;
+  /** Review cards due now across every topic (`GET /me/reviews`). */
+  reviewsDue: number;
 }
 
 interface CourseCalc {
@@ -59,9 +75,10 @@ interface CourseCalc {
 
 /**
  * `GET /me/mastery` (docs/10 §7): per-topic (category) mastery from
- * completed lessons and quiz / exercise results, and a skill tree per
- * published course (modules as nodes). Read-only; a handful of queries
- * regardless of catalog size.
+ * completed lessons, quiz / exercise results and spaced-repetition review
+ * cards, and a skill tree per published course (modules as nodes). A
+ * handful of queries regardless of catalog size; the only write is the
+ * lazy creation of missing review cards.
  */
 @Injectable()
 export class MasteryService {
@@ -70,7 +87,8 @@ export class MasteryService {
     @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
-  async forUser(userId: string): Promise<MasteryView> {
+  async forUser(userId: string, now = new Date()): Promise<MasteryView> {
+    await ensureReviewCards(this.prisma, userId);
     const [courses, categories] = await Promise.all([
       this.prisma.course.findMany({
         where: { status: 'PUBLISHED', deletedAt: null },
@@ -109,7 +127,7 @@ export class MasteryService {
         m.lessons.flatMap((l) => (l.exerciseId ? [l.exerciseId] : [])),
       ),
     );
-    const [done, quiz, exercise] = await Promise.all([
+    const [done, quiz, exercise, cardRows] = await Promise.all([
       this.prisma.progress.findMany({
         where: { userId, lessonId: { in: lessonIds } },
         select: { lessonId: true },
@@ -126,7 +144,26 @@ export class MasteryService {
             _max: { scorePct: true },
           })
         : Promise.resolve([]),
+      this.prisma.reviewCard.findMany({
+        where: { userId, lessonId: { in: lessonIds } },
+        select: { lessonId: true, box: true, dueAt: true },
+      }),
     ]);
+    const cards = new Map(cardRows.map((c) => [c.lessonId, c]));
+    /** Review boxes + summary of the completed lessons among `ids`. */
+    const reviewsOf = (ids: Iterable<string>) => {
+      const boxes: number[] = [];
+      const summary: ReviewSummary = { cards: 0, due: 0, mastered: 0 };
+      for (const id of ids) {
+        const card = completed.has(id) ? cards.get(id) : undefined;
+        if (!card) continue;
+        boxes.push(card.box);
+        summary.cards += 1;
+        if (isDue(card.dueAt, now)) summary.due += 1;
+        if (card.box >= GOLD_MIN_BOX) summary.mastered += 1;
+      }
+      return { boxes, summary };
+    };
     const completed = new Set(done.map((d) => d.lessonId));
     const quizBest = new Map(quiz.map((q) => [q.lessonId, q._max.scorePct]));
     const exBest = new Map(
@@ -181,6 +218,7 @@ export class MasteryService {
       const ids = c.modules.flatMap((m) => m.lessons.map((l) => l.id));
       const lessonsCompleted = ids.filter((id) => completed.has(id)).length;
       const scorePct = average(scores);
+      const reviews = reviewsOf(ids);
       calcs.set(c.id, {
         lessonIds: ids,
         scores,
@@ -195,7 +233,9 @@ export class MasteryService {
             lessonsTotal: ids.length,
             lessonsCompleted,
             scorePct,
+            reviewBoxes: reviews.boxes,
           }),
+          reviews: reviews.summary,
           nodes: modules.map((m, i) => ({
             ...m,
             state: states[i],
@@ -220,6 +260,7 @@ export class MasteryService {
         completed.has(id),
       ).length;
       const scorePct = average(parts.flatMap((p) => p.scores));
+      const reviews = reviewsOf(ids);
       return {
         categoryId: cat?.id ?? null,
         slug: cat?.slug ?? null,
@@ -234,7 +275,9 @@ export class MasteryService {
           lessonsTotal: ids.size,
           lessonsCompleted,
           scorePct,
+          reviewBoxes: reviews.boxes,
         }),
+        reviews: reviews.summary,
         courses: parts.map((p) => p.view),
       };
     };
@@ -258,6 +301,8 @@ export class MasteryService {
       GOLD: 0,
     };
     for (const t of topics) totals[t.mastery] += 1;
-    return { topics, totals };
+    // Each card once, even when its course sits in several topics.
+    const reviewsDue = reviewsOf(lessonIds).summary.due;
+    return { topics, totals, reviewsDue };
   }
 }

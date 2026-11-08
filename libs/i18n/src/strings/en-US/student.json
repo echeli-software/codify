@@ -1185,7 +1185,7 @@
     },
     "skills": {
       "title": "Skill tree",
-      "intro": "Topics light up as you complete lessons. Mastery grows with completion and your quiz and exercise scores.",
+      "intro": "Topics light up as you complete lessons. Mastery grows with completion, your quiz and exercise scores, and spaced reviews of what you learned.",
       "emptyTitle": "No topics yet",
       "emptyBody": "Start a course to grow your skill tree.",
       "totals": "Mastery summary",
@@ -1208,7 +1208,34 @@
         "AVAILABLE": "Up next · {total} lessons",
         "LOCKED": "Locked — finish {prereq} first"
       },
-      "legend": "Bronze: one lesson done. Silver: half the lessons with an average score of 70%+. Gold: every lesson with 90%+."
+      "legend": "Bronze: one lesson done. Silver: half the lessons with an average score of 70%+. Gold: every lesson with 90%+, and every quiz lesson passed in spaced reviews until it reaches box 3 of 5.",
+      "reviewsLine": "{mastered}/{cards} reviews solid",
+      "review": {
+        "title": "Review",
+        "due": "{count, plural, =0 {Nothing to review right now.} one {# review due} other {# reviews due}}",
+        "hint": "Quick quizzes on lessons you finished, spaced out over days. They build Gold mastery.",
+        "start": "Start review"
+      }
+    },
+    "review": {
+      "title": "Review",
+      "progress": "{n} of {total}",
+      "lesson": "Lesson",
+      "box": "Box {box} of 5",
+      "check": "Check answers",
+      "answerAll": "Answer every question to check.",
+      "next": "Next",
+      "finish": "Finish",
+      "passed": "{days, plural, one {Nice! Up to box {box} — see you tomorrow.} other {Nice! Up to box {box} — see you in # days.}}",
+      "missed": "Not quite ({pct}%). This one is back in box 1 for tomorrow.",
+      "mastery": "{topic}: {level}",
+      "doneTitle": "Review done",
+      "doneBody": "{passed} of {total} passed.",
+      "noneTitle": "All caught up",
+      "noneBody": "No reviews are due right now.",
+      "nextDue": "Next review {when}.",
+      "more": "Keep going",
+      "backToSkills": "Back to the skill tree"
     },
     "consent": {
       "title": "Cookies and analytics",

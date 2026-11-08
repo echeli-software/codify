@@ -19,6 +19,29 @@ describe('mastery rules (docs/10 §7)', () => {
     expect(lvl(10, null)).toBe('GOLD');
   });
 
+  it('GOLD also needs every completed lesson reviewed up to box 3', () => {
+    const lvl = (reviewBoxes: number[]) =>
+      masteryLevel({
+        lessonsTotal: 4,
+        lessonsCompleted: 4,
+        scorePct: 95,
+        reviewBoxes,
+      });
+    expect(lvl([3, 4, 5])).toBe('GOLD');
+    expect(lvl([])).toBe('GOLD'); // nothing to review (no quizzes)
+    // SILVER and BRONZE don't depend on reviews.
+    expect(lvl([3, 2])).toBe('SILVER');
+    expect(lvl([1])).toBe('SILVER');
+    expect(
+      masteryLevel({
+        lessonsTotal: 4,
+        lessonsCompleted: 1,
+        scorePct: 50,
+        reviewBoxes: [1],
+      }),
+    ).toBe('BRONZE');
+  });
+
   it('averages', () => {
     expect(average([])).toBeNull();
     expect(average([90, 71])).toBe(81);
@@ -100,9 +123,19 @@ describe('MasteryService.forUser', () => {
           { entityId: 'm1', locale: 'pt-BR', value: 'Básico' },
         ]),
       },
+      // No missing cards to create; l1 (a quiz) has one, due already.
+      $queryRaw: jest.fn(async () => []),
+      reviewCard: {
+        createMany: jest.fn(),
+        findMany: jest.fn(async () => [
+          { lessonId: 'l1', box: 2, dueAt: new Date('2026-11-01T00:00:00Z') },
+        ]),
+      },
     };
     const svc = new MasteryService(prisma as never);
-    const res = await svc.forUser('u1');
+    const res = await svc.forUser('u1', new Date('2026-11-08T00:00:00Z'));
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.reviewCard.createMany).not.toHaveBeenCalled();
     expect(res.topics).toHaveLength(2);
     const web = res.topics[0];
     expect(web).toEqual(
@@ -124,5 +157,81 @@ describe('MasteryService.forUser', () => {
       expect.objectContaining({ categoryId: null, mastery: 'NONE' }),
     );
     expect(res.totals).toEqual({ NONE: 1, BRONZE: 0, SILVER: 1, GOLD: 0 });
+    expect(web.reviews).toEqual({ cards: 1, due: 1, mastered: 0 });
+    expect(web.courses[0].reviews).toEqual({ cards: 1, due: 1, mastered: 0 });
+    expect(res.reviewsDue).toBe(1);
+  });
+
+  it('holds GOLD back until the reviews reach box 3', async () => {
+    const run = async (box: number) => {
+      const prisma = {
+        course: {
+          findMany: jest.fn(async () => [
+            {
+              id: 'c1',
+              slug: 'js',
+              sourceLocale: 'pt-BR',
+              categories: [{ categoryId: 'cat1' }],
+              modules: [
+                {
+                  id: 'm1',
+                  order: 1,
+                  lessons: [{ id: 'l1', type: 'QUIZ', exerciseId: null }],
+                },
+              ],
+            },
+          ]),
+        },
+        category: {
+          findMany: jest.fn(async () => [
+            { id: 'cat1', slug: 'web', name: 'Web', iconName: null },
+          ]),
+        },
+        progress: { findMany: jest.fn(async () => [{ lessonId: 'l1' }]) },
+        quizAttempt: {
+          groupBy: jest.fn(async () => [
+            { lessonId: 'l1', _max: { scorePct: 100 } },
+          ]),
+        },
+        submission: { groupBy: jest.fn(async () => []) },
+        contentTranslation: { findMany: jest.fn(async () => []) },
+        $queryRaw: jest.fn(async () => [
+          { lessonId: 'l1', completedAt: new Date('2026-11-01T00:00:00Z') },
+        ]),
+        reviewCard: {
+          createMany: jest.fn(async () => ({ count: 1 })),
+          findMany: jest.fn(async () => [
+            { lessonId: 'l1', box, dueAt: new Date('2026-12-01T00:00:00Z') },
+          ]),
+        },
+      };
+      const res = await new MasteryService(prisma as never).forUser(
+        'u1',
+        new Date('2026-11-08T00:00:00Z'),
+      );
+      return { res, prisma };
+    };
+    const early = await run(2);
+    expect(early.res.topics[0].mastery).toBe('SILVER');
+    expect(early.res.reviewsDue).toBe(0);
+    // The completed quiz lesson got its card lazily: box 1, due +1 day.
+    expect(early.prisma.reviewCard.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          userId: 'u1',
+          lessonId: 'l1',
+          box: 1,
+          dueAt: new Date('2026-11-02T00:00:00Z'),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    const later = await run(3);
+    expect(later.res.topics[0].mastery).toBe('GOLD');
+    expect(later.res.topics[0].reviews).toEqual({
+      cards: 1,
+      due: 0,
+      mastered: 1,
+    });
   });
 });

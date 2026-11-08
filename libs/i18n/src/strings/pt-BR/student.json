@@ -1185,7 +1185,7 @@
     },
     "skills": {
       "title": "Árvore de habilidades",
-      "intro": "Os temas acendem conforme você conclui lições. O domínio cresce com a conclusão e suas notas em quizzes e exercícios.",
+      "intro": "Os temas acendem conforme você conclui lições. O domínio cresce com a conclusão, suas notas em quizzes e exercícios e as revisões espaçadas do que você aprendeu.",
       "emptyTitle": "Nenhum tema ainda",
       "emptyBody": "Comece um curso para sua árvore crescer.",
       "totals": "Resumo do domínio",
@@ -1208,7 +1208,34 @@
         "AVAILABLE": "Próximo · {total} lições",
         "LOCKED": "Bloqueado — conclua {prereq} antes"
       },
-      "legend": "Bronze: uma lição concluída. Prata: metade das lições com nota média de 70%+. Ouro: todas as lições com 90%+."
+      "legend": "Bronze: uma lição concluída. Prata: metade das lições com nota média de 70%+. Ouro: todas as lições com 90%+, e cada lição com quiz aprovada nas revisões espaçadas até chegar à caixa 3 de 5.",
+      "reviewsLine": "{mastered}/{cards} revisões firmes",
+      "review": {
+        "title": "Revisão",
+        "due": "{count, plural, =0 {Nada para revisar agora.} one {# revisão pendente} other {# revisões pendentes}}",
+        "hint": "Quizzes rápidos das lições que você concluiu, espaçados ao longo dos dias. Eles levam ao domínio Ouro.",
+        "start": "Começar revisão"
+      }
+    },
+    "review": {
+      "title": "Revisão",
+      "progress": "{n} de {total}",
+      "lesson": "Lição",
+      "box": "Caixa {box} de 5",
+      "check": "Conferir respostas",
+      "answerAll": "Responda todas as perguntas para conferir.",
+      "next": "Próxima",
+      "finish": "Concluir",
+      "passed": "{days, plural, one {Boa! Subiu para a caixa {box} — até amanhã.} other {Boa! Subiu para a caixa {box} — até daqui a # dias.}}",
+      "missed": "Quase ({pct}%). Esta volta para a caixa 1 e aparece amanhã.",
+      "mastery": "{topic}: {level}",
+      "doneTitle": "Revisão concluída",
+      "doneBody": "{passed} de {total} aprovadas.",
+      "noneTitle": "Tudo em dia",
+      "noneBody": "Nenhuma revisão pendente agora.",
+      "nextDue": "Próxima revisão {when}.",
+      "more": "Continuar",
+      "backToSkills": "Voltar à árvore de habilidades"
     },
     "consent": {
       "title": "Cookies e análises",

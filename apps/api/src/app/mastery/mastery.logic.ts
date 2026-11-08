@@ -3,6 +3,8 @@
  * motivation"). Pure functions so the rules are unit-tested without a DB.
  */
 
+import { reviewsMastered } from './reviews.logic.js';
+
 export type MasteryLevel = 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD';
 export type SkillNodeState =
   | 'COMPLETED'
@@ -19,16 +21,21 @@ export const MASTERY_RULES = {
 
 /**
  * Mastery of a topic from completed lessons and quiz/exercise results:
- *   - GOLD: every lesson done, average best score ≥ 90 (or nothing graded);
+ *   - GOLD: every lesson done, average best score ≥ 90 (or nothing graded),
+ *     and every completed lesson's review card (spaced repetition,
+ *     `reviews.logic.ts`) in box ≥ 3;
  *   - SILVER: ≥ 50 % done, average best score ≥ 70 (or nothing graded);
  *   - BRONZE: at least one lesson done;
  *   - NONE otherwise.
  * `scorePct` is null when the learner has no graded attempt in the topic.
+ * `reviewBoxes` are the boxes of the completed lessons' review cards
+ * (lessons without a quiz have none and don't block GOLD).
  */
 export function masteryLevel(input: {
   lessonsTotal: number;
   lessonsCompleted: number;
   scorePct: number | null;
+  reviewBoxes?: readonly number[];
 }): MasteryLevel {
   const { lessonsTotal, lessonsCompleted, scorePct } = input;
   if (lessonsTotal <= 0 || lessonsCompleted <= 0) return 'NONE';
@@ -36,7 +43,8 @@ export function masteryLevel(input: {
   const scoreOk = (min: number) => scorePct === null || scorePct >= min;
   if (
     share >= MASTERY_RULES.GOLD.completion &&
-    scoreOk(MASTERY_RULES.GOLD.score)
+    scoreOk(MASTERY_RULES.GOLD.score) &&
+    reviewsMastered(input.reviewBoxes ?? [])
   )
     return 'GOLD';
   if (

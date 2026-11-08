@@ -447,3 +447,10 @@ export {
 } from './lib/admin-catalog.client.js';
 // Round 4 (SOC-2): per-pet names.
 export type { PetNameResponse } from './lib/items.client.js';
+// Round 4 (SOC-8): spaced-repetition reviews.
+export type {
+  ReviewSummary,
+  ReviewCard,
+  ReviewQueue,
+  ReviewResult,
+} from './lib/mastery.client.js';

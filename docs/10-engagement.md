@@ -266,8 +266,34 @@ GOLD = every lesson and ≥ 90 %, SILVER = ≥ 50 % of lessons and ≥ 70 %,
 BRONZE = ≥ 1 lesson (no graded attempt counts as meeting the score bar);
 each course carries module nodes `COMPLETED | IN_PROGRESS | AVAILABLE |
 LOCKED` (locked behind the previous unfinished module — shown, not
-enforced). Spaced-repetition checks are not built yet. Student page:
-`/skills` (linked from Profile).
+enforced). Student page: `/skills` (linked from Profile).
+
+**As built (spaced-repetition checks).** Every completed lesson whose
+content has a quiz block gets a `ReviewCard` (Leitner box 1–5) in box 1,
+due one day after the completion. Cards are created lazily and idempotently
+(`@@unique(userId, lessonId)`) whenever mastery or the review queue is read,
+so completions from any path — and those made before reviews existed — get
+one. Exercises, AI prompts and scenarios are not reviewed. `GET
+/me/reviews?limit=` (STUDENT, 1–20, default 10) → `{ dueCount, nextDueAt,
+items }`: due cards oldest first with lesson / course titles, the course's
+topics, `box`, `dueAt`, `reviews`, `lapses` and a `doc` holding only the
+lesson's quiz blocks in the caller's locale with the answer keys stripped
+(as `GET /lessons/:id`); lessons the learner can no longer open are left
+out. `POST /me/reviews/:lessonId { answers }` grades on the server with the
+quiz grader: ≥ 70 % moves the card up one box (max 5) and sets `dueAt` to
++1 / 3 / 7 / 16 / 35 days by the new box; a miss drops it to box 1 (+1 day)
+and counts a lapse. It returns the score, per-question feedback with the
+key (the card can't be retried until due again), the new card, the
+mastery of the lesson's topics and the remaining `dueCount`; 409
+`review.not_due` (not due, or a concurrent review won), 404
+`review.not_found`, 402 without access. Reviews pay no XP or coins and are
+not quiz attempts. Mastery rule: **GOLD additionally requires every
+completed lesson's review card in the topic (and course) to be in box ≥ 3**
+— two passed reviews at least four days apart; BRONZE and SILVER are
+unchanged. Topics and courses carry `reviews: { cards, due, mastered }` and
+the view `reviewsDue`. `/skills` shows a "Review" card with the due count;
+`/skills/review` runs the session one card at a time (shared lesson
+renderer, check → result with the new box and topic mastery → next).
 
 ## 8. Anti-pattern checklist (review before any feature ships)
 
@@ -436,7 +462,8 @@ Common props on every event (added by the client SDK): `platform`
 | `shop_view` / `item_purchase` / `item_equip`                       | Shop browsed / bought / equipped                      | `itemId`, `rarity`, `costCoins`, `equipOnPurchase`                                           |
 | `avatar_randomize` / `starter_pet_offered` / `starter_pet_claimed` | Dressing-room Random / gift sheet shown / gift opened | `itemId?`, `named?`                                                                          |
 | `friend_compare_viewed` / `activity_feed_opt_in`                   | Compare sheet opened / sharing toggled                | `optIn?`                                                                                     |
-| `skill_tree_viewed`                                                | Skill tree opened                                     | `topics`, `gold`                                                                             |
+| `skill_tree_viewed`                                                | Skill tree opened                                     | `topics`, `gold`, `reviewsDue`                                                               |
+| `review_completed`                                                 | Spaced-repetition review graded                       | `lessonId`, `passed`, `scorePct`, `box`                                                      |
 | `local_reminder_scheduled`                                         | Native backup reminder scheduled                      | `minute`                                                                                     |
 | `promo_banner_view`                                                | Campaign/promo banner shown                           | `multiplierId`, `kind`, `value`                                                              |
 

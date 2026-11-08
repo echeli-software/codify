@@ -14,6 +14,7 @@ import {
   IonContent,
 } from '@ionic/angular/standalone';
 import {
+  AppButton,
   AppCard,
   AppSkeleton,
   EmptyState,
@@ -49,7 +50,8 @@ const NODE_ICON: Record<SkillNodeState, IconName> = {
 
 /**
  * Skill tree (docs/10 §7): per-topic Bronze / Silver / Gold mastery from
- * completed lessons and quiz / exercise results, and per course an
+ * completed lessons, quiz / exercise results and spaced-repetition reviews
+ * (the "Review" card opens the due queue at /skills/review), and per course an
  * ordered path of modules that light up as they are completed; locked
  * nodes name the module that unlocks them. A real list structure (topic →
  * course → module) so screen readers get the hierarchy and state.
@@ -64,6 +66,7 @@ const NODE_ICON: Record<SkillNodeState, IconName> = {
     IonButtons,
     IonBackButton,
     IonContent,
+    AppButton,
     AppCard,
     AppSkeleton,
     EmptyState,
@@ -97,6 +100,40 @@ const NODE_ICON: Record<SkillNodeState, IconName> = {
                 [description]="'student.skills.emptyBody' | translate"
               />
             } @else {
+              <cdf-app-card padding="normal">
+                <section
+                  class="sk__review"
+                  aria-labelledby="sk-review"
+                  data-testid="review-entry"
+                  [attr.data-due]="v.reviewsDue ?? 0"
+                >
+                  <div class="sk__review-copy">
+                    <h2 id="sk-review">
+                      {{ 'student.skills.review.title' | translate }}
+                    </h2>
+                    <p class="sk__muted">
+                      {{
+                        'student.skills.review.due'
+                          | translate: { count: v.reviewsDue ?? 0 }
+                      }}
+                    </p>
+                    <p class="sk__muted">
+                      {{ 'student.skills.review.hint' | translate }}
+                    </p>
+                  </div>
+                  @if (v.reviewsDue) {
+                    <cdf-app-button
+                      kind="primary"
+                      size="sm"
+                      routerLink="/skills/review"
+                      data-testid="review-start"
+                    >
+                      {{ 'student.skills.review.start' | translate }}
+                    </cdf-app-button>
+                  }
+                </section>
+              </cdf-app-card>
+
               <ul
                 class="sk__totals"
                 [attr.aria-label]="'student.skills.totals' | translate"
@@ -154,6 +191,17 @@ const NODE_ICON: Record<SkillNodeState, IconName> = {
                                 {{
                                   'student.skills.score'
                                     | translate: { pct: t.scorePct }
+                                }}
+                              }
+                              @if (t.reviews?.cards) {
+                                ·
+                                {{
+                                  'student.skills.reviewsLine'
+                                    | translate
+                                      : {
+                                          mastered: t.reviews!.mastered,
+                                          cards: t.reviews!.cards,
+                                        }
                                 }}
                               }
                             </p>
@@ -267,6 +315,23 @@ const NODE_ICON: Record<SkillNodeState, IconName> = {
         color: var(--cdf-color-text-muted);
         font-size: var(--cdf-font-size-sm);
         margin: 0;
+      }
+      .sk__review {
+        display: flex;
+        gap: var(--cdf-space-3);
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .sk__review h2 {
+        margin: 0 0 4px;
+        font-size: var(--cdf-font-size-md);
+      }
+      .sk__review-copy {
+        flex: 1 1 240px;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
       }
       .sk__totals {
         list-style: none;
@@ -397,6 +462,7 @@ export class SkillsPage {
       this.telemetry.track('skill_tree_viewed', {
         topics: v.topics.length,
         gold: v.totals.GOLD,
+        reviewsDue: v.reviewsDue ?? 0,
       });
     } catch (err) {
       this.errorKey.set(errorMessageKey(err));
