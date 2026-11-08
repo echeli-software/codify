@@ -122,6 +122,7 @@ Images: `apps/api/Dockerfile` (multi-stage: `pnpm fetch` + offline install from 
 - **Postgres**: DO Managed daily snapshots + 7-day PITR.
 - **R2 assets**: versioned bucket; lifecycle rule prunes old versions after 90 days.
 - **Long-term DB dumps**: weekly `pg_dump` to R2 cold storage, 90-day retention. Encrypted with `age` using a public key whose private key lives in 1Password.
+  - As built: `infra/backup/pg-backup.sh` (`pg_dump -Fc | age -r $AGE_RECIPIENTS | aws s3 cp` to R2 bucket `codify-backups/<env>/`, size check, prune > `BACKUP_RETENTION_DAYS`, optional heartbeat URL), packaged as `codify/pg-backup:16` and scheduled by `/etc/cron.d/codify-pg-backup` (Sundays 03:23 UTC, cloud-init on app + staging droplets). Values in `/etc/codify/backup.env` (mode 600, from 1Password — nothing in the repo). Restore notes: `infra/backup/README.md`.
 
 Restore drill: quarterly. Restore latest dump to a throwaway DB, run `prisma db pull` and basic queries to verify.
 

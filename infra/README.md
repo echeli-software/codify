@@ -188,7 +188,10 @@ they are missing, so forks and partially configured repos stay green.
 ## 10. Backups & drills
 
 - Managed Postgres: daily snapshots + 7-day PITR (DO default).
-- Weekly encrypted dump to R2 (docs/13 §11) — cron on `vps-app-01`:
-  `pg_dump "$DATABASE_URL" | age -r <pubkey> | rclone rcat r2:codify-backups/db-$(date +%F).sql.age`.
+- Weekly encrypted dump to R2 (docs/13 §11): `infra/backup/` — a
+  `pg_dump | age | R2` script in a small image, run Sundays 03:23 UTC by
+  `/etc/cron.d/codify-pg-backup` (installed by cloud-init on the app and
+  staging droplets; idle until `/etc/codify/backup.env` exists). Setup,
+  retention and restore steps: [`infra/backup/README.md`](./backup/README.md).
 - Quarterly restore drill: restore into a throwaway cluster, run
   `DATABASE_URL=… node tools/scripts/drift-check.mjs`, spot-check queries.

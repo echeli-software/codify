@@ -34,6 +34,16 @@ write_files:
       enabled = true
       maxretry = 5
       bantime = 1h
+%{ if role != "judge0" ~}
+  # Weekly encrypted pg_dump → R2 (infra/backup, docs/13 §11). No-op until
+  # /etc/codify/backup.env is created.
+  - path: /etc/cron.d/codify-pg-backup
+    permissions: "0644"
+    content: |
+      SHELL=/bin/bash
+      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      23 3 * * 0 root [ -f /etc/codify/backup.env ] && docker run --rm --network host --env-file /etc/codify/backup.env codify/pg-backup:16 >> /var/log/codify-pg-backup.log 2>&1
+%{ endif ~}
   - path: /etc/docker/daemon.json
     content: |
       {

@@ -1,0 +1,5 @@
+# /etc/cron.d/codify-pg-backup — weekly encrypted pg_dump to R2 (docs/13 §11).
+# Sundays 03:23 UTC; skipped until /etc/codify/backup.env exists.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+23 3 * * 0 root [ -f /etc/codify/backup.env ] && docker run --rm --network host --env-file /etc/codify/backup.env codify/pg-backup:16 >> /var/log/codify-pg-backup.log 2>&1
