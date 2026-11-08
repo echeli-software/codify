@@ -22,8 +22,12 @@ describe('AuditService', () => {
       diff: { displayName: 'New' },
     });
     expect(created).toHaveLength(1);
-    expect((created[0] as { data: { actorId: string } }).data.actorId).toBe('u1');
-    expect((created[0] as { data: { actorRole: string } }).data.actorRole).toBe('ADMIN');
+    expect((created[0] as { data: { actorId: string } }).data.actorId).toBe(
+      'u1',
+    );
+    expect((created[0] as { data: { actorRole: string } }).data.actorRole).toBe(
+      'ADMIN',
+    );
     expect((created[0] as { data: { action: string } }).data.action).toBe(
       'user.update_self',
     );

@@ -75,12 +75,20 @@ export const envSchema = z
     /** Comma list of allowed browser origins. Dev default: localhost apps. */
     CORS_ORIGINS: commaList,
     /**
-     * Express `trust proxy` setting. A hop count (`1` = Cloudflare →
-     * API, `2` = Cloudflare → Coolify proxy → API), `true`/`false`, or a
-     * comma list of trusted subnets. Default: 1 in production, loopback
-     * otherwise.
+     * Express `trust proxy` setting: which hops in front of the API may set
+     * X-Forwarded-For. A hop count, `true`/`false`, or a comma list of
+     * subnets / proxy-addr names. Default in production: private networks
+     * (`loopback, linklocal, uniquelocal` — the Coolify proxy on the Docker
+     * network), so `req.ip` is the Cloudflare edge; `loopback` otherwise.
      */
     TRUST_PROXY: optionalString,
+    /**
+     * Believe `CF-Connecting-IP` when the request came from a Cloudflare
+     * edge address (see common/client-ip.ts). Default true.
+     */
+    TRUST_CLOUDFLARE: boolFlag(true),
+    /** Comma list of CIDRs replacing the built-in Cloudflare edge ranges. */
+    CLOUDFLARE_IP_RANGES: commaList,
 
     // ─── Observability ───────────────────────────────────────────────────
     SENTRY_DSN: z.url().optional(),

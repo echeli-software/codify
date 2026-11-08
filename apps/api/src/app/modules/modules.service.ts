@@ -134,7 +134,10 @@ export class ModulesService {
    * (courseId, order) unique index is free for a new module. Every read
    * path filters `Module.deletedAt` / `Lesson.deletedAt`.
    */
-  async remove(actor: ApiUser, id: string): Promise<void> {
+  async remove(
+    actor: ApiUser,
+    id: string,
+  ): Promise<{ courseId: string; order: number; lessonCount: number }> {
     const target = await this.prisma.module.findFirst({
       where: { id, deletedAt: null },
       include: { course: true },
@@ -143,7 +146,7 @@ export class ModulesService {
     await this.requireCourseAccess(actor, target.courseId, 'write');
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const { count } = await this.prisma.$transaction(async (tx) => {
           const now = new Date();
           const lowest = await tx.module.findFirst({
             where: { courseId: target.courseId },
@@ -157,12 +160,16 @@ export class ModulesService {
               order: Math.min(lowest?.order ?? 0, 0) - 1,
             },
           });
-          await tx.lesson.updateMany({
+          return tx.lesson.updateMany({
             where: { moduleId: id, deletedAt: null },
             data: { deletedAt: now },
           });
         });
-        return;
+        return {
+          courseId: target.courseId,
+          order: target.order,
+          lessonCount: count,
+        };
       } catch (err) {
         // Two concurrent deletes in one course can pick the same parking
         // slot; the loser retries with a fresh minimum.

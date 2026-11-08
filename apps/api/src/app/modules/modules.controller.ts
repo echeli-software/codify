@@ -8,9 +8,7 @@ import {
   Param,
   Patch,
   Post,
-  Req,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -59,7 +57,6 @@ export class ModulesController {
     @CurrentUser() actor: ApiUser,
     @Param('courseId') courseId: string,
     @Body() body: CreateModuleDto,
-    @Req() req: Request,
   ): Promise<ModuleResponse> {
     const created = await this.modules.create(actor, courseId, body);
     void this.audit.record(actor, {
@@ -67,8 +64,6 @@ export class ModulesController {
       entity: 'Module',
       entityId: created.id,
       diff: { ...body, courseId },
-      ip: req.ip ?? null,
-      userAgent: (req.headers['user-agent'] as string) ?? null,
     });
     return created;
   }
@@ -79,7 +74,6 @@ export class ModulesController {
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
     @Body() body: UpdateModuleDto,
-    @Req() req: Request,
   ): Promise<ModuleResponse> {
     const updated = await this.modules.update(actor, id, body);
     void this.audit.record(actor, {
@@ -87,8 +81,6 @@ export class ModulesController {
       entity: 'Module',
       entityId: id,
       diff: { ...body },
-      ip: req.ip ?? null,
-      userAgent: (req.headers['user-agent'] as string) ?? null,
     });
     return updated;
   }
@@ -99,15 +91,13 @@ export class ModulesController {
   async remove(
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
-    @Req() req: Request,
   ): Promise<void> {
-    await this.modules.remove(actor, id);
+    const before = await this.modules.remove(actor, id);
     void this.audit.record(actor, {
       action: 'module.delete',
       entity: 'Module',
       entityId: id,
-      ip: req.ip ?? null,
-      userAgent: (req.headers['user-agent'] as string) ?? null,
+      before,
     });
   }
 }

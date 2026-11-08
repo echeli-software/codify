@@ -140,7 +140,7 @@ describe('AppConfigService', () => {
     expect(new AppConfigService(parseEnv(PROD_OK)).clerkEnabled).toBe(true);
   });
 
-  it('parses TRUST_PROXY (hops, booleans, subnet lists) and defaults to 1 hop in production', () => {
+  it('parses TRUST_PROXY (hops, booleans, subnet lists) and defaults to private networks in production', () => {
     const tp = (v?: string) =>
       new AppConfigService(
         parseEnv({ DATABASE_URL: DB, ...(v ? { TRUST_PROXY: v } : {}) }),
@@ -149,7 +149,9 @@ describe('AppConfigService', () => {
     expect(tp('true')).toBe(true);
     expect(tp('false')).toBe(false);
     expect(tp('loopback, 10.0.0.0/8')).toBe('loopback, 10.0.0.0/8');
-    expect(new AppConfigService(parseEnv(PROD_OK)).trustProxy).toBe(1);
+    expect(new AppConfigService(parseEnv(PROD_OK)).trustProxy).toBe(
+      'loopback, linklocal, uniquelocal',
+    );
   });
 });
 

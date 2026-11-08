@@ -1,14 +1,13 @@
 import { normalizeIp } from '@nestjs/throttler';
+import { clientIp, type ClientIpRequest } from '../client-ip.js';
 
-interface TrackableRequest {
-  ip?: string;
-  socket?: { remoteAddress?: string };
+interface TrackableRequest extends ClientIpRequest {
   user?: { userId?: string };
 }
 
-/** Client IP (Express resolves it through `trust proxy`), IPv6 bucketed by /64. */
+/** Client IP (`clientIp()`: Cloudflare-aware), IPv6 bucketed by /64. */
 export function ipTracker(req: TrackableRequest): string {
-  const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+  const ip = clientIp(req) ?? 'unknown';
   return `ip:${normalizeIp(ip)}`;
 }
 

@@ -10,6 +10,9 @@ import { jobsEnabled, loadEnv } from './env.js';
  * Construct with an explicit `Env` in unit tests:
  *   new AppConfigService(parseEnv({ DATABASE_URL: 'postgres://…' }))
  */
+/** Coolify's proxy reaches the API over the private Docker network. */
+export const PRODUCTION_TRUST_PROXY = 'loopback, linklocal, uniquelocal';
+
 @Injectable()
 export class AppConfigService {
   readonly env: Env;
@@ -49,7 +52,8 @@ export class AppConfigService {
   /** Value for Express' `trust proxy` setting. */
   get trustProxy(): boolean | number | string {
     const raw = this.env.TRUST_PROXY;
-    if (raw === undefined) return this.isProduction ? 1 : 'loopback';
+    if (raw === undefined)
+      return this.isProduction ? PRODUCTION_TRUST_PROXY : 'loopback';
     if (raw === 'true') return true;
     if (raw === 'false') return false;
     if (/^\d+$/.test(raw)) return Number(raw);

@@ -141,6 +141,13 @@ export class AccountPurgeService {
         where: mine,
         data: { response: '', breakdownJson: [] },
       });
+      // The user's own audit rows keep the action trail but lose the
+      // network identifiers (docs/14 §11–12); rows by staff about this
+      // user carry the staff member's IP and are kept.
+      await tx.auditLog.updateMany({
+        where: { actorId: userId },
+        data: { ip: null, userAgent: null },
+      });
       await tx.auditLog.create({
         data: {
           action: 'user.purged',

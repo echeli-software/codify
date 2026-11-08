@@ -65,6 +65,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
   - AI-prompt grading: 5/min/user, 60/day/user.
   - Code submission: 1/3s/user, 200/day/user.
 - Exceeded → 429 with `Retry-After`.
+- **Client IP** (`apps/api/src/app/common/client-ip.ts`, one function for rate-limit trackers, audit rows and the request context): production chain is client → Cloudflare → Coolify proxy → API. Express resolves `req.ip` through `TRUST_PROXY` (default in production: `loopback, linklocal, uniquelocal`, i.e. the Coolify proxy on the Docker network), which yields the Cloudflare edge; only when that address is inside the Cloudflare ranges (built-in list, `CLOUDFLARE_IP_RANGES` overrides) is `CF-Connecting-IP` used. A request that reaches the origin directly can't spoof its IP with the header. `TRUST_CLOUDFLARE=false` disables the header entirely. Logs never carry IPs (§17).
 
 ## 8. Idempotency
 
@@ -107,6 +108,8 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
   - Translation marked complete.
   - Stripe configuration sync.
 - Includes actor, IP, user-agent, before/after diff (where applicable).
+  - IP and user agent are stamped automatically on every `AuditService.record` call from the request context (`RequestContextMiddleware`, AsyncLocalStorage; UA truncated to 512 chars) — controllers don't pass them; jobs (no request) record none. `record(actor, { before, after })` stores them as `diff.before` / `diff.after`.
+  - The account purge (§13.1) nulls `ip` / `userAgent` on the purged user's own audit rows (`actorId` = user); staff rows about the user keep the staff member's IP.
 - Read-only in admin UI; export to S3 for long-term retention.
 
 ## 12. PII & data minimization

@@ -37,6 +37,7 @@ import { TranslationsModule } from './translations/translations.module.js';
 
 import { AppConfigModule } from './config/config.module.js';
 import { PlatformModule } from './common/platform.module.js';
+import { RequestContextMiddleware } from './common/request-context.js';
 import { OpsModule } from './ops/ops.module.js';
 import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
 import { AccountModule } from './account/account.module.js';
@@ -90,6 +91,8 @@ export class AppModule implements NestModule {
     // AuthMiddleware runs on every request, populating `req.user` when a
     // valid Bearer token is present. The RolesGuard (bound globally via
     // APP_GUARD) enforces `@Public()` / `@Roles(...)` rules.
-    consumer.apply(AuthMiddleware).forRoutes('*');
+    // RequestContextMiddleware first: client IP / user agent / request id
+    // for audit rows (AsyncLocalStorage, docs/14 §11).
+    consumer.apply(RequestContextMiddleware, AuthMiddleware).forRoutes('*');
   }
 }

@@ -118,6 +118,26 @@ function seed() {
   );
   db.t['friendRequest'].push({ senderId: 'live', receiverId: 'gone' });
   db.t['friendNudge'].push({ senderId: 'gone', receiverId: 'live' });
+  db.t['auditLog'].push(
+    {
+      actorId: 'gone',
+      action: 'user.deleted',
+      ip: '10.0.0.1',
+      userAgent: 'UA',
+    },
+    {
+      actorId: 'admin',
+      action: 'user.suspended',
+      ip: '10.0.0.9',
+      userAgent: 'UA',
+    },
+    {
+      actorId: 'live',
+      action: 'user.update_self',
+      ip: '10.0.0.3',
+      userAgent: 'UA',
+    },
+  );
   return db;
 }
 
@@ -167,6 +187,10 @@ describe('AccountPurgeService', () => {
     expect(of('coinTransaction', 'gone')).toHaveLength(1);
     expect(of('payment', 'gone')).toHaveLength(1);
     expect(db.t['auditLog']).toEqual([
+      // The user's own rows lose IP + user agent; staff rows are kept.
+      expect.objectContaining({ actorId: 'gone', ip: null, userAgent: null }),
+      expect.objectContaining({ actorId: 'admin', ip: '10.0.0.9' }),
+      expect.objectContaining({ actorId: 'live', ip: '10.0.0.3' }),
       expect.objectContaining({ action: 'user.purged', entityId: 'gone' }),
     ]);
     // Grace-period and live accounts untouched.
