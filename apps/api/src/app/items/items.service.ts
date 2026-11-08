@@ -519,29 +519,24 @@ export class ItemsService {
     };
   }
 
-  async saveConfig(
-    userId: string,
-    config: Record<string, unknown>,
-  ): Promise<AvatarResponse> {
-    // AvatarConfig patch (docs/08 §5): known keys, curated values only.
   /**
    * Save the avatar config. Offline edits (docs/16 §8) pass the device
    * `clientTimestamp`: last write wins against `User.avatarUpdatedAt`, so a
    * change synced late never overwrites a newer one (`stale: true`).
    */
+  async saveConfig(
+    userId: string,
+    config: Record<string, unknown>,
+    clientTimestamp?: string | null,
+  ): Promise<AvatarResponse> {
+    // AvatarConfig patch (docs/08 §5): known keys, curated values only.
     const valid = validateAvatarConfig(config);
     if (!valid.ok)
       throw new BadRequestException({
-    clientTimestamp?: string | null,
         code: 'avatar.config_invalid',
         message: 'Invalid avatar settings',
         errors: valid.errors,
       });
-    const stored = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { avatarConfig: true },
-    });
-    // The patch is merged over the stored (normalized) config.
     const at = avatarWriteTime(clientTimestamp);
     if (clientTimestamp) {
       const current = await this.prisma.user.findUnique({
@@ -551,6 +546,11 @@ export class ItemsService {
       if (isStaleWrite(at, current?.avatarUpdatedAt))
         return { ...(await this.getAvatar(userId)), stale: true };
     }
+    const stored = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { avatarConfig: true },
+    });
+    // The patch is merged over the stored (normalized) config.
     const merged = {
       ...normalizeAvatarConfig(stored.avatarConfig),
       ...valid.value,
@@ -574,13 +574,8 @@ export class ItemsService {
     userId: string,
     slot: ItemSlot,
     itemId: string | null | undefined,
-  ): Promise<AvatarResponse> {
-    if (!itemId) {
-      await this.prisma.equippedItem.deleteMany({ where: { userId, slot } });
-      return this.getAvatar(userId);
-    }
     clientTimestamp?: string | null,
-    const owned = await this.prisma.userItem.findUnique({
+  ): Promise<AvatarResponse> {
     const at = avatarWriteTime(clientTimestamp);
     if (clientTimestamp) {
       const row = await this.prisma.equippedItem.findUnique({
@@ -590,6 +585,11 @@ export class ItemsService {
       if (isStaleWrite(at, row?.updatedAt))
         return { ...(await this.getAvatar(userId)), stale: true };
     }
+    if (!itemId) {
+      await this.prisma.equippedItem.deleteMany({ where: { userId, slot } });
+      return this.getAvatar(userId);
+    }
+    const owned = await this.prisma.userItem.findUnique({
       where: { userId_itemId: { userId, itemId } },
       include: { item: true },
     });
