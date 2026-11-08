@@ -162,6 +162,16 @@ lower bound.
 3. Webhook `checkout.session.async_payment_succeeded` confirms (usually < 5 min).
 4. Subscription created `ACTIVE` for one year, not renewing (`cancelAtPeriodEnd`); the renewal reminder below prompts the next PIX payment.
 
+### Guardian step (minors, launch decision 2026-11)
+
+**As built.** Users aged 12–17 (docs/14 §13.2) need a parent or guardian's confirmation before a **web** checkout:
+
+1. `GET /api/billing/guardian-consent?planPriceId=` returns `{ required, ageGroup, consent }` for the subscription page.
+2. `POST /api/billing/guardian-consent` `{ planPriceId, guardianName, guardianEmail, confirmed: true }` (STUDENT). The tick box reads "I am 18 or older and this user's parent or guardian". The API stores a `GuardianConsent` row (`purpose: web_checkout`, plan price, client IP from `clientIp()`, user agent) and emails the guardian a one-off notice in the student's locale (`EmailService.sendNotice`, `billing/guardian-consent-email.ts`). The notice names the student, plan and price, and says how to object; it has no unsubscribe link because the guardian is not a subscriber. Refusals: 409 `GUARDIAN_CONSENT_NOT_NEEDED` (adult), 403 `BIRTH_DATE_REQUIRED`, 400 `GUARDIAN_EMAIL_IS_STUDENT`, 429 `GUARDIAN_CONSENT_RATE_LIMITED` (5 per day, since each one emails someone). Audited `billing.guardian_consent` (no name / email in the audit row).
+3. `POST /api/billing/checkout-session` lets adults through. A minor needs a confirmation **for that plan price** from the last 24 h (403 `GUARDIAN_CONSENT_REQUIRED`). An account with no date of birth gets 403 `BIRTH_DATE_REQUIRED`.
+
+Store purchases (App Store / Google Play) don't come through here: the native app shows minors an "ask a parent" note, and the stores' family controls apply. The confirmations are part of the data export, and the purge deletes them.
+
 ### Renewal
 
 - Card: Stripe auto-charges; on success → `invoice.paid` → continue. On fail → `invoice.payment_failed` → status `PAST_DUE`; Stripe smart retries; we email + push.

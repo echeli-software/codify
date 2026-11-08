@@ -303,6 +303,8 @@ page has a Country select (the countries present, by localized name, plus
 "Unknown") and a Country column; the user Profile tab shows the country
 with a note that it comes from the IP address.
 
+**As built (Phase 14, age).** `GET /api/users?ageGroup=minor|adult|none` filters on `User.birthDate` (UTC day). List rows and the detail carry `ageGroup` (null = not given); staff never see the date itself. The Users page has an "Age group" select (Under 18 / Adult / Not given) and column. The Profile tab shows the age group. The Account tab has an **Age** panel with "Correct date of birth" (ADMIN, SUPPORT): a date and an optional reason, then a typed confirmation with the user's email. It calls `POST /api/admin/users/:id/birth-date` (audited `user.birth_date_corrected`, age groups only). A date under 12 warns that the account will be deleted at once; afterwards the page returns to Users (docs/14 §13.2).
+
 ## 11. Out of scope (initial)
 
 - Multi-author collaboration on a single lesson (locking only — last write wins with autosave conflict warning).

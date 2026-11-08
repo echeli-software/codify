@@ -63,6 +63,7 @@ Notifications bell (top-right on desktop, `Today` header on mobile) opens an in-
 
 ### Onboarding (first launch only)
 
+0. **Date of birth** (launch decision 2026-11, 12+): when the account has none, onboarding opens with "When were you born?". It can't be skipped.
 1. **Welcome carousel** (3 slides, swipeable; auto-advance on tap).
 2. **Goal picker**: "Why are you here?" — career change / new tech / AI tooling / soft skills. Recorded; influences first-recommended courses.
 3. **Track picker**: top-3 recommended courses based on goal. Pick one to start (others suggested later).
@@ -70,7 +71,9 @@ Notifications bell (top-right on desktop, `Today` header on mobile) opens an in-
 5. **First lesson**: launches the first lesson of the chosen course; lesson is short and winnable.
 6. **First reward**: lesson complete → coin + XP shower → unlock first cosmetic item (free starter pet) → invite to name pet → return to Today.
 
-Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed at any step except sign-in.
+Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed at any step except sign-in and date of birth.
+
+**As built — date of birth (docs/14 "Minors").** `cdf-birth-date-form` has three labelled fields (day, month name, year) in one fieldset, in the locale's order (pt-BR dd/mm/aaaa, en-US mm/dd/yyyy). It has no date picker, and errors are announced with `role="alert"`. It sends `PUT /me/birth-date` once. The date is checked on the device first and then by the API on the account's time zone. Under 12, the API deletes the account at once and answers 403 `AGE_BELOW_MINIMUM`. The app then ends the session (`AppSessionService.endDeletedAccount`: auth first, then the local queue, identity cache and downloads, with no telemetry) and shows `/account/too-young`, "Codify is for ages 12 and up", signed out. Existing users with no date get the same form as a one-time blocking modal `<dialog>` over the shell (`cdf-birth-date-gate`; Escape does not close it). On Today it waits while first-run onboarding decides or shows, because onboarding asks first.
 
 ### Today
 
@@ -171,16 +174,19 @@ Each lesson type has a dedicated runner:
 - Leaderboard table (virtualized, current user pinned to bottom or own row highlighted).
 - Promotion / relegation thresholds visualized.
 - Past weeks history.
+- As built (docs/14 "Minors"): every row shows the display name. Members with `profileVisible: false` (minors, or members with no date of birth, who aren't the viewer's friend) get no link to their profile.
 
 ### Friends
 
 - Friends list with quick "nudge" (sends `FRIEND_NUDGE` notification) and "compare" (mini side-by-side stats).
 - Add by email / by share link (`?ref=<userId>`).
 - Friend requests inbox.
+- As built (docs/14 "Minors"): the "share my activity" toggle is disabled for users under 18 (or with no date of birth), with the reason shown. The API refuses the opt-in with 403 `AGE_RESTRICTED`.
 
 ### Profile
 
 - Public profile preview (what others see).
+- As built (docs/14 "Minors"): a minor's profile (`GET /users/:id/profile`) is visible only to them and their friends. Anyone else gets the same 404 as for an unknown user, and the app shows "not found".
 - Stats: total XP, level, longest streak, courses completed, badges, items owned.
 - Achievements / badges grid.
 
@@ -191,6 +197,7 @@ Each lesson type has a dedicated runner:
 - Manage payment method → Stripe Customer Portal in `<ion-modal>` with in-app browser fallback.
 - Billing history (`GET /billing/payments`): date, amount, method (card / PIX / boleto / store), status (paid / failed / refunded / partially refunded) and the receipt link, paged.
 - Cancel subscription (no dark patterns: single-screen confirm with "you'll keep access until [date]").
+- As built (docs/09 "Guardian step"): on the web, a minor's checkout sheet shows the parent / guardian confirmation (`cdf-guardian-consent`) first, and "Continue to payment" stays disabled until it is recorded. In the native apps, minors see an "ask a parent" note and the stores' family controls apply.
 
 ### Settings
 
