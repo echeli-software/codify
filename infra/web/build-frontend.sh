@@ -6,7 +6,11 @@
 #   infra/web/build-frontend.sh <admin|student> <api-url> [pages|nginx|none]
 #
 # Env: CDN_ORIGIN, CLERK_ORIGIN (optional, see security-headers.mjs);
-#      CLERK_PUBLISHABLE_KEY (optional; unset = dev role-picker login).
+#      CLERK_PUBLISHABLE_KEY (optional; unset = dev role-picker login);
+#      SENTRY_DSN_STUDENT / SENTRY_DSN_ADMIN (optional, else SENTRY_DSN; the
+#      app's Sentry project DSN — unset = no Sentry, the SDK chunk is never
+#      loaded); APP_VERSION (optional; release tag for
+#      Sentry/analytics, default: package version + short git sha).
 # Output: dist/apps/<app>/browser (+ _headers for pages,
 #         dist/apps/<app>/security-headers.conf for nginx).
 set -euo pipefail
@@ -25,6 +29,20 @@ defines=("--define.CODIFY_API_URL='\"${api_url}\"'")
 if [ -n "${CLERK_PUBLISHABLE_KEY:-}" ]; then
   defines+=("--define.CODIFY_CLERK_PUBLISHABLE_KEY='\"${CLERK_PUBLISHABLE_KEY}\"'")
 fi
+dsn_var="SENTRY_DSN_$(echo "$app" | tr '[:lower:]' '[:upper:]')"
+sentry_dsn="${!dsn_var:-${SENTRY_DSN:-}}"
+if [ -n "$sentry_dsn" ]; then
+  case "$sentry_dsn" in https://*) ;; *) echo "${dsn_var} / SENTRY_DSN must be an https:// DSN" >&2; exit 2 ;; esac
+  defines+=("--define.CODIFY_SENTRY_DSN='\"${sentry_dsn}\"'")
+fi
+app_version="${APP_VERSION:-}"
+if [ -z "$app_version" ]; then
+  pkg_version="$(node -p "require('./package.json').version" 2>/dev/null || echo 0.0.0)"
+  sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  app_version="${pkg_version}${sha:++${sha}}"
+fi
+case "$app_version" in *[!A-Za-z0-9._+-]*) echo "APP_VERSION has unsupported characters" >&2; exit 2 ;; esac
+defines+=("--define.CODIFY_APP_VERSION='\"${app_version}\"'")
 pnpm exec nx run "${app}:build:production" --parallel=1 "${defines[@]}"
 
 out="dist/apps/${app}/browser"

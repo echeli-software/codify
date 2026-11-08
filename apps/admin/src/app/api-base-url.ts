@@ -27,3 +27,24 @@ export const CLERK_PUBLISHABLE_KEY: string | undefined =
   CODIFY_CLERK_PUBLISHABLE_KEY
     ? CODIFY_CLERK_PUBLISHABLE_KEY
     : undefined;
+
+/** Reads a string build define, treating unset/empty as undefined. */
+function defined(value: string | undefined): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+/**
+ * Sentry DSN of the admin project (`--define=CODIFY_SENTRY_DSN="'https://…'"`,
+ * set by infra/web/build-frontend.sh from SENTRY_DSN). Unset = no Sentry.
+ */
+declare const CODIFY_SENTRY_DSN: string | undefined;
+export const SENTRY_DSN: string | undefined = defined(
+  typeof CODIFY_SENTRY_DSN === 'string' ? CODIFY_SENTRY_DSN : undefined,
+);
+
+/** Release reported to Sentry (`--define=CODIFY_APP_VERSION="'…'"`), else `dev`. */
+declare const CODIFY_APP_VERSION: string | undefined;
+export const APP_VERSION: string =
+  defined(
+    typeof CODIFY_APP_VERSION === 'string' ? CODIFY_APP_VERSION : undefined,
+  ) ?? 'dev';

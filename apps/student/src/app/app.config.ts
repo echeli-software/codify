@@ -24,6 +24,8 @@ import { StudentLocalePersistence } from './platform/locale-persistence';
 import { isNativeRuntime } from './platform/runtime';
 import { accountStateInterceptor } from './pages/account/account-state';
 import { translationFallbackInterceptor } from './platform/translation-fallback.interceptor';
+import { MissingTranslationHandler } from '@ngx-translate/core';
+import { ReportingMissingTranslationHandler } from './platform/missing-translation';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -59,6 +61,11 @@ export const appConfig: ApplicationConfig = {
         STUDENT_PLATFORM_STRINGS,
       ],
     }),
+    // docs/11 §2: missing keys → dev console / rate-limited Sentry warning.
+    {
+      provide: MissingTranslationHandler,
+      useClass: ReportingMissingTranslationHandler,
+    },
     // docs/11 §6: persist the chosen locale on the user (PATCH /me).
     { provide: LOCALE_PERSISTENCE, useExisting: StudentLocalePersistence },
     // docs/11 §3: content translations — API online, downloads offline.
