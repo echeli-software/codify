@@ -40,10 +40,16 @@ export class I18nService {
 
   /** Current locale. Reactive. */
   readonly currentLocale = this._current.asReadonly();
-  /** Read-only list of supported locales for the language switcher. */
-  readonly availableLocales: readonly LocaleMeta[] = SUPPORTED_LOCALES.map(
-    (c) => LOCALE_META[c],
-  );
+  /** Locales the environment enables (docs/04 Settings), default all. */
+  private readonly _enabled = signal<readonly Locale[]>(SUPPORTED_LOCALES);
+  /**
+   * Locales for the language switcher: the supported ones the environment
+   * has enabled. A getter over a signal, so `computed`s that read it
+   * re-evaluate when {@link restrictLocales} changes the set.
+   */
+  get availableLocales(): readonly LocaleMeta[] {
+    return this._enabled().map((c) => LOCALE_META[c]);
+  }
   /** Convenience: meta for the current locale. */
   readonly currentMeta = computed(() => LOCALE_META[this._current()]);
 
@@ -64,7 +70,7 @@ export class I18nService {
    * locale's strings are loaded — synchronously when they already are.
    */
   setLocale(locale: Locale): Promise<void> {
-    if (!SUPPORTED_LOCALES.includes(locale)) return Promise.resolve();
+    if (!this._enabled().includes(locale)) return Promise.resolve();
     this.persist(locale);
     return this.applyLocale(locale);
   }
@@ -75,7 +81,7 @@ export class I18nService {
    * Resolves once the remote save settles; never rejects.
    */
   async changeLocale(locale: Locale): Promise<void> {
-    if (!SUPPORTED_LOCALES.includes(locale)) return;
+    if (!this._enabled().includes(locale)) return;
     await this.setLocale(locale);
     if (!this.persistence) return;
     try {
@@ -83,6 +89,22 @@ export class I18nService {
     } catch {
       // Remote save failed — the local choice (localStorage) still holds.
     }
+  }
+
+  /**
+   * Limit the switchable locales to `codes` (site settings "locale
+   * enable/disable"). Unknown codes are ignored and the default locale is
+   * always kept; when the current locale is disabled the app switches to
+   * the default.
+   */
+  restrictLocales(codes: readonly string[]): Promise<void> {
+    const enabled = SUPPORTED_LOCALES.filter(
+      (l) => l === DEFAULT_LOCALE || codes.includes(l),
+    );
+    this._enabled.set(enabled);
+    return enabled.includes(this._current())
+      ? Promise.resolve()
+      : this.setLocale(DEFAULT_LOCALE);
   }
 
   /** Translate a key with optional ICU params. Synchronous instant lookup. */

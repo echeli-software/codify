@@ -30,6 +30,7 @@
   $spacer: cdf.$space-4,
   $grid-breakpoints: cdf.$breakpoints
 );
+@use './high-contrast';
 
 // Bootstrap colours `<code>` with a fixed pink that fails contrast on dark
 // surfaces; follow the theme-aware token instead.

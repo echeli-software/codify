@@ -22,7 +22,8 @@
       "label": "Theme",
       "light": "Light",
       "dark": "Dark",
-      "system": "System"
+      "system": "System",
+      "highContrast": "High contrast"
     },
     "error": {
       "unknown": "Something went wrong. Please try again.",

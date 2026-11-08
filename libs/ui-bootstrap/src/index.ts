@@ -56,7 +56,12 @@ export { LanguageSwitcher } from './lib/molecules/language-switcher/language-swi
 export { ThemeToggle } from './lib/molecules/theme-toggle/theme-toggle.js';
 export {
   ThemeService,
+  THEME_MODES,
+  THEME_PERSISTENCE,
+  isThemeMode,
+  themeClasses,
   type ThemeMode,
+  type ThemePersistence,
 } from './lib/molecules/theme-toggle/theme.service.js';
 export { Pagination } from './lib/molecules/pagination/pagination.js';
 export {

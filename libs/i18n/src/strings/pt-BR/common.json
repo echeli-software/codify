@@ -22,7 +22,8 @@
       "label": "Tema",
       "light": "Claro",
       "dark": "Escuro",
-      "system": "Sistema"
+      "system": "Sistema",
+      "highContrast": "Alto contraste"
     },
     "error": {
       "unknown": "Algo deu errado. Tente de novo.",

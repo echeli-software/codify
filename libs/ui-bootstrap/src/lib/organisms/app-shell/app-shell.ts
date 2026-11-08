@@ -1,7 +1,9 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   ElementRef,
+  computed,
   inject,
   input,
   output,
@@ -30,9 +32,11 @@ export interface NavSection {
 /**
  * Admin app shell: collapsible sidebar + sticky topbar + scrollable content.
  *
- * Responsive:
- *   - ≥ md: persistent sidebar (240px); collapses to 64px (icons only) when
- *     `collapsed` toggled.
+ * Responsive (docs/04 §4):
+ *   - ≥ 1024px: persistent sidebar (240px); collapses to 64px (icons only)
+ *     when `collapsed` toggled.
+ *   - 768–1023px (tablet): icons only by default; the toggle still expands
+ *     it. Crossing the tablet boundary resets to that breakpoint's default.
  *   - < md: sidebar hidden by default; opens as a drawer overlay when
  *     `mobileOpen` toggled (hamburger in topbar).
  *
@@ -59,7 +63,7 @@ let shellSeq = 0;
   template: `
     <div
       class="cdf-shell"
-      [class.cdf-shell--collapsed]="collapsed()"
+      [class.cdf-shell--collapsed]="iconsOnly()"
       [class.cdf-shell--mobile-open]="mobileOpen()"
     >
       <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- Esc bubbles up from the focused nav link -->
@@ -73,7 +77,7 @@ let shellSeq = 0;
       >
         <div class="cdf-shell__brand">
           <cdf-icon [name]="brandIcon()" size="lg" />
-          @if (!collapsed()) {
+          @if (!iconsOnly()) {
             <span class="cdf-shell__brand-label">{{ brand() }}</span>
           }
         </div>
@@ -81,7 +85,7 @@ let shellSeq = 0;
         <nav class="cdf-shell__nav">
           @for (section of nav(); track $index) {
             <div class="cdf-shell__section">
-              @if (section.label && !collapsed()) {
+              @if (section.label && !iconsOnly()) {
                 <h3 class="cdf-shell__section-label">{{ section.label }}</h3>
               }
               <ul>
@@ -92,10 +96,14 @@ let shellSeq = 0;
                       [routerLink]="item.routerLink"
                       routerLinkActive="cdf-shell__nav-link--active"
                       [routerLinkActiveOptions]="{ exact: false }"
+                      [attr.title]="iconsOnly() ? item.label : null"
                       (click)="closeMobile()"
                     >
                       <cdf-icon [name]="item.icon" size="sm" />
-                      @if (!collapsed()) {
+                      @if (iconsOnly()) {
+                        <!-- Icons-only rail: the label stays the link's accessible name. -->
+                        <span class="visually-hidden">{{ item.label }}</span>
+                      } @else {
                         <span class="cdf-shell__nav-label">{{
                           item.label
                         }}</span>
@@ -176,10 +184,29 @@ export class AppShell {
   readonly brandIcon = input<IconName>('gear');
   readonly nav = input.required<NavSection[]>();
 
-  /** Two-way bindable collapsed state (persisted by the consumer if needed). */
-  readonly collapsed = signal(false);
+  private readonly tablet =
+    typeof matchMedia === 'function'
+      ? matchMedia('(min-width: 768px) and (max-width: 1023.98px)')
+      : null;
+
+  /** Collapsed (icons-only) state; defaults to true on tablet widths. */
+  readonly collapsed = signal(this.tablet?.matches ?? false);
   /** Toggle for mobile drawer state. */
   readonly mobileOpen = signal(false);
+  /** The open phone drawer always shows labels. */
+  protected readonly iconsOnly = computed(
+    () => this.collapsed() && !this.mobileOpen(),
+  );
+
+  constructor() {
+    const q = this.tablet;
+    if (!q) return;
+    const onChange = (e: MediaQueryListEvent) => this.collapsed.set(e.matches);
+    q.addEventListener('change', onChange);
+    inject(DestroyRef).onDestroy(() =>
+      q.removeEventListener('change', onChange),
+    );
+  }
 
   readonly collapsedChange = output<boolean>();
 

@@ -4,7 +4,7 @@ import { Icon } from '../../atoms/icon/icon.js';
 import { ThemeService, type ThemeMode } from './theme.service.js';
 
 /**
- * Three-state segmented control: light / dark / system. Reads + writes
+ * Segmented control: light / dark / system / high contrast. Reads + writes
  * `ThemeService` so multiple instances stay in sync.
  */
 @Component({
@@ -45,6 +45,17 @@ import { ThemeService, type ThemeMode } from './theme.service.js';
         (click)="set('system')"
       >
         {{ 'common.theme.system' | translate }}
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="theme.mode() === 'high-contrast'"
+        [class.cdf-theme-toggle__active]="theme.mode() === 'high-contrast'"
+        [attr.aria-label]="'common.theme.highContrast' | translate"
+        [title]="'common.theme.highContrast' | translate"
+        (click)="set('high-contrast')"
+      >
+        <cdf-icon name="eye" size="sm" />
       </button>
     </fieldset>
   `,

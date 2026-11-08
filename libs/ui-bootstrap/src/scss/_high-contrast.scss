@@ -1,0 +1,48 @@
+// ─── High-contrast token set (docs/04 §7) ────────────────────────────────
+// Applied with `theme-hc` on <html> (ThemeService mode `high-contrast`, which
+// also sets `theme-light` so the dark media query never kicks in). Black on
+// white surfaces, solid black borders, a dark violet brand colour (≥ 7:1 on
+// white, WCAG AAA) and a thick two-tone focus ring. `:root.theme-hc` beats
+// the plain `:root` theme rules on specificity, whatever the source order.
+
+:root.theme-hc {
+  --cdf-color-bg: #ffffff;
+  --cdf-color-surface: #ffffff;
+  --cdf-color-surface-elev: #ffffff;
+  --cdf-color-border: #000000;
+  --cdf-color-text: #000000;
+  --cdf-color-text-muted: #1a1a1a;
+  --cdf-color-text-subtle: #2b2b2b;
+  --cdf-color-bg-rgb: 255, 255, 255;
+  --cdf-color-text-rgb: 0, 0, 0;
+
+  --cdf-color-primary: #3d0099;
+  --cdf-color-primary-hover: #2b006b;
+  --cdf-color-primary-active: #1f004d;
+  --cdf-color-primary-subtle: #ece5ff;
+  --cdf-color-primary-on: #ffffff;
+  --cdf-color-primary-rgb: 61, 0, 153;
+  --cdf-color-primary-hover-rgb: 43, 0, 107;
+
+  --cdf-color-primary-text: #3d0099;
+  --cdf-color-primary-text-rgb: 61, 0, 153;
+  --cdf-color-success-text: #0b5a1e;
+  --cdf-color-warning-text: #6b3d00;
+  --cdf-color-danger-text: #8b0000;
+  --cdf-color-info-text: #003d80;
+
+  --cdf-shadow-focus-ring: 0 0 0 2px #ffffff, 0 0 0 5px #000000;
+  color-scheme: light;
+
+  // Links and controls are underlined / outlined, not colour-only.
+  a {
+    text-decoration: underline;
+  }
+  .btn,
+  .form-control,
+  .form-select,
+  .form-check-input {
+    border-width: 2px;
+    border-color: #000000;
+  }
+}
