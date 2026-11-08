@@ -1,4 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { NotificationsClient } from '@codify/api-client';
+import { I18nService } from '@codify/i18n';
+import { NativePlatformService } from './native-platform.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { NativePushService } from './native-push.service';
 import {
@@ -182,10 +186,6 @@ describe('NativePlatformService theme + reminder wiring', () => {
       syncDailyReminder: jest.fn(async () => 'scheduled'),
       cancelDailyReminder: jest.fn(async () => undefined),
     };
-    const { NativePlatformService } = await import('./native-platform.service');
-    const { NotificationsClient } = await import('@codify/api-client');
-    const { provideRouter } = await import('@angular/router');
-    const { I18nService } = await import('@codify/i18n');
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
