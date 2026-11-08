@@ -101,6 +101,8 @@ export interface AdminSearchHit {
   title: string;
   subtitle: string | null;
   courseSlug?: string | null;
+  /** `content`: lesson matched by its body text (subtitle has a snippet). */
+  match?: 'content';
 }
 
 export interface AdminSearchResults {

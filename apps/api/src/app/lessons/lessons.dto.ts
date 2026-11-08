@@ -131,6 +131,36 @@ export interface LessonResponse {
   contentJson: unknown;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Student reads (docs/11 §3 fetch pattern): `locale` = the content locale
+   * asked for, `source` = the locale the title + body were served in
+   * (≠ `locale` when they fell back), `fallback` = whether they did.
+   */
+  _translation?: TranslationMeta;
+}
+
+export interface TranslationMeta {
+  locale: string;
+  source: string;
+  fallback: boolean;
+}
+
+/** GET /api/lessons/:id/multipliers item (read-only editor list). */
+export interface LessonMultiplier {
+  id: string;
+  kind: string;
+  target: string;
+  value: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  courseId: string | null;
+  lessonId: string | null;
+  description: string | null;
+  isActive: boolean;
+  /** Enabled and inside its window right now. */
+  activeNow: boolean;
+  /** `lesson` = targets this lesson; `course` = the whole course. */
+  scope: 'lesson' | 'course';
 }
 
 /** Lesson metadata without content (offline bundle, paywalled views). */

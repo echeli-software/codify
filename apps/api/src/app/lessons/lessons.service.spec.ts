@@ -90,6 +90,17 @@ function setup(f: Fixture = {}, granted = true) {
     exercise: { findMany: jest.fn(async () => [{ id: EXERCISE_ID }]) },
     aiPrompt: { findMany: jest.fn(async () => [{ id: PROMPT_ID }]) },
     scenario: { findMany: jest.fn(async () => [{ id: SCENARIO_ID }]) },
+    asset: {
+      findMany: jest.fn(async () => [
+        {
+          id: '0192f3a4-sample',
+          kind: 'IMAGE',
+          confirmed: true,
+          mimeType: 'image/png',
+        },
+      ]),
+    },
+    multiplier: { findMany: jest.fn(async () => []) },
     $transaction: jest.fn(
       async (fn: (tx: unknown) => unknown): Promise<unknown> => fn(prisma),
     ),
@@ -174,7 +185,16 @@ describe('LessonsService.getById — content locale (docs/11 §3)', () => {
   const localizer = (locale: string) => ({
     requestLocale: jest.fn(async () => locale),
   });
-  const enDoc = { ...kitchenSinkLessonDoc(), marker: 'pt' };
+  /** A valid translation: same structure, translated first paragraph. */
+  const ptDoc = (() => {
+    const d = kitchenSinkLessonDoc();
+    const i = d.content.findIndex((b) => b.type === 'paragraph');
+    d.content[i] = {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Olá, sinais' }],
+    };
+    return d;
+  })();
 
   function withTranslations(rows: unknown[]) {
     const { prisma, access } = setup({ isFree: true });
@@ -185,7 +205,7 @@ describe('LessonsService.getById — content locale (docs/11 §3)', () => {
   it('serves the requested locale’s title and body', async () => {
     const { prisma, access } = withTranslations([
       { field: 'title', value: 'Sinais 101', outdated: false },
-      { field: 'contentJson', value: JSON.stringify(enDoc), outdated: false },
+      { field: 'contentJson', value: JSON.stringify(ptDoc), outdated: false },
     ]);
     const svc = new LessonsService(
       prisma as never,
@@ -195,7 +215,12 @@ describe('LessonsService.getById — content locale (docs/11 §3)', () => {
     const ctx = await runInTranslationContext({} as never, async (c) => {
       const res = await svc.getById(STUDENT, 'lesson-1');
       expect(res.title).toBe('Sinais 101');
-      expect(res.contentJson).toMatchObject({ marker: 'pt' });
+      expect(JSON.stringify(res.contentJson)).toContain('Olá, sinais');
+      expect(res._translation).toEqual({
+        locale: 'pt-BR',
+        source: 'pt-BR',
+        fallback: false,
+      });
       return c;
     });
     expect(ctx.fallbackFrom).toBeNull();
@@ -212,7 +237,7 @@ describe('LessonsService.getById — content locale (docs/11 §3)', () => {
   it('falls back to the source (and notes it) for an outdated body', async () => {
     const { prisma, access } = withTranslations([
       { field: 'title', value: 'Sinais 101', outdated: false },
-      { field: 'contentJson', value: JSON.stringify(enDoc), outdated: true },
+      { field: 'contentJson', value: JSON.stringify(ptDoc), outdated: true },
     ]);
     const svc = new LessonsService(
       prisma as never,
@@ -221,11 +246,66 @@ describe('LessonsService.getById — content locale (docs/11 §3)', () => {
     );
     const ctx = await runInTranslationContext({} as never, async (c) => {
       const res = await svc.getById(STUDENT, 'lesson-1');
-      expect(res.contentJson).not.toHaveProperty('marker');
+      expect(JSON.stringify(res.contentJson)).not.toContain('Olá, sinais');
+      expect(res._translation).toEqual({
+        locale: 'pt-BR',
+        source: 'en',
+        fallback: true,
+      });
       return c;
     });
     // The course's source locale in the fixture is 'en'.
     expect(ctx.fallbackFrom).toBe('en');
+  });
+
+  it.each([
+    ['invalid JSON', '{not json'],
+    [
+      'a schema-invalid doc',
+      JSON.stringify({ type: 'doc', version: 1, content: [{ type: 'nope' }] }),
+    ],
+    [
+      'a different block structure',
+      JSON.stringify({
+        ...ptDoc,
+        content: ptDoc.content.filter((b) => b.type !== 'quiz'),
+      }),
+    ],
+  ])('never serves %s as the translated body (FIX-6)', async (_l, value) => {
+    const { prisma, access } = withTranslations([
+      { field: 'title', value: 'Sinais 101', outdated: false },
+      { field: 'contentJson', value, outdated: false },
+    ]);
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      localizer('pt-BR') as never,
+    );
+    const ctx = await runInTranslationContext({} as never, async (c) => {
+      const res = await svc.getById(STUDENT, 'lesson-1');
+      expect(res.title).toBe('Sinais 101');
+      expect(res._translation?.fallback).toBe(true);
+      expect(JSON.stringify(res.contentJson)).toContain('"type":"quiz"');
+      return c;
+    });
+    expect(ctx.fallbackFrom).toBe('en');
+  });
+
+  it('404s TRANSLATION_NOT_AVAILABLE with ?fallback=false', async () => {
+    const { prisma, access } = withTranslations([]);
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      localizer('pt-BR') as never,
+    );
+    const err = await runInTranslationContext(
+      { query: { fallback: 'false' } } as never,
+      () => caught(svc.getById(STUDENT, 'lesson-1')),
+    );
+    expect(err).toBeInstanceOf(NotFoundException);
+    expect(err.getResponse()).toMatchObject({
+      code: 'TRANSLATION_NOT_AVAILABLE',
+    });
   });
 
   it('source-locale callers skip the translations query', async () => {
@@ -300,6 +380,66 @@ describe('LessonsService.update — content validation', () => {
     expect(JSON.stringify(err.getResponse())).toContain('Unknown exerciseId');
   });
 
+  it('400s when an image assetId is unknown, not an image or unconfirmed', async () => {
+    for (const rows of [
+      [],
+      [
+        {
+          id: '0192f3a4-sample',
+          kind: 'VIDEO',
+          confirmed: true,
+          mimeType: 'video/mp4',
+        },
+      ],
+      [
+        {
+          id: '0192f3a4-sample',
+          kind: 'IMAGE',
+          confirmed: false,
+          mimeType: 'image/png',
+        },
+      ],
+    ]) {
+      const { svc, prisma, updates } = setup();
+      prisma.asset.findMany.mockResolvedValueOnce(rows);
+      const err = await caught(
+        svc.update(ADMIN, 'lesson-1', { contentJson: kitchenSinkLessonDoc() }),
+      );
+      expect(err.getStatus()).toBe(400);
+      const issues = (err.getResponse() as { issues: { path: string }[] })
+        .issues;
+      expect(issues[0].path).toMatch(/^content\.\d+\.attrs\.assetId$/);
+      expect(updates).toHaveLength(0);
+    }
+  });
+
+  it('fills embed metadata on save through the metadata service', async () => {
+    const { prisma, access, updates } = setup();
+    const embeds = {
+      enrich: jest.fn(
+        async (doc: {
+          content: { type: string; attrs?: Record<string, unknown> }[];
+        }) => {
+          for (const b of doc.content)
+            if (b.type === 'embed' && b.attrs)
+              b.attrs['meta'] = { title: 'From oEmbed' };
+          return doc;
+        },
+      ),
+    };
+    const svc = new LessonsService(
+      prisma as never,
+      access as never,
+      undefined,
+      embeds as never,
+    );
+    await svc.update(ADMIN, 'lesson-1', {
+      contentJson: kitchenSinkLessonDoc(),
+    });
+    expect(embeds.enrich).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(updates[0])).toContain('From oEmbed');
+  });
+
   it('413s oversize docs', async () => {
     const { svc } = setup();
     const huge = {
@@ -369,5 +509,61 @@ describe('LessonsService.lessonVersions', () => {
     await expect(svc.lessonVersions(ADMIN, 'course-1')).resolves.toHaveLength(
       2,
     );
+  });
+});
+
+describe('LessonsService.multipliers', () => {
+  it('lists lesson + course-wide rules with scope and activeNow', async () => {
+    const { svc, prisma } = setup();
+    prisma.multiplier.findMany.mockResolvedValueOnce([
+      {
+        id: 'm1',
+        kind: 'LESSON_PROMO',
+        target: 'XP',
+        value: { toString: () => '2.00', valueOf: () => 2 },
+        startsAt: null,
+        endsAt: null,
+        courseId: null,
+        lessonId: 'lesson-1',
+        description: 'Launch',
+        isActive: true,
+      },
+      {
+        id: 'm2',
+        kind: 'COURSE_PROMO',
+        target: 'BOTH',
+        value: 1.5,
+        startsAt: new Date('2000-01-01T00:00:00Z'),
+        endsAt: new Date('2000-02-01T00:00:00Z'),
+        courseId: 'course-1',
+        lessonId: null,
+        description: null,
+        isActive: true,
+      },
+    ]);
+    const out = await svc.multipliers(ADMIN, 'lesson-1');
+    expect(out.map((m) => [m.id, m.scope, m.activeNow, m.value])).toEqual([
+      ['m1', 'lesson', true, 2],
+      ['m2', 'course', false, 1.5],
+    ]);
+    expect(prisma.multiplier.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: null,
+          OR: [
+            { lessonId: 'lesson-1' },
+            { courseId: 'course-1', lessonId: null },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('refuses students and other teachers', async () => {
+    const { svc } = setup();
+    await expect(svc.multipliers(STUDENT, 'lesson-1')).rejects.toThrow();
+    await expect(
+      svc.multipliers(user('TEACHER', 'teacher-2'), 'lesson-1'),
+    ).rejects.toThrow();
   });
 });

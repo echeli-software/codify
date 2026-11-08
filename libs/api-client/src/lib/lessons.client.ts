@@ -19,6 +19,25 @@ export interface Lesson {
   contentJson: unknown;
   createdAt: string;
   updatedAt: string;
+  /** Student reads: content locale asked for / served in, and whether it fell back. */
+  _translation?: { locale: string; source: string; fallback: boolean };
+}
+
+/** GET /lessons/:id/multipliers item — promotions applying to a lesson. */
+export interface LessonMultiplier {
+  id: string;
+  kind: string;
+  target: 'XP' | 'COINS' | 'BOTH' | string;
+  value: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  courseId: string | null;
+  lessonId: string | null;
+  description: string | null;
+  isActive: boolean;
+  activeNow: boolean;
+  /** `lesson`: targets this lesson; `course`: course-wide. */
+  scope: 'lesson' | 'course';
 }
 
 /** Lesson metadata without content. */
@@ -143,6 +162,15 @@ export class LessonsClient {
         `${this.config.baseUrl}/lessons/${encodeURIComponent(id)}`,
         body,
         { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /** ADMIN / the course's TEACHER: read-only promotions list for the editor. */
+  multipliers(id: string): Promise<LessonMultiplier[]> {
+    return firstValueFrom(
+      this.http.get<LessonMultiplier[]>(
+        `${this.config.baseUrl}/lessons/${encodeURIComponent(id)}/multipliers`,
       ),
     );
   }

@@ -76,3 +76,15 @@ export class TranslationFallbackInterceptor implements NestInterceptor {
     );
   }
 }
+
+/**
+ * `?fallback=false` on the current request (docs/11 §3 fetch pattern):
+ * the caller wants the requested locale or nothing. Default true.
+ */
+export function requestAllowsFallback(): boolean {
+  const q = storage.getStore()?.req?.query as
+    | Record<string, unknown>
+    | undefined;
+  const v = q?.['fallback'];
+  return !(typeof v === 'string' && v.trim().toLowerCase() === 'false');
+}

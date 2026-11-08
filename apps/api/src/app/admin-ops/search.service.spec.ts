@@ -1,6 +1,11 @@
 import type { ApiUser } from '../auth/auth.types.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
-import { SearchService, searchableTypes } from './search.service.js';
+import {
+  SearchService,
+  ilikePattern,
+  searchableTypes,
+  snippetAround,
+} from './search.service.js';
 
 const user = (role: ApiUser['role']): ApiUser => ({
   userId: `${role.toLowerCase()}-1`,
@@ -55,6 +60,7 @@ function setup() {
         { id: 'b1', name: 'Logic', slug: 'logic' },
       ]),
     },
+    $queryRaw: jest.fn(async () => [] as { id: string; hit: string }[]),
   };
   return {
     svc: new SearchService(prisma as unknown as PrismaService),
@@ -152,9 +158,67 @@ describe('SearchService.search', () => {
     expect(prisma.lesson.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          module: { course: { deletedAt: null, authorId: 'teacher-1' } },
+          module: {
+            deletedAt: null,
+            course: { deletedAt: null, authorId: 'teacher-1' },
+          },
         }),
       }),
     );
+  });
+});
+
+describe('deep content search (docs/06 §11)', () => {
+  it('escapes ILIKE wildcards and builds a short snippet', () => {
+    expect(ilikePattern('50%_a\\b')).toBe('%50\\%\\_a\\\\b%');
+    const long = `${'x '.repeat(60)}Stripe checkout ${'y '.repeat(60)}`;
+    const snip = snippetAround(long, 'stripe');
+    expect(snip).toContain('Stripe checkout');
+    expect(snip.startsWith('…')).toBe(true);
+    expect(snip.length).toBeLessThanOrEqual(82);
+    expect(snippetAround('short text', 'zz')).toBe('short text');
+  });
+
+  it('adds body-only matches after title matches, with a snippet subtitle', async () => {
+    const { svc, prisma } = setup();
+    prisma.$queryRaw.mockResolvedValueOnce([
+      { id: 'l2', hit: 'Pay with Stripe Checkout' },
+      { id: 'l1', hit: 'Also mentions stripe' },
+    ]);
+    prisma.lesson.findMany.mockResolvedValueOnce([
+      {
+        id: 'l2',
+        module: { course: { slug: 'billing', sourceLocale: 'pt-BR' } },
+      },
+      {
+        id: 'l1',
+        module: { course: { slug: 'logic', sourceLocale: 'pt-BR' } },
+      },
+    ] as never);
+    const res = await svc.search(user('ADMIN'), 'stripe', 'pt-BR');
+    expect(res.lessons.map((h) => [h.id, h.match ?? 'title'])).toEqual([
+      ['l1', 'title'],
+      ['l2', 'content'],
+    ]);
+    expect(res.lessons[1].subtitle).toBe(
+      'billing · “Pay with Stripe Checkout”',
+    );
+    const where = (
+      prisma.lesson.findMany.mock.calls.at(-1) as unknown as [
+        { where: { id: { in: string[] } } },
+      ]
+    )[0].where;
+    expect(where.id.in).toEqual(expect.arrayContaining(['l1', 'l2', 'stripe']));
+  });
+
+  it('scopes the body query to the teacher’s courses and never runs it for SUPPORT', async () => {
+    const { svc, prisma } = setup();
+    await svc.search(user('TEACHER'), 'stripe', 'pt-BR');
+    const call = prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(JSON.stringify(call)).toContain('teacher-1');
+    expect(JSON.stringify(call)).toContain('%stripe%');
+    prisma.$queryRaw.mockClear();
+    await svc.search(user('SUPPORT'), 'stripe', 'pt-BR');
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 });

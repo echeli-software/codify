@@ -1,5 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { checkTranslatedBody } from '../lessons/lesson-content.js';
+import {
+  parseImportFile,
+  toCsv,
+  toJsonExport,
+  type ImportRowError,
+  type TranslationFileFormat,
+} from './translations-io.js';
 import {
   buildCompleteness,
   buildWorkRows,
@@ -49,6 +57,47 @@ export interface TranslationScope {
 }
 
 const MAX_CONTENT_JSON = 512 * 1024;
+
+/**
+ * 400 `INVALID_TRANSLATIONS`: `detail` joins the problems, `problems` lists
+ * them (one per item / lesson-body issue).
+ */
+function invalidTranslations(errors: string[]): BadRequestException {
+  return new BadRequestException({
+    code: 'INVALID_TRANSLATIONS',
+    message: errors.join('; '),
+    errors,
+  });
+}
+
+/** One translation to mark complete (POST /admin/translations/complete). */
+export interface TranslationRef {
+  entityType: TranslatableEntityType;
+  entityId: string;
+  field: string;
+  locale: string;
+}
+
+export interface TranslationImportReport {
+  dryRun: boolean;
+  /** Rows written (0 on a dry run or when any row has an error). */
+  imported: number;
+  /** Rows that would be / were written. */
+  valid: number;
+  /** Rows left alone: empty translatedValue or unchanged value. */
+  skipped: number;
+  errors: ImportRowError[];
+  /** Rows whose `sourceValue` no longer matches the current source (imported, kept outdated). */
+  sourceChanged: { row: number; entityId: string; field: string }[];
+}
+
+interface CheckedItem extends TranslationUpsert {
+  /** Value to store (contentJson: the validated, re-serialised doc). */
+  stored: string;
+  entity: SourceEntity;
+  /** Index of the item in the checked list. */
+  index: number;
+}
 
 /**
  * Content translation workspace (docs/11 §3): the admin list of
@@ -109,47 +158,8 @@ export class TranslationsService {
   ): Promise<{ updated: number; before: Record<string, string | null> }> {
     if (items.length === 0)
       throw new BadRequestException('No translations to save');
-    const errors: string[] = [];
-    const byType = new Map<TranslatableEntityType, Map<string, SourceEntity>>();
-    for (const type of new Set(items.map((i) => i.entityType))) {
-      const ids = [
-        ...new Set(
-          items.filter((i) => i.entityType === type).map((i) => i.entityId),
-        ),
-      ];
-      const entities = await this.loadEntities(type, ids, true, scope);
-      byType.set(type, new Map(entities.map((e) => [e.entityId, e])));
-    }
-    items.forEach((it, i) => {
-      const at = `items[${i}]`;
-      if (!(SUPPORTED_LOCALES as readonly string[]).includes(it.locale))
-        errors.push(
-          `${at}.locale must be one of ${SUPPORTED_LOCALES.join(', ')}`,
-        );
-      if (!TRANSLATABLE_FIELDS[it.entityType]?.includes(it.field))
-        errors.push(
-          `${at}.field must be one of ${TRANSLATABLE_FIELDS[it.entityType]?.join(', ')}`,
-        );
-      const entity = byType.get(it.entityType)?.get(it.entityId);
-      if (!entity)
-        errors.push(`${at}: ${it.entityType} ${it.entityId} not found`);
-      else if (entity.sourceLocale === it.locale)
-        errors.push(
-          `${at}: ${it.locale} is the source locale — edit the ${it.entityType.toLowerCase()} itself`,
-        );
-      if (it.field === 'contentJson') {
-        if (it.value.length > MAX_CONTENT_JSON)
-          errors.push(`${at}.value is too large`);
-        else {
-          try {
-            JSON.parse(it.value);
-          } catch {
-            errors.push(`${at}.value must be JSON for contentJson`);
-          }
-        }
-      }
-    });
-    if (errors.length) throw new BadRequestException(errors);
+    const { checked, errors } = await this.checkItems(items, scope);
+    if (errors.length) throw invalidTranslations(errors);
 
     const existing = await this.prisma.contentTranslation.findMany({
       where: {
@@ -182,7 +192,7 @@ export class TranslationsService {
     }
 
     await this.prisma.$transaction(
-      items.map((it) =>
+      checked.map((it) =>
         this.prisma.contentTranslation.upsert({
           where: {
             entityType_entityId_locale_field: {
@@ -197,13 +207,336 @@ export class TranslationsService {
             entityId: it.entityId,
             locale: it.locale,
             field: it.field,
-            value: it.value,
+            value: it.stored,
           },
-          update: { value: it.value, outdated: false },
+          update: { value: it.stored, outdated: false },
         }),
       ),
     );
     return { updated: items.length, before };
+  }
+
+  /**
+   * Validate upserts without writing: supported locale, known field,
+   * existing entity in scope, never the source locale; lesson bodies must
+   * be valid LessonDocs with the source's block structure (docs/11 §3,
+   * FIX-6). `errors` are human-readable, prefixed with `items[i]`.
+   */
+  private async checkItems(
+    items: TranslationUpsert[],
+    scope?: TranslationScope,
+    label: (i: number) => string = (i) => `items[${i}]`,
+  ): Promise<{ checked: CheckedItem[]; errors: string[] }> {
+    const errors: string[] = [];
+    const byType = new Map<TranslatableEntityType, Map<string, SourceEntity>>();
+    for (const type of new Set(items.map((i) => i.entityType))) {
+      const ids = [
+        ...new Set(
+          items.filter((i) => i.entityType === type).map((i) => i.entityId),
+        ),
+      ];
+      const entities = await this.loadEntities(type, ids, true, scope);
+      byType.set(type, new Map(entities.map((e) => [e.entityId, e])));
+    }
+    const checked: CheckedItem[] = [];
+    items.forEach((it, i) => {
+      const at = label(i);
+      const before = errors.length;
+      if (!(SUPPORTED_LOCALES as readonly string[]).includes(it.locale))
+        errors.push(
+          `${at}.locale must be one of ${SUPPORTED_LOCALES.join(', ')}`,
+        );
+      if (!TRANSLATABLE_FIELDS[it.entityType]?.includes(it.field))
+        errors.push(
+          `${at}.field must be one of ${TRANSLATABLE_FIELDS[it.entityType]?.join(', ')}`,
+        );
+      const entity = byType.get(it.entityType)?.get(it.entityId);
+      if (!entity)
+        errors.push(`${at}: ${it.entityType} ${it.entityId} not found`);
+      else if (entity.sourceLocale === it.locale)
+        errors.push(
+          `${at}: ${it.locale} is the source locale — edit the ${it.entityType.toLowerCase()} itself`,
+        );
+      let stored = it.value;
+      if (it.field === 'contentJson') {
+        if (it.value.length > MAX_CONTENT_JSON)
+          errors.push(`${at}.value is too large`);
+        else if (entity) {
+          const source = entity.sourceValues['contentJson'];
+          let sourceDoc: unknown = null;
+          try {
+            sourceDoc = source ? JSON.parse(source) : null;
+          } catch {
+            /* unreadable source → structure check reports it */
+          }
+          const result = checkTranslatedBody(sourceDoc, it.value);
+          if (result.ok) stored = JSON.stringify(result.doc);
+          else
+            for (const issue of result.issues)
+              errors.push(
+                `${at}.value${issue.path ? ` ${issue.path}` : ''}: ${issue.message}`,
+              );
+        }
+      }
+      if (errors.length === before && entity)
+        checked.push({ ...it, stored, entity, index: i });
+    });
+    return { checked, errors };
+  }
+
+  // ─── Mark complete (docs/11 §3 editor flow) ─────────────────────────────
+
+  /**
+   * Explicit "mark complete": clears `outdated` on existing, non-empty
+   * translations without changing their text (the translator checked the
+   * text still fits the new source). Lesson bodies are re-validated against
+   * the CURRENT source structure first. All-or-nothing.
+   */
+  async markComplete(
+    items: TranslationRef[],
+    scope?: TranslationScope,
+  ): Promise<{ completed: number; keys: string[] }> {
+    if (items.length === 0)
+      throw new BadRequestException('No translations to mark complete');
+    const rows = await this.prisma.contentTranslation.findMany({
+      where: {
+        OR: items.map((it) => ({
+          entityType: it.entityType,
+          entityId: it.entityId,
+          locale: it.locale,
+          field: it.field,
+        })),
+      },
+      select: {
+        entityType: true,
+        entityId: true,
+        locale: true,
+        field: true,
+        value: true,
+      },
+    });
+    const errors: string[] = [];
+    const upserts: TranslationUpsert[] = [];
+    items.forEach((it, i) => {
+      const row = rows.find(
+        (r) =>
+          r.entityType === it.entityType &&
+          r.entityId === it.entityId &&
+          r.locale === it.locale &&
+          r.field === it.field,
+      );
+      if (!row || !row.value)
+        errors.push(`items[${i}]: there is no translation to mark complete`);
+      else upserts.push({ ...it, value: row.value });
+    });
+    if (errors.length) throw invalidTranslations(errors);
+    const { errors: invalid } = await this.checkItems(upserts, scope);
+    if (invalid.length) throw invalidTranslations(invalid);
+    await this.prisma.$transaction(
+      upserts.map((it) =>
+        this.prisma.contentTranslation.update({
+          where: {
+            entityType_entityId_locale_field: {
+              entityType: it.entityType,
+              entityId: it.entityId,
+              locale: it.locale,
+              field: it.field,
+            },
+          },
+          data: { outdated: false },
+        }),
+      ),
+    );
+    const keys = upserts.map(
+      (it) => `${it.entityType}:${it.entityId}:${it.locale}:${it.field}`,
+    );
+    return { completed: upserts.length, keys };
+  }
+
+  // ─── Bulk export / import (docs/11 §3) ──────────────────────────────────
+
+  /** Every translatable row of one entity type for one target locale. */
+  async exportFile(
+    entityType: TranslatableEntityType,
+    locale: string,
+    format: TranslationFileFormat,
+    scope?: TranslationScope,
+  ): Promise<{ filename: string; contentType: string; body: string }> {
+    const entities = await this.loadEntities(
+      entityType,
+      undefined,
+      true,
+      scope,
+    );
+    const translations = await this.loadTranslations(
+      entityType,
+      entities.map((e) => e.entityId),
+    );
+    const rows = buildWorkRows(entities, translations, [locale]);
+    const base = `translations-${entityType.toLowerCase()}-${locale}`;
+    return format === 'csv'
+      ? {
+          filename: `${base}.csv`,
+          contentType: 'text/csv; charset=utf-8',
+          body: toCsv(rows),
+        }
+      : {
+          filename: `${base}.json`,
+          contentType: 'application/json; charset=utf-8',
+          body: toJsonExport(entityType, locale, rows),
+        };
+  }
+
+  /**
+   * Import a CSV / JSON file for one entity type + locale. Every row is
+   * validated (locale = the chosen one, known entity in scope, translatable
+   * field, never the source locale, lesson bodies valid + structure-locked);
+   * rows with an empty `translatedValue` or an unchanged value are skipped.
+   * Nothing is written when any row has an error, or on `dryRun`. The
+   * `sourceValue` column is informational and NEVER written; when it no
+   * longer matches the current source the row is imported but stays
+   * flagged outdated.
+   */
+  async importFile(
+    input: {
+      entityType: TranslatableEntityType;
+      locale: string;
+      format: TranslationFileFormat;
+      content: string;
+      dryRun?: boolean;
+    },
+    scope?: TranslationScope,
+  ): Promise<{
+    report: TranslationImportReport;
+    before: Record<string, string | null>;
+  }> {
+    const { rows, errors } = parseImportFile(input.format, input.content);
+    const report: TranslationImportReport = {
+      dryRun: !!input.dryRun,
+      imported: 0,
+      valid: 0,
+      skipped: 0,
+      errors,
+      sourceChanged: [],
+    };
+    const candidates = rows.filter((r) => {
+      if (r.locale && r.locale !== input.locale) {
+        errors.push({
+          row: r.row,
+          entityId: r.entityId,
+          field: r.field,
+          message: `locale "${r.locale}" does not match the import locale ${input.locale}`,
+        });
+        return false;
+      }
+      if (r.translatedValue.trim() === '') {
+        report.skipped++;
+        return false;
+      }
+      return true;
+    });
+    const seen = new Set<string>();
+    for (const r of candidates) {
+      const k = `${r.entityId}\u0000${r.field}`;
+      if (seen.has(k))
+        errors.push({
+          row: r.row,
+          entityId: r.entityId,
+          field: r.field,
+          message: 'Duplicate row for this entity and field',
+        });
+      seen.add(k);
+    }
+    const items: TranslationUpsert[] = candidates.map((r) => ({
+      entityType: input.entityType,
+      entityId: r.entityId,
+      field: r.field,
+      locale: input.locale,
+      value: r.translatedValue,
+    }));
+    const { checked, errors: itemErrors } = await this.checkItems(
+      items,
+      scope,
+      (i) => `row ${candidates[i].row}`,
+    );
+    for (const message of itemErrors) {
+      const m = /^row (\d+)/.exec(message);
+      const row = m ? Number(m[1]) : 0;
+      const c = candidates.find((x) => x.row === row);
+      errors.push({ row, entityId: c?.entityId, field: c?.field, message });
+    }
+    errors.sort((a, b) => a.row - b.row);
+
+    const existing = checked.length
+      ? await this.prisma.contentTranslation.findMany({
+          where: {
+            entityType: input.entityType,
+            locale: input.locale,
+            entityId: { in: [...new Set(checked.map((c) => c.entityId))] },
+          },
+          select: { entityId: true, field: true, value: true, outdated: true },
+        })
+      : [];
+    const current = (c: CheckedItem) =>
+      existing.find((e) => e.entityId === c.entityId && e.field === c.field);
+    const writes: (CheckedItem & { outdated: boolean })[] = [];
+    for (const c of checked) {
+      const row = candidates[c.index];
+      const prev = current(c);
+      const src = c.entity.sourceValues[c.field] ?? '';
+      const sourceKnown = row?.sourceValue != null;
+      const sourceChanged = sourceKnown && row.sourceValue !== src;
+      // Unchanged text is only re-written to clear `outdated` when the file
+      // shows the translator worked from the current source.
+      if (
+        prev &&
+        prev.value === c.stored &&
+        !(prev.outdated && sourceKnown && !sourceChanged)
+      ) {
+        report.skipped++;
+        continue;
+      }
+      if (sourceChanged)
+        report.sourceChanged.push({
+          row: row?.row ?? 0,
+          entityId: c.entityId,
+          field: c.field,
+        });
+      writes.push({ ...c, outdated: sourceChanged });
+    }
+    report.valid = writes.length;
+    const before: Record<string, string | null> = {};
+    if (errors.length || input.dryRun || writes.length === 0)
+      return { report, before };
+
+    for (const w of writes)
+      before[`${w.entityType}:${w.entityId}:${w.locale}:${w.field}`] =
+        current(w)?.value ?? null;
+    await this.prisma.$transaction(
+      writes.map((w) =>
+        this.prisma.contentTranslation.upsert({
+          where: {
+            entityType_entityId_locale_field: {
+              entityType: w.entityType,
+              entityId: w.entityId,
+              locale: w.locale,
+              field: w.field,
+            },
+          },
+          create: {
+            entityType: w.entityType,
+            entityId: w.entityId,
+            locale: w.locale,
+            field: w.field,
+            value: w.stored,
+            outdated: w.outdated,
+          },
+          update: { value: w.stored, outdated: w.outdated },
+        }),
+      ),
+    );
+    report.imported = writes.length;
+    return { report, before };
   }
 
   /** Public batch resolve with requested → source → default fallback. */

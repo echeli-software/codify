@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import type { SearchHit, SearchResponse } from './admin-ops.dto.js';
@@ -11,7 +12,35 @@ export const SEARCH_MAX_CHARS = 100;
 /** Title matches considered before scoping/limiting. */
 const TITLE_CANDIDATES = 50;
 
-const ci = (q: string) => ({ contains: q, mode: 'insensitive' as const });
+/**
+ * Case-insensitive substring filter. Prisma passes `contains` into LIKE
+ * unescaped, so `%` / `_` / `\` in the query are escaped to match literally.
+ */
+const ci = (q: string) => ({
+  contains: q.replace(/[\\%_]/g, (c) => `\\${c}`),
+  mode: 'insensitive' as const,
+});
+
+/** Characters of the body snippet shown in the palette. */
+export const SNIPPET_CHARS = 80;
+
+/** `q` as an ILIKE substring pattern (wildcards in `q` match literally). */
+export function ilikePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/** ~SNIPPET_CHARS of `text` around the first case-insensitive `q`. */
+export function snippetAround(text: string, q: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  const at = flat.toLowerCase().indexOf(q.toLowerCase());
+  if (flat.length <= SNIPPET_CHARS || at < 0)
+    return flat.length <= SNIPPET_CHARS
+      ? flat
+      : `${flat.slice(0, SNIPPET_CHARS - 1)}…`;
+  const start = Math.max(0, at - Math.floor((SNIPPET_CHARS - q.length) / 2));
+  const end = Math.min(flat.length, start + SNIPPET_CHARS);
+  return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`;
+}
 
 /**
  * Which entity types each staff role may search — mirrors the admin
@@ -32,7 +61,8 @@ export function searchableTypes(role: ApiUser['role']) {
  * GET /admin/search?q= — the Cmd/Ctrl-K palette (docs/04 §6). Case-
  * insensitive substring match on names/titles (titles through the
  * ContentTranslation table, any locale) and slugs, plus exact ids; at
- * most {@link SEARCH_LIMIT} hits per type.
+ * most {@link SEARCH_LIMIT} hits per type. Lessons also match on their
+ * body text (docs/06 §11 deep content search, see `bodyMatches`).
  */
 @Injectable()
 export class SearchService {
@@ -109,12 +139,16 @@ export class SearchService {
     locale: string,
     authorId?: string,
   ): Promise<SearchHit[]> {
-    const ids = await this.titleMatches('LESSON', q);
+    const [ids, body] = await Promise.all([
+      this.titleMatches('LESSON', q),
+      this.bodyMatches(q, authorId),
+    ]);
     const rows = await this.prisma.lesson.findMany({
       where: {
         deletedAt: null,
-        id: { in: [...ids, q] },
+        id: { in: [...new Set([...ids, ...body.keys(), q])] },
         module: {
+          deletedAt: null,
           course: { deletedAt: null, ...(authorId ? { authorId } : {}) },
         },
       },
@@ -125,7 +159,7 @@ export class SearchService {
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: SEARCH_LIMIT,
+      take: TITLE_CANDIDATES,
     });
     const titles = await resolveTitles(
       this.prisma,
@@ -133,13 +167,79 @@ export class SearchService {
       new Map(rows.map((r) => [r.id, r.module.course.sourceLocale])),
       locale,
     );
-    return rows.map((r) => ({
-      type: 'lesson',
-      id: r.id,
-      title: titles.get(r.id) ?? r.id,
-      subtitle: r.module.course.slug,
-      courseSlug: r.module.course.slug,
-    }));
+    // Title / id matches first, then body-only matches.
+    const titleIds = new Set([...ids, q]);
+    return rows
+      .map((r) => {
+        const snippet = titleIds.has(r.id) ? null : (body.get(r.id) ?? null);
+        return {
+          type: 'lesson' as const,
+          id: r.id,
+          title: titles.get(r.id) ?? r.id,
+          subtitle: snippet
+            ? `${r.module.course.slug} · “${snippetAround(snippet, q)}”`
+            : r.module.course.slug,
+          courseSlug: r.module.course.slug,
+          ...(snippet ? { match: 'content' as const } : {}),
+        };
+      })
+      .sort((a, b) => Number(!!a.match) - Number(!!b.match))
+      .slice(0, SEARCH_LIMIT);
+  }
+
+  /**
+   * Deep content search (docs/06 §11): lessons whose body — the source
+   * `contentJson` or a translated body (ContentTranslation rows holding
+   * JSON) — has a user-visible string containing `q` (case-insensitive):
+   * text nodes, quiz questions / options / explanations, image alt +
+   * captions, embed / video titles. Extracted with `jsonb_path_query`, so
+   * keys, ids and URLs never match. Scoped like the title search (teachers:
+   * own courses). Returns lesson id → the first matching string.
+   */
+  private async bodyMatches(
+    q: string,
+    authorId?: string,
+  ): Promise<Map<string, string>> {
+    const pattern = ilikePattern(q);
+    const author = authorId
+      ? Prisma.sql`AND c."authorId" = ${authorId}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ id: string; hit: string }[]>`
+      WITH docs AS (
+        SELECT l.id, l."updatedAt", l."contentJson" AS doc
+        FROM "Lesson" l
+        JOIN "Module" m ON m.id = l."moduleId"
+        JOIN "Course" c ON c.id = m."courseId"
+        WHERE l."deletedAt" IS NULL AND m."deletedAt" IS NULL
+          AND c."deletedAt" IS NULL ${author}
+        UNION ALL
+        SELECT l.id, l."updatedAt",
+          CASE WHEN ct.value IS JSON OBJECT THEN ct.value::jsonb END AS doc
+        FROM "ContentTranslation" ct
+        JOIN "Lesson" l ON l.id = ct."entityId"
+        JOIN "Module" m ON m.id = l."moduleId"
+        JOIN "Course" c ON c.id = m."courseId"
+        WHERE ct."entityType" = 'LESSON' AND ct.field = 'contentJson'
+          AND l."deletedAt" IS NULL AND m."deletedAt" IS NULL
+          AND c."deletedAt" IS NULL ${author}
+      )
+      SELECT DISTINCT ON (d.id) d.id, hit.s AS hit
+      FROM docs d
+      CROSS JOIN LATERAL (
+        SELECT v #>> '{}' AS s
+        FROM unnest(ARRAY[
+          'strict $.**.text', 'strict $.**.question', 'strict $.**.explanation',
+          'strict $.**.alt', 'strict $.**.caption', 'strict $.**.title'
+        ]::jsonpath[]) AS p(path)
+        CROSS JOIN LATERAL jsonb_path_query(d.doc, p.path) AS v
+        WHERE jsonb_typeof(v) = 'string' AND (v #>> '{}') ILIKE ${pattern}
+        LIMIT 1
+      ) hit
+      WHERE d.doc IS NOT NULL
+      ORDER BY d.id, d."updatedAt" DESC
+      LIMIT ${TITLE_CANDIDATES}
+    `;
+    return new Map(rows.map((r) => [r.id, r.hit]));
   }
 
   private async users(q: string): Promise<SearchHit[]> {

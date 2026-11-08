@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -95,4 +96,63 @@ export class ResolveTranslationsQueryDto {
   @IsString()
   @MaxLength(200)
   fields?: string;
+}
+
+export class TranslationRefDto {
+  @IsIn(TRANSLATABLE_ENTITIES)
+  entityType!: (typeof TRANSLATABLE_ENTITIES)[number];
+
+  @IsString()
+  @Length(1, 64)
+  entityId!: string;
+
+  @IsString()
+  @Length(1, 40)
+  field!: string;
+
+  @IsIn(SUPPORTED_LOCALES)
+  locale!: (typeof SUPPORTED_LOCALES)[number];
+}
+
+/** POST /api/admin/translations/complete */
+export class MarkTranslationsCompleteDto {
+  @ValidateNested({ each: true })
+  @Type(() => TranslationRefDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  items!: TranslationRefDto[];
+}
+
+/** GET /api/admin/translations/export */
+export class ExportTranslationsQueryDto {
+  @IsIn(TRANSLATABLE_ENTITIES)
+  entityType!: (typeof TRANSLATABLE_ENTITIES)[number];
+
+  @IsIn(SUPPORTED_LOCALES)
+  locale!: (typeof SUPPORTED_LOCALES)[number];
+
+  @IsOptional()
+  @IsIn(['csv', 'json'])
+  format?: 'csv' | 'json';
+}
+
+/** POST /api/admin/translations/import */
+export class ImportTranslationsDto {
+  @IsIn(TRANSLATABLE_ENTITIES)
+  entityType!: (typeof TRANSLATABLE_ENTITIES)[number];
+
+  @IsIn(SUPPORTED_LOCALES)
+  locale!: (typeof SUPPORTED_LOCALES)[number];
+
+  @IsIn(['csv', 'json'])
+  format!: 'csv' | 'json';
+
+  /** The file's text (UTF-8). The JSON body limit (1 MB) bounds it. */
+  @IsString()
+  @Length(1, 1_000_000)
+  content!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
 }

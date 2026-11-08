@@ -27,10 +27,16 @@ import { offlineRunners } from './offline-runners.js';
 import { AccessService } from '../billing/access.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
-import { noteTranslationFallback } from '../translations/translation-context.js';
+import {
+  noteTranslationFallback,
+  requestAllowsFallback,
+} from '../translations/translation-context.js';
+import { EmbedMetadataService } from './embed-metadata.service.js';
+import { checkTranslatedBody, imageAssetIssues } from './lesson-content.js';
 import type {
   CreateLessonDto,
   LessonMeta,
+  LessonMultiplier,
   LessonOfflineBundle,
   LessonResponse,
   LessonVersion,
@@ -56,6 +62,7 @@ export class LessonsService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     @Optional() private readonly localizer?: ContentLocalizer,
+    @Optional() private readonly embeds?: EmbedMetadataService,
   ) {}
 
   async create(
@@ -121,27 +128,43 @@ export class LessonsService {
     const l = await this.loadForStudent(id);
     await this.assertStudentAccess(actor, l);
     const meta = await this.meta(l);
-    const { title, doc } = await this.localizeForStudent(l, meta.title);
+    const { title, doc, translation } = await this.localizeForStudent(
+      l,
+      meta.title,
+    );
     return {
       ...meta,
       title,
       contentJson: stripQuizAnswers(this.readDoc(doc)),
+      _translation: translation,
     };
   }
 
   /**
    * Title + body in the caller's locale (docs/11 §3): the requested
    * locale's ContentTranslation rows, else the course's source locale
-   * (noted for `X-Translation-Fallback`). An outdated body translation is
-   * not served — its block structure may no longer match the source.
+   * (noted for `X-Translation-Fallback`). A body translation is served only
+   * when it is current (not `outdated`), passes `lessonDocSchema` and keeps
+   * the source's block structure (FIX-6) — anything else falls back to the
+   * source. `?fallback=false` turns a fallback into 404
+   * `TRANSLATION_NOT_AVAILABLE` instead.
    */
   private async localizeForStudent(
     l: LessonWithCourse,
     sourceTitle: string,
-  ): Promise<{ title: string; doc: unknown }> {
+  ): Promise<{
+    title: string;
+    doc: unknown;
+    translation: { locale: string; source: string; fallback: boolean };
+  }> {
     const source = l.module.course.sourceLocale;
     const locale = (await this.localizer?.requestLocale()) ?? source;
-    if (locale === source) return { title: sourceTitle, doc: l.contentJson };
+    if (locale === source)
+      return {
+        title: sourceTitle,
+        doc: l.contentJson,
+        translation: { locale, source, fallback: false },
+      };
     const rows = await this.prisma.contentTranslation.findMany({
       where: {
         entityType: 'LESSON',
@@ -157,17 +180,71 @@ export class LessonsService {
     );
     let doc: unknown = null;
     if (body) {
-      try {
-        const parsed: unknown = JSON.parse(body.value);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
-          doc = parsed;
-      } catch {
-        /* unreadable translation → serve the source */
-      }
+      const checked = checkTranslatedBody(l.contentJson, body.value);
+      // An invalid or structurally different stored translation (written
+      // before validation existed, or the source changed shape) is never
+      // served — the source is.
+      if (checked.ok) doc = checked.doc;
     }
-    if (!title || (doc == null && l.contentJson != null))
+    const fellBack = !title || (doc == null && l.contentJson != null);
+    if (fellBack) {
+      if (!requestAllowsFallback()) {
+        throw new NotFoundException({
+          code: 'TRANSLATION_NOT_AVAILABLE',
+          message: `This lesson has no up-to-date ${locale} translation`,
+          locale,
+        });
+      }
       noteTranslationFallback(source);
-    return { title: title ?? sourceTitle, doc: doc ?? l.contentJson };
+    }
+    return {
+      title: title ?? sourceTitle,
+      doc: doc ?? l.contentJson,
+      translation: {
+        locale,
+        source: fellBack ? source : locale,
+        fallback: fellBack,
+      },
+    };
+  }
+
+  /**
+   * GET /lessons/:id/multipliers — the promotions that apply to this lesson
+   * (rules targeting it, plus course-wide rules of its course), for the
+   * editor's read-only list. ADMIN, or the course's TEACHER.
+   */
+  async multipliers(actor: ApiUser, id: string): Promise<LessonMultiplier[]> {
+    const l = await this.load(id);
+    await this.requireModuleAccess(actor, l.moduleId, 'write');
+    const rows = await this.prisma.multiplier.findMany({
+      where: {
+        userId: null,
+        OR: [
+          { lessonId: l.id },
+          { courseId: l.module.courseId, lessonId: null },
+        ],
+      },
+      orderBy: [{ isActive: 'desc' }, { startsAt: 'desc' }],
+      take: 100,
+    });
+    const now = Date.now();
+    return rows.map((m) => ({
+      id: m.id,
+      kind: m.kind,
+      target: m.target,
+      value: Number(m.value),
+      startsAt: m.startsAt?.toISOString() ?? null,
+      endsAt: m.endsAt?.toISOString() ?? null,
+      courseId: m.courseId,
+      lessonId: m.lessonId,
+      description: m.description,
+      isActive: m.isActive,
+      activeNow:
+        m.isActive &&
+        (!m.startsAt || m.startsAt.getTime() <= now) &&
+        (!m.endsAt || m.endsAt.getTime() > now),
+      scope: m.lessonId ? 'lesson' : 'course',
+    }));
   }
 
   /**
@@ -462,11 +539,14 @@ export class LessonsService {
     }
     const result = validateLessonDoc(migrated);
     if (!result.ok) throw invalidContent(result.issues);
-    await this.assertRefsExist(result.doc as unknown as LessonDoc);
-    return result.doc as unknown as Prisma.InputJsonValue;
+    const doc = result.doc as unknown as LessonDoc;
+    await this.assertRefsExist(doc);
+    // docs/06 §3: oEmbed metadata on save (allowlisted providers only).
+    await this.embeds?.enrich(doc);
+    return doc as unknown as Prisma.InputJsonValue;
   }
 
-  /** docs/06 §6: ref blocks must point at existing rows. */
+  /** docs/06 §6: ref blocks and image assets must point at existing rows. */
   private async assertRefsExist(doc: LessonDoc): Promise<void> {
     const refs = collectLessonRefs(doc);
     const [exercises, prompts, scenarios] = await Promise.all([
@@ -509,6 +589,7 @@ export class LessonsService {
     missing(refs.exerciseIds, exercises, 'exerciseId');
     missing(refs.aiPromptIds, prompts, 'aiPromptId');
     missing(refs.scenarioIds, scenarios, 'scenarioId');
+    issues.push(...(await imageAssetIssues(this.prisma, doc)));
     if (issues.length) throw invalidContent(issues);
   }
 

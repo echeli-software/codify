@@ -96,6 +96,47 @@ export interface ResolvedTranslations {
   items: Record<string, Record<string, ResolvedField>>;
 }
 
+export type TranslationFileFormat = 'csv' | 'json';
+
+/** A translation addressed without its value (mark complete). */
+export interface TranslationRef {
+  entityType: TranslatableEntityType;
+  entityId: string;
+  field: string;
+  locale: ContentLocale;
+}
+
+export interface TranslationImportBody {
+  entityType: TranslatableEntityType;
+  locale: ContentLocale;
+  format: TranslationFileFormat;
+  /** The file's text. */
+  content: string;
+  /** Validate and report without writing. */
+  dryRun?: boolean;
+}
+
+export interface TranslationImportRowError {
+  /** 1-based row in the file (CSV data rows start at 2; 0 = whole file). */
+  row: number;
+  entityId?: string;
+  field?: string;
+  message: string;
+}
+
+/**
+ * POST /admin/translations/import result (200), also carried as `report`
+ * on the 400 `TRANSLATION_IMPORT_INVALID` problem (then nothing was written).
+ */
+export interface TranslationImportReport {
+  dryRun: boolean;
+  imported: number;
+  valid: number;
+  skipped: number;
+  errors: TranslationImportRowError[];
+  sourceChanged: { row: number; entityId: string; field: string }[];
+}
+
 /** Typed client for content translations (docs/11 §3). */
 @Injectable({ providedIn: 'root' })
 export class TranslationsClient {
@@ -138,6 +179,55 @@ export class TranslationsClient {
     return firstValueFrom(
       this.http.get<TranslationCompleteness>(
         `${this.base}/admin/translations/completeness`,
+      ),
+    );
+  }
+
+  /** ADMIN/TEACHER: explicit "mark complete" — clears outdated, keeps the text. Audited. */
+  markComplete(items: TranslationRef[]): Promise<{ completed: number }> {
+    return firstValueFrom(
+      this.http.post<{ completed: number }>(
+        `${this.base}/admin/translations/complete`,
+        { items },
+        { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /** ADMIN/TEACHER: CSV / JSON file of one entity type × locale. */
+  async exportFile(
+    entityType: TranslatableEntityType,
+    locale: ContentLocale,
+    format: TranslationFileFormat,
+  ): Promise<{ filename: string; blob: Blob }> {
+    const params = new HttpParams()
+      .set('entityType', entityType)
+      .set('locale', locale)
+      .set('format', format);
+    const res = await firstValueFrom(
+      this.http.get(`${this.base}/admin/translations/export`, {
+        params,
+        observe: 'response',
+        responseType: 'blob',
+      }),
+    );
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const filename =
+      /filename="([^"]+)"/.exec(disposition)?.[1] ??
+      `translations-${entityType.toLowerCase()}-${locale}.${format}`;
+    return { filename, blob: res.body ?? new Blob([]) };
+  }
+
+  /**
+   * ADMIN/TEACHER: bulk import. Rejects (ProblemDetailsError
+   * `TRANSLATION_IMPORT_INVALID`, `data.report`) when any row is invalid.
+   */
+  importFile(body: TranslationImportBody): Promise<TranslationImportReport> {
+    return firstValueFrom(
+      this.http.post<TranslationImportReport>(
+        `${this.base}/admin/translations/import`,
+        body,
+        { context: withIdempotency() },
       ),
     );
   }

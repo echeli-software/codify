@@ -17,6 +17,7 @@ import type { ApiUser } from '../auth/auth.types.js';
 import {
   CreateLessonDto,
   UpdateLessonDto,
+  type LessonMultiplier,
   type LessonOfflineBundle,
   type LessonResponse,
   type LessonVersion,
@@ -53,6 +54,16 @@ export class LessonsController {
     @Param('id') id: string,
   ): Promise<LessonOfflineBundle> {
     return this.lessons.offlineBundle(actor, id);
+  }
+
+  /** Promotions applying to the lesson (its own + course-wide), read-only. */
+  @Roles('ADMIN', 'TEACHER')
+  @Get('lessons/:id/multipliers')
+  multipliers(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<LessonMultiplier[]> {
+    return this.lessons.multipliers(actor, id);
   }
 
   /** `[{ lessonId, updatedAt }]` so downloads re-fetch only changed lessons. */

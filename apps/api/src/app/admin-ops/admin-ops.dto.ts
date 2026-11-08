@@ -118,6 +118,8 @@ export interface SearchHit {
   subtitle: string | null;
   /** For lessons: the parent course slug (deep link context). */
   courseSlug?: string | null;
+  /** `content`: a lesson found by its body text (subtitle carries a snippet). */
+  match?: 'content';
 }
 
 export interface SearchResponse {

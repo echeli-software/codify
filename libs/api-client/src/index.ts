@@ -337,3 +337,12 @@ export {
   type NotificationPreferences,
   type UpdateNotificationPreferencesBody,
 } from './lib/notifications.client.js';
+// Authoring (round 3): lesson multipliers, translation import/export/complete.
+export type { LessonMultiplier } from './lib/lessons.client.js';
+export type {
+  TranslationFileFormat,
+  TranslationRef,
+  TranslationImportBody,
+  TranslationImportRowError,
+  TranslationImportReport,
+} from './lib/translations.client.js';
