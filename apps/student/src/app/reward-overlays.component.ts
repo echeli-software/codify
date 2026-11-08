@@ -233,7 +233,7 @@ export function countdown(endsAt: string, now = Date.now()): string {
             <p class="rt__mult" data-testid="reward-multipliers">
               {{
                 'gamification.reward.xpBoosted'
-                  | translate: { parts: xpParts().join(' × ') }
+                  | translate: { parts: xpParts().join(' · ') }
               }}
             </p>
           }
@@ -241,7 +241,7 @@ export function countdown(endsAt: string, now = Date.now()): string {
             <p class="rt__mult" data-testid="reward-coin-multipliers">
               {{
                 'gamification.reward.coinsBoosted'
-                  | translate: { parts: coinParts().join(' × ') }
+                  | translate: { parts: coinParts().join(' · ') }
               }}
             </p>
           }
@@ -412,7 +412,8 @@ export function countdown(endsAt: string, now = Date.now()): string {
       .cel {
         position: fixed;
         inset: 0;
-        z-index: 1100;
+        /* Above app sheets / Ionic overlays: a celebration is modal. */
+        z-index: 30000;
         display: grid;
         place-items: center;
         padding: 16px;
