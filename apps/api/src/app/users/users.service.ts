@@ -13,10 +13,12 @@ import type {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadEquippedPet, petNameAlias } from '../items/pet-names.js';
-import type {
-  AdminUserListItem,
-  MeResponse,
-  UpdateMeDto,
+import {
+  COUNTRY_UNKNOWN,
+  type AdminUserCountry,
+  type AdminUserListItem,
+  type MeResponse,
+  type UpdateMeDto,
 } from './users.dto.js';
 
 const ME_FIELDS = {
@@ -38,6 +40,7 @@ const ME_FIELDS = {
   activityFeedOptIn: true,
   theme: true,
   onboardingGoal: true,
+  country: true,
 } as const;
 
 @Injectable()
@@ -112,6 +115,8 @@ export class UsersService {
     lastSeenFrom?: Date;
     lastSeenTo?: Date;
     subscriptionStatus?: SubscriptionStatusFilter;
+    /** ISO 3166-1 alpha-2 (upper case) or COUNTRY_UNKNOWN. */
+    country?: string;
   }): Promise<{
     items: AdminUserListItem[];
     total: number;
@@ -130,6 +135,11 @@ export class UsersService {
           }
         : {}),
       ...subscriptionWhere(opts.subscriptionStatus),
+      ...(opts.country
+        ? {
+            country: opts.country === COUNTRY_UNKNOWN ? null : opts.country,
+          }
+        : {}),
       ...(q
         ? {
             OR: [
@@ -154,6 +164,7 @@ export class UsersService {
           locale: true,
           lastSeenAt: true,
           createdAt: true,
+          country: true,
         },
       }),
       this.prisma.user.count({ where }),
@@ -167,9 +178,31 @@ export class UsersService {
         locale: u.locale,
         lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
         createdAt: u.createdAt.toISOString(),
+        country: u.country ?? null,
       })),
       total,
     };
+  }
+
+  /**
+   * Countries present among (not deleted) users, most users first; the
+   * unknown bucket (country null) last. Feeds the Users country filter.
+   */
+  async countriesForAdmin(): Promise<{ items: AdminUserCountry[] }> {
+    const rows = await this.prisma.user.groupBy({
+      by: ['country'],
+      where: { deletedAt: null },
+      _count: { _all: true },
+    });
+    const items = rows
+      .map((r) => ({ country: r.country ?? null, users: r._count._all }))
+      .sort(
+        (a, b) =>
+          Number(a.country === null) - Number(b.country === null) ||
+          b.users - a.users ||
+          (a.country ?? '').localeCompare(b.country ?? ''),
+      );
+    return { items };
   }
 
   async getDetailForAdmin(id: string): Promise<MeResponse> {
@@ -216,6 +249,7 @@ function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
     activityFeedOptIn: u.activityFeedOptIn,
     theme: (u.theme as MeResponse['theme']) ?? null,
     onboardingGoal: (u.onboardingGoal as MeResponse['onboardingGoal']) ?? null,
+    country: u.country ?? null,
   };
 }
 

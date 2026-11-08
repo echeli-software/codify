@@ -32,6 +32,8 @@ export interface MeResponse {
   activityFeedOptIn?: boolean;
   /** Onboarding goal; null = none stored. Optional for older APIs. */
   onboardingGoal?: OnboardingGoal | null;
+  /** ISO 3166-1 alpha-2 from the IP address; null = unknown. */
+  country?: string | null;
 }
 
 export interface UpdateMeBody {
@@ -59,6 +61,8 @@ export interface AdminUserListItem {
   locale: string;
   lastSeenAt: string | null;
   createdAt: string;
+  /** ISO 3166-1 alpha-2 from the IP address; null = unknown. */
+  country?: string | null;
 }
 
 export interface AdminUserListResponse {

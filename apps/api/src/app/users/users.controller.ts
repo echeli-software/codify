@@ -20,6 +20,7 @@ import { UsersService } from './users.service.js';
 import {
   UpdateMeDto,
   UserListFiltersDto,
+  type AdminUserCountry,
   type AdminUserListItem,
   type MeResponse,
 } from './users.dto.js';
@@ -74,7 +75,15 @@ export class UsersController {
       lastSeenFrom,
       lastSeenTo,
       subscriptionStatus: filters.subscriptionStatus,
+      country: filters.country?.toUpperCase() || undefined,
     });
+  }
+
+  /** Countries present among users (Users country filter) — Admin/Support. */
+  @Roles('ADMIN', 'SUPPORT')
+  @Get('countries')
+  countries(): Promise<{ items: AdminUserCountry[] }> {
+    return this.users.countriesForAdmin();
   }
 
   /** Detail view — Admin/Support only. */

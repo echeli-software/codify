@@ -8,6 +8,7 @@ export { API_CLIENT_CONFIG, type ApiClientConfig } from './lib/api-config.js';
 export { MeClient } from './lib/me.client.js';
 export {
   UsersClient,
+  type UserCountryCount,
   type UserListQuery,
   type UserSubscriptionFilter,
 } from './lib/users.client.js';

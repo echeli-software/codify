@@ -27,6 +27,14 @@ export interface UserListQuery {
   lastSeenFrom?: string;
   lastSeenTo?: string;
   subscriptionStatus?: UserSubscriptionFilter;
+  /** ISO 3166-1 alpha-2, or `NONE` for users without a known country. */
+  country?: string;
+}
+
+/** `GET /api/users/countries` row; `country: null` = unknown. */
+export interface UserCountryCount {
+  country: string | null;
+  users: number;
 }
 
 /**
@@ -41,7 +49,7 @@ export class UsersClient {
 
   /**
    * GET /api/users?skip=&take=&q=&role=&locale=&lastSeenFrom=&lastSeenTo=
-   * &subscriptionStatus= — `q` matches email or display name
+   * &subscriptionStatus=&country= — `q` matches email or display name
    * (case-insensitive substring) or an exact user id.
    */
   list(opts: UserListQuery = {}): Promise<AdminUserListResponse> {
@@ -54,6 +62,7 @@ export class UsersClient {
     if (opts.lastSeenTo) params = params.set('lastSeenTo', opts.lastSeenTo);
     if (opts.subscriptionStatus)
       params = params.set('subscriptionStatus', opts.subscriptionStatus);
+    if (opts.country) params = params.set('country', opts.country);
     if (typeof opts.skip === 'number')
       params = params.set('skip', String(opts.skip));
     if (typeof opts.take === 'number')
@@ -62,6 +71,15 @@ export class UsersClient {
       this.http.get<AdminUserListResponse>(`${this.config.baseUrl}/users`, {
         params,
       }),
+    );
+  }
+
+  /** GET /api/users/countries — countries present (Users filter). */
+  countries(): Promise<{ items: UserCountryCount[] }> {
+    return firstValueFrom(
+      this.http.get<{ items: UserCountryCount[] }>(
+        `${this.config.baseUrl}/users/countries`,
+      ),
     );
   }
 

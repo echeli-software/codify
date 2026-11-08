@@ -4,6 +4,7 @@ import {
   IsInt,
   IsISO8601,
   IsOptional,
+  Matches,
   IsString,
   Length,
   Max,
@@ -161,6 +162,8 @@ export interface MeResponse {
   theme: UserTheme | null;
   /** Onboarding goal (docs/05 "Recommended next"), null = none picked. */
   onboardingGoal: OnboardingGoal | null;
+  /** ISO 3166-1 alpha-2 from the IP address (CF-IPCountry), null = unknown. */
+  country: string | null;
 }
 
 export interface AdminUserListItem {
@@ -171,6 +174,18 @@ export interface AdminUserListItem {
   locale: string;
   lastSeenAt: string | null;
   createdAt: string;
+  /** ISO 3166-1 alpha-2 (CF-IPCountry), null = unknown. */
+  country: string | null;
+}
+
+/** `country` list filter value for users without a known country. */
+export const COUNTRY_UNKNOWN = 'NONE';
+
+/** `GET /api/users/countries`: countries present among users. */
+export interface AdminUserCountry {
+  /** ISO 3166-1 alpha-2, or null for users without a known country. */
+  country: string | null;
+  users: number;
 }
 
 /** Subscription statuses accepted by the `subscriptionStatus` filter. */
@@ -207,6 +222,14 @@ export class UserListFiltersDto {
   @IsOptional()
   @IsIn(SUBSCRIPTION_STATUS_FILTERS)
   subscriptionStatus?: (typeof SUBSCRIPTION_STATUS_FILTERS)[number];
+
+  /** ISO 3166-1 alpha-2 (any case), or `NONE` for an unknown country. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^([A-Za-z]{2}|NONE)$/, {
+    message: 'country must be a two-letter ISO 3166-1 code or NONE',
+  })
+  country?: string;
 
   // Declared so the whitelist accepts them; the handler reads them
   // through their own @Query params.

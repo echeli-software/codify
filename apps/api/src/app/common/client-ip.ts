@@ -127,13 +127,26 @@ export function clientIp(
   opts?: ClientIpOptions,
 ): string | null {
   if (!opts && req.clientIp !== undefined) return req.clientIp;
-  const { opts: o } = resolved(opts);
   const raw = req.ip ?? req.socket?.remoteAddress;
   let ip: string | null = raw ? stripV4Mapped(raw) : null;
-  if (ip && o.trustCloudflare && isCloudflareAddress(ip, opts)) {
+  if (ip && viaCloudflare(req, opts)) {
     const cf = header(req, 'cf-connecting-ip');
     if (cf && isIP(cf)) ip = stripV4Mapped(cf);
   }
   if (!opts) req.clientIp = ip;
   return ip;
+}
+
+/**
+ * True when the request reached us from a Cloudflare edge (and
+ * TRUST_CLOUDFLARE is on), i.e. when Cloudflare's own request headers
+ * (`CF-Connecting-IP`, `CF-IPCountry`) can be believed.
+ */
+export function viaCloudflare(
+  req: ClientIpRequest,
+  opts?: ClientIpOptions,
+): boolean {
+  const { opts: o } = resolved(opts);
+  const raw = req.ip ?? req.socket?.remoteAddress;
+  return !!raw && o.trustCloudflare && isCloudflareAddress(raw, opts);
 }

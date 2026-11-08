@@ -470,4 +470,134 @@ describe('AuthMiddleware', () => {
       expect(r).toMatchObject({ error: null, next: 1, user: undefined });
     });
   });
+
+  describe('country (CF-IPCountry)', () => {
+    const CF_EDGE = '173.245.48.10';
+    const DAY_MS = 86_400_000;
+    const use = (
+      mw: AuthMiddleware,
+      headers: Record<string, string>,
+      ip = '127.0.0.1',
+    ) =>
+      mw.use(
+        {
+          method: 'GET',
+          originalUrl: '/api/me',
+          ip,
+          headers: { authorization: 'Bearer dev-token-student', ...headers },
+        } as never,
+        {} as never,
+        jest.fn(),
+      );
+
+    it('stores the country when provisioning a new user', async () => {
+      const prisma = fakePrisma();
+      const mw = new AuthMiddleware(
+        prisma as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+      await use(mw, { 'cf-ipcountry': 'br' }, CF_EDGE);
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            country: 'BR',
+            countryUpdatedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('ignores CF-IPCountry that did not come through Cloudflare', async () => {
+      const prisma = fakePrisma();
+      const dev = new AuthMiddleware(
+        prisma as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+      await use(dev, { 'cf-ipcountry': 'BR' }, '203.0.113.5');
+      const data = (
+        prisma.user.create.mock.calls[0] as unknown as [
+          { data: Record<string, unknown> },
+        ]
+      )[0].data;
+      expect(data['country']).toBeUndefined();
+    });
+
+    it('takes x-dev-country with ALLOW_DEV_AUTH', async () => {
+      const prisma = fakePrisma();
+      const mw = new AuthMiddleware(
+        prisma as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+      await use(mw, { 'x-dev-country': 'pt' });
+      expect(prisma.rows[0]).toMatchObject({ country: 'PT' });
+    });
+
+    it('refreshes a day-old country on the lastSeenAt write only', async () => {
+      const stale = new Date(Date.now() - LAST_SEEN_INTERVAL_MS - 1000);
+      const row = {
+        id: 'u1',
+        clerkId: 'dev-student',
+        email: 'student@codify.local',
+        role: 'STUDENT' as const,
+        displayName: 'S',
+        lastSeenAt: stale,
+        deletedAt: null,
+        country: 'BR',
+        countryUpdatedAt: new Date(Date.now() - DAY_MS - 1000),
+      };
+      const prisma = fakePrisma([row]);
+      const mw = new AuthMiddleware(
+        prisma as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+      await use(mw, { 'x-dev-country': 'PT' });
+      expect(prisma.user.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.user.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            lastSeenAt: expect.any(Date),
+            country: 'PT',
+          }),
+        }),
+      );
+
+      // Recently seen → no write at all, whatever the header says.
+      prisma.user.updateMany.mockClear();
+      row.lastSeenAt = new Date();
+      await use(mw, { 'x-dev-country': 'AR' });
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('keeps a fresh country on the lastSeenAt write', async () => {
+      const row = {
+        id: 'u1',
+        clerkId: 'dev-student',
+        email: 'student@codify.local',
+        role: 'STUDENT' as const,
+        displayName: 'S',
+        lastSeenAt: null,
+        deletedAt: null,
+        country: 'BR',
+        countryUpdatedAt: new Date(Date.now() - 60_000),
+      };
+      const prisma = fakePrisma([row]);
+      const mw = new AuthMiddleware(
+        prisma as never,
+        cfg({ ALLOW_DEV_AUTH: 'true' }),
+        clerkStub(),
+      );
+      await use(mw, { 'x-dev-country': 'PT' });
+      const args = (
+        prisma.user.updateMany.mock.calls[0] as unknown as [
+          { data: Record<string, unknown> },
+        ]
+      )[0];
+      expect(args.data['lastSeenAt']).toBeInstanceOf(Date);
+      expect(args.data['country']).toBeUndefined();
+    });
+  });
 });

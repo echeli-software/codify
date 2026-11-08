@@ -10,6 +10,7 @@ import {
   accountBlockFor,
   type AccountLifecycle,
 } from '../account/account-state.js';
+import { countryUpdate, requestCountry } from '../common/client-country.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { UserLifecycleService } from '../engagement/user-lifecycle.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
@@ -36,6 +37,8 @@ const USER_FIELDS = {
   role: true,
   displayName: true,
   lastSeenAt: true,
+  country: true,
+  countryUpdatedAt: true,
   deletedAt: true,
   deletionRequestedAt: true,
   purgedAt: true,
@@ -49,6 +52,14 @@ interface ResolvedRow extends AccountLifecycle {
   role: ApiUser['role'];
   displayName: string;
   lastSeenAt: Date | null;
+  country?: string | null;
+  countryUpdatedAt?: Date | null;
+}
+
+/** Per-request facts used when provisioning / touching the row. */
+export interface RequestContext {
+  /** `CF-IPCountry` (Cloudflare edges only) or the dev override. */
+  country: string | null;
 }
 
 /** A resolved caller plus their account lifecycle state. */
@@ -89,6 +100,8 @@ interface NewUserProfile {
  * 403 `MFA_REQUIRED` / `SESSION_TOO_OLD` except on `GET /me`.
  * `lastSeenAt` is written at most once per
  * LAST_SEEN_INTERVAL_MS per active user, never on every request.
+ * `country` (CF-IPCountry, common/client-country.ts) is stored on
+ * provisioning and refreshed at most daily, riding on that same write.
  */
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
@@ -115,7 +128,11 @@ export class AuthMiddleware implements NestMiddleware {
       if (token) {
         let account: ResolvedAccount | null = null;
         try {
-          account = await this.resolveAccount(token);
+          account = await this.resolveAccount(token, {
+            country: requestCountry(req, {
+              devOverride: this.config.devAuthEnabled,
+            }),
+          });
         } catch (err) {
           this.logger.warn(`Auth resolution failed: ${(err as Error).message}`);
         }
@@ -150,47 +167,59 @@ export class AuthMiddleware implements NestMiddleware {
   }
 
   /** Token → caller + lifecycle state (deleted/suspended included), or null. */
-  async resolveAccount(token: string): Promise<ResolvedAccount | null> {
+  async resolveAccount(
+    token: string,
+    ctx: RequestContext = { country: null },
+  ): Promise<ResolvedAccount | null> {
     if (token.startsWith('dev-token-')) {
       if (!this.config.devAuthEnabled) return null;
       const stub = parseStubToken(token);
       if (!stub) return null;
-      return this.findOrProvision(stub.clerkId, async () => ({
-        email: stub.email,
-        displayName: stub.displayName,
-        role: stub.role,
-      }));
+      return this.findOrProvision(
+        stub.clerkId,
+        async () => ({
+          email: stub.email,
+          displayName: stub.displayName,
+          role: stub.role,
+        }),
+        ctx,
+      );
     }
 
     const verified = await this.clerk.verify(token);
     if (!verified) return null;
-    const account = await this.findOrProvision(verified.sub, async () => {
-      const profile =
-        (await this.clerk.fetchProfile(verified.sub)) ??
-        profileFromClaims(verified.sub, verified.claims);
-      return {
-        email: profile.email ?? placeholderEmail(verified.sub),
-        displayName: profile.displayName,
-        role: 'STUDENT',
-      };
-    });
+    const account = await this.findOrProvision(
+      verified.sub,
+      async () => {
+        const profile =
+          (await this.clerk.fetchProfile(verified.sub)) ??
+          profileFromClaims(verified.sub, verified.claims);
+        return {
+          email: profile.email ?? placeholderEmail(verified.sub),
+          displayName: profile.displayName,
+          role: 'STUDENT',
+        };
+      },
+      ctx,
+    );
     return account ? { ...account, claims: verified.claims } : null;
   }
 
   private async findOrProvision(
     clerkId: string,
     profile: () => Promise<NewUserProfile>,
+    ctx: RequestContext,
   ): Promise<ResolvedAccount | null> {
     let row: ResolvedRow | null = await this.prisma.user.findUnique({
       where: { clerkId },
       select: USER_FIELDS,
     });
     if (!row) {
-      row = await this.provision(clerkId, await profile());
+      row = await this.provision(clerkId, await profile(), ctx);
       if (row && !row.deletedAt) this.lifecycle?.onCreated(row.id);
     }
     if (!row || row.purgedAt) return null;
-    if (!row.deletedAt && !row.suspendedAt) this.touch(row);
+    if (!row.deletedAt && !row.suspendedAt) this.touch(row, ctx);
     return {
       user: {
         userId: row.id,
@@ -211,6 +240,7 @@ export class AuthMiddleware implements NestMiddleware {
   private async provision(
     clerkId: string,
     p: NewUserProfile,
+    ctx: RequestContext,
   ): Promise<ResolvedRow | null> {
     const create = () =>
       this.prisma.user.create({
@@ -220,6 +250,9 @@ export class AuthMiddleware implements NestMiddleware {
           displayName: p.displayName,
           role: p.role,
           lastSeenAt: new Date(),
+          ...(ctx.country
+            ? { country: ctx.country, countryUpdatedAt: new Date() }
+            : {}),
         },
         select: USER_FIELDS,
       });
@@ -259,8 +292,14 @@ export class AuthMiddleware implements NestMiddleware {
     return null;
   }
 
-  /** Fire-and-forget lastSeenAt refresh, at most once per interval. */
-  private touch(row: ResolvedRow): void {
+  /**
+   * Fire-and-forget lastSeenAt refresh, at most once per interval. The
+   * daily country refresh rides on the same write (no extra query). A row
+   * the Clerk webhook created has no country yet (the webhook comes from
+   * Clerk's servers, not the user) and no lastSeenAt, so the user's first
+   * request fills both.
+   */
+  private touch(row: ResolvedRow, ctx: RequestContext): void {
     const now = Date.now();
     if (
       row.lastSeenAt &&
@@ -274,13 +313,21 @@ export class AuthMiddleware implements NestMiddleware {
       new Date(now),
     );
     const cutoff = new Date(now - LAST_SEEN_INTERVAL_MS);
+    const country = countryUpdate(
+      {
+        country: row.country ?? null,
+        countryUpdatedAt: row.countryUpdatedAt ?? null,
+      },
+      ctx.country,
+      new Date(now),
+    );
     void this.prisma.user
       .updateMany({
         where: {
           id: row.id,
           OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: cutoff } }],
         },
-        data: { lastSeenAt: new Date(now) },
+        data: { lastSeenAt: new Date(now), ...(country ?? {}) },
       })
       .catch((err: Error) =>
         this.logger.warn(`lastSeenAt update failed: ${err.message}`),
