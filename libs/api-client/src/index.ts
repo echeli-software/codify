@@ -382,3 +382,33 @@ export {
   type SearchCourseHit,
   type SearchLessonHit,
 } from './lib/search.client.js';
+// Admin (round 3): catalog tools — courses bulk/filters, curriculum, course
+// insights, promotions preview, badge rule check, drop wizard, site settings.
+export {
+  AdminCatalogClient,
+  SiteConfigClient,
+  type AdminCourseListQuery,
+  type BulkCourseAction,
+  type BulkCoursesBody,
+  type BulkCoursesResult,
+  type CourseAuthor,
+  type CurriculumOrderBody,
+  type CurriculumOrderResult,
+  type DuplicatedLesson,
+  type FreeLessonsResult,
+  type TranslationFieldStatus,
+  type CourseTranslationsReport,
+  type CourseAnalyticsReport,
+  type CourseEnrollmentRow,
+  type CourseMultiplierRow,
+  type MultiplierPreview,
+  type MultiplierPreviewDimension,
+  type BadgeRuleValidation,
+  type DropCopy,
+  type ScheduleDropBody,
+  type ScheduledDrop,
+  type ThemePreference,
+  type SiteConfig,
+  type SiteSettingsAdmin,
+  type UpdateSiteSettingsBody,
+} from './lib/admin-catalog.client.js';

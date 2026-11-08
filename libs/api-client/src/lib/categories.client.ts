@@ -11,6 +11,8 @@ export interface Category {
   description: string | null;
   iconName: string | null;
   colorToken: string | null;
+  /** Catalog order (ascending); drag-to-reorder in the admin. */
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +28,7 @@ export interface CreateCategoryBody {
   description?: string;
   iconName?: string;
   colorToken?: string;
+  sortOrder?: number;
 }
 
 export type UpdateCategoryBody = Partial<CreateCategoryBody>;
@@ -86,6 +89,16 @@ export class CategoriesClient {
     return firstValueFrom(
       this.http.delete<void>(
         `${this.config.baseUrl}/categories/${encodeURIComponent(id)}`,
+      ),
+    );
+  }
+
+  /** PUT /categories/order — every live category id in the new order (ADMIN). */
+  reorder(ids: string[]): Promise<CategoryListResponse> {
+    return firstValueFrom(
+      this.http.put<CategoryListResponse>(
+        `${this.config.baseUrl}/categories/order`,
+        { ids },
       ),
     );
   }

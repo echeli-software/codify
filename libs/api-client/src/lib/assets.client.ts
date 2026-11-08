@@ -15,6 +15,11 @@ export interface AssetView {
   confirmed: boolean;
   uploadedById: string | null;
   createdAt: string;
+  /** Pixel size recorded on confirm (images only). */
+  width?: number | null;
+  height?: number | null;
+  /** Confirm found identical bytes already uploaded: this is that asset. */
+  deduplicated?: boolean;
 }
 
 export interface PresignedUpload {
