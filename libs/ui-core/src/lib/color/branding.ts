@@ -31,8 +31,8 @@ export function brandingVars(
       continue;
     out[`--cdf-color-${name}`] = value;
     if (name === 'primary' || name === 'primary-hover') {
-      const rgb = hexToRgbTriplet(value);
-      if (rgb) out[`--cdf-color-${name}-rgb`] = rgb;
+      // `value` already passed HEX, so the triplet is never null here.
+      out[`--cdf-color-${name}-rgb`] = hexToRgbTriplet(value) as string;
     }
   }
   return out;

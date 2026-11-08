@@ -684,7 +684,7 @@
     },
     "avatar": {
       "title": "Provador",
-      "offline": "Você está offline — seu avatar é exibido a partir deste aparelho. Conecte-se para alterá-lo.",
+      "offline": "Você está offline — as alterações ficam salvas neste aparelho e sincronizam quando você se reconectar.",
       "tryingOn": "Provando {name}",
       "tryOnHint": "Isto é uma prévia — compre na loja para ficar com o item.",
       "backToShop": "Voltar à loja",
@@ -746,7 +746,8 @@
       "petTitle": "Seu pet",
       "petName": "Nome do pet",
       "petSaved": "Salvo — diga oi para {name}!",
-      "bulkEquipped": "{count, plural, one {# item equipado.} other {# itens equipados.}}"
+      "bulkEquipped": "{count, plural, one {# item equipado.} other {# itens equipados.}}",
+      "savedOffline": "Salvo neste aparelho — sincroniza quando você voltar a ficar online."
     },
     "profile": {
       "title": "Perfil",

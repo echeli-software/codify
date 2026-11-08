@@ -102,6 +102,7 @@ const SCENARIOS: Record<
     ],
   },
   mysteryChestOpen: { canonical: { xp: 15, coins: 120 } },
+  promoCode: { canonical: { xp: 0, coins: 50 } },
 };
 
 const KINDS = Object.keys(SCENARIOS) as RewardKind[];

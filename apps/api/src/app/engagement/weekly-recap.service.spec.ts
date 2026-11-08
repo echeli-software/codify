@@ -17,7 +17,19 @@ function setup(xp: number, lessons: number) {
               { timezone: 'Asia/Tokyo' },
             ];
           if (args.cursor) return [];
-          return [{ id: 'u1', streak: { currentDays: 4 } }];
+          return [
+            {
+              id: 'u1',
+              timezone: 'America/Sao_Paulo',
+              // Active yesterday (local Sunday) → still a live 4-day streak.
+              streak: {
+                currentDays: 4,
+                longestDays: 4,
+                freezesAvailable: 0,
+                lastActivityDate: new Date('2026-10-11T00:00:00Z'),
+              },
+            },
+          ];
         },
       ),
     },

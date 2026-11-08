@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { effectiveStreak, localDateKey } from '@codify/domain';
+import { toStreakState } from '../gamification/gamification.service.js';
 import { weeklyRecapCopy, weeklyRecapLines } from '../email/copy.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { localWeekStart } from '../notifications/push.service.js';
@@ -92,7 +94,18 @@ export class WeeklyRecapService {
               none: { kind: 'WEEKLY_RECAP', emailEnabled: false },
             },
           },
-          select: { id: true, streak: { select: { currentDays: true } } },
+          select: {
+            id: true,
+            timezone: true,
+            streak: {
+              select: {
+                currentDays: true,
+                longestDays: true,
+                freezesAvailable: true,
+                lastActivityDate: true,
+              },
+            },
+          },
           orderBy: { id: 'asc' },
           take: BATCH,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -122,7 +135,11 @@ export class WeeklyRecapService {
           const stats = {
             xp: xpBy.get(u.id) ?? 0,
             lessons: lessonsBy.get(u.id) ?? 0,
-            streakDays: u.streak?.currentDays ?? 0,
+            // Settled for today (a lapsed streak reads 0, not the stale row).
+            streakDays: effectiveStreak(
+              u.streak ? toStreakState(u.streak) : null,
+              localDateKey(now, u.timezone),
+            ).currentDays,
           };
           if (stats.xp <= 0 && stats.lessons <= 0) {
             out.noActivity += 1;

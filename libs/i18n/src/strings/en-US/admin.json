@@ -1641,7 +1641,10 @@
         "lesson": "Lesson",
         "opened": "Opened (90 days)",
         "dropOffRate": "Drop-off",
-        "fullFunnels": "See full course funnels"
+        "fullFunnels": "See full course funnels",
+        "retentionD1": "Day 1",
+        "retentionD7": "Day 7",
+        "retentionD30": "Day 30"
       },
       "exercises": {
         "title": "Exercise health",

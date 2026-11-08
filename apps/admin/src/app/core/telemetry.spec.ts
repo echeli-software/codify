@@ -47,6 +47,31 @@ describe('featureEventFor', () => {
         req('PUT', '/api/admin/translations', { items: [1, 2, 3] }),
       ),
     ).toEqual({ name: 'translation_completed', props: { count: 3 } });
+    expect(
+      featureEventFor(
+        req('POST', '/api/admin/translations/complete', { items: [1, 2] }),
+      ),
+    ).toEqual({
+      name: 'translation_completed',
+      props: { via: 'mark_complete', count: 2 },
+    });
+    expect(
+      featureEventFor(
+        req('POST', '/api/admin/translations/import', {
+          entityType: 'LESSON',
+          locale: 'en-US',
+          dryRun: false,
+        }),
+      ),
+    ).toEqual({
+      name: 'translation_completed',
+      props: { via: 'import', entityType: 'LESSON', locale: 'en-US' },
+    });
+    expect(
+      featureEventFor(
+        req('POST', '/api/admin/translations/import', { dryRun: true }),
+      ),
+    ).toBeNull();
   });
 
   it('ignores reads, other paths and non-API urls', () => {

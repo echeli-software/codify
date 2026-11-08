@@ -1641,7 +1641,10 @@
         "lesson": "Aula",
         "opened": "Abriram (90 dias)",
         "dropOffRate": "Abandono",
-        "fullFunnels": "Ver os funis completos dos cursos"
+        "fullFunnels": "Ver os funis completos dos cursos",
+        "retentionD1": "Dia 1",
+        "retentionD7": "Dia 7",
+        "retentionD30": "Dia 30"
       },
       "exercises": {
         "title": "Saúde dos exercícios",

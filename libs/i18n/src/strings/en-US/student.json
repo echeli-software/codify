@@ -684,7 +684,7 @@
     },
     "avatar": {
       "title": "Dressing room",
-      "offline": "You're offline — your avatar is shown from this device. Connect to change it.",
+      "offline": "You're offline — changes are saved on this device and sync when you reconnect.",
       "tryingOn": "Trying on {name}",
       "tryOnHint": "This is a preview — buy it in the shop to keep it.",
       "backToShop": "Back to shop",
@@ -746,7 +746,8 @@
       "petTitle": "Your pet",
       "petName": "Pet name",
       "petSaved": "Saved — say hi to {name}!",
-      "bulkEquipped": "{count, plural, one {# item equipped.} other {# items equipped.}}"
+      "bulkEquipped": "{count, plural, one {# item equipped.} other {# items equipped.}}",
+      "savedOffline": "Saved on this device — it syncs when you're back online."
     },
     "profile": {
       "title": "Profile",

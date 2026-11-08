@@ -353,9 +353,21 @@ type Tab = 'overview' | 'courses' | 'events';
                           <th scope="col" class="num">
                             {{ 'admin.staff.analytics.signups' | translate }}
                           </th>
-                          <th scope="col" class="num">D1</th>
-                          <th scope="col" class="num">D7</th>
-                          <th scope="col" class="num">D30</th>
+                          <th scope="col" class="num">
+                            {{
+                              'admin.staff.analytics.retentionD1' | translate
+                            }}
+                          </th>
+                          <th scope="col" class="num">
+                            {{
+                              'admin.staff.analytics.retentionD7' | translate
+                            }}
+                          </th>
+                          <th scope="col" class="num">
+                            {{
+                              'admin.staff.analytics.retentionD30' | translate
+                            }}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>

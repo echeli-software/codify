@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { effectiveStreak, localDateKey } from '@codify/domain';
 import { levelFromXp, tierForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
 import { coursesCompleted } from './learner-stats.js';
+import { toStreakState } from '../gamification/gamification.service.js';
 
 export interface PublicProfile {
   userId: string;
@@ -58,6 +60,7 @@ export class ProfileService {
         totalXp: true,
         avatarConfig: true,
         petName: true,
+        timezone: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -129,6 +132,10 @@ export class ProfileService {
     }
 
     const level = levelFromXp(user.totalXp);
+    const liveStreak = effectiveStreak(
+      streak ? toStreakState(streak) : null,
+      localDateKey(new Date(), user.timezone),
+    );
     return {
       userId: user.id,
       displayName: user.displayName,
@@ -149,8 +156,10 @@ export class ProfileService {
       })),
       stats: {
         lessonsCompleted,
-        streakDays: streak?.currentDays ?? 0,
-        longestStreak: streak?.longestDays ?? 0,
+        // Settled for today, like the summary (a missed day shows 0, not the
+        // stale count the hourly settlement job hasn't written yet).
+        streakDays: liveStreak.currentDays,
+        longestStreak: liveStreak.longestDays,
         friends: friendsA + friendsB,
         coursesCompleted: courses.get(userId) ?? 0,
         itemsOwned,

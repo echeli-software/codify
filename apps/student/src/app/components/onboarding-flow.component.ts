@@ -135,7 +135,7 @@ export function recommendForGoal(
           <cdf-onboarding-carousel
             [slides]="slides()"
             (skipped)="finish(null)"
-            (completed)="step.set('goal')"
+            (completed)="carouselDone()"
           />
         }
         @case ('goal') {
@@ -365,6 +365,12 @@ export class OnboardingFlowComponent {
     const g = this.goal();
     return g ? recommendForGoal(g, this.courses(), this.categories()) : [];
   });
+
+  /** Welcome carousel finished (docs/10 §2 step 1, onboarding funnel). */
+  protected carouselDone(): void {
+    this.telemetry.onboardingStep('welcome');
+    this.step.set('goal');
+  }
 
   protected pickGoal(g: OnboardingGoal): void {
     this.goal.set(g);

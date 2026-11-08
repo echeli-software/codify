@@ -42,6 +42,8 @@ export const FEATURE_RULES: readonly {
   path: RegExp;
   event: AdminFeatureEvent;
   props?: (req: HttpRequest<unknown>, match: RegExpMatchArray) => object;
+  /** Extra condition on the request (e.g. skip dry runs). */
+  when?: (req: HttpRequest<unknown>) => boolean;
 }[] = [
   { method: 'POST', path: /^\/courses$/, event: 'course_created' },
   {
@@ -78,6 +80,32 @@ export const FEATURE_RULES: readonly {
       return Array.isArray(items) ? { count: items.length } : {};
     },
   },
+  {
+    method: 'POST',
+    path: /^\/admin\/translations\/complete$/,
+    event: 'translation_completed',
+    props: (req) => {
+      const items = (req.body as { items?: unknown[] } | null)?.items;
+      return {
+        via: 'mark_complete',
+        ...(Array.isArray(items) ? { count: items.length } : {}),
+      };
+    },
+  },
+  {
+    method: 'POST',
+    path: /^\/admin\/translations\/import$/,
+    event: 'translation_completed',
+    when: (req) => !(req.body as { dryRun?: boolean } | null)?.dryRun,
+    props: (req) => {
+      const body = req.body as { entityType?: string; locale?: string } | null;
+      return {
+        via: 'import',
+        ...(body?.entityType ? { entityType: body.entityType } : {}),
+        ...(body?.locale ? { locale: body.locale } : {}),
+      };
+    },
+  },
 ];
 
 /** API path of a request URL: everything after the first `/api`. */
@@ -95,6 +123,7 @@ export function featureEventFor(
   if (!path) return null;
   for (const rule of FEATURE_RULES) {
     if (rule.method !== req.method) continue;
+    if (rule.when && !rule.when(req)) continue;
     const m = path.match(rule.path);
     if (m) return { name: rule.event, props: rule.props?.(req, m) ?? {} };
   }

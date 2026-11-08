@@ -1235,8 +1235,12 @@ export class SubscriptionPage {
   protected async openPortal(): Promise<void> {
     this.portalLoading.set(true);
     try {
+      // On native the webview origin (capacitor://…) isn't a page Stripe can
+      // send the in-app browser back to: let the API use STUDENT_APP_URL.
       const res = await this.billing.createPortal(
-        `${window.location.origin}/subscription`,
+        this.native.isNative
+          ? undefined
+          : `${window.location.origin}/subscription`,
       );
       // In-app browser on native, a new tab on the web (STF-12, docs/09 §7).
       await this.native.shell.openExternal(res.url);

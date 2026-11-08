@@ -43,6 +43,7 @@ import {
   ItemsClient,
   MeClient,
   type AvatarResponse,
+  type ItemSlot,
   type InventoryItem,
   type ShopItem,
 } from '@codify/api-client';
@@ -58,6 +59,7 @@ import {
   equippedSprites,
   toUiItem,
 } from './shared/avatar.js';
+import { OfflineSyncService } from '../offline/offline-sync.service.js';
 
 /** Look changes are saved 3 s after the last tap (docs/08 §9). */
 const LOOK_AUTOSAVE_MS = 3000;
@@ -164,7 +166,7 @@ const LOOK_AUTOSAVE_MS = 3000;
               [saving]="saving()"
               [randomizing]="randomizing()"
               [animate]="!reducedMotion()"
-              [autosaveMs]="online() ? 3000 : 0"
+              [autosaveMs]="3000"
               (save)="save($event)"
               (randomize)="randomize()"
               (poseChange)="setLook({ pose: $event })"
@@ -204,7 +206,6 @@ const LOOK_AUTOSAVE_MS = 3000;
                   [attr.aria-checked]="look().skinTone === tone"
                   [attr.aria-label]="'student.avatar.tones.' + tone | translate"
                   [attr.data-tone]="tone"
-                  [disabled]="!online()"
                   (click)="setLook({ skinTone: tone })"
                 ></button>
               }
@@ -223,7 +224,6 @@ const LOOK_AUTOSAVE_MS = 3000;
                   role="radio"
                   class="av__chip"
                   [attr.aria-checked]="look().baseBodyId === b"
-                  [disabled]="!online()"
                   (click)="setLook({ baseBodyId: b })"
                 >
                   {{ 'student.avatar.bodies.' + b | translate }}
@@ -245,7 +245,6 @@ const LOOK_AUTOSAVE_MS = 3000;
                   class="av__chip"
                   [attr.aria-checked]="look().baseHairStyle === h"
                   [attr.data-hair]="h"
-                  [disabled]="!online()"
                   (click)="setLook({ baseHairStyle: h })"
                 >
                   {{ 'student.avatar.hair.' + h | translate }}
@@ -272,7 +271,6 @@ const LOOK_AUTOSAVE_MS = 3000;
                   [attr.aria-label]="
                     'student.avatar.hairColors.c' + i | translate
                   "
-                  [disabled]="!online()"
                   (click)="setLook({ baseHairColor: c })"
                 ></button>
               }
@@ -295,7 +293,6 @@ const LOOK_AUTOSAVE_MS = 3000;
                   [attr.aria-label]="
                     'student.avatar.eyeColors.c' + i | translate
                   "
-                  [disabled]="!online()"
                   (click)="setLook({ eyeColor: c })"
                 ></button>
               }
@@ -346,7 +343,7 @@ const LOOK_AUTOSAVE_MS = 3000;
               data-testid="inventory"
               [items]="owned()"
               [busyId]="busyId()"
-              [bulk]="online()"
+              [bulk]="true"
               (equip)="equipOne($event, true)"
               (unequip)="equipOne($event, false)"
               (bulkEquip)="bulkEquip($event)"
@@ -468,6 +465,8 @@ const LOOK_AUTOSAVE_MS = 3000;
 })
 export class AvatarPage {
   private readonly items = inject(ItemsClient);
+  /** Offline edits queue here and sync last-write-wins (docs/16 §3, §8). */
+  private readonly offline = inject(OfflineSyncService);
   private readonly me = inject(MeClient);
   private readonly downloads = inject(DownloadService);
   private readonly network = inject(NetworkStatusService);
@@ -531,6 +530,51 @@ export class AvatarPage {
     void this.load();
   }
 
+  /**
+   * Offline equip: queue the slot changes and apply them to the local
+   * avatar from the owned inventory, so the dressing room shows them now.
+   */
+  private async queueEquips(
+    changes: { slot: ItemSlot; itemId: string | null }[],
+  ): Promise<void> {
+    if (changes.length === 0) return;
+    try {
+      await this.offline.queueAvatarEquip(changes);
+    } catch (err) {
+      this.toast.error(err);
+      return;
+    }
+    const owned = new Map(this.inventory().map((i) => [i.item.id, i.item]));
+    this.avatar.update((a) => {
+      if (!a) return a;
+      const equipped = { ...a.equipped };
+      for (const c of changes) {
+        const item = c.itemId ? owned.get(c.itemId) : undefined;
+        if (!item) {
+          delete equipped[c.slot];
+          continue;
+        }
+        equipped[c.slot] = {
+          itemId: item.id,
+          slug: item.slug,
+          name: item.name,
+          slot: item.slot,
+          rarity: item.rarity,
+          spriteAssetId: item.spriteAssetId,
+          spriteUrl: item.spriteUrl ?? null,
+        };
+      }
+      return { ...a, equipped };
+    });
+    this.inventory.update((list) =>
+      list.map((i) => {
+        const c = changes.find((ch) => ch.slot === i.item.slot);
+        return c ? { ...i, equipped: c.itemId === i.item.id } : i;
+      }),
+    );
+    this.toast.show({ message: 'student.avatar.savedOffline', kind: 'info' });
+  }
+
   private setAvatar(av: AvatarResponse): void {
     this.avatar.set(av);
     this.petName = av.petName ?? '';
@@ -592,6 +636,10 @@ export class AvatarPage {
   protected async save(next: EquippedMap): Promise<void> {
     const changes = changedSlots(this.equipped(), next);
     if (changes.length === 0 || this.saving()) return;
+    if (!this.online()) {
+      await this.queueEquips(changes);
+      return;
+    }
     this.saving.set(true);
     try {
       for (const c of changes) {
@@ -624,6 +672,12 @@ export class AvatarPage {
   }
 
   protected async equipOne(item: UiShopItem, on: boolean): Promise<void> {
+    if (!this.online()) {
+      await this.queueEquips([
+        { slot: item.slot as ItemSlot, itemId: on ? item.id : null },
+      ]);
+      return;
+    }
     this.busyId.set(item.id);
     try {
       this.setAvatar(await this.items.equip(item.slot, on ? item.id : null));
@@ -638,6 +692,12 @@ export class AvatarPage {
 
   /** Inventory multi-select: one item per slot, applied in turn. */
   protected async bulkEquip(chosen: UiShopItem[]): Promise<void> {
+    if (!this.online()) {
+      await this.queueEquips(
+        chosen.map((it) => ({ slot: it.slot as ItemSlot, itemId: it.id })),
+      );
+      return;
+    }
     this.saving.set(true);
     try {
       for (const it of chosen) {
@@ -660,7 +720,6 @@ export class AvatarPage {
 
   /** Base-look edit: preview now, save 3 s after the last change. */
   protected setLook(patch: Partial<AvatarConfig> | { pose: AvatarPose }): void {
-    if (!this.online()) return;
     this.lookDraft.update((d) => ({ ...d, ...patch }));
     if (this.lookTimer) clearTimeout(this.lookTimer);
     this.lookTimer = setTimeout(() => {
@@ -672,6 +731,23 @@ export class AvatarPage {
   private async flushLook(): Promise<void> {
     const patch = this.lookDraft();
     if (Object.keys(patch).length === 0) return;
+    if (!this.online()) {
+      // Queue the patch (merged with earlier offline edits) and show it now.
+      try {
+        await this.offline.queueAvatarConfig(patch);
+        this.avatar.update((a) =>
+          a ? { ...a, config: { ...(a.config ?? {}), ...patch } } : a,
+        );
+        this.lookDraft.set({});
+        this.toast.show({
+          message: 'student.avatar.savedOffline',
+          kind: 'info',
+        });
+      } catch (err) {
+        this.toast.error(err);
+      }
+      return;
+    }
     this.lookSaving.set(true);
     try {
       this.setAvatar(await this.items.saveConfig(patch));
