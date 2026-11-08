@@ -17,8 +17,10 @@ import {
   PlansClient,
   StaffToolsClient,
   UsersClient,
+  type AuditEntry,
 } from '@codify/api-client';
 import { UserDetailPage } from './user-detail.page';
+import { userAuditQuery } from './user-audit-tab.component';
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
@@ -58,6 +60,22 @@ const enrollment = {
   createdAt: '2026-11-01T00:00:00.000Z',
 };
 
+const entry = (over: Partial<AuditEntry> = {}): AuditEntry => ({
+  id: 'a1',
+  createdAt: '2026-11-08T10:00:00.000Z',
+  actorId: 'admin1',
+  actorName: 'Boss',
+  actorEmail: 'boss@x.y',
+  actorRole: 'ADMIN',
+  action: 'user.role_changed',
+  entity: 'User',
+  entityId: 'u1',
+  diff: { before: { role: 'STUDENT' }, after: { role: 'TEACHER' } },
+  ip: '1.2.3.4',
+  userAgent: 'jest',
+  ...over,
+});
+
 async function mount(
   opts: { role?: string; confirm?: boolean; viewer?: string } = {},
 ) {
@@ -74,7 +92,9 @@ async function mount(
     revoke: jest.fn().mockResolvedValue(undefined),
   };
   const ops = {
-    audit: jest.fn().mockResolvedValue({ items: [], nextCursor: null }),
+    audit: jest
+      .fn()
+      .mockResolvedValue({ items: [entry()], nextCursor: 'next-1' }),
   };
   const confirm = { open: jest.fn().mockResolvedValue(opts.confirm ?? true) };
   const toast = {
@@ -184,5 +204,58 @@ describe('UserDetailPage — typed confirmation (SEC-8)', () => {
     );
     expect(enrollments.revoke).toHaveBeenCalledWith('e1');
     expect(el.querySelector('[data-enrollment="e1"]')).toBeNull();
+  });
+});
+
+describe('UserDetailPage — Audit tab (STF-8)', () => {
+  it('builds the query for each scope', () => {
+    expect(userAuditQuery('u1', 'about')).toEqual({
+      entityType: 'User',
+      entityId: 'u1',
+    });
+    expect(userAuditQuery('u1', 'actions')).toEqual({ actorId: 'u1' });
+  });
+
+  it('lists entries about a student, with the diff viewer', async () => {
+    const { openTab, click, ops, el } = await mount();
+    await openTab('audit');
+    expect(ops.audit).toHaveBeenCalledWith({
+      entityType: 'User',
+      entityId: 'u1',
+      limit: 25,
+    });
+    // Students have no "actions by" scope.
+    expect(el.querySelector('[data-audit-scope]')).toBeNull();
+    expect(
+      el.querySelector('[data-testid="user-audit-table"]')?.textContent,
+    ).toContain('user.role_changed');
+    await click('[data-audit="a1"] cdf-button button');
+    const diff = el.querySelector('#udiff-a1')?.textContent ?? '';
+    expect(diff).toContain('STUDENT');
+    expect(diff).toContain('TEACHER');
+  });
+
+  it('staff users also list the actions they made, paged', async () => {
+    const { openTab, click, ops, el } = await mount({ role: 'SUPPORT' });
+    await openTab('audit');
+    ops.audit.mockResolvedValueOnce({
+      items: [entry({ id: 'a2', actorId: 'u1', action: 'user.suspended' })],
+      nextCursor: null,
+    });
+    await click('[data-audit-scope="actions"]');
+    expect(ops.audit).toHaveBeenLastCalledWith({ actorId: 'u1', limit: 25 });
+    expect(
+      el.querySelector('[data-testid="user-audit-table"]')?.textContent,
+    ).toContain('user.suspended');
+  });
+
+  it('a failed load shows an inline error with retry', async () => {
+    const { openTab, click, ops, el } = await mount();
+    ops.audit.mockRejectedValueOnce(new Error('boom'));
+    await openTab('audit');
+    expect(el.querySelector('[data-testid="load-error"]')).not.toBeNull();
+    await click('[data-testid="load-error"] cdf-button button');
+    expect(ops.audit).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="user-audit-table"]')).not.toBeNull();
   });
 });

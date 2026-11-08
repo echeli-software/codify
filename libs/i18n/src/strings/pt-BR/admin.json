@@ -1012,7 +1012,8 @@
         "enrollments": "Matrículas",
         "inventory": "Inventário",
         "ledger": "Extrato de moedas / XP",
-        "account": "Conta"
+        "account": "Conta",
+        "audit": "Auditoria"
       },
       "xp": "XP total",
       "coins": "Moedas",
@@ -1022,6 +1023,15 @@
       "profileReadOnly": "Os dados de identidade são gerenciados pelo usuário e pelo provedor de login.",
       "notFound": "Usuário não encontrado",
       "back": "Voltar aos usuários",
+      "audit": {
+        "title": "Trilha de auditoria",
+        "scope": "Quais registros",
+        "about": "Sobre este usuário",
+        "actions": "Ações deste usuário",
+        "empty": "Nenhuma alteração registrada para este usuário",
+        "emptyActions": "Este usuário não tem ações registradas",
+        "openLog": "Abrir no log de auditoria"
+      },
       "subs": {
         "title": "Assinaturas",
         "none": "Nenhuma assinatura.",

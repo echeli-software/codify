@@ -57,6 +57,7 @@ import { localToIso } from '../core/catalog';
 import { CursorPager } from '../core/cursor-pager';
 import { LoadError } from '../shared/load-error';
 import { UserAccountPanelComponent } from './user-account-panel.component';
+import { UserAuditTab } from './user-audit-tab.component';
 
 type Tab =
   | 'profile'
@@ -64,7 +65,8 @@ type Tab =
   | 'enrollments'
   | 'inventory'
   | 'ledger'
-  | 'account';
+  | 'account'
+  | 'audit';
 
 /** docs/14 §2: SUPPORT grants are capped at ~1 month. */
 export const SUPPORT_MAX_GRANT_DAYS = 31;
@@ -91,15 +93,16 @@ export function daysUntil(
  * User detail (docs/04 "Users"): profile, subscriptions (grant a plan for N
  * days — SUPPORT capped at 31 with the API's message shown — and cancel now
  * or at period end) and course enrollments (grant PROMO / ADMIN_GRANT with
- * an access end, revoke), inventory, ledger and account. Every mutation
- * carries an audit reason; cancelling, revoking, role changes and grants
- * ask for the user's email typed back (SEC-8).
+ * an access end, revoke), inventory, ledger, account and the audit trail
+ * (STF-8). Every mutation carries an audit reason; cancelling, revoking,
+ * role changes and grants ask for the user's email typed back (SEC-8).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     UserAccountPanelComponent,
+    UserAuditTab,
     RouterLink,
     Avatar,
     Badge,
@@ -942,6 +945,18 @@ export function daysUntil(
               <cdf-user-account-panel [userId]="userId()" [email]="u.email" />
             </section>
           }
+          @case ('audit') {
+            <section
+              id="upanel-audit"
+              role="tabpanel"
+              aria-labelledby="utab-audit"
+            >
+              <cdf-user-audit-tab
+                [userId]="userId()"
+                [staff]="u.role !== 'STUDENT'"
+              />
+            </section>
+          }
         }
       } @else if (notFound()) {
         <cdf-empty-state
@@ -1031,6 +1046,7 @@ export class UserDetailPage {
     'inventory',
     'ledger',
     'account',
+    'audit',
   ];
   protected readonly isAdmin = computed(() => this.auth.role() === 'ADMIN');
   /** Staff can't change their own role (403 ROLE_CHANGE_SELF). */

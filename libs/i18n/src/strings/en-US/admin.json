@@ -1012,7 +1012,8 @@
         "enrollments": "Enrollments",
         "inventory": "Inventory",
         "ledger": "Coin / XP ledger",
-        "account": "Account"
+        "account": "Account",
+        "audit": "Audit"
       },
       "xp": "Total XP",
       "coins": "Coins",
@@ -1022,6 +1023,15 @@
       "profileReadOnly": "Identity data is managed by the user and the sign-in provider.",
       "notFound": "User not found",
       "back": "Back to users",
+      "audit": {
+        "title": "Audit trail",
+        "scope": "Which entries",
+        "about": "About this user",
+        "actions": "Actions by this user",
+        "empty": "No recorded changes to this user",
+        "emptyActions": "This user has no recorded actions",
+        "openLog": "Open in the audit log"
+      },
       "subs": {
         "title": "Subscriptions",
         "none": "No subscriptions.",
