@@ -16,7 +16,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { PlansService } from './plans.service.js';
+import { PlansService, planAuditSnapshot } from './plans.service.js';
 import {
   CreatePlanDto,
   ListPlansQueryDto,
@@ -73,10 +73,10 @@ export class PlansController {
     @Req() req: Request,
   ): Promise<PlanResponse> {
     const created = await this.plans.create(body);
-    void this.audit.record(
-      actor,
-      auditMeta('plan.create', created.id, { ...body }, req),
-    );
+    void this.audit.record(actor, {
+      ...auditMeta('plan.create', created.id, null, req),
+      after: planAuditSnapshot(created),
+    });
     return created;
   }
 
@@ -88,12 +88,13 @@ export class PlansController {
     @Body() body: UpdatePlanDto,
     @Req() req: Request,
   ): Promise<PlanResponse> {
-    const updated = await this.plans.update(id, body);
-    void this.audit.record(
-      actor,
-      auditMeta('plan.update', id, { ...body }, req),
-    );
-    return updated;
+    const { before, after } = await this.plans.update(id, body);
+    void this.audit.record(actor, {
+      ...auditMeta('plan.update', id, null, req),
+      before: planAuditSnapshot(before),
+      after: planAuditSnapshot(after),
+    });
+    return after;
   }
 
   @Roles('ADMIN')
@@ -104,8 +105,11 @@ export class PlansController {
     @Param('id') id: string,
     @Req() req: Request,
   ): Promise<void> {
-    await this.plans.softDelete(id);
-    void this.audit.record(actor, auditMeta('plan.delete', id, null, req));
+    const removed = await this.plans.softDelete(id);
+    void this.audit.record(actor, {
+      ...auditMeta('plan.delete', id, null, req),
+      before: planAuditSnapshot(removed),
+    });
   }
 
   @Roles('ADMIN')
@@ -133,12 +137,17 @@ export class PlansController {
     @Body() body: UpdatePlanPriceDto,
     @Req() req: Request,
   ): Promise<PlanResponse> {
-    const updated = await this.plans.updatePrice(id, priceId, body);
-    void this.audit.record(
-      actor,
-      auditMeta('plan.price.update', id, { priceId, ...body }, req),
+    const { plan, before, after } = await this.plans.updatePrice(
+      id,
+      priceId,
+      body,
     );
-    return updated;
+    void this.audit.record(actor, {
+      ...auditMeta('plan.price.update', id, { priceId }, req),
+      before: { ...before },
+      after: { ...after },
+    });
+    return plan;
   }
 
   @Roles('ADMIN')
@@ -149,12 +158,12 @@ export class PlansController {
     @Param('priceId') priceId: string,
     @Req() req: Request,
   ): Promise<PlanResponse> {
-    const updated = await this.plans.removePrice(id, priceId);
-    void this.audit.record(
-      actor,
-      auditMeta('plan.price.remove', id, { priceId }, req),
-    );
-    return updated;
+    const { plan, before } = await this.plans.removePrice(id, priceId);
+    void this.audit.record(actor, {
+      ...auditMeta('plan.price.remove', id, { priceId }, req),
+      before: { ...before },
+    });
+    return plan;
   }
 
   @Roles('ADMIN')

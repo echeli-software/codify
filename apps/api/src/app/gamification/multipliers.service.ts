@@ -58,6 +58,20 @@ type MultiplierRow = {
   updatedAt: Date;
 };
 
+/**
+ * The audited fields of a rule (`diff.before` / `diff.after`): the stored
+ * columns, without timestamps or the derived `activeNow`.
+ */
+export function multiplierAuditSnapshot(
+  m: MultiplierResponse,
+): Record<string, unknown> {
+  const stored: Record<string, unknown> = { ...m };
+  delete stored['activeNow'];
+  delete stored['createdAt'];
+  delete stored['updatedAt'];
+  return stored;
+}
+
 function toResponse(m: MultiplierRow, now = new Date()): MultiplierResponse {
   return {
     id: m.id,
@@ -132,10 +146,11 @@ export class MultipliersService {
     return toResponse(created);
   }
 
+  /** Patch a rule; returns it before and after (for the audit row). */
   async update(
     id: string,
     patch: Partial<MultiplierInput>,
-  ): Promise<MultiplierResponse> {
+  ): Promise<{ before: MultiplierResponse; after: MultiplierResponse }> {
     const current = await this.prisma.multiplier.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Multiplier not found');
 
@@ -178,13 +193,19 @@ export class MultipliersService {
         isActive: patch.isActive,
       },
     });
-    return toResponse(updated);
+    const now = new Date();
+    return {
+      before: toResponse(current, now),
+      after: toResponse(updated, now),
+    };
   }
 
-  async remove(id: string): Promise<void> {
+  /** Delete a rule; returns it as it was (for the audit row). */
+  async remove(id: string): Promise<MultiplierResponse> {
     const target = await this.prisma.multiplier.findUnique({ where: { id } });
     if (!target) throw new NotFoundException('Multiplier not found');
     await this.prisma.multiplier.delete({ where: { id } });
+    return toResponse(target);
   }
 
   private assertValid(draft: Parameters<typeof validateMultiplierDraft>[0]) {

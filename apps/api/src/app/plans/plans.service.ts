@@ -185,9 +185,17 @@ export class PlansService {
     return this.getById(created.id, { includeInactive: true });
   }
 
-  async update(id: string, patch: UpdatePlanDto): Promise<PlanResponse> {
+  /**
+   * Patch a plan. Returns the plan before and after the patch so the
+   * controller can audit both (docs/14 §12).
+   */
+  async update(
+    id: string,
+    patch: UpdatePlanDto,
+  ): Promise<{ before: PlanResponse; after: PlanResponse }> {
     const target = await this.prisma.plan.findFirst({
       where: { id, deletedAt: null },
+      include: PLAN_INCLUDE,
     });
     if (!target) throw new NotFoundException('Plan not found');
     if (patch.slug && patch.slug !== target.slug) {
@@ -230,18 +238,24 @@ export class PlansService {
       id,
       changedFields(target, patch, ['name', 'description', 'tagline']),
     );
-    return this.getById(id, { includeInactive: true });
+    return {
+      before: toResponse(target, true),
+      after: await this.getById(id, { includeInactive: true }),
+    };
   }
 
-  async softDelete(id: string): Promise<void> {
+  /** Soft-delete a plan; returns it as it was (for the audit row). */
+  async softDelete(id: string): Promise<PlanResponse> {
     const target = await this.prisma.plan.findFirst({
       where: { id, deletedAt: null },
+      include: PLAN_INCLUDE,
     });
     if (!target) throw new NotFoundException('Plan not found');
     await this.prisma.plan.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
+    return toResponse(target, true);
   }
 
   async addPrice(
@@ -285,7 +299,11 @@ export class PlansService {
     planId: string,
     priceId: string,
     patch: UpdatePlanPriceDto,
-  ): Promise<PlanResponse> {
+  ): Promise<{
+    plan: PlanResponse;
+    before: PlanPriceResponse;
+    after: PlanPriceResponse;
+  }> {
     const price = await this.prisma.planPrice.findFirst({
       where: { id: priceId, planId, plan: { deletedAt: null } },
     });
@@ -296,12 +314,16 @@ export class PlansService {
     if (patch.isActive !== undefined) data.isActive = patch.isActive;
     if (patch.maxInstallments !== undefined)
       data.maxInstallments = patch.maxInstallments;
-    if (Object.keys(data).length) {
-      await this.withStoreProductConflict(() =>
-        this.prisma.planPrice.update({ where: { id: priceId }, data }),
-      );
-    }
-    return this.getById(planId, { includeInactive: true });
+    const updated = Object.keys(data).length
+      ? await this.withStoreProductConflict(() =>
+          this.prisma.planPrice.update({ where: { id: priceId }, data }),
+        )
+      : price;
+    return {
+      plan: await this.getById(planId, { includeInactive: true }),
+      before: toPriceResponse(price),
+      after: toPriceResponse(updated),
+    };
   }
 
   /** storeProductId is globally unique: map the P2002 to a 409. */
@@ -318,13 +340,20 @@ export class PlansService {
     }
   }
 
-  async removePrice(planId: string, priceId: string): Promise<PlanResponse> {
+  /** Delete a price line; returns the plan and the removed price. */
+  async removePrice(
+    planId: string,
+    priceId: string,
+  ): Promise<{ plan: PlanResponse; before: PlanPriceResponse }> {
     const price = await this.prisma.planPrice.findFirst({
       where: { id: priceId, planId },
     });
     if (!price) throw new NotFoundException('Price not found');
     await this.prisma.planPrice.delete({ where: { id: priceId } });
-    return this.getById(planId, { includeInactive: true });
+    return {
+      plan: await this.getById(planId, { includeInactive: true }),
+      before: toPriceResponse(price),
+    };
   }
 
   /**
@@ -391,6 +420,18 @@ function assertNoDuplicatePrices(
     }
     seen.add(key);
   }
+}
+
+/**
+ * The audited fields of a plan (`diff.before` / `diff.after`): the stored
+ * columns, categories and price lines, without timestamps or derived flags.
+ */
+export function planAuditSnapshot(p: PlanResponse): Record<string, unknown> {
+  const stored: Record<string, unknown> = { ...p };
+  delete stored['syncedToStripe'];
+  delete stored['createdAt'];
+  delete stored['updatedAt'];
+  return stored;
 }
 
 function toPriceResponse(p: PlanPrice): PlanPriceResponse {

@@ -15,6 +15,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
   MultipliersService,
+  multiplierAuditSnapshot,
   type MultiplierResponse,
 } from './multipliers.service.js';
 import {
@@ -59,7 +60,7 @@ export class MultipliersController {
       action: 'multiplier.create',
       entity: 'Multiplier',
       entityId: created.id,
-      diff: { ...body },
+      after: multiplierAuditSnapshot(created),
     });
     return created;
   }
@@ -70,14 +71,15 @@ export class MultipliersController {
     @Param('id') id: string,
     @Body() body: UpdateMultiplierDto,
   ): Promise<MultiplierResponse> {
-    const updated = await this.multipliers.update(id, body);
+    const { before, after } = await this.multipliers.update(id, body);
     void this.audit.record(actor, {
       action: 'multiplier.update',
       entity: 'Multiplier',
       entityId: id,
-      diff: { ...body },
+      before: multiplierAuditSnapshot(before),
+      after: multiplierAuditSnapshot(after),
     });
-    return updated;
+    return after;
   }
 
   @Delete(':id')
@@ -86,11 +88,12 @@ export class MultipliersController {
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
   ): Promise<void> {
-    await this.multipliers.remove(id);
+    const removed = await this.multipliers.remove(id);
     void this.audit.record(actor, {
       action: 'multiplier.delete',
       entity: 'Multiplier',
       entityId: id,
+      before: multiplierAuditSnapshot(removed),
     });
   }
 }
