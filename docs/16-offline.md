@@ -394,3 +394,52 @@ This work is split across two phases:
 - Auto-download settings.
 
 These feed naturally into the existing roadmap. See [15-roadmap.md](./15-roadmap.md).
+
+## 14. As built (round 3)
+
+**Queue kinds.** `OfflineEventQueue` (`apps/student/src/app/offline/event-queue.ts`)
+holds `lesson_complete`, `quiz_attempt`, `scenario_complete`, `avatar_equip`,
+`avatar_config_update`, `lesson_progress_seen` and `preference_update`. Every
+event keeps `clientEventId` (Idempotency-Key) + `clientTimestamp`; queued
+completions also carry a local reward `estimate` (lesson base XP / coins).
+
+| Kind | Replayed as | Notes |
+| --- | --- | --- |
+| `scenario_complete` | `POST /scenarios/:id/complete` `{ path, clientTimestamp }` + `Idempotency-Key` | Played from the downloaded graph; the server walks and scores the path again. A replayed key returns the recorded run (`replayed: true`, no new row, no cooldown). Best local play per lesson (a completed path beats a partial one). |
+| `avatar_equip` | `PUT /avatar/equip` per slot with `clientTimestamp` | One coalesced event per user, latest change per slot. Server: last-write-wins against `EquippedItem.updatedAt` (stored = the client time); an older write answers `stale: true` and changes nothing; the client toasts "changed on another device". |
+| `avatar_config_update` | `PUT /avatar/config` with `clientTimestamp` | Merged patch; LWW against `User.avatarUpdatedAt`. `OfflineSyncService.queueAvatarEquip/queueAvatarConfig` are the entry points for the dressing room. Edge: an unequip removes the row, so a later-synced *older* equip of that slot still applies. |
+| `preference_update` | `PATCH /me` | Merged; used for the locale switch and the time-zone setting while offline. |
+| `lesson_progress_seen` | analytics event `lesson_progress_seen` with the original time | A lesson opened from the download while offline. |
+
+**Offline lists.** Catalog (per filter set), Today (summary, quests,
+enrollments, catalog, categories, league, avatar, continue-card course +
+progress) and My courses keep their last successful response in
+localStorage, scoped by user id (`offline/response-cache.ts`), and render it
+offline with an "Offline · showing what you saw …" chip. The lesson player
+saves the course curriculum (`course-cache.ts`) so the outline, position and
+"Next" work offline; offline, "Next" skips to the next *downloaded* lesson.
+
+**Estimates.** `OfflineSyncService.pendingEstimate` sums the estimates of
+queued completions that will count (lesson completes, locally-correct quiz
+attempts, completed scenario plays). The shell shows `≈ coins` with
+"estimated — final coins are applied when synced", Today shows the pending
+line and advances lesson-count / XP quests optimistically
+(`optimisticQuests`), and course / outline rows show a clock icon for lessons
+with a queued completion. A background 409 on `lesson_complete` toasts
+"Already completed elsewhere".
+
+**Bundle.** `GET /lessons/:id/offline-bundle` adds `scenario { id, graph,
+updatedAt }` (SCENARIO lessons) and `exercise { id, language, entryFunction,
+starterCode, visibleTests }` (EXERCISE lessons — never the solution, harness
+or hidden tests). Offline the exercise is shown read-only with "Connect to
+run code".
+
+**Download prompt.** Enrolling on the course page (without auto-download)
+shows "Want to read this course offline? Download it now." with *Download
+course* / *Download the next 3 lessons* / *Not now*.
+
+**Telemetry.** `offline_queue_enqueued`, `queue_depth_on_flush`,
+`sync_flush` (`sent`, `succeeded`, `conflicts`, `failed`, `halted`),
+`sync_conflict`, `offline_session_minutes`; the old `download_*` /
+`download_eviction` names are sent as `course_download_*` / `cache_evicted`
+(docs/10 §14).

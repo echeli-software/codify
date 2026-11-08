@@ -458,6 +458,29 @@ Common props on every event (added by the client SDK): `platform`
 | `notification_fewer`            | "Fewer like this" tapped                     | `kind`, `level`                                                                |
 | `app_opened` / `session_start`  | App start (student boot); session start      | `online`                                                                       |
 
+**Navigation / funnel (student app)**
+
+| Event | When | Props |
+| --- | --- | --- |
+| `page_view` | Route shown | `route` (pattern, e.g. `/lessons/:id`) |
+| `screen_time` | Left a route / tab hidden | `route`, `durationMs` |
+| `onboarding_step_complete` | Onboarding step finished | `step` (`goal` / `track` / …), step props |
+| `paywall_cta_tap` | Paywall call-to-action tapped | `source`, `planId?`, `lessonId?` |
+| `catalog_search` / `global_search` | Catalog / header search answered | `results` or `courses`, `lessons`, `length` |
+| `download_offer_accepted` | Post-enrollment download prompt | `courseId`, `what` (`course` / `next`) |
+| `offline_session_minutes` | Back online after ≥ 1 min offline | `minutes` |
+| `lesson_progress_seen` | Lesson opened offline (sent on sync) | `lessonId`, `courseId` |
+| `queue_depth_on_flush` | Offline queue flush starts | `queueDepth`, `manual` |
+| `consent_updated` | Web consent saved (if analytics allowed) | `analytics`, `errors` |
+| `timezone_detected` | Device time zone applied | `changed` |
+
+The client maps names that predate this catalogue to it
+(`TelemetryService.LEGACY_EVENT_NAMES`): `download_started|completed|failed` →
+`course_download_start|complete|fail`, `download_eviction` → `cache_evicted`,
+`push_opened` → `push_open`, `sync_flush_completed|failed` → `sync_flush`. Every
+client event carries `locale` and `online`; on the web nothing is sent until
+analytics consent is given (docs/14 §13).
+
 Server-side events (`push_sent`, `push_skipped`) are written by `PushService` with `platform: "server"`. The
 daily-quest reminder learns the typical session start from `app_opened` (emitted on every app start) and
 `session_start`.

@@ -89,6 +89,20 @@ Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed
 - Sort: recommended, newest, most popular, shortest.
 - Course cards with cover, title, category chips, lesson count, duration, "free preview available" badge, "included in [Plan]" mini chip.
 
+_As built:_ `GET /courses` takes `q` (server-side search over course titles
+/ descriptions in any locale, slug and category names), `difficulty` (1–5),
+`free=true` (has a free preview lesson), `premium=true` (no free lessons),
+`language` (source locale or a translated title) and `sort`
+(`recommended` = default order, `newest`, `popular` = enrollments,
+`shortest`); list and detail items carry `hasFreePreview`. Cards show the
+cover (`coverUrl`), the free-preview badge and "premium only". The desktop
+header (≥ 768 px) has the breadcrumb (≥ 1024 px) and a global search over
+courses and lessons — `GET /catalog/search?q=` (any signed-in user; ≥ 2
+chars; published content, titles only, in the caller's locale) →
+`{ courses: [{ id, slug, title }], lessons: [{ id, title, type, isFree,
+courseId, courseSlug, courseTitle }] }`. Today's "Recommended next" ranks
+courses by the onboarding goal and the categories of enrolled courses.
+
 ### Learn → Course detail
 
 - Hero: cover, title, author, difficulty, duration, total lessons.
@@ -105,6 +119,15 @@ Total: ≤ 60 seconds to first reward (excluding lesson read time). Skip allowed
 - For interactive blocks: inline within the flow.
 - Footer (sticky): "Mark complete" / "Next" once read; "Submit" / "Run" for exercise-type lessons.
 - On complete: optimistic UI + reward orchestration → navigate to next lesson or course summary.
+- _As built:_ header buttons for the module outline (sheet below 1024 px; a
+  side rail at ≥ 1024 px) and reading settings (text size S / M / L / XL,
+  remembered per device; sound effects on/off via `SoundService`). Leaving
+  with answered-but-unsubmitted quiz questions asks first (route
+  `canDeactivate` + `beforeunload`).
+- _Exercise editor:_ Monaco (lazy chunk, JS / TS / Python / HTML / CSS
+  grammars) on devices with a fine pointer; on touch-only devices the native
+  textarea stays — Monaco lists mobile browsers as unsupported and its
+  selection / IME handling on soft keyboards is unreliable.
 
 ### Learn → Quiz / Exercise / Scenario
 

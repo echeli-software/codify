@@ -145,6 +145,16 @@ Purge job (`AccountPurgeService`, daily 03:17 UTC, behind `JOBS_ENABLED`): accou
 - **DPO contact**: published in privacy policy.
 - **Data residency**: BR DB primary; backups in same region; no cross-region transfer of PII without explicit consent flow (which we don't currently need).
 - **Cookies**: minimal — auth + analytics. Banner on first visit (web only) with granular toggles.
+  - _As built_ (`apps/student/src/app/components/consent-banner.component.ts`,
+    `telemetry/consent.ts`): first web visit shows *Accept all* / *Necessary
+    only* / *Customize* (necessary — always on; product analytics; error
+    reporting) with a link to `/privacy`; the choice is stored only in
+    localStorage (`codify.consent.v1`, versioned). Until analytics is allowed
+    `TelemetryService` drops events (nothing is buffered); Sentry is only
+    initialised at start-up when error reporting is allowed (a later "allow"
+    applies from the next launch). The same toggles live on Settings → Data &
+    privacy. Native apps show no banner: analytics and diagnostics are declared
+    in the App Store privacy details / Play Data safety form and are on.
 
 ## 14. Payment compliance
 

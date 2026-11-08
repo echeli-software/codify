@@ -202,6 +202,13 @@ Promotion: `main` auto-deploys to staging. Tagged release (`v*`) deploys to prod
 | Bundle: student initial route | < 250KB gzipped |
 | Bundle: admin initial route | < 400KB gzipped (acceptable, internal users) |
 
+Enforced for the student app by the Angular `initial` budget in
+`apps/student/project.json` (warning 600 kB, **error 1 MB raw**). Angular
+budgets measure minified bytes, not gzip; the measured ratio of the initial
+chunks is ≈ 4 : 1 (447 kB raw ≈ 113 kB transfer, Nov 2026), so 1 MB raw is the
+250 kB-gzipped line and `nx build` (CI) fails above it. Heavy features stay in
+lazy chunks (Monaco: `monaco-setup` + `editor-worker`, Clerk, Ionic).
+
 ## 10. Background jobs (BullMQ)
 
 Single inventory of all queues. Workers are separate Nest processes consuming from Redis.

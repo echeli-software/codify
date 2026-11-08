@@ -71,6 +71,46 @@ As built: `infra/judge0/image` extends `judge0/judge0:1.13.1` with Node.js 22 an
 - Use `<iframe>` with `sandbox="allow-scripts"` (no same-origin) and CSP headers.
 - Test harness: a small framework that exposes a postMessage API; tests verify DOM state, computed styles, console output.
 
+**As built.** `Exercise.language = "web"` (`BROWSER_EXERCISE_LANGUAGE`,
+`libs/domain/src/lib/browser-exercise.ts`). The student's code is loaded as
+the iframe `srcdoc` (assigned from code, so Angular doesn't sanitize the
+scripts) with `sandbox="allow-scripts"` — an opaque origin with no access to
+the app's cookies, storage or DOM — and a meta CSP `default-src 'none';
+script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:;
+…` that blocks every network request. The harness (injected before the
+student's code) captures `console.*` and errors and answers one
+`{ type: 'codify:run-tests', nonce, tests }` message from the parent window
+with the raw value of each check; the parent only accepts the reply from that
+frame's window with the run's nonce and grades it (`gradeBrowserTests`, deep
+equality with `expected`). A run that doesn't answer within 5 s (endless
+loop, crash) fails every test.
+
+Tests reuse the stored `{ id, name, args, expected }` shape; `args[0]` is the
+check: `["text", sel]`, `["exists", sel]`, `["count", sel]`,
+`["attr", sel, name]`, `["style", sel, prop]` (computed value, e.g.
+`"rgb(255, 0, 0)"`), `["console", index]` (`-1` = all lines joined by `\n`),
+`["eval", expr]`. They are validated on save (`INVALID_TESTS`). Hidden tests
+are not used for web exercises — they would have to be shipped to the browser.
+
+`POST /exercises/:id/browser-result` (STUDENT, reward throttle group,
+`Idempotency-Key`) `{ code, results: [{ id, passed, error? }],
+clientTimestamp? }` → the same `SubmissionView` as `/submit`. The server
+checks that the exercise is a `web` exercise the student can access, that
+every visible test is reported exactly once (`BROWSER_RESULTS_MISMATCH`) and
+≤ 10 runs / minute per exercise (`SUBMIT_RATE_LIMITED`), stores a COMPLETE
+Submission and, on a pass, completes the lesson through
+`ProgressService.recordCompletion` (`EXERCISE_PASS`, first pass only).
+`/run` and `/submit` answer `LANGUAGE_NOT_SUPPORTED` for web exercises.
+
+**Trust model.** The verdict of a browser exercise is *client-attested*: the
+server has no browser to re-run DOM / style checks, so a modified client can
+report a pass. That is accepted because the reward is the same small,
+non-monetary first-completion XP / coins as any lesson (paid once per lesson,
+inside the daily caps and the reward rate-limit group), the submitted code is
+stored with every result for review, and nothing else (certificates aside —
+capstones are rubric-graded) depends on it. Server-verified grading would
+need a headless-browser runner and is out of scope.
+
 ## 5. Exercise definition
 
 `Exercise` row contains:
