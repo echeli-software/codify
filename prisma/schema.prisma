@@ -73,6 +73,9 @@ model User {
   activityFeedOptIn Boolean   @default(false)
   /// Last-write-wins clock for avatarConfig (docs/16 §8).
   avatarUpdatedAt   DateTime?
+  /// Onboarding goal (docs/10 §2): career | newTech | ai | softSkills.
+  /// Drives "Recommended next" on every device.
+  onboardingGoal    String?
 
   /// Running gamification totals — single-row updates from Progress
   /// completions inside the same transaction that writes Progress, so
@@ -84,41 +87,43 @@ model User {
   /// AvatarConfig JSON (base body, skin tone, hair). See 08-avatar-and-shop.md.
   avatarConfig Json?
 
-  auditedActions     AuditLog[]
-  authoredCourses    Course[]                 @relation("CourseAuthor")
-  progress           Progress[]
-  subscriptions      Subscription[]
-  xpEvents           XpEvent[]
-  coinTransactions   CoinTransaction[]
-  streak             Streak?
-  deviceTokens       DeviceToken[]
-  userBadges         UserBadge[]
-  questAssignments   QuestAssignment[]
-  items              UserItem[]
-  equipped           EquippedItem[]
-  leagueMemberships  LeagueMembership[]
-  sentFriendRequests FriendRequest[]          @relation("Sender")
-  recvFriendRequests FriendRequest[]          @relation("Receiver")
-  friendshipsA       Friendship[]             @relation("FriendA")
-  friendshipsB       Friendship[]             @relation("FriendB")
-  sentNudges         FriendNudge[]            @relation("NudgeSender")
-  recvNudges         FriendNudge[]            @relation("NudgeReceiver")
-  submissions        Submission[]
-  aiSubmissions      AiSubmission[]
-  scenarioRuns       ScenarioRun[]
-  certificates       Certificate[]
-  enrollments        Enrollment[]
-  quizAttempts       QuizAttempt[]
-  uploadedAssets     Asset[]
-  analyticsEvents    AnalyticsEvent[]
-  referredBy         User?                    @relation("Referrals", fields: [referredById], references: [id])
-  referrals          User[]                   @relation("Referrals")
-  notifications      Notification[]
-  notificationPrefs  NotificationPreference[]
-  payments           Payment[]
-  promoRedemptions   PromoCodeRedemption[]
-  coinBonusPools     CoinBonusPool[]
-  multipliers        Multiplier[]
+  auditedActions       AuditLog[]
+  authoredCourses      Course[]                 @relation("CourseAuthor")
+  progress             Progress[]
+  subscriptions        Subscription[]
+  xpEvents             XpEvent[]
+  coinTransactions     CoinTransaction[]
+  streak               Streak?
+  deviceTokens         DeviceToken[]
+  userBadges           UserBadge[]
+  questAssignments     QuestAssignment[]
+  items                UserItem[]
+  avatarSlotTombstones AvatarSlotTombstone[]
+  reviewCards          ReviewCard[]
+  equipped             EquippedItem[]
+  leagueMemberships    LeagueMembership[]
+  sentFriendRequests   FriendRequest[]          @relation("Sender")
+  recvFriendRequests   FriendRequest[]          @relation("Receiver")
+  friendshipsA         Friendship[]             @relation("FriendA")
+  friendshipsB         Friendship[]             @relation("FriendB")
+  sentNudges           FriendNudge[]            @relation("NudgeSender")
+  recvNudges           FriendNudge[]            @relation("NudgeReceiver")
+  submissions          Submission[]
+  aiSubmissions        AiSubmission[]
+  scenarioRuns         ScenarioRun[]
+  certificates         Certificate[]
+  enrollments          Enrollment[]
+  quizAttempts         QuizAttempt[]
+  uploadedAssets       Asset[]
+  analyticsEvents      AnalyticsEvent[]
+  referredBy           User?                    @relation("Referrals", fields: [referredById], references: [id])
+  referrals            User[]                   @relation("Referrals")
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
+  payments             Payment[]
+  promoRedemptions     PromoCodeRedemption[]
+  coinBonusPools       CoinBonusPool[]
+  multipliers          Multiplier[]
 
   @@index([role])
   @@index([lastSeenAt])
@@ -265,6 +270,7 @@ model Lesson {
   progress     Progress[]
   multipliers  Multiplier[]
   quizAttempts QuizAttempt[]
+  reviewCards  ReviewCard[]
 
   @@unique([moduleId, order])
   @@index([type])
@@ -755,6 +761,8 @@ model UserItem {
   item       Item                  @relation(fields: [itemId], references: [id])
   source     ItemAcquisitionSource
   acquiredAt DateTime              @default(now())
+  /// The user's own name for this item — pets (docs/08 §10).
+  nickname   String?
 
   @@unique([userId, itemId])
   @@index([userId, acquiredAt])
@@ -771,6 +779,17 @@ model EquippedItem {
 
   @@id([userId, slot])
   @@index([userId])
+}
+
+/// An emptied avatar slot (docs/16 §8): an offline equip of this slot
+/// queued before `clearedAt` must not win over the unequip.
+model AvatarSlotTombstone {
+  userId    String
+  slot      ItemSlot
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clearedAt DateTime
+
+  @@id([userId, slot])
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1393,4 +1412,25 @@ model CoinBonusPool {
 
   @@id([userId, weekStart])
   @@index([weekStart, paidAt])
+}
+
+/// Spaced-repetition review of a completed lesson (docs/10 §7): Leitner
+/// box 1–5; a pass moves it up a box and pushes `dueAt` out, a miss drops
+/// it to box 1. Mastery (GOLD) needs the topic's cards reviewed.
+model ReviewCard {
+  id             String    @id @default(dbgenerated("uuid_generate_v7()"))
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId       String
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  box            Int       @default(1)
+  dueAt          DateTime
+  reviews        Int       @default(0)
+  lapses         Int       @default(0)
+  lastResult     Boolean?
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([userId, lessonId])
+  @@index([userId, dueAt])
 }
