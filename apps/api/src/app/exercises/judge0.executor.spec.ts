@@ -8,6 +8,7 @@ import { ExecutorUnavailableError, type RunRequest } from './executor.types.js';
 import {
   Judge0Executor,
   JUDGE0_STATUS,
+  DEFAULT_JUDGE0_LANGUAGE_IDS,
   mapJudge0Status,
   parseJudge0LanguageIds,
   type Judge0Result,
@@ -111,8 +112,10 @@ describe('Judge0Executor', () => {
     expect(calls[0].method).toBe('POST');
     expect(calls[0].headers['X-Auth-Token']).toBe('tok');
     expect(calls[0].body).toMatchObject({
-      language_id: 92,
+      language_id: 312,
       cpu_time_limit: 1.5,
+      cpu_extra_time: 0.5,
+      wall_time_limit: 5,
       memory_limit: 64_000,
       enable_network: false,
     });
@@ -249,11 +252,37 @@ describe('Judge0Executor', () => {
     expect(res.errorKind).toBe('runtime');
   });
 
+  it('defaults to the Codify Judge0 image ids (Node 22 / Python 3.12)', () => {
+    expect(DEFAULT_JUDGE0_LANGUAGE_IDS).toEqual({
+      javascript: 222,
+      typescript: 223,
+      python: 312,
+    });
+  });
+
+  it('clamps cpu / memory to the Judge0 caps and keeps wall time at 5 s', async () => {
+    const { fetchImpl, calls } = mockFetch(({ stdin }) => ({
+      status: { id: JUDGE0_STATUS.TIME_LIMIT_EXCEEDED },
+      stdout: b64(fakeHarnessStdout(stdin, {})),
+    }));
+    const res = await new Judge0Executor({
+      baseUrl: 'http://j',
+      fetchImpl,
+      caps: { maxCpuMs: 3000, maxMemoryKb: 200_000, maxWallS: 5 },
+    }).run({ ...req, timeLimitMs: 10_000, memoryLimitKb: 512_000 });
+    expect(calls[0].body).toMatchObject({
+      cpu_time_limit: 3,
+      memory_limit: 200_000,
+      wall_time_limit: 5,
+    });
+    expect(res.output).toBe('Your code ran longer than 3000 ms.');
+  });
+
   it('uses configurable language ids and rejects unknown languages', async () => {
     expect(parseJudge0LanguageIds('python:71, javascript=63')).toMatchObject({
       python: 71,
       javascript: 63,
-      typescript: 94,
+      typescript: 223,
     });
     expect(() => parseJudge0LanguageIds('ruby:72')).toThrow(/unsupported/);
     expect(() => parseJudge0LanguageIds('python:x')).toThrow(/invalid/);

@@ -52,6 +52,8 @@ Defaults per submission:
 - Output: 64KB.
 - Network: disabled.
 
+Caps (as built): Judge0's `MAX_CPU_TIME_LIMIT=5` / `MAX_MEMORY_LIMIT=256000` / `MAX_WALL_TIME_LIMIT=5` (`infra/judge0/judge0.conf.template`) are the upper bounds of `Exercise.timeLimitMs` (100–5000) and `memoryLimitKb` (16000–256000) in the API DTOs and the admin exercise editor (`apps/api/src/app/exercises/judge0-limits.ts`). The executor always sends `wall_time_limit` 5 s and `cpu_extra_time` 0.5 s, and clamps cpu/memory to `JUDGE0_MAX_CPU_TIME_LIMIT` (s) / `JUDGE0_MAX_MEMORY_LIMIT` (KB) / `JUDGE0_MAX_WALL_TIME_LIMIT` (s) — defaults equal the template; set them only for a Judge0 host configured differently. Older rows above the caps still run, clamped.
+
 ## 4. Supported languages (initial)
 
 - JavaScript (Node 22 LTS)
@@ -60,6 +62,8 @@ Defaults per submission:
 - HTML/CSS/JS for front-end exercises (see "Browser-side" below)
 
 Adding a language = adding a Judge0 image with the runtime + writing a test harness template.
+
+As built: `infra/judge0/image` extends `judge0/judge0:1.13.1` with Node.js 22 and Python 3.12 as Judge0 languages **222** (JavaScript), **223** (TypeScript via Node's `--experimental-strip-types`) and **312** (Python); the API defaults to these ids and `JUDGE0_LANGUAGE_IDS` overrides them. The stock 1.13.1 image only has Node 12 / TS 3.7 / Python 3.8 (ids 63 / 74 / 71).
 
 ### Browser-side exercises (HTML/CSS/JS)
 

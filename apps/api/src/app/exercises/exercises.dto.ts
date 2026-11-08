@@ -13,6 +13,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ENTRY_FUNCTION_PATTERN, EXERCISE_LANGUAGES } from '@codify/domain';
+import {
+  EXERCISE_MEMORY_LIMIT_KB,
+  EXERCISE_TIME_LIMIT_MS,
+} from './judge0-limits.js';
 
 /** A test case — fields pass the whitelist via @Allow (values are free-form JSON; checked in the service). */
 export class TestCaseDto {
@@ -51,16 +55,17 @@ export class CreateExerciseDto {
   @Type(() => TestCaseDto)
   hiddenTests!: TestCaseDto[];
 
+  /** Bounds = Judge0 caps (judge0-limits.ts, docs/12 §3). */
   @IsOptional()
   @IsInt()
-  @Min(100)
-  @Max(10000)
+  @Min(EXERCISE_TIME_LIMIT_MS.min)
+  @Max(EXERCISE_TIME_LIMIT_MS.max)
   timeLimitMs?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(16000)
-  @Max(512000)
+  @Min(EXERCISE_MEMORY_LIMIT_KB.min)
+  @Max(EXERCISE_MEMORY_LIMIT_KB.max)
   memoryLimitKb?: number;
 
   /**
@@ -94,8 +99,16 @@ export class UpdateExerciseDto {
   @ValidateNested({ each: true })
   @Type(() => TestCaseDto)
   hiddenTests?: TestCaseDto[];
-  @IsOptional() @IsInt() @Min(100) @Max(10000) timeLimitMs?: number;
-  @IsOptional() @IsInt() @Min(16000) @Max(512000) memoryLimitKb?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(EXERCISE_TIME_LIMIT_MS.min)
+  @Max(EXERCISE_TIME_LIMIT_MS.max)
+  timeLimitMs?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(EXERCISE_MEMORY_LIMIT_KB.min)
+  @Max(EXERCISE_MEMORY_LIMIT_KB.max)
+  memoryLimitKb?: number;
   @IsOptional() @IsString() @Length(0, 20000) testHarness?: string;
 }
 

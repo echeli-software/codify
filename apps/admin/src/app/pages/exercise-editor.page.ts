@@ -69,6 +69,16 @@ const STARTERS: Record<
   },
 };
 
+/**
+ * Sandbox caps — mirror apps/api/src/app/exercises/judge0-limits.ts (Judge0
+ * MAX_CPU_TIME_LIMIT 5 s / MAX_MEMORY_LIMIT 256000 KB, docs/12 §3). The API
+ * rejects anything outside these bounds.
+ */
+export const EXERCISE_LIMITS = {
+  timeMs: { min: 100, max: 5000 },
+  memoryKb: { min: 16000, max: 256000 },
+} as const;
+
 const SAMPLE_VISIBLE: ExerciseTestCase[] = [
   { id: 'v1', name: 'adds two numbers', args: [1, 2], expected: 3 },
 ];
@@ -224,7 +234,8 @@ export function parseTests(
           </cdf-form-field>
           <cdf-form-field
             [label]="'admin.exercise.timeLimit' | translate"
-            [help]="'admin.exercise.timeLimitHelp' | translate"
+            [help]="'admin.exercise.timeLimitHelp' | translate: limits.timeMs"
+            [error]="fieldErrors()['timeLimitMs'] ?? null"
             controlId="ex-time"
           >
             <cdf-input
@@ -236,7 +247,10 @@ export function parseTests(
           </cdf-form-field>
           <cdf-form-field
             [label]="'admin.exercise.memoryLimit' | translate"
-            [help]="'admin.exercise.memoryLimitHelp' | translate"
+            [help]="
+              'admin.exercise.memoryLimitHelp' | translate: limits.memoryKb
+            "
+            [error]="fieldErrors()['memoryLimitKb'] ?? null"
             controlId="ex-memory"
           >
             <cdf-input
@@ -448,6 +462,7 @@ export class ExerciseEditorPage implements HasUnsavedChanges {
   protected readonly verifying = signal(false);
   protected readonly dirty = signal(false);
   protected readonly formError = signal<string | null>(null);
+  protected readonly limits = EXERCISE_LIMITS;
   protected readonly fieldErrors = signal<Record<string, string | undefined>>(
     {},
   );
@@ -554,6 +569,18 @@ export class ExerciseEditorPage implements HasUnsavedChanges {
     if (!hidden.ok) errs['hiddenTests'] = this.describeProblem(hidden.problem);
     if (!/^[A-Za-z_$][\w$]*$/.test(this.f.entryFunction.trim()))
       errs['entryFunction'] = this.i18n.t('admin.exercise.invalidEntry');
+    const inRange = (v: unknown, r: { min: number; max: number }) =>
+      Number.isInteger(Number(v)) && Number(v) >= r.min && Number(v) <= r.max;
+    if (!inRange(this.f.timeLimitMs, EXERCISE_LIMITS.timeMs))
+      errs['timeLimitMs'] = this.i18n.t(
+        'admin.exercise.timeLimitRange',
+        EXERCISE_LIMITS.timeMs,
+      );
+    if (!inRange(this.f.memoryLimitKb, EXERCISE_LIMITS.memoryKb))
+      errs['memoryLimitKb'] = this.i18n.t(
+        'admin.exercise.memoryLimitRange',
+        EXERCISE_LIMITS.memoryKb,
+      );
     this.fieldErrors.set(errs);
     if (!visible.ok || !hidden.ok || Object.keys(errs).length) return null;
     return {

@@ -31,7 +31,10 @@ SUBMISSION_CACHE_DURATION=1
 
 ################################################################################
 # Sandbox limits (per submission). The API may lower CPU/memory per exercise
-# (Exercise.timeLimitMs / memoryLimitKb) but never above the MAX_* values.
+# (Exercise.timeLimitMs / memoryLimitKb) but never above the MAX_* values:
+# its validation caps exercises at 5 s / 256000 KB and the executor sends
+# wall 5 s. If you change a MAX_* below, set the API's JUDGE0_MAX_CPU_TIME_LIMIT
+# / JUDGE0_MAX_MEMORY_LIMIT / JUDGE0_MAX_WALL_TIME_LIMIT to the same value.
 ################################################################################
 # Network: disabled and not overridable by a request.
 ENABLE_NETWORK=false

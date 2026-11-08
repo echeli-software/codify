@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import type { CodeExecutor } from './executor.types.js';
 import { ChildProcessExecutor } from './child-process.executor.js';
 import { Judge0Executor, parseJudge0LanguageIds } from './judge0.executor.js';
+import { judge0CapsFromEnv } from './judge0-limits.js';
 
 /**
  * Code-execution seam (docs/12-code-execution.md).
@@ -36,6 +37,7 @@ export function createCodeExecutor(
       baseUrl: url,
       authToken: env['JUDGE0_AUTH_TOKEN']?.trim() || undefined,
       languageIds: parseJudge0LanguageIds(env['JUDGE0_LANGUAGE_IDS']),
+      caps: judge0CapsFromEnv(env),
     });
     log.log(
       `Judge0 executor → ${url} (${executor.supportedLanguages.join(', ')})`,

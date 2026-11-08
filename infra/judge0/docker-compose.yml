@@ -14,7 +14,13 @@
 name: judge0
 
 x-judge0: &judge0
-  image: judge0/judge0:${JUDGE0_VERSION:-1.13.1}
+  # Judge0 1.13.1 + Node 22 / Python 3.12 (image/Dockerfile, docs/12 §4).
+  # Build it on the host first: docker build -t codify/judge0:1.13.1-node22-py312 image
+  image: ${JUDGE0_IMAGE:-codify/judge0:1.13.1-node22-py312}
+  build:
+    context: ./image
+    args:
+      JUDGE0_VERSION: ${JUDGE0_VERSION:-1.13.1}
   env_file: judge0.conf
   # isolate needs cgroups + mount namespaces → privileged (host is dedicated
   # to Judge0 for exactly this reason, docs/12 §2).

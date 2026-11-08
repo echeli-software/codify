@@ -11,20 +11,28 @@ import {
   type RunRequest,
   type RunResponse,
 } from './executor.types.js';
+import {
+  DEFAULT_JUDGE0_CAPS,
+  JUDGE0_CPU_EXTRA_TIME_S,
+  effectiveLimits,
+  type Judge0Caps,
+} from './judge0-limits.js';
 
 /**
- * Judge0 language ids. Defaults are Judge0 CE ≥ 1.13 (Node.js 18.15 = 93,
- * TypeScript 5.0.3 = 94, Python 3.11.2 = 92). docs/12 §4 targets Node 22 /
- * Python 3.12 images — a self-hosted Judge0 with custom images will have its
- * own ids, so override with JUDGE0_LANGUAGE_IDS="javascript:93,typescript:94,python:92"
+ * Judge0 language ids. Defaults are the Codify Judge0 image
+ * (infra/judge0/image): Node.js 22 = 222, TypeScript on Node 22 (type
+ * stripping) = 223, Python 3.12 = 312 — docs/12 §4. The stock Judge0 CE
+ * 1.13.1 image only has Node 12 (63) / TypeScript 3.7 (74) / Python 3.8 (71),
+ * and the hosted ce.judge0.com has Node 18 (93) / TS 5 (94) / Python 3.11 (92).
+ * Override with JUDGE0_LANGUAGE_IDS="javascript:222,typescript:223,python:312"
  * (check `GET /languages` on the Judge0 host).
  */
 export const DEFAULT_JUDGE0_LANGUAGE_IDS: Readonly<
   Record<HarnessLanguage, number>
 > = {
-  javascript: 93,
-  typescript: 94,
-  python: 92,
+  javascript: 222,
+  typescript: 223,
+  python: 312,
 };
 
 export function parseJudge0LanguageIds(
@@ -122,6 +130,8 @@ export interface Judge0ExecutorOptions {
   requestTimeoutMs?: number;
   /** Poll interval when Judge0 does not honour `wait=true`. */
   pollIntervalMs?: number;
+  /** The Judge0 host's MAX_* limits (judge0CapsFromEnv). */
+  caps?: Judge0Caps;
 }
 
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
@@ -131,9 +141,10 @@ const unb64 = (s: string | null | undefined) =>
 /**
  * Judge0 HTTP client (docs/12 §1, §5). One Judge0 submission per student
  * run: the generated harness executes every test in a single sandbox, so a
- * submit costs one isolate start-up (docs/12 §10 latency target). Limits:
- * cpu_time_limit ← timeLimitMs, memory_limit ← memoryLimitKb, wall 5s+,
- * network off, output capped by Judge0's max_file_size.
+ * submit costs one isolate start-up (docs/12 §10 latency target). Limits
+ * (docs/12 §3): cpu_time_limit ← timeLimitMs and memory_limit ←
+ * memoryLimitKb, both clamped to the host's MAX_* caps; wall time fixed at
+ * 5 s; network off; output capped by Judge0's max_file_size.
  */
 export class Judge0Executor implements CodeExecutor {
   readonly mode = 'judge0' as const;
@@ -143,6 +154,7 @@ export class Judge0Executor implements CodeExecutor {
   private readonly fetchImpl: typeof fetch;
   private readonly requestTimeoutMs: number;
   private readonly pollIntervalMs: number;
+  private readonly caps: Judge0Caps;
 
   constructor(private readonly opts: Judge0ExecutorOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
@@ -151,6 +163,7 @@ export class Judge0Executor implements CodeExecutor {
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.requestTimeoutMs = opts.requestTimeoutMs ?? 20_000;
     this.pollIntervalMs = opts.pollIntervalMs ?? 250;
+    this.caps = opts.caps ?? DEFAULT_JUDGE0_CAPS;
   }
 
   async run(req: RunRequest): Promise<RunResponse> {
@@ -170,15 +183,15 @@ export class Judge0Executor implements CodeExecutor {
       tests: req.tests,
       testHarness: req.testHarness,
     });
-    const cpuSeconds = Math.max(0.1, req.timeLimitMs / 1000);
+    const limits = effectiveLimits(req, this.caps);
     const body = {
       source_code: b64(bundle.source),
       language_id: languageId,
       stdin: b64(bundle.stdin),
-      cpu_time_limit: cpuSeconds,
-      cpu_extra_time: 0.5,
-      wall_time_limit: Math.max(5, cpuSeconds * 2 + 1),
-      memory_limit: req.memoryLimitKb,
+      cpu_time_limit: limits.cpuMs / 1000,
+      cpu_extra_time: JUDGE0_CPU_EXTRA_TIME_S,
+      wall_time_limit: limits.wallS,
+      memory_limit: limits.memoryKb,
       stack_limit: 64_000,
       max_processes_and_or_threads: 30,
       enable_network: false,
@@ -186,7 +199,7 @@ export class Judge0Executor implements CodeExecutor {
       number_of_runs: 1,
     };
 
-    const deadline = Date.now() + this.requestTimeoutMs + req.timeLimitMs * 2;
+    const deadline = Date.now() + this.requestTimeoutMs + limits.wallS * 1000;
     let result = await this.request<Judge0Result>(
       'POST',
       '/submissions?base64_encoded=true&wait=true',
@@ -225,7 +238,7 @@ export class Judge0Executor implements CodeExecutor {
       result.status.id,
       stderr,
       result.memory,
-      req.memoryLimitKb,
+      limits.memoryKb,
     );
     if (kind === 'infra') {
       throw new ExecutorUnavailableError(
@@ -249,10 +262,10 @@ export class Judge0Executor implements CodeExecutor {
         output = cleanOutput(compileOutput || stderr);
         break;
       case 'timeout':
-        output = `Your code ran longer than ${req.timeLimitMs} ms.`;
+        output = `Your code ran longer than ${limits.cpuMs} ms.`;
         break;
       case 'memory':
-        output = `Your code used more than ${Math.round(req.memoryLimitKb / 1024)} MB of memory.`;
+        output = `Your code used more than ${Math.round(limits.memoryKb / 1024)} MB of memory.`;
         break;
       case 'runtime':
         output =

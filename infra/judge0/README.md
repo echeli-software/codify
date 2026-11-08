@@ -4,21 +4,22 @@ Self-hosted Judge0 for programming exercises (docs/12-code-execution.md,
 roadmap Phase 10). The droplet, VPC and cloud firewall come from
 `infra/terraform`; this directory holds what runs on the host.
 
-| File                                     | Purpose                                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `docker-compose.yml`                     | Judge0 server + workers + internal Postgres/Redis, resource limits, `internal` network     |
-| `judge0.conf.template`                   | Judge0 settings: auth tokens, sandbox limits (docs/12 §3), network disabled, callbacks off |
-| `judge0-egress-lockdown.sh` / `.service` | `DOCKER-USER` iptables rules that drop new outbound connections from the Judge0 networks   |
+| File                                            | Purpose                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `docker-compose.yml`                            | Judge0 server + workers + internal Postgres/Redis, resource limits, `internal` network     |
+| `judge0.conf.template`                          | Judge0 settings: auth tokens, sandbox limits (docs/12 §3), network disabled, callbacks off |
+| `judge0-egress-lockdown.sh` / `.service`        | `DOCKER-USER` iptables rules that drop new outbound connections from the Judge0 networks   |
+| `image/Dockerfile`, `image/codify-languages.rb` | Judge0 1.13.1 + Node.js 22 and Python 3.12 as languages 222 / 223 / 312 (docs/12 §4)       |
 
 ## Isolation layers
 
-| Layer                             | What it enforces                                                                                                                                     | Where                             |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| DO cloud firewall `codify-judge0` | Inbound :2358 only from `vps-app-01` (and `vps-staging-01` when `judge0_allow_staging`); SSH from operator CIDRs; egress limited to DNS/NTP/HTTP(S)  | `infra/terraform/digitalocean.tf` |
-| Bind address                      | `:2358` published on the VPC private IP only, never the public interface                                                                             | `JUDGE0_BIND_ADDR`                |
-| Docker `internal` network         | db, redis and workers have no default route                                                                                                          | `docker-compose.yml`              |
-| `DOCKER-USER` rules               | No NEW outbound connection from either Judge0 subnet (replies still flow)                                                                            | `judge0-egress-lockdown.sh`       |
-| isolate                           | Per-submission chroot + cgroup; `ENABLE_NETWORK=false`, `ALLOW_ENABLE_NETWORK=false`; CPU 2 s, wall 5 s, 128 MB, 64 MB stack, 30 procs, 64 KB output | `judge0.conf.template`            |
+| Layer                             | What it enforces                                                                                                                                                       | Where                             |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| DO cloud firewall `codify-judge0` | Inbound :2358 only from `vps-app-01` (and `vps-staging-01` when `judge0_allow_staging`); SSH from operator CIDRs; egress limited to DNS/NTP/HTTP(S)                    | `infra/terraform/digitalocean.tf` |
+| Bind address                      | `:2358` published on the VPC private IP only, never the public interface                                                                                               | `JUDGE0_BIND_ADDR`                |
+| Docker `internal` network         | db, redis and workers have no default route                                                                                                                            | `docker-compose.yml`              |
+| `DOCKER-USER` rules               | No NEW outbound connection from either Judge0 subnet (replies still flow)                                                                                              | `judge0-egress-lockdown.sh`       |
+| isolate                           | Per-submission chroot + cgroup; `ENABLE_NETWORK=false`, `ALLOW_ENABLE_NETWORK=false`; CPU 2 s (max 5), wall 5 s, 128 MB (max 256), 64 MB stack, 30 procs, 64 KB output | `judge0.conf.template`            |
 
 **What DigitalOcean firewalls can't express:** they apply to the whole
 droplet, not to containers or processes, and their egress rules must stay open
@@ -50,12 +51,31 @@ lockdown script blocks it from initiating connections.
    sudo install -m 644 judge0-egress-lockdown.service /etc/systemd/system/
    sudo systemctl enable --now judge0-egress-lockdown
    ```
-5. Start Judge0 on the VPC address (`terraform output judge0_private_url`):
+5. Build the image with the Codify runtimes (the stock 1.13.1 image only has
+   Node 12 / TypeScript 3.7 / Python 3.8; ids 92–94 exist only on the hosted
+   ce.judge0.com):
+
+   ```bash
+   docker compose build   # → codify/judge0:1.13.1-node22-py312
+   ```
+
+   Language ids (the API defaults; `JUDGE0_LANGUAGE_IDS` overrides):
+
+   | id  | Language                                              |
+   | --- | ----------------------------------------------------- |
+   | 222 | JavaScript (Node.js 22)                               |
+   | 223 | TypeScript (Node.js 22, `--experimental-strip-types`) |
+   | 312 | Python 3.12                                           |
+
+   Judge0 re-seeds `languages` from `db/languages/*.rb` on every start, so
+   the ids survive restarts. Check with `GET /languages`.
+
+6. Start Judge0 on the VPC address (`terraform output judge0_private_url`):
    ```bash
    echo "JUDGE0_BIND_ADDR=$(ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1)" > .env
    docker compose up -d
    ```
-6. From `vps-app-01`, verify:
+7. From `vps-app-01`, verify:
    ```bash
    curl -s -H "X-Auth-Token: $JUDGE0_AUTH_TOKEN" http://<judge0-private-ip>:2358/about
    ```
@@ -63,7 +83,7 @@ lockdown script blocks it from initiating connections.
 
 ## Hostile-submission checks (roadmap Phase 10 acceptance)
 
-Run from the app host against `/submissions?wait=true` with the JS language id;
+Run from the app host against `/submissions?wait=true` with the JS language id (222);
 each must finish with the noted status and the host must stay healthy:
 
 | Submission                                                                    | Expected                                            |
