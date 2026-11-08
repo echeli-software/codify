@@ -56,7 +56,7 @@ export function streakReminderCopy(locale: string, days: number): Copy {
     locale,
     {
       title: '🔥 Mantenha sua sequência!',
-      body: `Você está há ${days} ${days === 1 ? 'dia' : 'dias'} seguidos. Faça uma lição hoje para não perder.`,
+      body: `Você está há ${days} ${days === 1 ? 'dia seguido' : 'dias seguidos'}. Faça uma lição hoje para não perder.`,
     },
     {
       title: '🔥 Keep your streak alive!',
