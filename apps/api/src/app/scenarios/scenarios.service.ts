@@ -9,7 +9,11 @@ import {
   assertCanManageAttached,
   lessonForAuthor,
 } from '../courses/course-ownership.js';
-import { ProgressService } from '../progress/progress.service.js';
+import {
+  ProgressService,
+  validateClientTimestamp,
+} from '../progress/progress.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import {
   RateLimitedException,
   retryAfterSeconds,
@@ -45,6 +49,8 @@ export interface CompleteResult {
   reward?: RewardResult;
   questsCompleted?: CompletedQuest[];
   badgesUnlocked?: UnlockedBadge[];
+  /** True when an Idempotency-Key replay returned an already-recorded run. */
+  replayed?: boolean;
 }
 
 @Injectable()
@@ -135,12 +141,19 @@ export class ScenariosService {
     };
   }
 
-  /** Record a play-through. Replayable; the reward fires only on the first completion. */
+  /**
+   * Record a play-through. Replayable; the reward fires only on the first
+   * completion. Offline plays (docs/16 §7 `scenario_complete`) send an
+   * `Idempotency-Key` (a replayed key returns the original run, no new row,
+   * no cooldown) and the device `clientTimestamp` for streak attribution.
+   */
   async complete(
     userId: string,
     scenarioId: string,
     choiceIds: string[],
+    opts: { idempotencyKey?: string; clientTimestamp?: string } = {},
   ): Promise<CompleteResult> {
+    const clientTimestamp = validateClientTimestamp(opts.clientTimestamp);
     const { scenario, lesson } = await this.scenarioWithLesson(scenarioId);
     await this.assertAccess(userId, lesson.id);
 
@@ -151,6 +164,20 @@ export class ScenariosService {
         code: 'INVALID_SCENARIO_PATH',
         message: walk.reason ?? 'Invalid path',
       });
+
+    const recordKey = opts.idempotencyKey
+      ? `scenario_complete:${userId}:${scenarioId}:${opts.idempotencyKey}`
+      : null;
+    const replay = recordKey
+      ? await this.replayRun(
+          recordKey,
+          userId,
+          lesson.id,
+          scenarioId,
+          clientTimestamp,
+        )
+      : null;
+    if (replay) return replay;
 
     const last = await this.prisma.scenarioRun.findFirst({
       where: { userId, scenarioId },
@@ -167,16 +194,45 @@ export class ScenariosService {
         'SCENARIO_COOLDOWN',
       );
 
-    const run = await this.prisma.scenarioRun.create({
-      data: {
-        userId,
-        scenarioId,
-        pathJson: choiceIds as unknown as Prisma.InputJsonValue,
-        maxDepth: walk.depth,
-        completed: walk.completed,
-        outcome: walk.outcome ?? null,
-      },
-    });
+    const runData: Prisma.ScenarioRunUncheckedCreateInput = {
+      userId,
+      scenarioId,
+      pathJson: choiceIds as unknown as Prisma.InputJsonValue,
+      maxDepth: walk.depth,
+      completed: walk.completed,
+      outcome: walk.outcome ?? null,
+    };
+    let run: { id: string };
+    try {
+      run = !recordKey
+        ? await this.prisma.scenarioRun.create({ data: runData })
+        : await this.prisma.$transaction(async (tx) => {
+            const created = await tx.scenarioRun.create({ data: runData });
+            // Stored with the run; responseHash carries its id for replays.
+            await tx.idempotencyRecord.create({
+              data: {
+                key: recordKey,
+                scope: 'scenario_complete',
+                userId,
+                responseHash: created.id,
+              },
+            });
+            return created;
+          });
+    } catch (err) {
+      // A concurrent request with the same key won the race.
+      if (recordKey && isUniqueViolation(err)) {
+        const again = await this.replayRun(
+          recordKey,
+          userId,
+          lesson.id,
+          scenarioId,
+          clientTimestamp,
+        );
+        if (again) return again;
+      }
+      throw err;
+    }
 
     const result: CompleteResult = {
       runId: run.id,
@@ -197,6 +253,57 @@ export class ScenariosService {
         refType: 'scenario',
         refId: scenarioId,
         questEvent: 'scenario_complete',
+        ...(clientTimestamp ? { clientTimestamp } : {}),
+      });
+      if (!done.alreadyCompleted) {
+        result.reward = done.reward;
+        result.questsCompleted = done.questsCompleted;
+        result.badgesUnlocked = done.badgesUnlocked;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * The run an Idempotency-Key already recorded, rebuilt (no new row). The
+   * completion is re-asserted: recordCompletion is idempotent and finishes
+   * the lesson if the original request died before it did.
+   */
+  private async replayRun(
+    recordKey: string,
+    userId: string,
+    lessonId: string,
+    scenarioId: string,
+    clientTimestamp: string | null,
+  ): Promise<CompleteResult | null> {
+    const seen = await this.prisma.idempotencyRecord.findUnique({
+      where: { key: recordKey },
+      select: { responseHash: true },
+    });
+    if (!seen?.responseHash) return null;
+    const run = await this.prisma.scenarioRun.findUnique({
+      where: { id: seen.responseHash },
+    });
+    if (!run || run.userId !== userId || run.scenarioId !== scenarioId)
+      return null;
+    const result: CompleteResult = {
+      runId: run.id,
+      completed: run.completed,
+      depth: run.maxDepth,
+      outcome: run.outcome ?? undefined,
+      path: (run.pathJson as unknown as string[]) ?? [],
+      replayed: true,
+    };
+    if (run.completed) {
+      const done = await this.progress.recordCompletion({
+        userId,
+        lessonId,
+        xpSource: 'SCENARIO_COMPLETE',
+        coinSource: 'SCENARIO_COMPLETE',
+        refType: 'scenario',
+        refId: scenarioId,
+        questEvent: 'scenario_complete',
+        ...(clientTimestamp ? { clientTimestamp } : {}),
       });
       if (!done.alreadyCompleted) {
         result.reward = done.reward;

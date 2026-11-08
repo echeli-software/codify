@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -22,6 +24,8 @@ import {
 import { CompleteScenarioDto, ScenarioGraphDto } from './scenarios.dto.js';
 import { RetryAfterInterceptor } from '../exercises/rate-limit.js';
 import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_.:-]{8,128}$/;
 
 @Controller()
 export class ScenariosController {
@@ -111,8 +115,22 @@ export class ScenariosController {
     @Param('id') id: string,
     @Body() body: CompleteScenarioDto,
     @Req() req: Request,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<CompleteResult> {
-    const res = await this.scenarios.complete(actor.userId, id, body.path);
+    if (
+      idempotencyKey !== undefined &&
+      !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_IDEMPOTENCY_KEY',
+        message: 'Idempotency-Key must be 8–128 characters of [A-Za-z0-9_.:-]',
+      });
+    }
+    const res = await this.scenarios.complete(actor.userId, id, body.path, {
+      idempotencyKey,
+      clientTimestamp: body.clientTimestamp,
+    });
+    if (res.replayed) return res;
     void this.audit.record(actor, {
       action: 'scenario.complete',
       entity: 'Scenario',

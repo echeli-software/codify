@@ -155,6 +155,30 @@ export interface LessonOfflineBundle {
   /** Image URLs referenced by the doc, for asset prefetch. */
   imageSrcs: string[];
   updatedAt: string;
+  /** SCENARIO lessons: the graph, played locally offline (docs/16 §3). */
+  scenario?: OfflineScenario;
+  /** EXERCISE lessons: starter code + visible tests (no solution / hidden tests). */
+  exercise?: OfflineExerciseStub;
+}
+
+export interface OfflineScenario {
+  id: string;
+  /** Same graph `GET /lessons/:id/scenario` serves. */
+  graph: unknown;
+  updatedAt: string;
+}
+
+export interface OfflineExerciseStub {
+  id: string;
+  language: string;
+  entryFunction: string;
+  starterCode: string;
+  visibleTests: {
+    id: string;
+    name: string;
+    args: unknown[];
+    expected: unknown;
+  }[];
 }
 
 /** GET /api/courses/:id/lesson-versions item. */

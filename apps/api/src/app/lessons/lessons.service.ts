@@ -23,6 +23,7 @@ import {
   type LessonDocIssue,
 } from '@codify/lesson-schema';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { offlineRunners } from './offline-runners.js';
 import { AccessService } from '../billing/access.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
@@ -198,6 +199,7 @@ export class LessonsService {
       },
       imageSrcs: collectLessonRefs(doc).imageSrcs,
       updatedAt: meta.updatedAt,
+      ...(await offlineRunners(this.prisma, l)),
     };
   }
 

@@ -35,6 +35,8 @@ export interface CourseListItem {
   categoryIds: string[];
   moduleCount: number;
   lessonCount: number;
+  /** At least one live lesson is free ("free preview available"). */
+  hasFreePreview?: boolean;
 }
 
 export interface CourseLessonSummary {
@@ -68,7 +70,20 @@ export interface ListCoursesQuery {
   authorId?: string;
   skip?: number;
   take?: number;
+  /** Server-side search: titles/descriptions (any locale), slug, category names. */
+  q?: string;
+  difficulty?: number;
+  /** Only courses with a free preview lesson. */
+  free?: boolean;
+  /** Only courses without free lessons. */
+  premium?: boolean;
+  /** Content language (source locale or translated title). */
+  language?: string;
+  sort?: CourseSort;
 }
+
+/** Catalog sort orders (docs/05 Catalog). */
+export type CourseSort = 'recommended' | 'newest' | 'popular' | 'shortest';
 
 export interface CreateCourseBody {
   slug: string;

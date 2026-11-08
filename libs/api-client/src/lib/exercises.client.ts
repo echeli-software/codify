@@ -28,7 +28,15 @@ export interface StudentExercise {
   lastSubmissionId?: string | null;
 }
 
-export type ExerciseLanguage = 'javascript' | 'typescript' | 'python';
+/** `web` = HTML/CSS/JS graded in a sandboxed iframe in the browser (docs/12 §4). */
+export type ExerciseLanguage = 'javascript' | 'typescript' | 'python' | 'web';
+
+/** Body of `POST /exercises/:id/browser-result` (browser-graded run). */
+export interface BrowserResultBody {
+  code: string;
+  results: { id: string; passed: boolean; error?: string }[];
+  clientTimestamp?: string;
+}
 
 export interface ExerciseTestResult {
   id: string;
@@ -177,6 +185,24 @@ export class ExercisesClient {
       this.http.post<SubmissionView>(
         `${this.base}/exercises/${encodeURIComponent(exerciseId)}/submit`,
         { code },
+        { context: withIdempotency(undefined, idempotencyKey) },
+      ),
+    );
+  }
+  /**
+   * Record a browser-graded run of a `web` exercise (docs/12 §4). The
+   * verdict is client-attested; a pass completes the lesson (first pass
+   * only). Same `SubmissionView` as `submit`.
+   */
+  browserResult(
+    exerciseId: string,
+    body: BrowserResultBody,
+    idempotencyKey?: string,
+  ): Promise<SubmissionView> {
+    return firstValueFrom(
+      this.http.post<SubmissionView>(
+        `${this.base}/exercises/${encodeURIComponent(exerciseId)}/browser-result`,
+        body,
         { context: withIdempotency(undefined, idempotencyKey) },
       ),
     );

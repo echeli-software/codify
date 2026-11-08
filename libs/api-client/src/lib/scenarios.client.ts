@@ -43,6 +43,16 @@ export interface CompleteResult {
   reward?: RewardResult;
   questsCompleted?: CompletedQuest[];
   badgesUnlocked?: UnlockedBadge[];
+  /** An Idempotency-Key replay returned the already-recorded run. */
+  replayed?: boolean;
+}
+
+/** Offline replay of a locally played scenario (docs/16 §7). */
+export interface CompleteScenarioOptions {
+  /** Pins the Idempotency-Key (the queued event's clientEventId). */
+  idempotencyKey?: string;
+  /** ISO-8601 device time of the play-through. */
+  clientTimestamp?: string;
 }
 
 export interface AdminScenario {
@@ -66,12 +76,18 @@ export class ScenariosClient {
       ),
     );
   }
-  complete(id: string, path: string[]): Promise<CompleteResult> {
+  complete(
+    id: string,
+    path: string[],
+    opts: CompleteScenarioOptions = {},
+  ): Promise<CompleteResult> {
     return firstValueFrom(
       this.http.post<CompleteResult>(
         `${this.base}/scenarios/${encodeURIComponent(id)}/complete`,
-        { path },
-        { context: withIdempotency() },
+        opts.clientTimestamp
+          ? { path, clientTimestamp: opts.clientTimestamp }
+          : { path },
+        { context: withIdempotency(undefined, opts.idempotencyKey) },
       ),
     );
   }

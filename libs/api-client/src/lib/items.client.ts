@@ -74,6 +74,32 @@ export interface EquippedRef {
 export interface AvatarResponse {
   config: Record<string, unknown> | null;
   equipped: Partial<Record<ItemSlot, EquippedRef>>;
+  /** A queued (clientTimestamp) write lost to a newer change — nothing changed (docs/16 §8). */
+  stale?: boolean;
+  /** The user's pet name (`User.petName`). Optional for older APIs. */
+  petName?: string | null;
+}
+
+/** `GET /avatar/starter-pet` (docs/10 §2 first reward). */
+export interface StarterPetStatus {
+  claimed: boolean;
+  /** Not claimed and the first lesson is done → the gift can be opened. */
+  eligible: boolean;
+  item: Item | null;
+  petName: string | null;
+}
+
+export interface ClaimStarterPetResponse extends StarterPetStatus {
+  alreadyClaimed: boolean;
+  avatar: AvatarResponse;
+}
+
+/** Offline replay of an avatar edit: last-write-wins by device time. */
+export interface AvatarWriteOptions {
+  /** ISO-8601 device time of the edit. */
+  clientTimestamp?: string;
+  /** Pins the Idempotency-Key (the queued event's clientEventId). */
+  idempotencyKey?: string;
 }
 
 export interface ItemCategory {
@@ -162,21 +188,64 @@ export class ItemsClient {
     return firstValueFrom(this.http.get<AvatarResponse>(`${this.base}/avatar`));
   }
 
-  saveConfig(config: Record<string, unknown>): Promise<AvatarResponse> {
+  saveConfig(
+    config: Record<string, unknown>,
+    opts: AvatarWriteOptions = {},
+  ): Promise<AvatarResponse> {
     return firstValueFrom(
       this.http.put<AvatarResponse>(
         `${this.base}/avatar/config`,
-        { config },
-        { context: withIdempotency() },
+        opts.clientTimestamp
+          ? { config, clientTimestamp: opts.clientTimestamp }
+          : { config },
+        { context: withIdempotency(undefined, opts.idempotencyKey) },
       ),
     );
   }
 
-  equip(slot: ItemSlot, itemId: string | null): Promise<AvatarResponse> {
+  equip(
+    slot: ItemSlot,
+    itemId: string | null,
+    opts: AvatarWriteOptions = {},
+  ): Promise<AvatarResponse> {
     return firstValueFrom(
       this.http.put<AvatarResponse>(
         `${this.base}/avatar/equip`,
-        { slot, itemId },
+        opts.clientTimestamp
+          ? { slot, itemId, clientTimestamp: opts.clientTimestamp }
+          : { slot, itemId },
+        { context: withIdempotency(undefined, opts.idempotencyKey) },
+      ),
+    );
+  }
+
+  /** "Random": equip a random owned item per slot (`look` also shuffles the base look). */
+  randomize(
+    opts: { slots?: ItemSlot[]; look?: boolean } = {},
+  ): Promise<AvatarResponse> {
+    return firstValueFrom(
+      this.http.post<AvatarResponse>(`${this.base}/avatar/random`, opts, {
+        context: withIdempotency(),
+      }),
+    );
+  }
+
+  /** Starter-pet gift state (claimed / eligible). */
+  starterPet(): Promise<StarterPetStatus> {
+    return firstValueFrom(
+      this.http.get<StarterPetStatus>(`${this.base}/avatar/starter-pet`),
+    );
+  }
+
+  /**
+   * Open the starter-pet gift (idempotent) and optionally name it. 409
+   * `starter_pet.locked` before the first lesson is completed.
+   */
+  claimStarterPet(petName?: string): Promise<ClaimStarterPetResponse> {
+    return firstValueFrom(
+      this.http.post<ClaimStarterPetResponse>(
+        `${this.base}/avatar/starter-pet`,
+        petName ? { petName } : {},
         { context: withIdempotency() },
       ),
     );

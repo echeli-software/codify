@@ -14,6 +14,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 
+import { COURSE_SORTS, type CourseSort } from './course-discovery.js';
+
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
 const COURSE_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 
@@ -142,6 +144,40 @@ export class ListCoursesQueryDto {
   @Min(1)
   @Max(200)
   take?: number;
+
+  // ─── Student catalog discovery (docs/05 Catalog) — see course-discovery.ts
+
+  /** Search title/description (any locale), slug and category names. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  q?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  difficulty?: number;
+
+  /** 'true' → only courses with a free preview lesson. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  free?: 'true' | 'false';
+
+  /** 'true' → only courses without free lessons (subscription required). */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  premium?: 'true' | 'false';
+
+  /** Content language (source locale or a translated title), e.g. "en-US". */
+  @IsOptional()
+  @IsString()
+  @Length(2, 16)
+  language?: string;
+
+  @IsOptional()
+  @IsIn(COURSE_SORTS)
+  sort?: CourseSort;
 }
 
 export interface CourseListItem {
@@ -167,6 +203,8 @@ export interface CourseListItem {
   categoryIds: string[];
   moduleCount: number;
   lessonCount: number;
+  /** At least one live lesson is free ("free preview available", docs/05 §3). */
+  hasFreePreview?: boolean;
 }
 
 export interface CourseLessonSummary {

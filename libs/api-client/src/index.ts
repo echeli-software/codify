@@ -36,6 +36,7 @@ export {
   type CourseLessonSummary,
   type CourseDetail,
   type ListCoursesQuery,
+  type CourseSort,
   type CreateCourseBody,
   type UpdateCourseBody,
 } from './lib/courses.client.js';
@@ -91,6 +92,7 @@ export {
   type InventoryItem,
   type EquippedRef,
   type AvatarResponse,
+  type AvatarWriteOptions,
   type ItemCategory,
   type CreateItemBody,
 } from './lib/items.client.js';
@@ -105,6 +107,7 @@ export {
 export {
   ExercisesClient,
   type StudentExercise,
+  type BrowserResultBody,
   type ExerciseTestCase,
   type ExerciseTestResult,
   type RunResult,
@@ -135,6 +138,7 @@ export {
   type ScenarioGraph,
   type StudentScenario,
   type CompleteResult,
+  type CompleteScenarioOptions,
   type AdminScenario,
 } from './lib/scenarios.client.js';
 export {

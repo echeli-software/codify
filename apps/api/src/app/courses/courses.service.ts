@@ -14,6 +14,11 @@ import type {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { noteTranslationFallback } from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
+import {
+  discoveryFilters,
+  discoveryOrderBy,
+  freePreviewCourseIds,
+} from './course-discovery.js';
 import type {
   CourseDetail,
   CourseListItem,
@@ -62,6 +67,9 @@ export class CoursesService {
       where.categories = { some: { categoryId: query.categoryId } };
     }
 
+    const discovery = await discoveryFilters(this.prisma, query);
+    if (discovery.length) where.AND = discovery;
+
     const skip = query.skip ?? 0;
     const take = Math.min(query.take ?? 20, 200);
 
@@ -70,7 +78,10 @@ export class CoursesService {
         where,
         skip,
         take,
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        orderBy: discoveryOrderBy(query.sort) ?? [
+          { status: 'asc' },
+          { updatedAt: 'desc' },
+        ],
         include: {
           author: { select: { displayName: true } },
           categories: { select: { categoryId: true } },
@@ -126,6 +137,7 @@ export class CoursesService {
     }
 
     const covers = await this.coverUrls(rows.map((r) => r.coverAssetId));
+    const freePreview = await freePreviewCourseIds(this.prisma, courseIds);
     for (const r of rows)
       if (
         fellBack(
@@ -136,15 +148,16 @@ export class CoursesService {
       )
         noteTranslationFallback(r.sourceLocale);
     return {
-      items: rows.map((r) =>
-        toListItem(
+      items: rows.map((r) => ({
+        ...toListItem(
           r,
           translations.filter((t) => t.entityId === r.id),
           locale,
           lessonCountByCourseId.get(r.id) ?? 0,
           covers,
         ),
-      ),
+        hasFreePreview: freePreview.has(r.id),
+      })),
       total,
     };
   }
@@ -266,7 +279,13 @@ export class CoursesService {
     )
       noteTranslationFallback(course.sourceLocale);
 
-    return { ...list, modules };
+    return {
+      ...list,
+      hasFreePreview: course.modules.some((m) =>
+        m.lessons.some((l) => l.isFree),
+      ),
+      modules,
+    };
   }
 
   async create(

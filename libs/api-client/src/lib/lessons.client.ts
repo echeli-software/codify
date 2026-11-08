@@ -40,6 +40,21 @@ export interface LessonOfflineBundle {
   /** Image URLs in the doc, for asset prefetch. */
   imageSrcs: string[];
   updatedAt: string;
+  /** SCENARIO lessons: the graph, played locally offline. */
+  scenario?: { id: string; graph: unknown; updatedAt: string };
+  /** EXERCISE lessons: starter code + visible tests (never solutions / hidden tests). */
+  exercise?: {
+    id: string;
+    language: string;
+    entryFunction: string;
+    starterCode: string;
+    visibleTests: {
+      id: string;
+      name: string;
+      args: unknown[];
+      expected: unknown;
+    }[];
+  };
 }
 
 /** GET /api/courses/:id/lesson-versions item. */

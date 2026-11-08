@@ -38,6 +38,7 @@ const LANGUAGES: readonly ExerciseLanguage[] = [
   'javascript',
   'typescript',
   'python',
+  'web',
 ];
 
 const STARTERS: Record<
@@ -57,6 +58,14 @@ const STARTERS: Record<
   python: {
     starter: 'def solution(a, b):\n    # your code\n    pass\n',
     solution: 'def solution(a, b):\n    return a + b\n',
+  },
+  // Browser-graded HTML/CSS/JS (docs/12 §4): tests are browser checks,
+  // e.g. { "args": ["text", "h1"], "expected": "Hello" }; hidden tests are
+  // not used (they would have to ship to the browser).
+  web: {
+    starter: '<h1></h1>\n<style>\n  h1 { }\n</style>\n',
+    solution:
+      '<h1>Hello</h1>\n<style>\n  h1 { color: rgb(255, 0, 0); }\n</style>\n',
   },
 };
 
@@ -246,7 +255,7 @@ export function parseTests(
             {{ 'admin.exercise.starter' | translate }}
           </h2>
           <cdf-code-editor
-            [language]="f.language"
+            [language]="f.language === 'web' ? 'javascript' : f.language"
             [ariaLabel]="'admin.exercise.starter' | translate"
             [(ngModel)]="f.starterCode"
             (ngModelChange)="touch()"
@@ -255,7 +264,7 @@ export function parseTests(
         <section class="admin-card">
           <h2>{{ 'admin.exercise.solution' | translate }}</h2>
           <cdf-code-editor
-            [language]="f.language"
+            [language]="f.language === 'web' ? 'javascript' : f.language"
             [ariaLabel]="'admin.exercise.solution' | translate"
             [(ngModel)]="f.solutionCode"
             (ngModelChange)="touch()"
@@ -295,7 +304,7 @@ export function parseTests(
             {{ 'admin.exercise.harnessHelp' | translate }}
           </p>
           <cdf-code-editor
-            [language]="f.language"
+            [language]="f.language === 'web' ? 'javascript' : f.language"
             [height]="160"
             [ariaLabel]="'admin.exercise.harness' | translate"
             [(ngModel)]="f.testHarness"
@@ -623,4 +632,5 @@ const LANGUAGE_LABEL: Record<ExerciseLanguage, string> = {
   javascript: 'JavaScript',
   typescript: 'TypeScript',
   python: 'Python',
+  web: 'HTML / CSS / JS',
 };

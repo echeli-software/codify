@@ -65,7 +65,12 @@ describe('verdictFromResults', () => {
 
 describe('languages + entry function', () => {
   it('whitelists javascript, typescript and python only', () => {
-    expect(EXERCISE_LANGUAGES).toEqual(['javascript', 'typescript', 'python']);
+    expect(EXERCISE_LANGUAGES).toEqual([
+      'javascript',
+      'typescript',
+      'python',
+      'web',
+    ]);
     expect(isExerciseLanguage('python')).toBe(true);
     expect(isExerciseLanguage('ruby')).toBe(false);
   });

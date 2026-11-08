@@ -8,7 +8,9 @@ import {
 } from '@nestjs/common';
 import type { Exercise, Prisma } from '@prisma/client';
 import {
+  isBrowserExerciseLanguage,
   isExerciseLanguage,
+  validateBrowserTests,
   scoreFromResults,
   verdictFromResults,
   type TestCase,
@@ -274,9 +276,16 @@ export class ExercisesService {
           code: 'LANGUAGE_NOT_SUPPORTED',
           message: `Unsupported language "${input.language}"`,
         });
-      this.assertRunnable(input.language);
+      // Browser exercises run in the student's browser, not the executor.
+      if (!isBrowserExerciseLanguage(input.language))
+        this.assertRunnable(input.language);
     }
-    const errors = validateTestCases(input.visibleTests, input.hiddenTests);
+    const errors = [
+      ...validateTestCases(input.visibleTests, input.hiddenTests),
+      ...(input.language && isBrowserExerciseLanguage(input.language)
+        ? validateBrowserTests(input.visibleTests)
+        : []),
+    ];
     if (errors.length)
       throw new BadRequestException({
         code: 'INVALID_TESTS',

@@ -107,6 +107,8 @@ export const EXERCISE_LANGUAGES = [
   'javascript',
   'typescript',
   'python',
+  /** HTML/CSS/JS run in a sandboxed iframe in the browser (browser-exercise.ts). */
+  'web',
 ] as const;
 export type ExerciseLanguage = (typeof EXERCISE_LANGUAGES)[number];
 
