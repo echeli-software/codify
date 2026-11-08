@@ -210,6 +210,14 @@
         "week": "Week of {date}",
         "freeze": "+1 streak freeze",
         "cta": "Let's go"
+      },
+      "history": {
+        "title": "Past weeks",
+        "week": "Week of {date}",
+        "line": "{tier} · #{rank} of {size} · {xp} XP",
+        "promoted": "Promoted",
+        "demoted": "Relegated",
+        "stayed": "Stayed"
       }
     },
     "friends": {
@@ -242,7 +250,32 @@
       "nudgeNamed": "Nudge {name}",
       "nudgeSent": "Nudge sent to {name}!",
       "nudgeQueued": "Nudge saved — {name} will see it next time they open Codify.",
-      "nudgeTooSoon": "You already nudged {name} today. Try again tomorrow."
+      "nudgeTooSoon": "You already nudged {name} today. Try again tomorrow.",
+      "activity": {
+        "title": "Friends activity",
+        "seeFriends": "Friends",
+        "badge": "{name} unlocked “{badge}”",
+        "lesson": "{name} finished “{lesson}”",
+        "lessonUntitled": "{name} finished a lesson",
+        "optIn": "Share my learning activity with friends",
+        "optInHint": "Friends who share theirs see when you finish lessons or unlock badges. Nothing is shown publicly."
+      },
+      "compare": "Compare",
+      "compareNamed": "Compare with {name}",
+      "compareTitle": "You vs {name}",
+      "compareCaption": "Your stats next to {name}’s",
+      "compareStat": "Stat",
+      "compareYou": "You",
+      "stats": {
+        "level": "Level",
+        "totalXp": "Total XP",
+        "weeklyXp": "XP this week",
+        "streakDays": "Current streak",
+        "longestStreak": "Longest streak",
+        "lessonsCompleted": "Lessons",
+        "coursesCompleted": "Courses completed",
+        "badges": "Badges"
+      }
     },
     "reward": {
       "multipliers": "Boosted: {parts}",
@@ -295,7 +328,11 @@
       "trackTitle": "Pick a course to start",
       "trackBody": "We picked these for your goal. You can change any time.",
       "noCourses": "No courses are published yet — explore the catalog later.",
-      "lessons": "{count, plural, one {# lesson} other {# lessons}}"
+      "lessons": "{count, plural, one {# lesson} other {# lessons}}",
+      "scheduleTitle": "When should we remind you?",
+      "scheduleBody": "Pick a time for your daily lesson. A few minutes a day builds the habit.",
+      "reminderLabel": "Daily reminder",
+      "scheduleConfirm": "Remind me"
     },
     "lesson": {
       "title": "Lesson",
@@ -562,7 +599,13 @@
         "coins": "Not enough coins yet — finish a few lessons.",
         "level": "Unlocks at level {level}.",
         "unavailable": "Not available right now."
-      }
+      },
+      "filterCategory": "Filter by category",
+      "filterMore": "More filters",
+      "rarity": "Rarity",
+      "anyRarity": "Any rarity",
+      "premiumOnly": "Premium only",
+      "limitedOnly": "Limited drops"
     },
     "avatar": {
       "title": "Dressing room",
@@ -578,11 +621,57 @@
         "light": "Light",
         "tan": "Tan",
         "brown": "Brown",
-        "deep": "Deep"
+        "deep": "Deep",
+        "fair": "Fair",
+        "olive": "Olive",
+        "dark": "Dark"
       },
       "inventory": "Inventory",
       "browseShop": "Browse shop",
-      "saved": "Look saved."
+      "saved": "Look saved.",
+      "look": "Base look (free)",
+      "lookSaving": "Saving…",
+      "lookPending": "Saving in a moment…",
+      "body": "Body",
+      "bodies": {
+        "classic": "Classic",
+        "broad": "Broad",
+        "slim": "Slim"
+      },
+      "hairStyle": "Hair style",
+      "hair": {
+        "short": "Short",
+        "medium": "Medium",
+        "long": "Long",
+        "curly": "Curly",
+        "coily": "Coily",
+        "bald": "Bald",
+        "covered": "Head covering"
+      },
+      "hairColor": "Hair colour",
+      "hairColors": {
+        "c0": "Black",
+        "c1": "Dark brown",
+        "c2": "Brown",
+        "c3": "Light brown",
+        "c4": "Blonde",
+        "c5": "Grey",
+        "c6": "Red",
+        "c7": "Purple"
+      },
+      "eyeColor": "Eye colour",
+      "eyeColors": {
+        "c0": "Dark brown",
+        "c1": "Brown",
+        "c2": "Green",
+        "c3": "Blue",
+        "c4": "Grey",
+        "c5": "Hazel"
+      },
+      "petTitle": "Your pet",
+      "petName": "Pet name",
+      "petSaved": "Saved — say hi to {name}!",
+      "bulkEquipped": "{count, plural, one {# item equipped.} other {# items equipped.}}"
     },
     "profile": {
       "title": "Profile",
@@ -624,6 +713,10 @@
         "privacyPolicy": {
           "title": "Privacy Policy",
           "body": "How we handle your personal data"
+        },
+        "skills": {
+          "title": "Skill tree",
+          "body": "Your mastery per topic"
         }
       },
       "account": "Account",
@@ -650,6 +743,22 @@
         "invited": "Joined",
         "converted": "Finished a lesson",
         "rewards": "You earned"
+      },
+      "stats": {
+        "title": "Your stats",
+        "totalXp": "Total XP",
+        "level": "Level",
+        "longestStreak": "Longest streak",
+        "coursesCompleted": "Courses completed",
+        "itemsOwned": "Items owned",
+        "badges": "Badges"
+      },
+      "help": {
+        "title": "Help & about",
+        "howItWorks": "How Codify works",
+        "support": "Contact support ({email})",
+        "about": "About Codify",
+        "version": "App version {version}"
       }
     },
     "publicProfile": {
@@ -662,7 +771,10 @@
       "noBadges": "No badges yet.",
       "loadError": "Couldn't load this profile",
       "notFound": "Profile not found",
-      "notFoundBody": "This learner may not exist anymore."
+      "notFoundBody": "This learner may not exist anymore.",
+      "pet": "with {name} 🐾",
+      "courses": "Courses",
+      "items": "Items"
     },
     "forbidden": {
       "title": "No access",
@@ -976,6 +1088,46 @@
           }
         ]
       }
+    },
+    "starterPet": {
+      "title": "You unlocked your first pet!",
+      "body": "{pet} wants to study with you. Give your new buddy a name?",
+      "nameLabel": "Name your pet",
+      "nameHint": "You can change it any time in the dressing room.",
+      "later": "Not now",
+      "claim": "Keep my pet",
+      "claimed": "{pet} joined you!"
+    },
+    "native": {
+      "reminderTitle": "Time for today’s lesson",
+      "reminderBody": "A few minutes keeps your streak going."
+    },
+    "skills": {
+      "title": "Skill tree",
+      "intro": "Topics light up as you complete lessons. Mastery grows with completion and your quiz and exercise scores.",
+      "emptyTitle": "No topics yet",
+      "emptyBody": "Start a course to grow your skill tree.",
+      "totals": "Mastery summary",
+      "levelCount": "{level}: {count}",
+      "level": {
+        "NONE": "Not started",
+        "BRONZE": "Bronze",
+        "SILVER": "Silver",
+        "GOLD": "Gold"
+      },
+      "other": "Other courses",
+      "topicLine": "{level} · {done}/{total} lessons",
+      "score": "average score {pct}%",
+      "progressLabel": "{name} progress",
+      "pathLabel": "Modules of {name}",
+      "module": "Module {n}",
+      "state": {
+        "COMPLETED": "Completed · {done}/{total} lessons",
+        "IN_PROGRESS": "In progress · {done}/{total} lessons",
+        "AVAILABLE": "Up next · {total} lessons",
+        "LOCKED": "Locked — finish {prereq} first"
+      },
+      "legend": "Bronze: one lesson done. Silver: half the lessons with an average score of 70%+. Gold: every lesson with 90%+."
     }
   }
 }

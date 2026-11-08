@@ -27,8 +27,16 @@ import {
   type IconName,
 } from '@codify/ui-ionic';
 import { AuthService } from '@codify/auth';
-import { TranslatePipe } from '@codify/i18n';
-import { ItemsClient, MeClient, type AvatarResponse } from '@codify/api-client';
+import { LocalePipe, TranslatePipe } from '@codify/i18n';
+import { APP_VERSION } from '../api-base-url.js';
+import { SUPPORT_EMAIL } from './account/suspended.page.js';
+import {
+  ItemsClient,
+  LeaguesClient,
+  MeClient,
+  type AvatarResponse,
+  type PublicProfile,
+} from '@codify/api-client';
 import {
   MotionAndSoundService,
   SoundService,
@@ -39,6 +47,7 @@ import { AppSessionService } from '../platform/app-session.service.js';
 import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
 import { ReferralCardComponent } from '../components/referral-card.component.js';
 import { equippedSprites } from './shared/avatar.js';
+import { PromoCodeRedeem } from '../components/promotions/promo-code-redeem.component.js';
 
 interface NavLink {
   path: string;
@@ -61,6 +70,12 @@ const LINKS: NavLink[] = [
     testId: 'subscription-link',
   },
   { path: '/friends', icon: 'person', key: 'friends', testId: 'friends-link' },
+  {
+    path: '/skills',
+    icon: 'ribbon',
+    key: 'skills',
+    testId: 'skills-link',
+  },
   { path: '/league', icon: 'podium', key: 'league', testId: 'league-link' },
   {
     path: '/downloads',
@@ -89,8 +104,23 @@ const LINKS: NavLink[] = [
   { path: '/terms', icon: 'info-circle', key: 'terms', testId: 'terms-link' },
 ];
 
+/** Own-profile stat tiles (docs/05 Profile "Stats"). */
+const STAT_TILES: {
+  key: string;
+  value: (p: PublicProfile, level: number) => number;
+}[] = [
+  { key: 'totalXp', value: (p) => p.totalXp },
+  { key: 'level', value: (_p, level) => level },
+  { key: 'longestStreak', value: (p) => p.stats.longestStreak },
+  { key: 'coursesCompleted', value: (p) => p.stats.coursesCompleted ?? 0 },
+  { key: 'itemsOwned', value: (p) => p.stats.itemsOwned ?? 0 },
+  { key: 'badges', value: (p) => p.badges.length },
+];
+
 /**
- * Profile & settings (docs/05 §3 Profile / Settings): avatar + level,
+ * Profile & settings (docs/05 §3 Profile / Settings): avatar + level, stats
+ * (total XP, level, longest streak, courses completed, items owned,
+ * badges), help / support / about,
  * display name, language (persisted to the profile), theme, sound and
  * reduced-motion toggles (the reward engine's own prefs), certificates,
  * the referral card and links to the rest of the account surfaces.
@@ -98,6 +128,7 @@ const LINKS: NavLink[] = [
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PromoCodeRedeem,
     FormsModule,
     RouterLink,
     IonHeader,
@@ -113,6 +144,7 @@ const LINKS: NavLink[] = [
     Icon,
     LanguageSwitcher,
     LevelBadge,
+    LocalePipe,
     ThemeToggle,
     ProfileCertificatesComponent,
     ReferralCardComponent,
@@ -154,6 +186,24 @@ const LINKS: NavLink[] = [
             }}</a>
           </cdf-app-card>
 
+          @if (stats(); as st) {
+            <section aria-labelledby="pf-stats">
+              <h2 id="pf-stats">
+                {{ 'student.profile.stats.title' | translate }}
+              </h2>
+              <ul class="pf__stats" data-testid="profile-stats">
+                @for (t of st; track t.key) {
+                  <li class="pf__stat" [attr.data-stat]="t.key">
+                    <strong>{{ t.value | locale: 'number' }}</strong>
+                    <span>{{
+                      'student.profile.stats.' + t.key | translate
+                    }}</span>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+
           <nav [attr.aria-label]="'student.profile.navLabel' | translate">
             <ul class="pf__links">
               @for (l of links; track l.path) {
@@ -181,6 +231,9 @@ const LINKS: NavLink[] = [
 
           <cdf-referral-card />
           <cdf-profile-certificates />
+          <cdf-app-card padding="normal">
+            <cdf-promo-code-redeem />
+          </cdf-app-card>
 
           <h2>{{ 'student.profile.account' | translate }}</h2>
           <cdf-app-card padding="normal">
@@ -237,6 +290,44 @@ const LINKS: NavLink[] = [
                 {{ 'student.profile.reduceMotionHint' | translate }}
               </p>
             </div>
+          </cdf-app-card>
+
+          <h2 id="pf-help">{{ 'student.profile.help.title' | translate }}</h2>
+          <cdf-app-card padding="normal">
+            <ul
+              class="pf__help"
+              aria-labelledby="pf-help"
+              data-testid="help-links"
+            >
+              <li>
+                <a routerLink="/features" class="pf__help-link">
+                  <cdf-icon name="help-circle" size="sm" />
+                  {{ 'student.profile.help.howItWorks' | translate }}
+                </a>
+              </li>
+              <li>
+                <a
+                  [href]="'mailto:' + supportEmail"
+                  class="pf__help-link"
+                  data-testid="support-link"
+                >
+                  <cdf-icon name="chat" size="sm" />
+                  {{
+                    'student.profile.help.support'
+                      | translate: { email: supportEmail }
+                  }}
+                </a>
+              </li>
+              <li>
+                <a routerLink="/welcome" class="pf__help-link">
+                  <cdf-icon name="info-circle" size="sm" />
+                  {{ 'student.profile.help.about' | translate }}
+                </a>
+              </li>
+            </ul>
+            <p class="pf__muted" data-testid="app-version">
+              {{ 'student.profile.help.version' | translate: { version } }}
+            </p>
           </cdf-app-card>
 
           <h2>{{ 'student.profile.session' | translate }}</h2>
@@ -331,6 +422,52 @@ const LINKS: NavLink[] = [
         outline: 2px solid var(--cdf-color-primary);
         outline-offset: 2px;
       }
+      .pf__stats {
+        list-style: none;
+        margin: var(--cdf-space-2) 0 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--cdf-space-2);
+      }
+      .pf__stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 2px;
+        padding: var(--cdf-space-2);
+        border-radius: 12px;
+        background: var(--cdf-color-surface);
+        border: 1px solid var(--cdf-color-border);
+      }
+      .pf__stat strong {
+        font-size: var(--cdf-font-size-lg);
+      }
+      .pf__stat span {
+        font-size: var(--cdf-font-size-xs);
+        color: var(--cdf-color-text-muted);
+      }
+      .pf__help {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+      }
+      .pf__help-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 40px;
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+        word-break: break-word;
+      }
+      .pf__help-link:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
       .pf__form {
         display: flex;
         gap: var(--cdf-space-2);
@@ -357,6 +494,7 @@ export class ProfilePage {
   protected readonly auth = inject(AuthService);
   private readonly me = inject(MeClient);
   private readonly items = inject(ItemsClient);
+  private readonly leagues = inject(LeaguesClient);
   private readonly sound = inject(SoundService);
   private readonly motion = inject(MotionAndSoundService);
   private readonly toast = inject(AppToastService);
@@ -365,6 +503,15 @@ export class ProfilePage {
   protected readonly xp = inject(XpService);
 
   protected readonly links = LINKS;
+  protected readonly supportEmail = SUPPORT_EMAIL;
+  protected readonly version = APP_VERSION;
+  private readonly profile = signal<PublicProfile | null>(null);
+  protected readonly stats = computed(() => {
+    const p = this.profile();
+    if (!p) return null;
+    const level = this.xp.level();
+    return STAT_TILES.map((t) => ({ key: t.key, value: t.value(p, level) }));
+  });
   protected readonly user = this.auth.user;
   protected readonly avatar = signal<AvatarResponse | null>(null);
   protected readonly sprites = computed(() => equippedSprites(this.avatar()));
@@ -375,6 +522,18 @@ export class ProfilePage {
 
   constructor() {
     void this.loadAvatar();
+    void this.loadStats();
+  }
+
+  private async loadStats(): Promise<void> {
+    try {
+      // The server id (the dev-mode auth stub has its own placeholder id).
+      const me = await this.me.me();
+      this.profile.set(await this.leagues.profile(me.id));
+    } catch {
+      // Offline: the stats card stays hidden.
+      this.profile.set(null);
+    }
   }
 
   private async loadAvatar(): Promise<void> {

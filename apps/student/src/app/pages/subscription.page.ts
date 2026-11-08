@@ -952,7 +952,9 @@ export class SubscriptionPage {
       const res = await this.billing.createPortal(
         `${window.location.origin}/subscription`,
       );
-      window.location.href = res.url;
+      // In-app browser on native, a new tab on the web (STF-12, docs/09 §7).
+      await this.native.shell.openExternal(res.url);
+      this.portalLoading.set(false);
     } catch (err) {
       this.toast.error(err);
       this.portalLoading.set(false);

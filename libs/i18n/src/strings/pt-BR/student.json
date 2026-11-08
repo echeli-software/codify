@@ -210,6 +210,14 @@
         "week": "Semana de {date}",
         "freeze": "+1 congelamento de ofensiva",
         "cta": "Bora"
+      },
+      "history": {
+        "title": "Semanas anteriores",
+        "week": "Semana de {date}",
+        "line": "{tier} · #{rank} de {size} · {xp} XP",
+        "promoted": "Promovido",
+        "demoted": "Rebaixado",
+        "stayed": "Manteve"
       }
     },
     "friends": {
@@ -242,7 +250,32 @@
       "nudgeNamed": "Cutucar {name}",
       "nudgeSent": "Cutucada enviada para {name}!",
       "nudgeQueued": "Cutucada salva — {name} vai ver na próxima vez que abrir o Codify.",
-      "nudgeTooSoon": "Você já cutucou {name} hoje. Tente de novo amanhã."
+      "nudgeTooSoon": "Você já cutucou {name} hoje. Tente de novo amanhã.",
+      "activity": {
+        "title": "Atividade dos amigos",
+        "seeFriends": "Amigos",
+        "badge": "{name} conquistou “{badge}”",
+        "lesson": "{name} concluiu “{lesson}”",
+        "lessonUntitled": "{name} concluiu uma lição",
+        "optIn": "Compartilhar minha atividade com amigos",
+        "optInHint": "Amigos que também compartilham veem quando você conclui lições ou ganha conquistas. Nada fica público."
+      },
+      "compare": "Comparar",
+      "compareNamed": "Comparar com {name}",
+      "compareTitle": "Você vs {name}",
+      "compareCaption": "Suas estatísticas ao lado das de {name}",
+      "compareStat": "Estatística",
+      "compareYou": "Você",
+      "stats": {
+        "level": "Nível",
+        "totalXp": "XP total",
+        "weeklyXp": "XP na semana",
+        "streakDays": "Sequência atual",
+        "longestStreak": "Maior sequência",
+        "lessonsCompleted": "Lições",
+        "coursesCompleted": "Cursos concluídos",
+        "badges": "Conquistas"
+      }
     },
     "reward": {
       "multipliers": "Bônus: {parts}",
@@ -295,7 +328,11 @@
       "trackTitle": "Escolha um curso para começar",
       "trackBody": "Separamos estes para o seu objetivo. Você pode mudar quando quiser.",
       "noCourses": "Nenhum curso publicado ainda — explore o catálogo mais tarde.",
-      "lessons": "{count, plural, one {# lição} other {# lições}}"
+      "lessons": "{count, plural, one {# lição} other {# lições}}",
+      "scheduleTitle": "Quando devemos te lembrar?",
+      "scheduleBody": "Escolha um horário para a lição do dia. Poucos minutos por dia criam o hábito.",
+      "reminderLabel": "Lembrete diário",
+      "scheduleConfirm": "Me lembre"
     },
     "lesson": {
       "title": "Lição",
@@ -562,7 +599,13 @@
         "coins": "Moedas insuficientes — conclua mais algumas lições.",
         "level": "Libera no nível {level}.",
         "unavailable": "Indisponível no momento."
-      }
+      },
+      "filterCategory": "Filtrar por categoria",
+      "filterMore": "Mais filtros",
+      "rarity": "Raridade",
+      "anyRarity": "Qualquer raridade",
+      "premiumOnly": "Só premium",
+      "limitedOnly": "Edições limitadas"
     },
     "avatar": {
       "title": "Provador",
@@ -578,11 +621,57 @@
         "light": "Claro",
         "tan": "Moreno claro",
         "brown": "Moreno",
-        "deep": "Escuro"
+        "deep": "Escuro",
+        "fair": "Muito claro",
+        "olive": "Oliva",
+        "dark": "Moreno escuro"
       },
       "inventory": "Inventário",
       "browseShop": "Ver loja",
-      "saved": "Visual salvo."
+      "saved": "Visual salvo.",
+      "look": "Visual básico (grátis)",
+      "lookSaving": "Salvando…",
+      "lookPending": "Salvando em instantes…",
+      "body": "Corpo",
+      "bodies": {
+        "classic": "Clássico",
+        "broad": "Largo",
+        "slim": "Esguio"
+      },
+      "hairStyle": "Cabelo",
+      "hair": {
+        "short": "Curto",
+        "medium": "Médio",
+        "long": "Longo",
+        "curly": "Cacheado",
+        "coily": "Crespo",
+        "bald": "Careca",
+        "covered": "Cabeça coberta"
+      },
+      "hairColor": "Cor do cabelo",
+      "hairColors": {
+        "c0": "Preto",
+        "c1": "Castanho-escuro",
+        "c2": "Castanho",
+        "c3": "Castanho-claro",
+        "c4": "Loiro",
+        "c5": "Grisalho",
+        "c6": "Ruivo",
+        "c7": "Roxo"
+      },
+      "eyeColor": "Cor dos olhos",
+      "eyeColors": {
+        "c0": "Castanho-escuro",
+        "c1": "Castanho",
+        "c2": "Verde",
+        "c3": "Azul",
+        "c4": "Cinza",
+        "c5": "Mel"
+      },
+      "petTitle": "Seu pet",
+      "petName": "Nome do pet",
+      "petSaved": "Salvo — diga oi para {name}!",
+      "bulkEquipped": "{count, plural, one {# item equipado.} other {# itens equipados.}}"
     },
     "profile": {
       "title": "Perfil",
@@ -624,6 +713,10 @@
         "privacyPolicy": {
           "title": "Política de Privacidade",
           "body": "Como tratamos seus dados pessoais"
+        },
+        "skills": {
+          "title": "Árvore de habilidades",
+          "body": "Seu domínio por tema"
         }
       },
       "account": "Conta",
@@ -650,6 +743,22 @@
         "invited": "Entraram",
         "converted": "Concluíram uma lição",
         "rewards": "Você ganhou"
+      },
+      "stats": {
+        "title": "Suas estatísticas",
+        "totalXp": "XP total",
+        "level": "Nível",
+        "longestStreak": "Maior sequência",
+        "coursesCompleted": "Cursos concluídos",
+        "itemsOwned": "Itens",
+        "badges": "Conquistas"
+      },
+      "help": {
+        "title": "Ajuda e sobre",
+        "howItWorks": "Como o Codify funciona",
+        "support": "Falar com o suporte ({email})",
+        "about": "Sobre o Codify",
+        "version": "Versão do app {version}"
       }
     },
     "publicProfile": {
@@ -662,7 +771,10 @@
       "noBadges": "Nenhuma conquista ainda.",
       "loadError": "Não foi possível carregar este perfil",
       "notFound": "Perfil não encontrado",
-      "notFoundBody": "Esta pessoa pode não existir mais."
+      "notFoundBody": "Esta pessoa pode não existir mais.",
+      "pet": "com {name} 🐾",
+      "courses": "Cursos",
+      "items": "Itens"
     },
     "forbidden": {
       "title": "Sem acesso",
@@ -976,6 +1088,46 @@
           }
         ]
       }
+    },
+    "starterPet": {
+      "title": "Você ganhou seu primeiro pet!",
+      "body": "{pet} quer estudar com você. Que tal dar um nome?",
+      "nameLabel": "Nome do pet",
+      "nameHint": "Dá para mudar quando quiser no provador.",
+      "later": "Agora não",
+      "claim": "Ficar com o pet",
+      "claimed": "{pet} chegou!"
+    },
+    "native": {
+      "reminderTitle": "Hora da lição de hoje",
+      "reminderBody": "Poucos minutos mantêm sua sequência."
+    },
+    "skills": {
+      "title": "Árvore de habilidades",
+      "intro": "Os temas acendem conforme você conclui lições. O domínio cresce com a conclusão e suas notas em quizzes e exercícios.",
+      "emptyTitle": "Nenhum tema ainda",
+      "emptyBody": "Comece um curso para sua árvore crescer.",
+      "totals": "Resumo do domínio",
+      "levelCount": "{level}: {count}",
+      "level": {
+        "NONE": "Não iniciado",
+        "BRONZE": "Bronze",
+        "SILVER": "Prata",
+        "GOLD": "Ouro"
+      },
+      "other": "Outros cursos",
+      "topicLine": "{level} · {done}/{total} lições",
+      "score": "nota média {pct}%",
+      "progressLabel": "Progresso em {name}",
+      "pathLabel": "Módulos de {name}",
+      "module": "Módulo {n}",
+      "state": {
+        "COMPLETED": "Concluído · {done}/{total} lições",
+        "IN_PROGRESS": "Em andamento · {done}/{total} lições",
+        "AVAILABLE": "Próximo · {total} lições",
+        "LOCKED": "Bloqueado — conclua {prereq} antes"
+      },
+      "legend": "Bronze: uma lição concluída. Prata: metade das lições com nota média de 70%+. Ouro: todas as lições com 90%+."
     }
   }
 }

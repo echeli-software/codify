@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -30,6 +30,7 @@ import {
   ItemsClient,
   ProblemDetailsError,
   type AvatarResponse,
+  type ItemRarity,
   type ItemSlot,
   type ShopItem,
 } from '@codify/api-client';
@@ -54,6 +55,15 @@ const SLOT_FILTERS: (ItemSlot | null)[] = [
   'PET',
   'BACKGROUND',
   'FRAME',
+  'EMOTE',
+];
+
+const RARITY_FILTERS: ItemRarity[] = [
+  'COMMON',
+  'UNCOMMON',
+  'RARE',
+  'EPIC',
+  'LEGENDARY',
 ];
 
 const REASON_KEYS: Record<string, string> = {
@@ -65,8 +75,10 @@ const REASON_KEYS: Record<string, string> = {
 };
 
 /**
- * Shop (docs/08): limited drops pinned with a countdown, slot filters
- * (aria-pressed chips) and the virtualized `ShopGrid`. Tapping an item
+ * Shop (docs/08 §7): limited drops pinned with a countdown, filter chips by
+ * slot (incl. EMOTE, preselected by `?slot=` from the dressing room),
+ * category, rarity, "can afford", premium-only and limited-only (the
+ * first five are API params), and the virtualized `ShopGrid`. Tapping an item
  * opens its detail sheet with a live try-on, "Try on in the dressing
  * room", and Buy / Buy & wear (`{ equip: true }`, atomic server-side).
  * Every API error is surfaced; online-only.
@@ -127,6 +139,61 @@ const REASON_KEYS: Record<string, string> = {
                 {{ (s ? 'ui.item.slot.' + s : 'ui.shop.all') | translate }}
               </button>
             }
+          </div>
+
+          @if (categories().length > 1) {
+            <div
+              class="sh__filters"
+              role="group"
+              [attr.aria-label]="'student.shop.filterCategory' | translate"
+              data-testid="category-filters"
+            >
+              <button
+                type="button"
+                class="sh__chip"
+                [attr.aria-pressed]="category() === null"
+                (click)="setCategory(null)"
+              >
+                {{ 'ui.shop.all' | translate }}
+              </button>
+              @for (c of categories(); track c.slug) {
+                <button
+                  type="button"
+                  class="sh__chip"
+                  [attr.aria-pressed]="category() === c.slug"
+                  [attr.data-category]="c.slug"
+                  (click)="setCategory(c.slug)"
+                >
+                  {{ c.name }}
+                </button>
+              }
+            </div>
+          }
+
+          <div
+            class="sh__filters"
+            role="group"
+            [attr.aria-label]="'student.shop.filterMore' | translate"
+            data-testid="more-filters"
+          >
+            <label class="sh__select">
+              <span class="sh__sr">{{
+                'student.shop.rarity' | translate
+              }}</span>
+              <select
+                data-testid="rarity-filter"
+                (change)="setRarity($any($event.target).value)"
+              >
+                <option value="" [selected]="!rarity()">
+                  {{ 'student.shop.anyRarity' | translate }}
+                </option>
+                @for (r of rarityFilters; track r) {
+                  <option [value]="r" [selected]="rarity() === r">
+                    {{ 'ui.item.rarity.' + r | translate }}
+                  </option>
+                }
+              </select>
+            </label>
             <button
               type="button"
               class="sh__chip"
@@ -136,11 +203,31 @@ const REASON_KEYS: Record<string, string> = {
             >
               {{ 'student.shop.canAfford' | translate }}
             </button>
+            <button
+              type="button"
+              class="sh__chip"
+              [attr.aria-pressed]="premiumOnly()"
+              (click)="togglePremium()"
+              data-testid="premium-filter"
+            >
+              {{ 'student.shop.premiumOnly' | translate }}
+            </button>
+            <button
+              type="button"
+              class="sh__chip"
+              [attr.aria-pressed]="limitedOnly()"
+              (click)="limitedOnly.set(!limitedOnly())"
+              data-testid="limited-filter"
+            >
+              {{ 'student.shop.limitedOnly' | translate }}
+            </button>
           </div>
 
           @if (loading()) {
             <cdf-app-skeleton shape="rect" [height]="320" />
-          } @else if (items().length === 0) {
+          } @else if (
+            items().length === 0 || (limitedOnly() && limited().length === 0)
+          ) {
             <cdf-empty-state
               icon="cart"
               [title]="'student.shop.emptyTitle' | translate"
@@ -173,20 +260,22 @@ const REASON_KEYS: Record<string, string> = {
                 />
               </section>
             }
-            <section aria-labelledby="sh-all">
-              <h2 id="sh-all" class="sh__sr">
-                {{ 'student.shop.allItems' | translate }}
-              </h2>
-              <cdf-shop-grid
-                data-testid="shop-grid"
-                [items]="regularUi()"
-                [balance]="coins()"
-                [level]="level()"
-                [isPremium]="isPremium()"
-                (buy)="open($event)"
-                (preview)="open($event)"
-              />
-            </section>
+            @if (!limitedOnly()) {
+              <section aria-labelledby="sh-all">
+                <h2 id="sh-all" class="sh__sr">
+                  {{ 'student.shop.allItems' | translate }}
+                </h2>
+                <cdf-shop-grid
+                  data-testid="shop-grid"
+                  [items]="regularUi()"
+                  [balance]="coins()"
+                  [level]="level()"
+                  [isPremium]="isPremium()"
+                  (buy)="open($event)"
+                  (preview)="open($event)"
+                />
+              </section>
+            }
           }
         </cdf-offline-gate>
       </div>
@@ -320,6 +409,20 @@ const REASON_KEYS: Record<string, string> = {
         outline: 2px solid var(--cdf-color-primary);
         outline-offset: 2px;
       }
+      .sh__select select {
+        min-height: 36px;
+        border-radius: 999px;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        font: inherit;
+        font-size: var(--cdf-font-size-sm);
+        padding: 4px 12px;
+      }
+      .sh__select select:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
       .sh__limited {
         border: 1px solid var(--cdf-color-warning);
         border-radius: 14px;
@@ -374,12 +477,14 @@ export class ShopPage {
   private readonly billing = inject(BillingClient);
   private readonly orchestrator = inject(RewardOrchestrator);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(AppToastService);
   private readonly telemetry = inject(TelemetryService);
   private readonly i18n = inject(I18nService);
   private readonly guard = new StaleGuard();
 
   protected readonly slotFilters = SLOT_FILTERS;
+  protected readonly rarityFilters = RARITY_FILTERS;
   protected readonly loading = signal(true);
   protected readonly items = signal<ShopItem[]>([]);
   protected readonly avatar = signal<AvatarResponse | null>(null);
@@ -388,6 +493,19 @@ export class ShopPage {
   protected readonly isPremium = signal(false);
   protected readonly slot = signal<ItemSlot | null>(null);
   protected readonly affordableOnly = signal(false);
+  protected readonly premiumOnly = signal(false);
+  protected readonly limitedOnly = signal(false);
+  protected readonly category = signal<string | null>(null);
+  protected readonly rarity = signal<ItemRarity | null>(null);
+  /** Categories seen in any load (filtering keeps the chips stable). */
+  private readonly seenCategories = signal<ReadonlyMap<string, string>>(
+    new Map(),
+  );
+  protected readonly categories = computed(() =>
+    [...this.seenCategories()]
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
   protected readonly selected = signal<ShopItem | null>(null);
   protected readonly sheetOpen = signal(false);
   protected readonly buying = signal<'plain' | 'equip' | null>(null);
@@ -426,6 +544,9 @@ export class ShopPage {
       clearInterval(timer);
       this.guard.cancel();
     });
+    const slot = this.route.snapshot.queryParamMap.get('slot');
+    if (slot && (SLOT_FILTERS as (string | null)[]).includes(slot))
+      this.slot.set(slot as ItemSlot);
     void this.load();
   }
 
@@ -453,12 +574,40 @@ export class ShopPage {
     const res = await this.guard.run(() =>
       this.itemsClient.shop({
         slot: this.slot() ?? undefined,
+        categorySlug: this.category() ?? undefined,
+        rarity: this.rarity() ?? undefined,
         affordableOnly: this.affordableOnly() || undefined,
+        premiumOnly: this.premiumOnly() || undefined,
       }),
     );
     if (res.stale) return;
-    if (res.ok) this.items.set(res.value);
-    else this.toast.error(res.error);
+    if (res.ok) {
+      this.items.set(res.value);
+      this.seenCategories.update((m) => {
+        const next = new Map(m);
+        for (const i of res.value)
+          next.set(i.categorySlug, i.categoryName ?? i.categorySlug);
+        return next;
+      });
+    } else this.toast.error(res.error);
+  }
+
+  protected setCategory(slug: string | null): void {
+    if (this.category() === slug) return;
+    this.category.set(slug);
+    void this.loadItems();
+  }
+
+  protected setRarity(v: string): void {
+    this.rarity.set(
+      (RARITY_FILTERS as string[]).includes(v) ? (v as ItemRarity) : null,
+    );
+    void this.loadItems();
+  }
+
+  protected togglePremium(): void {
+    this.premiumOnly.update((v) => !v);
+    void this.loadItems();
   }
 
   protected setSlot(s: ItemSlot | null): void {

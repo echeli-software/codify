@@ -20,6 +20,8 @@ import {
   AppCard,
   AppInput,
   AppSkeleton,
+  AppToggle,
+  BottomSheet,
   EmptyState,
   FormField,
   Icon,
@@ -27,12 +29,16 @@ import {
 } from '@codify/ui-ionic';
 import {
   LeaguesClient,
+  MeClient,
   ProblemDetailsError,
+  type CompareStats,
   type Friend,
+  type FriendCompare,
   type FriendInvite,
   type FriendRequest,
 } from '@codify/api-client';
-import { I18nService, TranslatePipe } from '@codify/i18n';
+import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
+import { FriendsActivityComponent } from '../components/friends-activity.component.js';
 import { AppToastService } from '../platform/app-toast.service.js';
 import { OfflineGate } from '../platform/offline-gate.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
@@ -40,9 +46,23 @@ import { shareLink } from './shared/share.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Rows of the compare card (docs/05 Friends "mini side-by-side stats"). */
+const COMPARE_ROWS: (keyof CompareStats)[] = [
+  'level',
+  'totalXp',
+  'weeklyXp',
+  'streakDays',
+  'longestStreak',
+  'lessonsCompleted',
+  'coursesCompleted',
+  'badges',
+];
+
 /**
- * Friends (docs/10 §5): share an invite link, add by email, answer
- * requests, nudge (rate-limited server-side) and open public profiles.
+ * Friends (docs/05 Friends, docs/10 §5): share an invite link, add by
+ * email, answer requests, nudge (rate-limited server-side), compare stats
+ * side by side, open public profiles, opt in to sharing your activity and
+ * see opted-in friends' recent activity.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,10 +80,14 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     AppCard,
     AppInput,
     AppSkeleton,
+    AppToggle,
+    BottomSheet,
     EmptyState,
     FormField,
+    FriendsActivityComponent,
     Icon,
     LevelBadge,
+    LocalePipe,
     OfflineGate,
     TranslatePipe,
   ],
@@ -133,6 +157,22 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             </form>
           </cdf-app-card>
 
+          <!-- Activity sharing (opt-in) -->
+          <cdf-app-card padding="normal" data-testid="activity-optin-card">
+            <cdf-app-toggle
+              [label]="'student.friends.activity.optIn' | translate"
+              [ngModel]="activityOptIn()"
+              (ngModelChange)="setActivityOptIn($event)"
+              [disabled]="activityOptIn() === null || savingOptIn()"
+              data-testid="activity-optin"
+            />
+            <p class="fr__muted">
+              {{ 'student.friends.activity.optInHint' | translate }}
+            </p>
+          </cdf-app-card>
+
+          <cdf-friends-activity [limit]="10" />
+
           <!-- Incoming requests -->
           @if (requests().length > 0) {
             <h2 class="fr__section">
@@ -196,6 +236,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                   </a>
                   <cdf-level-badge [level]="f.level" size="sm" />
                   <cdf-app-button
+                    kind="ghost"
+                    size="sm"
+                    [loading]="comparing() === f.userId"
+                    [ariaLabel]="
+                      'student.friends.compareNamed'
+                        | translate: { name: f.displayName }
+                    "
+                    (buttonClick)="compare(f)"
+                    data-testid="compare-btn"
+                  >
+                    <cdf-icon name="podium" size="sm" />
+                    {{ 'student.friends.compare' | translate }}
+                  </cdf-app-button>
+                  <cdf-app-button
                     kind="secondary"
                     size="sm"
                     [loading]="nudging() === f.userId"
@@ -221,6 +275,57 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           }
         </cdf-offline-gate>
       </div>
+
+      @if (comparison(); as c) {
+        <cdf-bottom-sheet
+          [open]="compareOpen()"
+          (openChange)="compareOpen.set($event)"
+          [title]="
+            'student.friends.compareTitle'
+              | translate: { name: c.friend.displayName }
+          "
+        >
+          <table class="fr__compare" data-testid="compare-table">
+            <caption class="fr__sr">
+              {{
+                'student.friends.compareCaption'
+                  | translate: { name: c.friend.displayName }
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">
+                  <span class="fr__sr">{{
+                    'student.friends.compareStat' | translate
+                  }}</span>
+                </th>
+                <th scope="col">
+                  {{ 'student.friends.compareYou' | translate }}
+                </th>
+                <th scope="col">{{ c.friend.displayName }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of compareRows; track row) {
+                <tr>
+                  <th scope="row">
+                    {{ 'student.friends.stats.' + row | translate }}
+                  </th>
+                  <td
+                    [class.fr__lead]="+c.me[row] > +c.friend[row]"
+                    [attr.data-stat]="row"
+                  >
+                    {{ c.me[row] | locale: 'number' }}
+                  </td>
+                  <td [class.fr__lead]="+c.friend[row] > +c.me[row]">
+                    {{ c.friend[row] | locale: 'number' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </cdf-bottom-sheet>
+      }
     </ion-content>
   `,
   styles: [
@@ -298,6 +403,40 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         outline: 2px solid var(--cdf-color-primary);
         outline-offset: 2px;
       }
+      .fr__sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      .fr__compare {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--cdf-font-size-sm);
+      }
+      .fr__compare th,
+      .fr__compare td {
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--cdf-color-border);
+        text-align: right;
+      }
+      .fr__compare th[scope='row'],
+      .fr__compare thead th:first-child {
+        text-align: left;
+        font-weight: 500;
+        color: var(--cdf-color-text-muted);
+      }
+      .fr__compare thead th {
+        font-weight: 700;
+      }
+      .fr__lead {
+        font-weight: 700;
+        color: var(--cdf-color-success, inherit);
+      }
+      .fr__row {
+        flex-wrap: wrap;
+      }
       .fr__name {
         flex: 1;
         font-weight: 600;
@@ -310,6 +449,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 })
 export class FriendsPage {
   private readonly client = inject(LeaguesClient);
+  private readonly me = inject(MeClient);
   private readonly toast = inject(AppToastService);
   private readonly i18n = inject(I18nService);
   private readonly telemetry = inject(TelemetryService);
@@ -322,10 +462,56 @@ export class FriendsPage {
   protected readonly friends = signal<Friend[]>([]);
   protected readonly requests = signal<FriendRequest[]>([]);
   protected readonly invite = signal<FriendInvite | null>(null);
+  protected readonly compareRows = COMPARE_ROWS;
+  protected readonly comparing = signal<string | null>(null);
+  protected readonly comparison = signal<FriendCompare | null>(null);
+  protected readonly compareOpen = signal(false);
+  /** Null until /me loads. */
+  protected readonly activityOptIn = signal<boolean | null>(null);
+  protected readonly savingOptIn = signal(false);
 
   constructor() {
     void this.refresh();
     void this.loadInvite();
+    void this.loadOptIn();
+  }
+
+  private async loadOptIn(): Promise<void> {
+    try {
+      this.activityOptIn.set((await this.me.me()).activityFeedOptIn ?? false);
+    } catch {
+      this.activityOptIn.set(null);
+    }
+  }
+
+  protected async setActivityOptIn(on: boolean): Promise<void> {
+    if (on === this.activityOptIn()) return;
+    const previous = this.activityOptIn();
+    this.activityOptIn.set(on);
+    this.savingOptIn.set(true);
+    try {
+      const me = await this.me.update({ activityFeedOptIn: on });
+      this.activityOptIn.set(me.activityFeedOptIn ?? on);
+      this.telemetry.track('activity_feed_opt_in', { optIn: on });
+    } catch (err) {
+      this.activityOptIn.set(previous);
+      this.toast.error(err);
+    } finally {
+      this.savingOptIn.set(false);
+    }
+  }
+
+  protected async compare(f: Friend): Promise<void> {
+    this.comparing.set(f.userId);
+    try {
+      this.comparison.set(await this.client.compare(f.userId));
+      this.compareOpen.set(true);
+      this.telemetry.track('friend_compare_viewed');
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.comparing.set(null);
+    }
   }
 
   private async refresh(): Promise<void> {

@@ -2,12 +2,20 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   output,
   signal,
 } from '@angular/core';
-import type { Category, CourseListItem } from '@codify/api-client';
+import {
+  CoursesClient,
+  NotificationsClient,
+  type Category,
+  type CourseListItem,
+} from '@codify/api-client';
 import { ContentTranslatePipe, TranslatePipe } from '@codify/i18n';
+import { NativePlatformService } from '../native/native-platform.service.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 import {
   AppButton,
   Icon,
@@ -31,6 +39,46 @@ const GOAL_HINTS: Record<OnboardingGoal, RegExp> = {
   ai: /(\bai\b|\bia\b|prompt|machine|intelig)/i,
   softSkills: /(soft|comunica|communic|lider|leader|career|carreira)/i,
 };
+
+/** Default daily reminder (docs/05 Onboarding "Schedule": 8 PM local). */
+export const DEFAULT_REMINDER_MINUTE = 20 * 60;
+
+/** "HH:MM" ⇄ minutes from midnight (exported for tests). */
+export function minuteToTime(m: number): string {
+  const h = Math.floor(m / 60);
+  return `${String(h).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+export function timeToMinute(v: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h < 24 && min < 60 ? h * 60 + min : null;
+}
+
+/**
+ * The route that launches a course's first lesson (docs/05 Onboarding
+ * step 5): the first free lesson, else the first lesson (the player shows
+ * the paywall when needed); the course page when it has no lessons or
+ * can't be loaded.
+ */
+export async function firstLessonRoute(
+  courses: Pick<CoursesClient, 'detail'>,
+  course: Pick<CourseListItem, 'id' | 'slug'>,
+): Promise<string[]> {
+  try {
+    const detail = await courses.detail(course.slug);
+    const lessons = detail.modules
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .flatMap((m) => m.lessons.slice().sort((a, b) => a.order - b.order));
+    const first = lessons.find((l) => l.isFree) ?? lessons[0];
+    if (first) return ['/lessons', first.id];
+  } catch {
+    // Offline / not found: the course page explains.
+  }
+  return ['/courses', course.slug];
+}
 
 /**
  * Up to three courses for a goal: matches on title / category names first,
@@ -56,9 +104,13 @@ export function recommendForGoal(
 }
 
 /**
- * First-run onboarding (docs/10 §2): welcome carousel → goal picker →
- * track picker. Emits the chosen course (or null when skipped); the page
- * enrolls and opens it. Every step can be skipped.
+ * First-run onboarding (docs/05 Onboarding, docs/10 §2): welcome carousel →
+ * goal picker → track picker → schedule (daily reminder time, pre-filled
+ * 20:00; saved as `reminderMinute` and mirrored to the native local
+ * reminder). Emits the chosen course (or null when skipped); the page
+ * enrolls and launches its first lesson (`firstLessonRoute`). The first
+ * reward — the starter pet + naming — follows the first completed lesson
+ * (`StarterPetGiftComponent`). Every step can be skipped.
  */
 @Component({
   selector: 'cdf-onboarding-flow',
@@ -137,7 +189,7 @@ export function recommendForGoal(
                 <button
                   type="button"
                   class="ob__option ob__option--course"
-                  (click)="finish(c)"
+                  (click)="pickCourse(c)"
                   [attr.data-course-id]="c.id"
                 >
                   <strong>{{
@@ -157,6 +209,45 @@ export function recommendForGoal(
               <cdf-app-button kind="ghost" (buttonClick)="finish(null)">{{
                 'common.skip' | translate
               }}</cdf-app-button>
+            </div>
+          </section>
+        }
+        @case ('schedule') {
+          <section
+            class="ob__panel"
+            aria-labelledby="ob-schedule"
+            data-testid="onboarding-schedule"
+          >
+            <h2 id="ob-schedule">
+              {{ 'student.onboarding.scheduleTitle' | translate }}
+            </h2>
+            <p class="ob__muted">
+              {{ 'student.onboarding.scheduleBody' | translate }}
+            </p>
+            <label class="ob__time" for="ob-time">
+              <span>{{ 'student.onboarding.reminderLabel' | translate }}</span>
+              <input
+                id="ob-time"
+                type="time"
+                step="900"
+                data-testid="onboarding-time"
+                [value]="time()"
+                (input)="time.set($any($event.target).value)"
+              />
+            </label>
+            <div class="ob__actions">
+              <cdf-app-button kind="ghost" (buttonClick)="schedule(false)">{{
+                'common.skip' | translate
+              }}</cdf-app-button>
+              <cdf-app-button
+                kind="primary"
+                [loading]="savingSchedule()"
+                [disabled]="timeToMinute(time()) === null"
+                (buttonClick)="schedule(true)"
+                data-testid="onboarding-schedule-confirm"
+              >
+                {{ 'student.onboarding.scheduleConfirm' | translate }}
+              </cdf-app-button>
             </div>
           </section>
         }
@@ -214,6 +305,27 @@ export function recommendForGoal(
         color: var(--cdf-color-text-muted);
         font-size: var(--cdf-font-size-sm);
       }
+      .ob__time {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-weight: 600;
+      }
+      .ob__time input {
+        font: inherit;
+        font-size: var(--cdf-font-size-xl);
+        min-height: 52px;
+        padding: 6px 12px;
+        border-radius: 12px;
+        border: 2px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        max-width: 220px;
+      }
+      .ob__time input:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
       .ob__actions {
         display: flex;
         justify-content: flex-end;
@@ -232,10 +344,22 @@ export class OnboardingFlowComponent {
   readonly done = output<{
     goal: OnboardingGoal | null;
     course: CourseListItem | null;
+    /** Reminder time saved in the schedule step (null when skipped). */
+    reminderMinute?: number | null;
   }>();
 
+  private readonly notifications = inject(NotificationsClient);
+  private readonly native = inject(NativePlatformService);
+  private readonly telemetry = inject(TelemetryService);
+
   protected readonly goals = ONBOARDING_GOALS;
-  protected readonly step = signal<'welcome' | 'goal' | 'track'>('welcome');
+  protected readonly timeToMinute = timeToMinute;
+  protected readonly step = signal<'welcome' | 'goal' | 'track' | 'schedule'>(
+    'welcome',
+  );
+  protected readonly time = signal(minuteToTime(DEFAULT_REMINDER_MINUTE));
+  protected readonly savingSchedule = signal(false);
+  private readonly course = signal<CourseListItem | null>(null);
   protected readonly goal = signal<OnboardingGoal | null>(null);
   protected readonly recommended = computed(() => {
     const g = this.goal();
@@ -245,6 +369,35 @@ export class OnboardingFlowComponent {
   protected pickGoal(g: OnboardingGoal): void {
     this.goal.set(g);
     this.step.set('track');
+  }
+
+  protected pickCourse(c: CourseListItem): void {
+    this.course.set(c);
+    this.step.set('schedule');
+  }
+
+  /** Schedule step: save the reminder time (or skip), then finish. */
+  protected async schedule(save: boolean): Promise<void> {
+    const minute = save ? timeToMinute(this.time()) : null;
+    if (minute !== null) {
+      this.savingSchedule.set(true);
+      try {
+        await this.notifications.updatePreferences({ reminderMinute: minute });
+      } catch {
+        // Offline: Settings → Notifications can set it later.
+      }
+      void this.native.syncLocalReminder(minute);
+      this.savingSchedule.set(false);
+    }
+    this.telemetry.onboardingStep('schedule', {
+      reminderMinute: minute,
+      skipped: minute === null,
+    });
+    this.done.emit({
+      goal: this.goal(),
+      course: this.course(),
+      reminderMinute: minute,
+    });
   }
 
   protected finish(course: CourseListItem | null): void {

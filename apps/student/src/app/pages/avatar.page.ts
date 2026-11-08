@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
@@ -15,20 +17,36 @@ import {
 import {
   AppButton,
   AppCard,
+  AppInput,
   AppSkeleton,
   AvatarBuilder,
   AvatarRenderer,
+  FormField,
   Icon,
   Inventory,
+  type AvatarSlot,
   type EquippedMap,
   type ShopItem as UiShopItem,
 } from '@codify/ui-ionic';
 import {
+  BASE_BODIES,
+  EYE_COLORS,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  SKIN_TONES,
+  SKIN_TONE_HEX,
+  normalizeAvatarConfig,
+  type AvatarConfig,
+  type AvatarPose,
+} from '@codify/ui-core';
+import {
   ItemsClient,
+  MeClient,
   type AvatarResponse,
   type InventoryItem,
   type ShopItem,
 } from '@codify/api-client';
+import { MotionAndSoundService } from '@codify/gamification-engine';
 import { TranslatePipe } from '@codify/i18n';
 import { DownloadService } from '../offline/download.service.js';
 import { NetworkStatusService } from '../offline/network-status.service.js';
@@ -41,24 +59,22 @@ import {
   toUiItem,
 } from './shared/avatar.js';
 
-const SKIN_TONES: { value: string; emoji: string }[] = [
-  { value: 'porcelain', emoji: '🧑🏻' },
-  { value: 'light', emoji: '🧑🏼' },
-  { value: 'tan', emoji: '🧑🏽' },
-  { value: 'brown', emoji: '🧑🏾' },
-  { value: 'deep', emoji: '🧑🏿' },
-];
+/** Look changes are saved 3 s after the last tap (docs/08 §9). */
+const LOOK_AUTOSAVE_MS = 3000;
 
 /**
- * Dressing room (docs/08): `AvatarBuilder` (slot tabs + owned items with a
- * live preview, saved in one go), the grouped `Inventory` with equip /
- * unequip toggles, free skin-tone customisation, and try-on of a shop item
- * (`?tryOn=<itemId>`) without buying. Renders from the offline asset cache
- * when there's no connection (equipping needs one).
+ * Dressing room (docs/08 §9–10): `AvatarBuilder` (every slot browsable,
+ * live preview, 3 s auto-save + Save, Random, pose picker, "Browse shop for
+ * [slot]"), the free base look (8 skin tones, base body, hair style +
+ * colour, eye colour — also auto-saved), pet naming, the grouped
+ * `Inventory` with rarity filter / search / bulk equip, and try-on of a
+ * shop item (`?tryOn=<itemId>`). Renders from the offline asset cache when
+ * there's no connection (editing needs one).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -66,9 +82,11 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
     IonContent,
     AppButton,
     AppCard,
+    AppInput,
     AppSkeleton,
     AvatarBuilder,
     AvatarRenderer,
+    FormField,
     Icon,
     Inventory,
     TranslatePipe,
@@ -99,7 +117,7 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
             >
               <div class="av__tryon-row">
                 <cdf-avatar-renderer
-                  [config]="avatar()?.config ?? null"
+                  [config]="look()"
                   [equipped]="tryOnSprites()"
                   [size]="140"
                 />
@@ -142,38 +160,178 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
               data-testid="avatar-builder"
               [items]="owned()"
               [equipped]="equipped()"
-              [config]="avatar()?.config ?? null"
+              [config]="look()"
               [saving]="saving()"
+              [randomizing]="randomizing()"
+              [animate]="!reducedMotion()"
+              [autosaveMs]="online() ? 3000 : 0"
               (save)="save($event)"
+              (randomize)="randomize()"
+              (poseChange)="setLook({ pose: $event })"
+              (browseShop)="browseShop($event)"
             />
           </section>
 
-          <section aria-labelledby="av-tone" class="av__section">
-            <h2 id="av-tone">{{ 'student.avatar.skinTone' | translate }}</h2>
+          <section
+            aria-labelledby="av-look"
+            class="av__section"
+            data-testid="look-editor"
+          >
+            <div class="av__head">
+              <h2 id="av-look">{{ 'student.avatar.look' | translate }}</h2>
+              <span class="av__muted" role="status" aria-live="polite">
+                @if (lookSaving()) {
+                  {{ 'student.avatar.lookSaving' | translate }}
+                } @else if (lookDirty()) {
+                  {{ 'student.avatar.lookPending' | translate }}
+                }
+              </span>
+            </div>
+
+            <h3 id="av-tone">{{ 'student.avatar.skinTone' | translate }}</h3>
             <div
-              class="av__tones"
+              class="av__swatches"
               role="radiogroup"
               aria-labelledby="av-tone"
               data-testid="skin-tones"
             >
-              @for (tone of skinTones; track tone.value) {
+              @for (tone of skinTones; track tone) {
                 <button
                   type="button"
                   role="radio"
-                  class="av__tone"
-                  [attr.aria-checked]="currentTone() === tone.value"
-                  [attr.aria-label]="
-                    'student.avatar.tones.' + tone.value | translate
-                  "
-                  [attr.data-tone]="tone.value"
+                  class="av__swatch"
+                  [style.background]="skinHex[tone]"
+                  [attr.aria-checked]="look().skinTone === tone"
+                  [attr.aria-label]="'student.avatar.tones.' + tone | translate"
+                  [attr.data-tone]="tone"
                   [disabled]="!online()"
-                  (click)="setSkinTone(tone.value)"
+                  (click)="setLook({ skinTone: tone })"
+                ></button>
+              }
+            </div>
+
+            <h3 id="av-body">{{ 'student.avatar.body' | translate }}</h3>
+            <div
+              class="av__chips"
+              role="radiogroup"
+              aria-labelledby="av-body"
+              data-testid="body-picker"
+            >
+              @for (b of bodies; track b) {
+                <button
+                  type="button"
+                  role="radio"
+                  class="av__chip"
+                  [attr.aria-checked]="look().baseBodyId === b"
+                  [disabled]="!online()"
+                  (click)="setLook({ baseBodyId: b })"
                 >
-                  <span aria-hidden="true">{{ tone.emoji }}</span>
+                  {{ 'student.avatar.bodies.' + b | translate }}
                 </button>
               }
             </div>
+
+            <h3 id="av-hair">{{ 'student.avatar.hairStyle' | translate }}</h3>
+            <div
+              class="av__chips"
+              role="radiogroup"
+              aria-labelledby="av-hair"
+              data-testid="hair-picker"
+            >
+              @for (h of hairStyles; track h) {
+                <button
+                  type="button"
+                  role="radio"
+                  class="av__chip"
+                  [attr.aria-checked]="look().baseHairStyle === h"
+                  [attr.data-hair]="h"
+                  [disabled]="!online()"
+                  (click)="setLook({ baseHairStyle: h })"
+                >
+                  {{ 'student.avatar.hair.' + h | translate }}
+                </button>
+              }
+            </div>
+
+            <h3 id="av-hair-color">
+              {{ 'student.avatar.hairColor' | translate }}
+            </h3>
+            <div
+              class="av__swatches"
+              role="radiogroup"
+              aria-labelledby="av-hair-color"
+              data-testid="hair-colors"
+            >
+              @for (c of hairColors; track c; let i = $index) {
+                <button
+                  type="button"
+                  role="radio"
+                  class="av__swatch"
+                  [style.background]="c"
+                  [attr.aria-checked]="look().baseHairColor === c"
+                  [attr.aria-label]="
+                    'student.avatar.hairColors.c' + i | translate
+                  "
+                  [disabled]="!online()"
+                  (click)="setLook({ baseHairColor: c })"
+                ></button>
+              }
+            </div>
+
+            <h3 id="av-eyes">{{ 'student.avatar.eyeColor' | translate }}</h3>
+            <div
+              class="av__swatches"
+              role="radiogroup"
+              aria-labelledby="av-eyes"
+              data-testid="eye-colors"
+            >
+              @for (c of eyeColors; track c; let i = $index) {
+                <button
+                  type="button"
+                  role="radio"
+                  class="av__swatch"
+                  [style.background]="c"
+                  [attr.aria-checked]="look().eyeColor === c"
+                  [attr.aria-label]="
+                    'student.avatar.eyeColors.c' + i | translate
+                  "
+                  [disabled]="!online()"
+                  (click)="setLook({ eyeColor: c })"
+                ></button>
+              }
+            </div>
           </section>
+
+          @if (hasPet()) {
+            <section aria-labelledby="av-pet" class="av__section">
+              <h2 id="av-pet">{{ 'student.avatar.petTitle' | translate }}</h2>
+              <form
+                class="av__pet"
+                (submit)="savePetName($event)"
+                data-testid="pet-name-form"
+              >
+                <cdf-form-field
+                  [label]="'student.avatar.petName' | translate"
+                  class="av__pet-field"
+                >
+                  <cdf-app-input
+                    name="petName"
+                    [(ngModel)]="petName"
+                    [maxLength]="30"
+                    data-testid="pet-name"
+                  />
+                </cdf-form-field>
+                <cdf-app-button
+                  kind="secondary"
+                  type="submit"
+                  [disabled]="!online()"
+                  [loading]="savingPet()"
+                >
+                  {{ 'common.save' | translate }}
+                </cdf-app-button>
+              </form>
+            </section>
+          }
 
           <section aria-labelledby="av-inventory" class="av__section">
             <div class="av__head">
@@ -188,8 +346,10 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
               data-testid="inventory"
               [items]="owned()"
               [busyId]="busyId()"
+              [bulk]="online()"
               (equip)="equipOne($event, true)"
               (unequip)="equipOne($event, false)"
+              (bulkEquip)="bulkEquip($event)"
             />
           </section>
         }
@@ -208,6 +368,11 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
       h2 {
         margin: 0 0 var(--cdf-space-2);
         font-size: var(--cdf-font-size-md);
+      }
+      h3 {
+        margin: var(--cdf-space-3) 0 var(--cdf-space-1);
+        font-size: var(--cdf-font-size-sm);
+        color: var(--cdf-color-text-muted);
       }
       .av__sr {
         position: absolute;
@@ -238,54 +403,101 @@ const SKIN_TONES: { value: string; emoji: string }[] = [
         display: flex;
         align-items: baseline;
         justify-content: space-between;
+        gap: var(--cdf-space-2);
+        flex-wrap: wrap;
       }
       .av__link {
         color: var(--cdf-color-primary);
         font-weight: 600;
         font-size: var(--cdf-font-size-sm);
       }
-      .av__tones {
+      .av__swatches,
+      .av__chips {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
       }
-      .av__tone {
-        font-size: 26px;
-        line-height: 1;
-        width: 48px;
-        height: 48px;
+      .av__swatch {
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
-        border: 2px solid transparent;
-        background: var(--cdf-color-surface-2, rgba(0, 0, 0, 0.05));
+        border: 3px solid var(--cdf-color-surface);
+        box-shadow: 0 0 0 1px var(--cdf-color-border);
         cursor: pointer;
       }
-      .av__tone[aria-checked='true'] {
-        border-color: var(--cdf-color-primary);
+      .av__swatch[aria-checked='true'] {
+        box-shadow: 0 0 0 3px var(--cdf-color-primary);
       }
-      .av__tone:focus-visible {
+      .av__chip {
+        min-height: 40px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        font: inherit;
+        font-size: var(--cdf-font-size-sm);
+        cursor: pointer;
+      }
+      .av__chip[aria-checked='true'] {
+        background: var(--cdf-color-primary);
+        border-color: transparent;
+        color: var(--cdf-color-on-primary, #fff);
+      }
+      .av__swatch:focus-visible,
+      .av__chip:focus-visible {
         outline: 2px solid var(--cdf-color-primary);
-        outline-offset: 2px;
+        outline-offset: 3px;
+      }
+      .av__swatch:disabled,
+      .av__chip:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .av__pet {
+        display: flex;
+        gap: var(--cdf-space-2);
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .av__pet-field {
+        flex: 1 1 220px;
       }
     `,
   ],
 })
 export class AvatarPage {
   private readonly items = inject(ItemsClient);
+  private readonly me = inject(MeClient);
   private readonly downloads = inject(DownloadService);
   private readonly network = inject(NetworkStatusService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(AppToastService);
   private readonly telemetry = inject(TelemetryService);
+  protected readonly reducedMotion = inject(MotionAndSoundService)
+    .reducedMotion;
 
   protected readonly skinTones = SKIN_TONES;
+  protected readonly skinHex = SKIN_TONE_HEX;
+  protected readonly bodies = BASE_BODIES;
+  protected readonly hairStyles = HAIR_STYLES;
+  protected readonly hairColors = HAIR_COLORS;
+  protected readonly eyeColors = EYE_COLORS;
   protected readonly online = this.network.online;
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  protected readonly randomizing = signal(false);
   protected readonly busyId = signal<string | null>(null);
   protected readonly avatar = signal<AvatarResponse | null>(null);
   protected readonly inventory = signal<InventoryItem[]>([]);
   protected readonly tryOn = signal<ShopItem | null>(null);
+  /** Unsaved look edits (auto-saved after 3 s). */
+  private readonly lookDraft = signal<Partial<AvatarConfig>>({});
+  protected readonly lookSaving = signal(false);
+  protected readonly savingPet = signal(false);
+  protected petName = '';
+  private lookTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly owned = computed<UiShopItem[]>(() =>
     this.inventory().map((i) =>
@@ -295,15 +507,33 @@ export class AvatarPage {
   protected readonly equipped = computed<EquippedMap>(() =>
     equippedMap(this.avatar()),
   );
+  protected readonly look = computed<AvatarConfig>(() => ({
+    ...normalizeAvatarConfig(this.avatar()?.config ?? null),
+    ...this.lookDraft(),
+  }));
+  protected readonly lookDirty = computed(
+    () => Object.keys(this.lookDraft()).length > 0,
+  );
   protected readonly tryOnSprites = computed(() =>
     equippedSprites(this.avatar(), this.tryOn()),
   );
-  protected readonly currentTone = computed(
-    () => (this.avatar()?.config?.['skinTone'] as string | undefined) ?? null,
+  protected readonly hasPet = computed(() =>
+    this.inventory().some((i) => i.item.slot === 'PET'),
   );
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.lookTimer) {
+        clearTimeout(this.lookTimer);
+        void this.flushLook();
+      }
+    });
     void this.load();
+  }
+
+  private setAvatar(av: AvatarResponse): void {
+    this.avatar.set(av);
+    this.petName = av.petName ?? '';
   }
 
   private async load(): Promise<void> {
@@ -318,7 +548,7 @@ export class AvatarPage {
         this.items.avatar(),
         this.items.inventory(),
       ]);
-      this.avatar.set(av);
+      this.setAvatar(av);
       this.inventory.set(inv);
       void this.downloads.prefetchAssets({ avatar: av, inventory: inv });
       await this.loadTryOn();
@@ -332,7 +562,7 @@ export class AvatarPage {
   private async loadFromCache(): Promise<boolean> {
     const cached = await this.downloads.getCachedAssets().catch(() => null);
     if (!cached) return false;
-    this.avatar.set(cached.avatar as AvatarResponse);
+    this.setAvatar(cached.avatar as AvatarResponse);
     this.inventory.set((cached.inventory as InventoryItem[]) ?? []);
     return true;
   }
@@ -354,14 +584,18 @@ export class AvatarPage {
     void this.router.navigate([], { queryParams: {}, replaceUrl: true });
   }
 
-  /** AvatarBuilder "Save": apply every changed slot. */
+  protected browseShop(slot: AvatarSlot): void {
+    void this.router.navigate(['/shop'], { queryParams: { slot } });
+  }
+
+  /** AvatarBuilder save / auto-save: apply every changed slot. */
   protected async save(next: EquippedMap): Promise<void> {
     const changes = changedSlots(this.equipped(), next);
-    if (changes.length === 0) return;
+    if (changes.length === 0 || this.saving()) return;
     this.saving.set(true);
     try {
       for (const c of changes) {
-        this.avatar.set(await this.items.equip(c.slot, c.itemId));
+        this.setAvatar(await this.items.equip(c.slot, c.itemId));
         if (c.itemId) this.telemetry.track('item_equip', { itemId: c.itemId });
       }
       await this.refreshInventory();
@@ -374,10 +608,25 @@ export class AvatarPage {
     }
   }
 
+  /** "Random": the server shuffles equipment from the owned set. */
+  protected async randomize(): Promise<void> {
+    if (!this.online() || this.randomizing()) return;
+    this.randomizing.set(true);
+    try {
+      this.setAvatar(await this.items.randomize());
+      this.telemetry.track('avatar_randomize');
+      await this.refreshInventory();
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.randomizing.set(false);
+    }
+  }
+
   protected async equipOne(item: UiShopItem, on: boolean): Promise<void> {
     this.busyId.set(item.id);
     try {
-      this.avatar.set(await this.items.equip(item.slot, on ? item.id : null));
+      this.setAvatar(await this.items.equip(item.slot, on ? item.id : null));
       if (on) this.telemetry.track('item_equip', { itemId: item.id });
       await this.refreshInventory();
     } catch (err) {
@@ -387,15 +636,80 @@ export class AvatarPage {
     }
   }
 
-  protected async setSkinTone(tone: string): Promise<void> {
-    const previous = this.avatar();
-    const config = { ...(previous?.config ?? {}), skinTone: tone };
-    this.avatar.update((a) => (a ? { ...a, config } : a));
+  /** Inventory multi-select: one item per slot, applied in turn. */
+  protected async bulkEquip(chosen: UiShopItem[]): Promise<void> {
+    this.saving.set(true);
     try {
-      this.avatar.set(await this.items.saveConfig(config));
+      for (const it of chosen) {
+        this.setAvatar(await this.items.equip(it.slot, it.id));
+        this.telemetry.track('item_equip', { itemId: it.id });
+      }
+      await this.refreshInventory();
+      this.toast.show({
+        message: 'student.avatar.bulkEquipped',
+        kind: 'success',
+        params: { count: chosen.length },
+      });
     } catch (err) {
-      this.avatar.set(previous);
       this.toast.error(err);
+      await this.refreshInventory();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /** Base-look edit: preview now, save 3 s after the last change. */
+  protected setLook(patch: Partial<AvatarConfig> | { pose: AvatarPose }): void {
+    if (!this.online()) return;
+    this.lookDraft.update((d) => ({ ...d, ...patch }));
+    if (this.lookTimer) clearTimeout(this.lookTimer);
+    this.lookTimer = setTimeout(() => {
+      this.lookTimer = null;
+      void this.flushLook();
+    }, LOOK_AUTOSAVE_MS);
+  }
+
+  private async flushLook(): Promise<void> {
+    const patch = this.lookDraft();
+    if (Object.keys(patch).length === 0) return;
+    this.lookSaving.set(true);
+    try {
+      this.setAvatar(await this.items.saveConfig(patch));
+      // Keep edits made while the save was in flight.
+      this.lookDraft.update((d) => {
+        const rest = { ...d };
+        for (const [k, v] of Object.entries(patch))
+          if (rest[k as keyof AvatarConfig] === v)
+            delete rest[k as keyof AvatarConfig];
+        return rest;
+      });
+    } catch (err) {
+      this.lookDraft.set({});
+      this.toast.error(err);
+    } finally {
+      this.lookSaving.set(false);
+    }
+  }
+
+  protected async savePetName(ev: Event): Promise<void> {
+    ev.preventDefault();
+    const name = this.petName.trim();
+    this.savingPet.set(true);
+    try {
+      const me = await this.me.update({ petName: name || null });
+      this.avatar.update((a) =>
+        a ? { ...a, petName: me.petName ?? null } : a,
+      );
+      this.petName = me.petName ?? '';
+      this.toast.show({
+        message: 'student.avatar.petSaved',
+        kind: 'success',
+        params: { name: me.petName ?? '' },
+      });
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.savingPet.set(false);
     }
   }
 

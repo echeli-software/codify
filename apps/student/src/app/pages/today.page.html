@@ -160,6 +160,8 @@
     </section>
     }
 
+    <cdf-friends-activity />
+
     <section aria-labelledby="today-recs">
       <div class="section-head">
         <h2 id="today-recs">
@@ -200,5 +202,7 @@
     [categories]="categories()"
     (done)="onOnboardingDone($event)"
   />
+  } @else {
+  <cdf-starter-pet-gift />
   }
 </ion-content>

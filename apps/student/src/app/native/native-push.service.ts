@@ -144,6 +144,24 @@ export class NativePushService {
     }
   }
 
+  /**
+   * Remote push permission without prompting: `unavailable` on the web or
+   * when the plugin is missing (then local reminders are the fallback).
+   */
+  async permission(): Promise<'granted' | 'denied' | 'prompt' | 'unavailable'> {
+    if (!isNativeRuntime()) return 'unavailable';
+    try {
+      const messaging = await this.plugin();
+      if (!messaging) return 'unavailable';
+      const perm = await messaging.checkPermissions();
+      if (perm.receive === 'granted') return 'granted';
+      if (perm.receive === 'denied') return 'denied';
+      return 'prompt';
+    } catch {
+      return 'unavailable';
+    }
+  }
+
   /** Unbind this device from the user and drop the FCM token. */
   async unregister(): Promise<void> {
     this.signedIn = false;

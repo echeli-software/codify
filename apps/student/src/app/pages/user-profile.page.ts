@@ -86,6 +86,13 @@ import { TelemetryService } from '../telemetry/telemetry.service.js';
               [level]="p.level"
             />
             <h1>{{ p.displayName }}</h1>
+            @if (p.petName) {
+              <p class="up__pet" data-testid="profile-pet">
+                {{
+                  'student.publicProfile.pet' | translate: { name: p.petName }
+                }}
+              </p>
+            }
             <cdf-app-badge variant="primary" [subtle]="true">
               {{
                 'student.publicProfile.tierLevel'
@@ -115,6 +122,18 @@ import { TelemetryService } from '../telemetry/telemetry.service.js';
               <dd>{{ p.stats.friends | locale: 'integer' }}</dd>
               <dt>{{ 'student.publicProfile.friends' | translate }}</dt>
             </div>
+            @if (p.stats.coursesCompleted !== undefined) {
+              <div>
+                <dd>{{ p.stats.coursesCompleted | locale: 'integer' }}</dd>
+                <dt>{{ 'student.publicProfile.courses' | translate }}</dt>
+              </div>
+            }
+            @if (p.stats.itemsOwned !== undefined) {
+              <div>
+                <dd>{{ p.stats.itemsOwned | locale: 'integer' }}</dd>
+                <dt>{{ 'student.publicProfile.items' | translate }}</dt>
+              </div>
+            }
           </dl>
 
           <h2>
@@ -175,9 +194,13 @@ import { TelemetryService } from '../telemetry/telemetry.service.js';
         margin: var(--cdf-space-2) 0 0;
         font-size: var(--cdf-font-size-xl);
       }
+      .up__pet {
+        margin: 0;
+        color: var(--cdf-color-text-muted);
+      }
       .up__stats {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: var(--cdf-space-2);
         margin: 0 0 var(--cdf-space-4);
       }

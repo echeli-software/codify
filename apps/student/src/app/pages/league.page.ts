@@ -38,6 +38,7 @@ import {
   ProblemDetailsError,
   type CurrentLeague,
   type LastWeekResult,
+  type LeagueHistoryEntry,
 } from '@codify/api-client';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
 import { OfflineGate } from '../platform/offline-gate.component.js';
@@ -232,6 +233,60 @@ export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
               }}</cdf-app-button>
             </cdf-empty-state>
           }
+
+          @if (history().length > 0) {
+            <section
+              class="lg__history"
+              aria-labelledby="lg-history"
+              data-testid="league-history"
+            >
+              <h2 id="lg-history">
+                {{ 'student.league.history.title' | translate }}
+              </h2>
+              <ol class="lg__history-list">
+                @for (h of history(); track h.weekStart) {
+                  <li class="lg__history-row" [attr.data-week]="h.weekStart">
+                    <span class="lg__history-tier" aria-hidden="true">{{
+                      tierIcon(h.tier)
+                    }}</span>
+                    <span class="lg__history-copy">
+                      <strong>{{
+                        'student.league.history.week'
+                          | translate: { date: (h.weekStart | locale: 'date') }
+                      }}</strong>
+                      <span class="lg__muted">
+                        {{
+                          'student.league.history.line'
+                            | translate
+                              : {
+                                  tier: ('ui.tier.' + h.tier | translate),
+                                  rank: h.finalRank,
+                                  size: h.cohortSize,
+                                  xp: h.weeklyXp,
+                                }
+                        }}
+                      </span>
+                    </span>
+                    <span
+                      class="lg__history-outcome"
+                      [attr.data-outcome]="
+                        h.promoted ? 'up' : h.demoted ? 'down' : 'stay'
+                      "
+                    >
+                      {{
+                        'student.league.history.' +
+                          (h.promoted
+                            ? 'promoted'
+                            : h.demoted
+                              ? 'demoted'
+                              : 'stayed') | translate
+                      }}
+                    </span>
+                  </li>
+                }
+              </ol>
+            </section>
+          }
         </cdf-offline-gate>
       </div>
 
@@ -299,6 +354,48 @@ export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
       .lg {
         max-width: 1280px;
         margin: 0 auto;
+      }
+      .lg__history {
+        margin-top: var(--cdf-space-4);
+      }
+      .lg__history h2 {
+        font-size: var(--cdf-font-size-md);
+        margin: 0 0 var(--cdf-space-2);
+      }
+      .lg__history-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+      }
+      .lg__history-row {
+        display: flex;
+        align-items: center;
+        gap: var(--cdf-space-2);
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+      }
+      .lg__history-tier {
+        font-size: 24px;
+      }
+      .lg__history-copy {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .lg__history-outcome {
+        font-size: var(--cdf-font-size-sm);
+        font-weight: 600;
+      }
+      .lg__history-outcome[data-outcome='up'] {
+        color: var(--cdf-color-success, inherit);
+      }
+      .lg__history-outcome[data-outcome='down'] {
+        color: var(--cdf-color-danger, inherit);
       }
       .lg__card {
         display: block;
@@ -416,6 +513,8 @@ export class LeaguePage {
   protected readonly errorKey = signal<string | null>(null);
   protected readonly league = signal<CurrentLeague | null>(null);
   protected readonly lastWeek = signal<LastWeekResult | null>(null);
+  /** Past weeks (docs/05 League "Past weeks history"). */
+  protected readonly history = signal<LeagueHistoryEntry[]>([]);
   protected readonly sheetOpen = signal(false);
   protected readonly now = signal(Date.now());
 
@@ -467,6 +566,16 @@ export class LeaguePage {
       this.loading.set(false);
     }
     void this.loadLastWeek();
+    void this.loadHistory();
+  }
+
+  private async loadHistory(): Promise<void> {
+    try {
+      this.history.set(await this.client.history(12));
+    } catch {
+      // Older API / feature off: the section stays hidden.
+      this.history.set([]);
+    }
   }
 
   private async loadLastWeek(): Promise<void> {

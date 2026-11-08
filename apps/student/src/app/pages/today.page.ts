@@ -64,8 +64,11 @@ import {
 import { AppToastService } from '../platform/app-toast.service.js';
 import {
   OnboardingFlowComponent,
+  firstLessonRoute,
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
+import { StarterPetGiftComponent } from '../components/starter-pet-gift.component.js';
+import { FriendsActivityComponent } from '../components/friends-activity.component.js';
 import { NotificationBell } from '../components/notification-bell.component.js';
 import { GrowthLinksService } from './shared/growth-links.service.js';
 import { DownloadService } from '../offline/download.service.js';
@@ -162,6 +165,8 @@ export function needsOnboarding(opts: {
     StreakChip,
     XpBar,
     OnboardingFlowComponent,
+    StarterPetGiftComponent,
+    FriendsActivityComponent,
     NotificationBell,
     TranslatePipe,
     ContentTranslatePipe,
@@ -442,7 +447,8 @@ export class TodayPage {
     } catch (err) {
       this.toast.error(err);
     }
-    void this.router.navigate(['/courses', ev.course.slug]);
+    // Onboarding step 5: launch the first lesson directly (docs/05).
+    void this.router.navigate(await firstLessonRoute(this.courses, ev.course));
   }
 
   private async claimGrowth(): Promise<void> {

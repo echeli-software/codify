@@ -1,11 +1,13 @@
 import { Injectable, Injector, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { type DevicePlatform } from '@codify/api-client';
+import { NotificationsClient, type DevicePlatform } from '@codify/api-client';
+import { I18nService } from '@codify/i18n';
 import type { PurchasesPlugin } from '@revenuecat/purchases-capacitor';
 import { REVENUECAT_ANDROID_KEY, REVENUECAT_IOS_KEY } from '../api-base-url.js';
 import { isNativeRuntime, runtimePlatform } from '../platform/runtime.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { NativePushService } from './native-push.service.js';
+import { NativeShellService } from './native-shell.service.js';
 
 /** Thrown when a plan price has no App Store / Play product configured. */
 export class StoreProductMissingError extends Error {
@@ -29,6 +31,9 @@ export class StoreProductMissingError extends Error {
  *     `logIn(userId)` after sign-in / `logOut` on sign-out, purchases by the
  *     price's `storeProductId`, restore.
  *   - Android hardware back button (exit at the root) + app foreground state.
+ *   - `NativeShellService`: local daily reminder as a backup when remote
+ *     push is off, the in-app browser (Stripe portal), theme-aware status
+ *     bar and the splash screen (hidden once booted).
  */
 @Injectable({ providedIn: 'root' })
 export class NativePlatformService {
@@ -36,6 +41,7 @@ export class NativePlatformService {
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly telemetry = inject(TelemetryService);
+  readonly shell = inject(NativeShellService);
 
   private purchasesP: Promise<PurchasesPlugin | null> | null = null;
   private rcConfigured = false;
@@ -66,6 +72,8 @@ export class NativePlatformService {
   async init(): Promise<void> {
     if (this.initialized || !this.isNative) return;
     this.initialized = true;
+    this.followTheme();
+    void this.shell.hideSplash();
     // Tap listeners go on at boot so a cold start from a notification
     // still deep-links (the token is only requested after sign-in).
     void this.push.init();
@@ -102,12 +110,64 @@ export class NativePlatformService {
     if (!this.isNative) return;
     await this.identifyPurchases(userId);
     await this.registerForPush();
+    await this.syncLocalReminder();
+  }
+
+  /**
+   * Local daily reminder as a backup for remote push (docs/05 §7): at the
+   * learner's reminder time (`reminderMinute`, else `minute`, else 20:00).
+   */
+  async syncLocalReminder(minute?: number | null): Promise<void> {
+    if (!this.isNative) return;
+    let at = minute;
+    if (at === undefined) {
+      try {
+        at = (await this.injector.get(NotificationsClient).preferences())
+          .reminderMinute;
+      } catch {
+        at = null;
+      }
+    }
+    const i18n = this.injector.get(I18nService);
+    await this.shell.syncDailyReminder(at, {
+      title: i18n.t('student.native.reminderTitle'),
+      body: i18n.t('student.native.reminderBody'),
+    });
+  }
+
+  /**
+   * Status bar follows the app theme: ThemeService (ui-ionic) toggles
+   * `theme-dark` / `theme-light` on <html>; neither = system mode
+   * (prefers-color-scheme). Observed here so this service never imports
+   * ui-ionic (Ionic stays out of the initial graph).
+   */
+  private followTheme(): void {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
+    let last: boolean | null = null;
+    const apply = () => {
+      const dark =
+        root.classList.contains('theme-dark') ||
+        (!root.classList.contains('theme-light') && !!media?.matches);
+      if (dark === last) return;
+      last = dark;
+      void this.shell.applyTheme(dark);
+    };
+    apply();
+    media?.addEventListener?.('change', apply);
+    if (typeof MutationObserver !== 'undefined')
+      new MutationObserver(apply).observe(root, {
+        attributes: true,
+        attributeFilter: ['class'],
+      });
   }
 
   /** On sign-out: unbind the push token and reset the RevenueCat customer. */
   async onSignedOut(): Promise<void> {
     if (!this.isNative) return;
     await this.push.unregister();
+    await this.shell.cancelDailyReminder();
     if (this.rcConfigured && this.rcUserId) {
       const Purchases = await this.purchases();
       await Purchases?.logOut().catch(() => undefined);
