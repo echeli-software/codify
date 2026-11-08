@@ -54,7 +54,7 @@ function sub(over: Record<string, unknown> = {}) {
 }
 
 function makePrisma() {
-  return {
+  const db = {
     planPrice: { findUnique: jest.fn(), findFirst: jest.fn() },
     plan: { findFirst: jest.fn() },
     user: { findFirst: jest.fn(async () => ({ id: 'user-1' })) },
@@ -78,10 +78,31 @@ function makePrisma() {
         ...data,
       })),
     },
+    payment: {
+      findUnique: jest.fn(async () => null),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'pay-1',
+        ...data,
+      })),
+      update: jest.fn(),
+    },
+    idempotencyRecord: { createMany: jest.fn(async () => ({ count: 1 })) },
+  };
+  return {
+    ...db,
+    $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
   };
 }
 
 const access = { pastDueGraceDays: jest.fn(async () => 3) };
+const winback = {
+  discountFor: jest.fn(async () => ({
+    offer: 'winback',
+    couponId: 'co_1',
+    promotionCodeId: null,
+    percentOff: 20,
+  })),
+};
 
 function stripeLikeProvider(): BillingProvider {
   return {
@@ -110,6 +131,7 @@ function stripeLikeProvider(): BillingProvider {
       metadata: {},
     })),
     cancelSubscriptionNow: jest.fn(async () => null),
+    refundPayment: jest.fn(),
   };
 }
 
@@ -126,6 +148,7 @@ describe('BillingService — dev checkout hardening', () => {
         prisma as never,
         access as never,
         provider,
+        winback as never,
       );
       await expect(
         svc.completeDevCheckout(student, 'cs_dev_x.y'),
@@ -136,7 +159,12 @@ describe('BillingService — dev checkout hardening', () => {
   it('rejects a forged / foreign session id and another user’s session', async () => {
     const prisma = makePrisma();
     const dev = new DevBillingProvider('k1');
-    const svc = new BillingService(prisma as never, access as never, dev);
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      dev,
+      winback as never,
+    );
     const other = new DevBillingProvider('k2');
     const { sessionId } = await other.createCheckoutSession(
       checkoutInput('user-1'),
@@ -156,10 +184,17 @@ describe('BillingService — dev checkout hardening', () => {
     prisma.planPrice.findFirst.mockResolvedValue({
       id: 'pp',
       period: 'ANNUAL',
+      amountCents: 47880,
+      currency: 'BRL',
       plan: { name: 'F' },
     });
     const dev = new DevBillingProvider('k1');
-    const svc = new BillingService(prisma as never, access as never, dev);
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      dev,
+      winback as never,
+    );
 
     const card = await dev.createCheckoutSession(checkoutInput('user-1'));
     const r1 = await svc.completeDevCheckout(student, card.sessionId);
@@ -176,6 +211,88 @@ describe('BillingService — dev checkout hardening', () => {
     expect(r2.status).toBe('ACTIVE');
     expect(r2.cancelAtPeriodEnd).toBe(true);
     expect(r2.renews).toBe(false);
+    // The trial logged no payment; the prepay did (dev billing history).
+    expect(prisma.payment.create).toHaveBeenCalledTimes(1);
+    expect(prisma.payment.create.mock.calls[0][0].data).toMatchObject({
+      provider: 'STRIPE',
+      amountCents: 47880,
+      currency: 'BRL',
+      method: 'pix',
+      status: 'PAID',
+    });
+  });
+
+  it('a win-back session is charged at the discount and records usage', async () => {
+    const prisma = makePrisma();
+    prisma.planPrice.findFirst.mockResolvedValue({
+      id: 'pp',
+      period: 'ANNUAL',
+      amountCents: 10000,
+      currency: 'BRL',
+      plan: { name: 'F' },
+    });
+    const dev = new DevBillingProvider('k1');
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      dev,
+      winback as never,
+    );
+    const s = await dev.createCheckoutSession({
+      ...checkoutInput('user-1'),
+      plan: { ...checkoutInput('user-1').plan, trialDays: 0 },
+      discount: {
+        offer: 'winback',
+        couponId: null,
+        promotionCodeId: null,
+        percentOff: 20,
+      },
+    });
+    await svc.completeDevCheckout(student, s.sessionId);
+    expect(prisma.payment.create.mock.calls[0][0].data).toMatchObject({
+      amountCents: 8000,
+    });
+    expect(prisma.idempotencyRecord.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          key: 'winback_offer:user-1',
+          scope: 'winback_offer',
+          userId: 'user-1',
+        },
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('checkout with offer=winback passes the discount to the provider', async () => {
+    const prisma = makePrisma();
+    const provider = stripeLikeProvider();
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      provider,
+      winback as never,
+    );
+    prisma.planPrice.findUnique.mockResolvedValue({
+      id: 'pp',
+      isActive: true,
+      period: 'ANNUAL',
+      currency: 'BRL',
+      amountCents: 10000,
+      plan: {
+        id: 'p',
+        name: 'P',
+        isActive: true,
+        deletedAt: null,
+        trialDays: 0,
+      },
+    });
+    prisma.subscription.findFirst.mockResolvedValue(null);
+    await svc.createCheckout(student, { planPriceId: 'pp', offer: 'winback' });
+    expect(winback.discountFor).toHaveBeenCalledWith('user-1', 'ANNUAL');
+    expect(
+      (provider.createCheckoutSession as jest.Mock).mock.calls[0][0].discount,
+    ).toMatchObject({ offer: 'winback', couponId: 'co_1' });
   });
 });
 
@@ -186,6 +303,7 @@ describe('BillingService — checkout', () => {
       prisma as never,
       access as never,
       stripeLikeProvider(),
+      winback as never,
     );
     prisma.planPrice.findUnique.mockResolvedValue({
       id: 'pp',
@@ -200,7 +318,12 @@ describe('BillingService — checkout', () => {
   it('reuses the stripeCustomerId from the user’s earlier subscription', async () => {
     const prisma = makePrisma();
     const provider = stripeLikeProvider();
-    const svc = new BillingService(prisma as never, access as never, provider);
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      provider,
+      winback as never,
+    );
     prisma.planPrice.findUnique.mockResolvedValue({
       id: 'pp',
       isActive: true,
@@ -239,7 +362,12 @@ describe('BillingService — cancel / resume', () => {
   it('cancel sets cancel_at_period_end on Stripe and mirrors it; access continues', async () => {
     const prisma = makePrisma();
     const provider = stripeLikeProvider();
-    const svc = new BillingService(prisma as never, access as never, provider);
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      provider,
+      winback as never,
+    );
     prisma.subscription.findFirst.mockResolvedValue(sub());
     const res = await svc.cancelMine(student, {});
     expect(provider.setCancelAtPeriodEnd).toHaveBeenCalledWith('sub_123', true);
@@ -254,6 +382,7 @@ describe('BillingService — cancel / resume', () => {
       prisma as never,
       access as never,
       new DevBillingProvider('k'),
+      winback as never,
     );
     prisma.subscription.findFirst.mockResolvedValue(
       sub({ stripeSubscriptionId: 'sub_dev_x' }),
@@ -271,6 +400,7 @@ describe('BillingService — cancel / resume', () => {
       prisma as never,
       access as never,
       stripeLikeProvider(),
+      winback as never,
     );
     prisma.subscription.findFirst.mockResolvedValue(
       sub({ source: 'APPLE_IAP', stripeSubscriptionId: null }),
@@ -286,6 +416,7 @@ describe('BillingService — cancel / resume', () => {
       prisma as never,
       access as never,
       stripeLikeProvider(),
+      winback as never,
     );
     prisma.subscription.findFirst.mockResolvedValue(
       sub({ status: 'CANCELED' }),
@@ -298,7 +429,12 @@ describe('BillingService — cancel / resume', () => {
   it('resume clears the pending cancellation on Stripe', async () => {
     const prisma = makePrisma();
     const provider = stripeLikeProvider();
-    const svc = new BillingService(prisma as never, access as never, provider);
+    const svc = new BillingService(
+      prisma as never,
+      access as never,
+      provider,
+      winback as never,
+    );
     prisma.subscription.findFirst.mockResolvedValue(
       sub({ cancelAtPeriodEnd: true }),
     );
@@ -319,6 +455,7 @@ describe('BillingService — cancel / resume', () => {
       prisma as never,
       access as never,
       stripeLikeProvider(),
+      winback as never,
     );
     prisma.subscription.findFirst.mockResolvedValue(
       sub({ cancelAtPeriodEnd: true, stripeSubscriptionId: 'cs_test_1' }),
@@ -336,6 +473,7 @@ describe('BillingAdminService', () => {
       prisma as never,
       access as never,
       provider,
+      winback as never,
     );
     return {
       prisma,

@@ -9,6 +9,8 @@ import {
   type CheckoutSessionResult,
   type PortalSessionInput,
   type PortalSessionResult,
+  type RefundInput,
+  type RefundResult,
   type StripeWebhookEvent,
   type SubscriptionSnapshot,
   type SyncPlanInput,
@@ -27,6 +29,7 @@ export type StripeClientLike = Pick<
   | 'webhooks'
   | 'invoices'
   | 'invoicePayments'
+  | 'refunds'
 >;
 
 type CheckoutCreateParams = NonNullable<
@@ -120,13 +123,23 @@ export class StripeBillingProvider implements BillingProvider {
   ): Promise<CheckoutSessionResult> {
     const { user, plan, price, paymentMethod } = input;
     const customer = await this.resolveCustomer(input);
-    const metadata = {
+    const discount = input.discount ?? null;
+    const metadata: Record<string, string> = {
       userId: user.id,
       planId: plan.id,
       priceId: price.id,
       period: price.period,
       paymentMethod,
+      ...(discount ? { offer: discount.offer } : {}),
     };
+    // Stripe takes either a preset discount or customer-entered promo codes.
+    const discounts = discount
+      ? [
+          discount.promotionCodeId
+            ? { promotion_code: discount.promotionCodeId }
+            : { coupon: discount.couponId ?? undefined },
+        ]
+      : null;
     const successUrl = withSessionPlaceholder(input.successUrl);
 
     let params: CheckoutCreateParams;
@@ -144,7 +157,7 @@ export class StripeBillingProvider implements BillingProvider {
         client_reference_id: user.id,
         line_items: [{ price: price.stripePriceId, quantity: 1 }],
         allowed_payment_method_types: ['card'],
-        allow_promotion_codes: true,
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         success_url: successUrl,
         cancel_url: input.cancelUrl,
         metadata,
@@ -184,6 +197,7 @@ export class StripeBillingProvider implements BillingProvider {
           },
         ],
         allowed_payment_method_types: [paymentMethod],
+        ...(discounts ? { discounts } : {}),
         success_url: successUrl,
         cancel_url: input.cancelUrl,
         metadata,
@@ -307,6 +321,52 @@ export class StripeBillingProvider implements BillingProvider {
     return snapshotFromStripeSubscription(
       await this.stripe.subscriptions.cancel(id),
     );
+  }
+
+  /**
+   * Refund through Stripe's Refunds API. Invoices are refunded through
+   * their PaymentIntent (InvoicePayments since API 2025-03-31), prepay
+   * Checkout Sessions through theirs, `ch_…` ids directly. The
+   * `charge.refunded` webhook then updates the Payment row.
+   */
+  async refundPayment(input: RefundInput): Promise<RefundResult> {
+    const target = await this.refundTarget(input.externalId);
+    const refund = await this.stripe.refunds.create(
+      {
+        ...target,
+        amount: input.amountCents,
+        reason: 'requested_by_customer',
+        metadata: input.metadata,
+      },
+      { idempotencyKey: input.idempotencyKey },
+    );
+    return { refundId: refund.id, status: refund.status ?? 'pending' };
+  }
+
+  private async refundTarget(
+    externalId: string,
+  ): Promise<{ payment_intent: string } | { charge: string }> {
+    if (externalId.startsWith('ch_')) return { charge: externalId };
+    if (externalId.startsWith('cs_')) {
+      const session = await this.stripe.checkout.sessions.retrieve(externalId);
+      const pi = idOf(session.payment_intent);
+      if (pi) return { payment_intent: pi };
+    } else if (externalId.startsWith('in_')) {
+      const payments = await this.stripe.invoicePayments.list({
+        invoice: externalId,
+        limit: 10,
+      });
+      const paid =
+        payments.data.find((p) => p.status === 'paid') ?? payments.data[0];
+      const pi = idOf(paid?.payment?.payment_intent);
+      if (pi) return { payment_intent: pi };
+      const charge = idOf(paid?.payment?.charge);
+      if (charge) return { charge };
+    }
+    throw new BadRequestException({
+      code: 'REFUND_TARGET_NOT_FOUND',
+      message: `No refundable charge found at Stripe for ${externalId}`,
+    });
   }
 
   /**

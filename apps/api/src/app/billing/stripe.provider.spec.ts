@@ -35,7 +35,14 @@ function mockStripe() {
         list: jest.fn(async () => ({
           data: [] as { id: string; mode: string }[],
         })),
+        retrieve: jest.fn(async () => ({
+          id: 'cs_p',
+          payment_intent: 'pi_cs',
+        })),
       },
+    },
+    refunds: {
+      create: jest.fn(async () => ({ id: 're_1', status: 'succeeded' })),
     },
     invoices: { retrieve: jest.fn() },
     invoicePayments: {
@@ -567,5 +574,115 @@ describe('StripeBillingProvider.resolveChargeContext (charge.refunded)', () => {
       payment_intent: 'pi_2',
       limit: 1,
     });
+  });
+});
+
+describe('StripeBillingProvider — win-back discount + refunds', () => {
+  it('applies the configured coupon (and drops customer promo codes)', async () => {
+    const { stripe, provider } = mockStripe();
+    await provider.createCheckoutSession(
+      input({
+        discount: {
+          offer: 'winback',
+          couponId: 'co_winback',
+          promotionCodeId: null,
+          percentOff: 20,
+        },
+      }),
+    );
+    const params = (
+      stripe.checkout.sessions.create.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ]
+    )[0];
+    expect(params['discounts']).toEqual([{ coupon: 'co_winback' }]);
+    expect(params['allow_promotion_codes']).toBeUndefined();
+    expect(params['metadata']).toMatchObject({ offer: 'winback' });
+
+    await provider.createCheckoutSession(
+      input({
+        discount: {
+          offer: 'winback',
+          couponId: 'co_x',
+          promotionCodeId: 'promo_1',
+          percentOff: 20,
+        },
+      }),
+    );
+    expect(
+      (
+        stripe.checkout.sessions.create.mock.calls[1] as unknown as [
+          Record<string, unknown>,
+        ]
+      )[0]['discounts'],
+    ).toEqual([{ promotion_code: 'promo_1' }]);
+
+    await provider.createCheckoutSession(input());
+    expect(
+      (
+        stripe.checkout.sessions.create.mock.calls[2] as unknown as [
+          Record<string, unknown>,
+        ]
+      )[0]['allow_promotion_codes'],
+    ).toBe(true);
+  });
+
+  const refundInput = (externalId: string) => ({
+    externalId,
+    amountCents: 1000,
+    payment: {
+      id: 'pay-1',
+      userId: 'user-1',
+      amountCents: 3990,
+      refundedCents: 0,
+      currency: 'BRL',
+      paidAt: new Date(),
+      stripeSubscriptionId: 'sub_1',
+    },
+    idempotencyKey: 'refund:pay-1:0:1000',
+    metadata: { paymentId: 'pay-1' },
+  });
+
+  it('refunds an invoice through its PaymentIntent, idempotently', async () => {
+    const { stripe, provider } = mockStripe();
+    stripe.invoicePayments.list.mockResolvedValueOnce({
+      data: [{ status: 'paid', payment: { payment_intent: 'pi_1' } }] as never,
+    });
+    const res = await provider.refundPayment(refundInput('in_1'));
+    expect(res).toEqual({ refundId: 're_1', status: 'succeeded' });
+    expect(stripe.invoicePayments.list).toHaveBeenCalledWith({
+      invoice: 'in_1',
+      limit: 10,
+    });
+    expect(stripe.refunds.create).toHaveBeenCalledWith(
+      {
+        payment_intent: 'pi_1',
+        amount: 1000,
+        reason: 'requested_by_customer',
+        metadata: { paymentId: 'pay-1' },
+      },
+      { idempotencyKey: 'refund:pay-1:0:1000' },
+    );
+  });
+
+  it('refunds prepay sessions and charges; 400 when nothing is refundable', async () => {
+    const { stripe, provider } = mockStripe();
+    await provider.refundPayment(refundInput('cs_p'));
+    expect(
+      (
+        stripe.refunds.create.mock.calls[0] as unknown as [
+          { payment_intent: string },
+        ]
+      )[0].payment_intent,
+    ).toBe('pi_cs');
+    await provider.refundPayment(refundInput('ch_9'));
+    expect(
+      (
+        stripe.refunds.create.mock.calls[1] as unknown as [{ charge: string }]
+      )[0].charge,
+    ).toBe('ch_9');
+    await expect(
+      provider.refundPayment(refundInput('in_none')),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

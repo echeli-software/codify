@@ -158,6 +158,16 @@ UI shows: "R$ 478,80 ou em até 12x de R$ 39,90 sem juros".
 - Beyond window: support-tier (capped) and admin-tier (unlimited).
 - Refund triggers `charge.refunded` → we update internal records and possibly revert recent gamification grants from a "first-month bonus" if abuse signal present.
 
+**Implementation** (`billing/refunds.service.ts`): refunds are issued at the provider (`BillingProvider.refundPayment` — Stripe Refunds API on the invoice's PaymentIntent, the prepay Checkout Session's PaymentIntent, or the charge; Stripe idempotency key `refund:<paymentId>:<refundedCents>:<amount>`). The Payment row, the access change and the first-payment-bonus claw-back are applied only by the `charge.refunded` webhook path (§6), so they are idempotent; the dev provider returns the simulated `charge.refunded` event and it is processed inline through the same path.
+
+| Method + path                                                               | Auth           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /billing/refund-eligibility`                                           | STUDENT        | `{ eligible, reason: NO_PAYMENT\|STORE_PURCHASE\|WINDOW_PASSED\|ALREADY_USED\|ALREADY_REFUNDED\|null, windowDays, payment: { id, amountCents, currency, paidAt, planName } \| null, deadline }`. The self-serve refund covers the user's **first** web payment within `billing.refundWindowDays` (GamificationConfig, default 7) of paying, once per account.                                                                                                                                                                                                                                                                    |
+| `POST /billing/refund` `{ confirm: "REFUND", reason? }`                     | STUDENT        | Full refund of that payment; the subscription ends now (canceled at Stripe too). `409 REFUND_NOT_ELIGIBLE { reason }`, `400 STORE_REFUND` (App Store / Google Play purchases are refunded by Apple / Google). Audited `billing.refund.self_serve` with before/after.                                                                                                                                                                                                                                                                                                                                                             |
+| `POST /billing/admin/payments/:paymentId/refund` `{ amountCents?, reason }` | SUPPORT, ADMIN | Default = everything not yet refunded. SUPPORT: cumulative refunds on the payment ≤ one month of the plan (MONTHLY price in the payment currency, else ANNUAL ÷ 12) → `403 REFUND_CAP_EXCEEDED { capCents, requiredRole: "ADMIN" }`. `409 ALREADY_REFUNDED` / `REFUND_IN_PROGRESS` (one refund per payment state at a time), `400 REFUND_EXCEEDS_REMAINING` / `STORE_REFUND` / `REFUND_FAILED`. Response `{ paymentId, refund: { id, status, amountCents, currency }, before, after: { status, refundedCents }, accessEnded, capCents }` (with Stripe, `after` changes when the webhook lands). Audited `billing.refund.issued`. |
+
+Dev checkouts (`POST /billing/dev/complete-checkout`) now log the Payment Stripe would (no row for a trial start), so the refund flows can be exercised locally.
+
 ## 6. Webhook handling
 
 Endpoint: `POST /v1/webhooks/stripe`.
@@ -225,6 +235,12 @@ Symbols and decimal/thousands separators per locale (Intl.NumberFormat).
 - Stripe `trial_period_days` on Checkout.
 - Status `TRIALING` until `trialEndsAt`.
 - Push reminder 2 days before trial ends.
+  Implementation: a BILLING notice (inbox + push + email) once per subscription per trial end
+  (`IdempotencyRecord billing_trial_reminder:<subscription>:<trialEndsAt>`), only while auto-renew is on.
+  `customer.subscription.trial_will_end` (Stripe sends it 3 days ahead) mirrors the subscription and
+  sends the reminder at once only when the trial ends within 2 days; otherwise — and for trials with no such
+  event (store trials) — the hourly `billing-trial-reminders` job (:29, behind `JOBS_ENABLED`) sends it at
+  the 2-day mark.
 - Cancel during trial → no charge; access revoked at trial end.
 
 ## 10. Promo codes
@@ -260,6 +276,12 @@ Admin dashboard pulls (precomputed nightly):
 - Trial → paid conversion %.
 - Average revenue per paying user (ARPPU).
 - Refund rate.
+
+Implementation: `GET /admin/reports/overview` (ADMIN) → `billing { mrr { currency: BRL, amountCents, byPlan[{ planId, planName, amountCents, subscriptions, excluded }] }, weeks[8]{ weekStart, newPaid, churned, netNew }, trialToPaid { trialsEnded, converted, rate }, arppu[{ currency, revenueCents, payingUsers, arppuCents }], refunds[{ currency, paidCents, refundedCents, payments, refundedPayments, rate }] }` — computed from Subscription / Payment / PlanPrice (MRR uses the dashboard's `computeMrr`; "new" = first non-failed payment of a subscription that week; "churned" = a subscription with a payment whose access ended that week; trial→paid = trials ended in the last 90 days with a payment after the trial; ARPPU over 30 days net of refunds; refund rate over 90 days). Cached 10 minutes per instance (`?fresh=1` recomputes) instead of a nightly precompute. The admin Analytics page renders it (docs/04).
+
+### Win-back offer at checkout (docs/10 §13)
+
+`GET /billing/offers` (STUDENT) → `{ winback: { offer: "winback", eligible, reason: NO_OFFER\|SUBSCRIBED\|USED\|NOT_CONFIGURED\|null, percentOff, appliesTo: "ANNUAL", expiresAt } }`. Eligible when the day-30 reactivation message was sent (REACTIVATION inbox row, `data.type = "winback"`) within `WINBACK_OFFER_DAYS` (14), the user has no live subscription, and has never redeemed it. `POST /billing/checkout-session` takes `offer: "winback"` (annual prices only — `400 OFFER_NOT_APPLICABLE`; `409 OFFER_NOT_AVAILABLE { reason }`): Stripe Checkout gets `discounts: [{ coupon: STRIPE_WINBACK_COUPON }]` (or `promotion_code: STRIPE_WINBACK_PROMOTION_CODE`) instead of `allow_promotion_codes`, and `metadata.offer = "winback"`; the dev provider charges `WINBACK_PERCENT_OFF` (20) less. Usage is recorded once per user (`IdempotencyRecord winback_offer:<userId>`) when the discounted checkout becomes a subscription (webhook create / prepay, or the dev completion).
 
 ## 14. Out of scope (initial)
 

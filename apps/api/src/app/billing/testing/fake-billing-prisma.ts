@@ -91,6 +91,20 @@ export class FakeBillingPrisma {
       this.state.idempotency.set(data.key, { ...data });
       return data;
     },
+    createMany: async ({
+      data,
+    }: {
+      data: { key: string; scope: string }[];
+      skipDuplicates?: boolean;
+    }) => {
+      let count = 0;
+      for (const d of data) {
+        if (this.state.idempotency.has(d.key)) continue;
+        this.state.idempotency.set(d.key, { ...d });
+        count += 1;
+      }
+      return { count };
+    },
   };
 
   readonly user = {

@@ -27,6 +27,8 @@ import { WebhookProcessor } from './webhook.processor.js';
 import { BillingJobsService } from './billing-jobs.service.js';
 import { BillingScheduler } from './billing.scheduler.js';
 import { PaymentsService } from './payments.service.js';
+import { RefundsService } from './refunds.service.js';
+import { WinbackOfferService } from './winback-offer.service.js';
 
 /**
  * Global billing module. Provides the BILLING_PROVIDER seam, the reusable
@@ -62,6 +64,8 @@ import { PaymentsService } from './payments.service.js';
     BillingScheduler,
     RevenueCatWebhookService,
     PaymentsService,
+    RefundsService,
+    WinbackOfferService,
     {
       provide: BILLING_PROVIDER,
       useFactory: (): BillingProvider => createBillingProvider(process.env),

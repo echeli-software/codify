@@ -40,7 +40,13 @@ import {
   BILLING_WEBHOOK_ENQUEUER,
   type WebhookEnqueuer,
 } from './webhook-queue.js';
-import { paymentFailedCopy } from './billing-push-copy.js';
+import { paymentFailedCopy, trialEndingCopy } from './billing-push-copy.js';
+import { claimWinbackUsage, WINBACK_OFFER } from './winback-offer.service.js';
+import {
+  TRIAL_REMINDER_DAYS,
+  claimTrialReminder,
+  trialReminderKey,
+} from './trial-reminder.js';
 import {
   currencyOf,
   invoiceFacts,
@@ -68,6 +74,8 @@ const SUBSCRIPTION_EVENTS = new Set([
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
+  // Sent 3 days before a trial ends (docs/09 §9): mirror + maybe remind.
+  'customer.subscription.trial_will_end',
 ]);
 const CHECKOUT_EVENTS = new Set([
   'checkout.session.completed',
@@ -225,9 +233,14 @@ export class WebhookService {
       if (!snap) return false;
       if (event.type === 'customer.subscription.deleted')
         snap.status = 'canceled';
-      return this.applySnapshot(tx, snap, event, {
+      const applied = await this.applySnapshot(tx, snap, event, {
         fromApi: pre.snapshot !== null,
       });
+      if (event.type === 'customer.subscription.trial_will_end') {
+        const reminded = await this.trialReminder(tx, snap.id, effects);
+        return applied || reminded;
+      }
+      return applied;
     }
 
     if (
@@ -245,6 +258,59 @@ export class WebhookService {
 
     this.logger.debug(`Ignoring unhandled event type ${event.type}`);
     return false;
+  }
+
+  /**
+   * `customer.subscription.trial_will_end` (docs/09 §9 "push reminder 2
+   * days before trial ends"). Stripe sends it 3 days ahead, so the reminder
+   * goes out now only when the trial ends within TRIAL_REMINDER_DAYS (short
+   * trials); otherwise the hourly BillingJobsService.sendTrialReminders
+   * sends it at the 2-day mark. Both claim the same key, so the user is
+   * reminded once per trial. Nothing is sent once auto-renew is off (no
+   * charge is coming).
+   */
+  private async trialReminder(
+    tx: Tx,
+    stripeSubscriptionId: string,
+    effects: AfterCommit[],
+  ): Promise<boolean> {
+    const row = await tx.subscription.findUnique({
+      where: { stripeSubscriptionId },
+    });
+    const now = new Date();
+    if (
+      !row?.trialEndsAt ||
+      row.status !== 'TRIALING' ||
+      row.cancelAtPeriodEnd ||
+      row.trialEndsAt <= now ||
+      row.trialEndsAt.getTime() - now.getTime() > TRIAL_REMINDER_DAYS * DAY_MS
+    )
+      return false;
+    if (
+      !(await claimTrialReminder(
+        tx,
+        trialReminderKey(row.id, row.trialEndsAt),
+        row.userId,
+      ))
+    )
+      return false;
+    const endsAt = row.trialEndsAt;
+    const [plan, user] = await Promise.all([
+      tx.plan.findUnique({ where: { id: row.planId } }),
+      tx.user.findUnique({ where: { id: row.userId } }),
+    ]);
+    const planName = plan?.name ?? 'Codify';
+    const timezone = user?.timezone ?? null;
+    effects.push({
+      kind: 'push',
+      userId: row.userId,
+      what: 'trial-ending',
+      content: ({ locale }) => ({
+        ...trialEndingCopy(locale, planName, endsAt, timezone),
+        data: { type: 'billing_trial_ending', subscriptionId: row.id },
+      }),
+    });
+    return true;
   }
 
   /**
@@ -780,8 +846,11 @@ export class WebhookService {
       });
     }
     // A prepay is the subscription's first (and only) payment.
-    if (!existing)
+    if (!existing) {
       await this.grantFirstPaymentBonus(tx, row, `checkout ${sessionId}`);
+      if (metadata['offer'] === WINBACK_OFFER)
+        await claimWinbackUsage(tx, userId);
+    }
     return true;
   }
 
@@ -896,6 +965,9 @@ export class WebhookService {
         stripeCustomerId: snap.customerId ?? opts.fallbackCustomerId ?? null,
       },
     });
+    // docs/10 §13: the discounted checkout redeemed the win-back offer.
+    if (metadata['offer'] === WINBACK_OFFER)
+      await claimWinbackUsage(tx, user.id);
     return true;
   }
 

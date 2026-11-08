@@ -63,6 +63,22 @@ export interface CheckoutSessionInput {
   paymentMethod: PaymentMethod;
   successUrl: string;
   cancelUrl: string;
+  /**
+   * A one-off discount (docs/10 §13 day-30 win-back). Stripe applies the
+   * configured coupon / promotion code (and then customer-entered promo
+   * codes are off — Stripe allows one or the other); the dev provider
+   * applies `percentOff` to the simulated payment.
+   */
+  discount?: CheckoutDiscount | null;
+}
+
+export interface CheckoutDiscount {
+  /** Offer key, recorded in the session/subscription metadata (`offer`). */
+  offer: string;
+  couponId: string | null;
+  promotionCodeId: string | null;
+  /** Shown to the user; what the dev provider charges off. */
+  percentOff: number;
 }
 
 export interface CheckoutSessionResult {
@@ -89,6 +105,9 @@ export interface DevCheckoutPayload {
   paymentMethod: PaymentMethod;
   trialDays: number;
   period: BillingPeriod;
+  /** Win-back (or other) offer applied at checkout. */
+  offer?: string;
+  percentOff?: number;
 }
 
 /** Minimal shape of the Stripe events we act on. */
@@ -133,6 +152,40 @@ export interface ChargeContext {
   checkoutSessionId: string | null;
 }
 
+/** Refund part or all of a logged payment (docs/09 §5 "Refunds"). */
+export interface RefundInput {
+  /** Payment.externalId: invoice (`in_…`), prepay Checkout Session (`cs_…`) or charge (`ch_…`). */
+  externalId: string;
+  /** Cents to refund now (> 0, ≤ what is left). */
+  amountCents: number;
+  /** The Payment row as we know it (the dev provider simulates the charge from it). */
+  payment: {
+    id: string;
+    userId: string;
+    amountCents: number;
+    refundedCents: number;
+    currency: string;
+    paidAt: Date | null;
+    /** The mirrored subscription's provider id (`sub_…` / `cs_…`), if any. */
+    stripeSubscriptionId: string | null;
+  };
+  /** Provider-side idempotency key: a retried request never refunds twice. */
+  idempotencyKey: string;
+  metadata: Record<string, string>;
+}
+
+export interface RefundResult {
+  refundId: string;
+  /** Provider status (`succeeded`, `pending`, …). */
+  status: string;
+  /**
+   * Dev only: the `charge.refunded` event Stripe would send. The caller
+   * feeds it to the webhook path so the Payment / Subscription / claw-back
+   * updates run exactly as they do for a real refund.
+   */
+  simulatedEvent?: StripeWebhookEvent;
+}
+
 export interface BillingProvider {
   readonly mode: 'dev' | 'stripe';
   syncPlan(input: SyncPlanInput): Promise<SyncPlanResult>;
@@ -172,6 +225,12 @@ export interface BillingProvider {
   ): Promise<SubscriptionSnapshot | null>;
   /** End a subscription now. Dev returns null. */
   cancelSubscriptionNow(id: string): Promise<SubscriptionSnapshot | null>;
+  /**
+   * Issue a refund at the provider. The resulting `charge.refunded` webhook
+   * updates our records (Stripe mode); the dev provider returns the event
+   * to apply instead.
+   */
+  refundPayment(input: RefundInput): Promise<RefundResult>;
 }
 
 /**
@@ -281,6 +340,12 @@ export class DevBillingProvider implements BillingProvider {
         paymentMethod: input.paymentMethod,
         trialDays: input.plan.trialDays,
         period: input.price.period,
+        ...(input.discount
+          ? {
+              offer: input.discount.offer,
+              percentOff: input.discount.percentOff,
+            }
+          : {}),
       },
       this.secret,
     );
@@ -331,6 +396,65 @@ export class DevBillingProvider implements BillingProvider {
 
   async cancelSubscriptionNow(): Promise<SubscriptionSnapshot | null> {
     return null;
+  }
+
+  /**
+   * Simulate a Stripe refund: the cumulative `charge.refunded` event for
+   * the payment, shaped like the payload the webhook falls back to without
+   * an API (expanded invoice with its subscription, or the prepay session
+   * id in metadata). Deterministic ids, so a replay is the same event.
+   */
+  async refundPayment(input: RefundInput): Promise<RefundResult> {
+    const p = input.payment;
+    const refunded = Math.min(
+      p.amountCents,
+      p.refundedCents + input.amountCents,
+    );
+    const ref = short(
+      createHmac('sha256', 'dev-refund')
+        .update(input.idempotencyKey)
+        .digest('hex'),
+    );
+    const isInvoice = input.externalId.startsWith('in_');
+    const isSession = input.externalId.startsWith('cs_');
+    const charge: Record<string, unknown> = {
+      id: `ch_dev_${short(p.id.replace(/-/g, ''))}`,
+      object: 'charge',
+      amount: p.amountCents,
+      amount_refunded: refunded,
+      refunded: refunded >= p.amountCents,
+      currency: p.currency.toLowerCase(),
+      created: Math.floor((p.paidAt ?? new Date()).getTime() / 1000),
+      payment_method_details: null,
+      metadata: {
+        userId: p.userId,
+        ...(isSession ? { checkoutSessionId: input.externalId } : {}),
+      },
+      ...(isInvoice
+        ? {
+            invoice: {
+              id: input.externalId,
+              subscription: p.stripeSubscriptionId,
+              ...(p.paidAt
+                ? { created: Math.floor(p.paidAt.getTime() / 1000) }
+                : {}),
+            },
+          }
+        : {}),
+    };
+    this.logger.log(
+      `[dev] refund ${input.amountCents} of ${input.externalId} (${refunded}/${p.amountCents} refunded)`,
+    );
+    return {
+      refundId: `re_dev_${ref}`,
+      status: 'succeeded',
+      simulatedEvent: {
+        id: `evt_dev_refund_${ref}`,
+        type: 'charge.refunded',
+        created: Math.floor(Date.now() / 1000),
+        data: { object: charge },
+      },
+    };
   }
 }
 

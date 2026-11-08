@@ -26,6 +26,8 @@ import {
   CreateCheckoutDto,
   GrantSubscriptionDto,
   PortalSessionDto,
+  SelfRefundDto,
+  StaffRefundDto,
   type AdminSubscriptionListResponse,
   type AdminSubscriptionResponse,
   type CheckoutSessionResponse,
@@ -36,6 +38,15 @@ import {
 import type { AccessResult } from '@codify/domain';
 import { IntRangePipe } from '../common/int-range.pipe.js';
 import { BILLING_PROVIDER, type BillingProvider } from './billing.provider.js';
+import {
+  RefundsService,
+  type RefundEligibilityView,
+  type RefundOutcome,
+} from './refunds.service.js';
+import {
+  WinbackOfferService,
+  type WinbackOfferView,
+} from './winback-offer.service.js';
 import {
   PaymentsService,
   stripeStatus,
@@ -68,6 +79,8 @@ export class BillingController {
     private readonly audit: AuditService,
     private readonly payments: PaymentsService,
     @Inject(BILLING_PROVIDER) private readonly provider: BillingProvider,
+    private readonly refunds: RefundsService,
+    private readonly winback: WinbackOfferService,
   ) {}
 
   /** Billing history (docs/05 Subscription), newest first. Any signed-in role. */
@@ -94,10 +107,63 @@ export class BillingController {
       action: 'billing.checkout.start',
       entity: 'PlanPrice',
       entityId: body.planPriceId,
-      diff: { paymentMethod: body.paymentMethod ?? 'card', mode: session.mode },
+      diff: {
+        paymentMethod: body.paymentMethod ?? 'card',
+        mode: session.mode,
+        offer: body.offer ?? null,
+      },
       ...reqMeta(req),
     });
     return session;
+  }
+
+  /** docs/10 §13: offers the caller can use at checkout (day-30 win-back). */
+  @Roles('STUDENT')
+  @Get('offers')
+  async offers(
+    @CurrentUser() actor: ApiUser,
+  ): Promise<{ winback: WinbackOfferView }> {
+    return { winback: await this.winback.status(actor.userId) };
+  }
+
+  /** docs/09 §5: may the caller refund their first payment themselves? */
+  @Roles('STUDENT')
+  @Get('refund-eligibility')
+  refundEligibility(
+    @CurrentUser() actor: ApiUser,
+  ): Promise<RefundEligibilityView> {
+    return this.refunds.eligibility(actor.userId);
+  }
+
+  /**
+   * Self-serve refund of the first payment within the window, once per
+   * account; access ends now. Typed confirmation `{ confirm: "REFUND" }`.
+   */
+  @Roles('STUDENT')
+  @Post('refund')
+  @HttpCode(200)
+  async selfRefund(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: SelfRefundDto,
+    @Req() req: Request,
+  ): Promise<RefundOutcome> {
+    const out = await this.refunds.requestSelfRefund(actor);
+    void this.audit.record(actor, {
+      action: 'billing.refund.self_serve',
+      entity: 'Payment',
+      entityId: out.paymentId,
+      diff: {
+        before: out.before,
+        after: out.after,
+        amountCents: out.refund.amountCents,
+        currency: out.refund.currency,
+        refundId: out.refund.id,
+        accessEnded: out.accessEnded,
+        reason: body.reason?.trim() || null,
+      },
+      ...reqMeta(req),
+    });
+    return out;
   }
 
   @Roles('STUDENT')
@@ -200,6 +266,42 @@ export class BillingController {
     take: number,
   ): Promise<PaymentPage<AdminPaymentView>> {
     return this.payments.listForUser(userId, skip, take);
+  }
+
+  /**
+   * Staff refund (docs/04 Users, docs/14 §2): SUPPORT up to one month of
+   * the plan (cumulative per payment), ADMIN up to the whole payment.
+   */
+  @Roles('SUPPORT', 'ADMIN')
+  @Post('admin/payments/:paymentId/refund')
+  @HttpCode(200)
+  async staffRefund(
+    @CurrentUser() actor: ApiUser,
+    @Param('paymentId', new ParseUUIDPipe()) paymentId: string,
+    @Body() body: StaffRefundDto,
+    @Req() req: Request,
+  ): Promise<RefundOutcome & { capCents: number | null }> {
+    const out = await this.refunds.staffRefund(
+      actor,
+      paymentId,
+      body.amountCents,
+    );
+    await this.audit.record(actor, {
+      action: 'billing.refund.issued',
+      entity: 'Payment',
+      entityId: paymentId,
+      diff: {
+        before: out.before,
+        after: out.after,
+        amountCents: out.refund.amountCents,
+        currency: out.refund.currency,
+        refundId: out.refund.id,
+        capCents: out.capCents,
+        reason: body.reason.trim(),
+      },
+      ...reqMeta(req),
+    });
+    return out;
   }
 
   /** docs/04 Settings: Stripe connection status (booleans + paths, no secrets). */

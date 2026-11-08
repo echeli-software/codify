@@ -28,6 +28,11 @@ export class CreateCheckoutDto {
   @IsOptional()
   @IsUrl({ require_tld: false })
   cancelUrl?: string;
+
+  /** docs/10 §13: apply the day-30 win-back discount (annual prices; once per user). */
+  @IsOptional()
+  @IsIn(['winback'])
+  offer?: 'winback';
 }
 
 export class PortalSessionDto {
@@ -155,4 +160,29 @@ export interface AdminSubscriptionResponse extends SubscriptionResponse {
 
 export interface AdminSubscriptionListResponse {
   subscriptions: AdminSubscriptionResponse[];
+}
+
+/** Staff refund of one payment (docs/09 §5, docs/14 §2). */
+export class StaffRefundDto {
+  /** Cents to refund; default = everything not yet refunded. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100_000_000)
+  amountCents?: number;
+
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
+/** Self-serve refund: the typed confirmation the page asks for. */
+export class SelfRefundDto {
+  @IsIn(['REFUND'])
+  confirm!: 'REFUND';
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  reason?: string;
 }

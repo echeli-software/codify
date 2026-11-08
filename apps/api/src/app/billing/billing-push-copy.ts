@@ -53,3 +53,32 @@ export function pixRenewalCopy(
         body: `Your ${planName} access ends on ${date}. Renew with PIX to keep learning.`,
       };
 }
+
+/** Trial ends in ≤ 2 days and the plan will start charging (docs/09 §9). */
+export function trialEndingCopy(
+  locale: string,
+  planName: string,
+  endsAt: Date,
+  timeZone: string | null | undefined,
+): PushCopy {
+  const pt = isPt(locale);
+  let date: string;
+  try {
+    date = endsAt.toLocaleDateString(pt ? 'pt-BR' : 'en-US', {
+      day: 'numeric',
+      month: 'long',
+      timeZone: timeZone || 'America/Sao_Paulo',
+    });
+  } catch {
+    date = endsAt.toISOString().slice(0, 10);
+  }
+  return pt
+    ? {
+        title: 'Seu teste grátis está acabando',
+        body: `Seu teste do ${planName} termina em ${date}. Depois disso a assinatura começa a ser cobrada — cancele antes se não quiser continuar.`,
+      }
+    : {
+        title: 'Your free trial ends soon',
+        body: `Your ${planName} trial ends on ${date}. Your subscription is charged after that — cancel before then if you don't want to continue.`,
+      };
+}

@@ -3,7 +3,12 @@ import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { AccessService } from './access.service.js';
-import { pixRenewalCopy } from './billing-push-copy.js';
+import { pixRenewalCopy, trialEndingCopy } from './billing-push-copy.js';
+import {
+  TRIAL_REMINDER_DAYS,
+  claimTrialReminder,
+  trialReminderKey,
+} from './trial-reminder.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** docs/09 §5 "Renewal": PIX renewal notice 7 days before the period ends. */
@@ -190,6 +195,72 @@ export class BillingJobsService {
       `PIX renewal reminders: ${result.candidates} due, ${result.notified} notified, ${result.alreadyReminded} already reminded, ${result.retryLater} retry later`,
     );
     return result;
+  }
+
+  /**
+   * Trial-ending reminder (docs/09 §9), the fallback for trials the Stripe
+   * `trial_will_end` webhook doesn't cover — it only sends 3 days ahead,
+   * and store (RevenueCat) trials have no such event. Hourly: every
+   * TRIALING subscription whose trial ends within TRIAL_REMINDER_DAYS and
+   * that will charge (auto-renew on) gets one BILLING notice (inbox + push
+   * + email), claimed on the same key as the webhook path.
+   */
+  async sendTrialReminders(now: Date = new Date()): Promise<{
+    candidates: number;
+    notified: number;
+    alreadyReminded: number;
+  }> {
+    const rows = await this.prisma.subscription.findMany({
+      where: {
+        status: 'TRIALING',
+        cancelAtPeriodEnd: false,
+        trialEndsAt: {
+          gt: now,
+          lte: new Date(now.getTime() + TRIAL_REMINDER_DAYS * DAY_MS),
+        },
+        user: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        userId: true,
+        trialEndsAt: true,
+        plan: { select: { name: true } },
+        user: { select: { timezone: true } },
+      },
+    });
+    const out = { candidates: rows.length, notified: 0, alreadyReminded: 0 };
+    for (const row of rows) {
+      const endsAt = row.trialEndsAt as Date;
+      const key = trialReminderKey(row.id, endsAt);
+      if (!(await claimTrialReminder(this.prisma, key, row.userId))) {
+        out.alreadyReminded += 1;
+        continue;
+      }
+      try {
+        await this.push.notify(
+          row.userId,
+          ({ locale }) => ({
+            kind: 'BILLING',
+            ...trialEndingCopy(
+              locale,
+              row.plan.name,
+              endsAt,
+              row.user.timezone,
+            ),
+            data: { type: 'billing_trial_ending', subscriptionId: row.id },
+          }),
+          { now },
+        );
+        out.notified += 1;
+      } catch (err) {
+        await this.unclaim(key);
+        throw err;
+      }
+    }
+    this.logger.log(
+      `trial reminders: ${out.candidates} due, ${out.notified} notified, ${out.alreadyReminded} already reminded`,
+    );
+    return out;
   }
 
   private async claim(key: string, userId: string): Promise<boolean> {

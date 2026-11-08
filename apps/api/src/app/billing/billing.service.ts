@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { Prisma, Subscription } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from '../auth/auth.types.js';
@@ -30,6 +31,11 @@ import {
   addDays,
   toSubscriptionResponse,
 } from './subscription-view.js';
+import { recordPaid } from './payments.js';
+import {
+  WinbackOfferService,
+  claimWinbackUsage,
+} from './winback-offer.service.js';
 
 function studentAppUrl(): string {
   return process.env['STUDENT_APP_URL'] ?? 'http://localhost:4202';
@@ -53,6 +59,7 @@ export class BillingService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     @Inject(BILLING_PROVIDER) private readonly billing: BillingProvider,
+    private readonly winback: WinbackOfferService,
   ) {}
 
   async createCheckout(
@@ -82,6 +89,11 @@ export class BillingService {
       );
     }
 
+    const discount =
+      dto.offer === 'winback'
+        ? await this.winback.discountFor(actor.userId, price.period)
+        : null;
+
     const known = await this.prisma.subscription.findFirst({
       where: { userId: actor.userId, stripeCustomerId: { not: null } },
       orderBy: { createdAt: 'desc' },
@@ -108,6 +120,7 @@ export class BillingService {
       paymentMethod,
       successUrl: dto.successUrl ?? `${studentAppUrl()}/billing/success`,
       cancelUrl: dto.cancelUrl ?? `${studentAppUrl()}/subscription`,
+      discount,
     });
 
     return {
@@ -230,10 +243,35 @@ export class BillingService {
       };
     }
 
-    const sub = await this.prisma.subscription.upsert({
-      where: { stripeSubscriptionId },
-      create: { ...data, userId: payload.userId, stripeSubscriptionId },
-      update: data,
+    const sub = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.subscription.upsert({
+        where: { stripeSubscriptionId },
+        create: { ...data, userId: payload.userId, stripeSubscriptionId },
+        update: data,
+      });
+      // Billing history (docs/09 §6): what Stripe's invoice.paid / prepay
+      // checkout would log — nothing for a trial start ($0 invoice). One
+      // row per session, so re-completing is a no-op.
+      const charged = prepaid || payload.trialDays <= 0;
+      if (charged) {
+        const pct = payload.percentOff ?? 0;
+        await recordPaid(tx, {
+          userId: payload.userId,
+          subscriptionId: row.id,
+          provider: 'STRIPE',
+          externalId: prepaid
+            ? stripeSubscriptionId
+            : `in_dev_${createHash('sha256').update(sessionId).digest('hex').slice(0, 24)}`,
+          amountCents: Math.round((price.amountCents * (100 - pct)) / 100),
+          currency: price.currency,
+          method: payload.paymentMethod,
+          receiptUrl: null,
+          paidAt: now,
+        });
+      }
+      if (payload.offer === 'winback')
+        await claimWinbackUsage(tx, payload.userId);
+      return row;
     });
     return toSubscriptionResponse(
       sub,

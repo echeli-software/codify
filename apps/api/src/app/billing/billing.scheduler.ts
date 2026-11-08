@@ -6,7 +6,8 @@ import { jobsEnabled } from '../config/env.js';
 import { BillingJobsService } from './billing-jobs.service.js';
 
 /**
- * Daily billing jobs (UTC). Disabled with JOBS_ENABLED=false and never
+ * Billing jobs (UTC): daily sweeper + PIX renewal reminders, hourly trial
+ * reminders. Disabled with JOBS_ENABLED=false and never
  * scheduled under jest. Both are idempotent, so a missed or doubled run is
  * harmless.
  */
@@ -47,6 +48,22 @@ export class BillingScheduler {
       await this.jobs.sendRenewalReminders();
     } catch (err) {
       this.fail('billing-pix-renewal-reminders', err);
+    }
+  }
+
+  /** Hourly: trial-ending reminders 2 days ahead (docs/09 §9). */
+  @Cron('29 * * * *', {
+    name: 'billing-trial-reminders',
+    timeZone: 'UTC',
+    disabled: !jobsEnabled(),
+    waitForCompletion: true,
+  })
+  async trialReminders(): Promise<void> {
+    if (!this.config.jobsEnabled) return;
+    try {
+      await this.jobs.sendTrialReminders();
+    } catch (err) {
+      this.fail('billing-trial-reminders', err);
     }
   }
 
