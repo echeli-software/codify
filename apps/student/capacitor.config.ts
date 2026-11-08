@@ -35,6 +35,16 @@ const config: CapacitorConfig = {
     FirebaseMessaging: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    // The app hides the splash as soon as it has booted
+    // (NativeShellService.hideSplash); the auto-hide is only a safety net.
+    SplashScreen: {
+      launchShowDuration: 3000,
+      launchAutoHide: true,
+    },
+    // Backup daily reminder when remote push is off (docs/05 §7).
+    LocalNotifications: {
+      iconColor: '#5b8def',
+    },
   },
 };
 
