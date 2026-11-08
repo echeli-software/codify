@@ -538,3 +538,48 @@ describe('GamificationService exclusive milestone cosmetics (ECO-8)', () => {
     ]);
   });
 });
+
+describe('GamificationService staff grants', () => {
+  it('ADMIN_GRANT is never held back by the daily caps, even when listed', async () => {
+    const { svc, users, pools } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      // A manual DB edit that lists ADMIN_GRANT is invalid → defaults apply.
+      config: { 'coins.dailyCaps': { ADMIN_GRANT: 1, LESSON_COMPLETE: 1 } },
+    });
+    const r = await svc.grantReward(
+      lesson({
+        baseCoins: 900,
+        xpSource: 'ADMIN_GRANT',
+        coinSource: 'ADMIN_GRANT',
+        idempotencyKey: 'g1',
+        flat: true,
+      }),
+    );
+    expect(r.coins).toBe(900);
+    expect(r.coinCap).toBeNull();
+    expect(users.get('u1')!.coins).toBe(900);
+    expect(pools.size).toBe(0);
+  });
+
+  it('staff-granted XP does not count toward the weekly league; earned XP does', async () => {
+    const { svc, leagues } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    await svc.grantReward(
+      lesson({
+        baseXp: 500,
+        xpSource: 'ADMIN_GRANT',
+        coinSource: 'ADMIN_GRANT',
+        idempotencyKey: 'g2',
+        flat: true,
+      }),
+    );
+    expect(leagues.accumulateXp).not.toHaveBeenCalled();
+    await svc.grantReward(lesson({ idempotencyKey: 'l9', flat: true }));
+    expect(leagues.accumulateXp).toHaveBeenCalledWith(
+      expect.anything(),
+      'u1',
+      10,
+    );
+  });
+});

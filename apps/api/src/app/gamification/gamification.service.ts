@@ -46,6 +46,15 @@ export const STREAK_MILESTONE_ITEMS: Record<number, string> = {
   365: 'streak-365-phoenix-pet',
 };
 
+/**
+ * XP sources that never count toward the weekly league (docs/07 §9: the
+ * league ranks learning, so a staff grant must not move someone up).
+ * Referral XP still counts ("weekly XP from all sources").
+ */
+export const LEAGUE_EXCLUDED_XP_SOURCES: ReadonlySet<string> = new Set([
+  'ADMIN_GRANT',
+]);
+
 /** Streak row → the pure-rule state (lastActivityDate is a local day at UTC midnight). */
 export function toStreakState(s: {
   currentDays: number;
@@ -453,8 +462,10 @@ export class GamificationService {
       select: { totalXp: true, coins: true },
     });
 
-    // 4b. Weekly league standing — all XP counts toward the current cohort.
-    if (xp > 0) await this.leagues.accumulateXp(tx, params.userId, xp);
+    // 4b. Weekly league standing — earned XP counts toward the current
+    //     cohort; staff grants don't (docs/07 §9 "honest competition").
+    if (xp > 0 && !LEAGUE_EXCLUDED_XP_SOURCES.has(params.xpSource))
+      await this.leagues.accumulateXp(tx, params.userId, xp);
 
     // 5. Level-up.
     const levelBefore = levelFromXp(user.totalXp);
