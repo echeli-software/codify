@@ -43,6 +43,7 @@ import type {
   ShopQueryDto,
   UpdateItemDto,
 } from './items.dto.js';
+import { ItemDropsService, renderDropCopy } from './item-drops.service.js';
 import {
   isAssetSpriteRef,
   loadSpriteUrls,
@@ -89,6 +90,7 @@ export class ItemsService {
     private readonly push: UserPushService,
     private readonly access: AccessService,
     @Optional() private readonly localizer?: ContentLocalizer,
+    @Optional() private readonly drops?: ItemDropsService,
   ) {}
 
   // ─── Categories (admin) ─────────────────────────────────────────────────
@@ -420,14 +422,17 @@ export class ItemsService {
         },
         select: { id: true },
       });
+      // Copy written in the drop wizard wins over the default (docs/04).
+      const custom = (await this.drops?.copyFor([item.id]))?.get(item.id);
       for (const u of audience) {
         const res = await this.push.sendToUser(
           u.id,
-          ({ locale }) =>
-            dropCopy(locale, {
-              ...item,
-              name: names.get(`${item.id}|${locale}`) ?? item.name,
-            }),
+          ({ locale }) => {
+            const name = names.get(`${item.id}|${locale}`) ?? item.name;
+            const base = dropCopy(locale, { ...item, name });
+            const own = custom?.get(locale);
+            return own ? { ...base, ...renderDropCopy(own, name) } : base;
+          },
           now,
         );
         pushed += res.sent;

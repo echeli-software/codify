@@ -134,6 +134,14 @@ export class ListCoursesQueryDto {
   @IsString()
   authorId?: string;
 
+  /**
+   * Staff only: `true` keeps courses with at least one missing or outdated
+   * translation (course, module or lesson field) in a target locale.
+   */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  missingTranslations?: 'true' | 'false';
+
   @IsOptional()
   @IsInt()
   @Min(0)

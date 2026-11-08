@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import { SiteSettingsService } from '../site-settings/site-settings.service.js';
 import type {
   Prisma,
   SubscriptionStatus,
@@ -29,11 +35,15 @@ const ME_FIELDS = {
   coins: true,
   petName: true,
   activityFeedOptIn: true,
+  theme: true,
 } as const;
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly site?: SiteSettingsService,
+  ) {}
 
   async getById(userId: string): Promise<MeResponse> {
     const user = await this.prisma.user.findUnique({
@@ -46,6 +56,15 @@ export class UsersService {
 
   async update(userId: string, patch: UpdateMeDto): Promise<MeResponse> {
     const { onboarded, petName, ...fields } = patch;
+    // docs/04 Settings "Locale enable/disable": a disabled locale can't be picked.
+    if (fields.locale && this.site) {
+      const { locales } = await this.site.get();
+      if (!locales.enabled.includes(fields.locale))
+        throw new BadRequestException({
+          code: 'LOCALE_DISABLED',
+          message: `Locale ${fields.locale} is not enabled`,
+        });
+    }
     if (onboarded === true) {
       // Only the first completion stamps the date.
       await this.prisma.user.updateMany({
@@ -175,6 +194,7 @@ function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
     coins: u.coins,
     petName: u.petName ?? null,
     activityFeedOptIn: u.activityFeedOptIn,
+    theme: (u.theme as MeResponse['theme']) ?? null,
   };
 }
 

@@ -45,6 +45,7 @@ import { OpsModule } from './ops/ops.module.js';
 import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
 import { AccountModule } from './account/account.module.js';
 import { FlagsModule } from './flags/flags.module.js';
+import { SiteSettingsModule } from './site-settings/site-settings.module.js';
 import { PromoCodesModule } from './promo-codes/promo-codes.module.js';
 
 @Module({
@@ -88,6 +89,7 @@ import { PromoCodesModule } from './promo-codes/promo-codes.module.js';
     AdminOpsModule,
     AccountModule,
     FlagsModule,
+    SiteSettingsModule,
     MasteryModule,
     PromoCodesModule,
   ],

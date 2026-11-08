@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type {
   ContentTranslation,
@@ -12,6 +13,7 @@ import type {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CourseInsightsService } from './course-insights.service.js';
 import { noteTranslationFallback } from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
@@ -37,7 +39,10 @@ interface ResolvedTitle {
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly insights?: CourseInsightsService,
+  ) {}
 
   /**
    * List with locale-aware title resolution. STUDENT callers only see
@@ -65,6 +70,22 @@ export class CoursesService {
 
     if (query.categoryId) {
       where.categories = { some: { categoryId: query.categoryId } };
+    }
+
+    // "Has missing translations" (docs/04 Courses list) — staff only.
+    if (
+      query.missingTranslations === 'true' &&
+      actor.role !== 'STUDENT' &&
+      this.insights
+    ) {
+      const candidates = await this.prisma.course.findMany({
+        where,
+        select: { id: true },
+      });
+      const incomplete = await this.insights.incompleteCourseIds(
+        candidates.map((c) => c.id),
+      );
+      where.id = { in: [...incomplete] };
     }
 
     const discovery = await discoveryFilters(this.prisma, query);

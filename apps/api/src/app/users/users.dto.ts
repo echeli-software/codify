@@ -43,6 +43,15 @@ function IsTimeZone(options?: ValidationOptions) {
  * intentionally NOT here — those are server-managed (role via admin
  * tooling; email + clerkId via the auth provider).
  */
+/** Per-account admin theme (docs/04 §7). */
+export const USER_THEMES = [
+  'light',
+  'dark',
+  'system',
+  'high-contrast',
+] as const;
+export type UserTheme = (typeof USER_THEMES)[number];
+
 export class UpdateMeDto {
   @IsOptional()
   @IsString()
@@ -95,6 +104,12 @@ export class UpdateMeDto {
   @IsOptional()
   @IsBoolean()
   activityFeedOptIn?: boolean;
+
+  /** Staff UI theme (docs/04 §7); null resets to the system default. */
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsIn(USER_THEMES)
+  theme?: UserTheme | null;
 }
 
 /** Public shape returned by /api/me. Excludes deletedAt + clerkId. */
@@ -118,6 +133,8 @@ export interface MeResponse {
   petName: string | null;
   /** Friends may see this user's learning activity (docs/10 §5). */
   activityFeedOptIn: boolean;
+  /** Staff UI theme preference (docs/04 §7), null = system. */
+  theme: UserTheme | null;
 }
 
 export interface AdminUserListItem {
