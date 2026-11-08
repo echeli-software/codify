@@ -19,8 +19,11 @@ import {
 } from '@codify/ui-ionic';
 import {
   CoinService,
+  CoinTarget,
   StreakService,
+  StreakTarget,
   XpService,
+  XpTarget,
 } from '@codify/gamification-engine';
 import { RewardOverlays } from '../reward-overlays.component.js';
 import { NotificationBell } from '../components/notification-bell.component.js';
@@ -121,6 +124,9 @@ const DESKTOP_QUERY = '(min-width: 768px)';
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CoinTarget,
+    XpTarget,
+    StreakTarget,
     AppShell,
     AppAvatar,
     BottomSheet,
@@ -167,6 +173,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
         }
         <span
           class="stat stat--streak"
+          cdfStreakTarget
           [attr.title]="
             'studentPlatform.shell.streak' | translate: { count: streak() }
           "
@@ -175,6 +182,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
         </span>
         <span
           class="stat stat--coins"
+          cdfCoinTarget
           [attr.title]="
             'studentPlatform.shell.coins' | translate: { count: coins() }
           "
@@ -183,6 +191,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
         </span>
         <span
           class="stat stat--xp"
+          cdfXpTarget
           [attr.title]="'studentPlatform.shell.xp' | translate: { count: xp() }"
         >
           <cdf-icon name="sparkles" size="xs" />{{ xp() | locale: 'compact' }}

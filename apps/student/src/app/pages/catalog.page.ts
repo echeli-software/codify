@@ -35,6 +35,7 @@ import {
 } from '@codify/ui-ionic';
 import { errorMessageKey } from '../platform/app-toast.service.js';
 import { StaleGuard } from './shared/stale-guard.js';
+import { PromoBadge } from '../components/promotions/promo-badge.component.js';
 
 interface CourseCardVM {
   id: string;
@@ -75,6 +76,7 @@ export function plansForCourse(
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PromoBadge,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -189,6 +191,9 @@ export function plansForCourse(
                     [routerLink]="['/courses', c.slug]"
                     [attr.data-course-slug]="c.slug"
                   >
+                    <span class="catalog__promo"
+                      ><cdf-promo-badge [courseId]="c.id"
+                    /></span>
                     <cdf-course-card
                       [title]="c.id | tContent: 'COURSE' : 'title' : c.title"
                       [author]="c.author"
@@ -292,7 +297,14 @@ export function plansForCourse(
           grid-template-columns: repeat(4, minmax(0, 1fr));
         }
       }
+      .catalog__promo {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 1;
+      }
       .catalog__card {
+        position: relative;
         display: flex;
         flex-direction: column;
         gap: 4px;

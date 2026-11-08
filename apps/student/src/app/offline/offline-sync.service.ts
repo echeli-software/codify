@@ -63,7 +63,9 @@ export function backoffDelay(
  *   - reconcile  409 domain-already-applied → drop + reconcile
  *   - paywall    402 → drop + surface the paywall
  *   - rejected   400/403/404 (and other permanent 4xx) → drop + error toast
- *   - timestamp  400 on clientTimestamp → replay once without it
+ *   - timestamp  400 on clientTimestamp → replay once without it (the API
+ *                clamps old / future times to "now" since docs/16 §8, so
+ *                only an unparseable value — or an older API — gets here)
  *   - auth       401 → keep, halt the flush until the same user signs in
  *   - retry      network / 408 / 429 / 5xx → keep, exponential backoff
  */

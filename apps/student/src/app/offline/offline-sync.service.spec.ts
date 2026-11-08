@@ -143,7 +143,8 @@ describe('OfflineSyncService', () => {
       [402, 'payment_required', 'paywall'],
       [409, 'LESSON_ALREADY_COMPLETED', 'reconcile'],
       [409, 'QUIZ_REQUIRES_GRADING', 'rejected'],
-      [400, 'CLIENT_TIMESTAMP_TOO_OLD', 'timestamp'],
+      [400, 'INVALID_CLIENT_TIMESTAMP', 'timestamp'],
+      [400, 'CLIENT_TIMESTAMP_TOO_OLD', 'timestamp'], // older API versions
       [400, 'validation.failed', 'rejected'],
       [403, undefined, 'rejected'],
       [404, undefined, 'rejected'],
@@ -337,10 +338,12 @@ describe('OfflineSyncService', () => {
     expect(svc.reconciled()?.response.totals.totalXp).toBe(110);
   });
 
-  it('replays without clientTimestamp when the server rejects it as too old', async () => {
+  it('replays without clientTimestamp when the server rejects it as unparseable', async () => {
+    // The API clamps old / future times to now (docs/16 §8); only a
+    // malformed value is still a 400.
     const svc = await setup();
     progress.complete
-      .mockRejectedValueOnce(problem(400, 'CLIENT_TIMESTAMP_TOO_OLD'))
+      .mockRejectedValueOnce(problem(400, 'INVALID_CLIENT_TIMESTAMP'))
       .mockResolvedValueOnce(okResponse('l1'));
     const out = await svc.completeLesson('l1');
     expect(out.status).toBe('synced');
