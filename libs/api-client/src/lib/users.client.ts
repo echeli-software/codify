@@ -4,6 +4,17 @@ import { firstValueFrom } from 'rxjs';
 import { API_CLIENT_CONFIG } from './api-config.js';
 import type { AdminUserListResponse, MeResponse } from './types.js';
 
+/** `ageGroup` filter: `minor` (12–17), `adult` (18+), `none` (not given). */
+export type UserAgeGroupFilter = 'minor' | 'adult' | 'none';
+
+/** POST /admin/users/:id/birth-date outcome (age groups only, never dates). */
+export interface BirthDateCorrectionResult {
+  userId: string;
+  before: { ageGroup: 'minor' | 'adult' | null };
+  /** `deleted`: the corrected date was under 12 — the account was removed. */
+  after: { ageGroup: 'minor' | 'adult' | null } | { deleted: true };
+}
+
 /** `subscriptionStatus` filter: a status, or NONE for never subscribed. */
 export type UserSubscriptionFilter =
   | 'TRIALING'
@@ -29,6 +40,8 @@ export interface UserListQuery {
   subscriptionStatus?: UserSubscriptionFilter;
   /** ISO 3166-1 alpha-2, or `NONE` for users without a known country. */
   country?: string;
+  /** docs/14 "Minors": 12–17, 18+, or no date of birth. */
+  ageGroup?: UserAgeGroupFilter;
 }
 
 /** `GET /api/users/countries` row; `country: null` = unknown. */
@@ -63,6 +76,7 @@ export class UsersClient {
     if (opts.subscriptionStatus)
       params = params.set('subscriptionStatus', opts.subscriptionStatus);
     if (opts.country) params = params.set('country', opts.country);
+    if (opts.ageGroup) params = params.set('ageGroup', opts.ageGroup);
     if (typeof opts.skip === 'number')
       params = params.set('skip', String(opts.skip));
     if (typeof opts.take === 'number')
@@ -79,6 +93,23 @@ export class UsersClient {
     return firstValueFrom(
       this.http.get<{ items: UserCountryCount[] }>(
         `${this.config.baseUrl}/users/countries`,
+      ),
+    );
+  }
+
+  /**
+   * POST /api/admin/users/:id/birth-date — staff correction (ADMIN,
+   * SUPPORT), typed confirmation "CORRECT". A date under 12 deletes the
+   * account. Audited with the age groups only.
+   */
+  correctBirthDate(
+    id: string,
+    body: { birthDate: string; confirm: 'CORRECT'; reason?: string },
+  ): Promise<BirthDateCorrectionResult> {
+    return firstValueFrom(
+      this.http.post<BirthDateCorrectionResult>(
+        `${this.config.baseUrl}/admin/users/${encodeURIComponent(id)}/birth-date`,
+        body,
       ),
     );
   }

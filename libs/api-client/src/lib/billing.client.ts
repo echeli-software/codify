@@ -16,6 +16,24 @@ export type SubscriptionStatus =
   | 'UNPAID'
   | 'PAUSED';
 
+/** A minor's parent / guardian confirmation (docs/09 "Guardian step"). */
+export interface GuardianConsentView {
+  id: string;
+  planPriceId: string | null;
+  guardianName: string;
+  confirmedAt: string;
+  /** Checkout of this plan price is allowed until then (24 h). */
+  validUntil: string;
+  noticeSent: boolean;
+}
+
+export interface GuardianConsentStatus {
+  /** True: confirm a guardian before checkout (403 GUARDIAN_CONSENT_REQUIRED otherwise). */
+  required: boolean;
+  ageGroup: 'minor' | 'adult' | null;
+  consent: Omit<GuardianConsentView, 'noticeSent'> | null;
+}
+
 export interface CheckoutSessionResponse {
   url: string;
   sessionId: string;
@@ -338,6 +356,39 @@ export class BillingClient {
         `${this.config.baseUrl}/billing/admin/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
         body,
         { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /**
+   * GET /billing/guardian-consent?planPriceId= — does the caller (a minor)
+   * need a parent / guardian confirmation before checking out this price?
+   */
+  guardianConsentStatus(planPriceId: string): Promise<GuardianConsentStatus> {
+    return firstValueFrom(
+      this.http.get<GuardianConsentStatus>(
+        `${this.config.baseUrl}/billing/guardian-consent`,
+        { params: { planPriceId } },
+      ),
+    );
+  }
+
+  /**
+   * POST /billing/guardian-consent — record the guardian's confirmation
+   * (valid 24 h for that price; the guardian is emailed). 409
+   * GUARDIAN_CONSENT_NOT_NEEDED (adult), 403 BIRTH_DATE_REQUIRED, 400
+   * GUARDIAN_EMAIL_IS_STUDENT, 429 GUARDIAN_CONSENT_RATE_LIMITED.
+   */
+  recordGuardianConsent(body: {
+    planPriceId: string;
+    guardianName: string;
+    guardianEmail: string;
+    confirmed: true;
+  }): Promise<GuardianConsentView> {
+    return firstValueFrom(
+      this.http.post<GuardianConsentView>(
+        `${this.config.baseUrl}/billing/guardian-consent`,
+        body,
       ),
     );
   }

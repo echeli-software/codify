@@ -7,6 +7,9 @@
 
 export type ApiUserRole = 'STUDENT' | 'TEACHER' | 'SUPPORT' | 'ADMIN';
 
+/** docs/14 "Minors": 12–17 `minor`, 18+ `adult`. */
+export type AgeGroup = 'minor' | 'adult';
+
 /** Learning goal picked at onboarding; ranks "Recommended next". */
 export type OnboardingGoal = 'career' | 'newTech' | 'ai' | 'softSkills';
 
@@ -32,6 +35,13 @@ export interface MeResponse {
   activityFeedOptIn?: boolean;
   /** Onboarding goal; null = none stored. Optional for older APIs. */
   onboardingGoal?: OnboardingGoal | null;
+  /**
+   * Date of birth (YYYY-MM-DD) — GET /me only; staff views leave it out.
+   * Set once with `MeClient.setBirthDate` (docs/14 "Minors").
+   */
+  birthDate?: string | null;
+  /** 12–17 `minor`, 18+ `adult`, null = not given. Optional for older APIs. */
+  ageGroup?: AgeGroup | null;
   /** ISO 3166-1 alpha-2 from the IP address; null = unknown. */
   country?: string | null;
 }
@@ -55,6 +65,8 @@ export interface UpdateMeBody {
 
 export interface AdminUserListItem {
   id: string;
+  /** 12–17 `minor`, 18+ `adult`, null = not given. Optional for older APIs. */
+  ageGroup?: AgeGroup | null;
   email: string;
   displayName: string;
   role: ApiUserRole;

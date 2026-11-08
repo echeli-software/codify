@@ -10,6 +10,8 @@ export {
   UsersClient,
   type UserCountryCount,
   type UserListQuery,
+  type UserAgeGroupFilter,
+  type BirthDateCorrectionResult,
   type UserSubscriptionFilter,
 } from './lib/users.client.js';
 export { DevicesClient, type DevicePlatform } from './lib/devices.client.js';
@@ -235,6 +237,7 @@ export type {
   MeResponse,
   UpdateMeBody,
   OnboardingGoal,
+  AgeGroup,
   AdminUserListItem,
   AdminUserListResponse,
   HealthResponse,
@@ -386,6 +389,8 @@ export type {
   RefundEligibility,
   RefundOutcome,
   WinbackOffer,
+  GuardianConsentStatus,
+  GuardianConsentView,
 } from './lib/billing.client.js';
 export type { ExperimentPolicy } from './lib/flags.client.js';
 export {

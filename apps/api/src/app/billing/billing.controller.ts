@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -48,6 +49,13 @@ import {
   type WinbackOfferView,
 } from './winback-offer.service.js';
 import {
+  GuardianConsentDto,
+  GuardianConsentService,
+  type GuardianConsentStatus,
+  type GuardianConsentView,
+} from './guardian-consent.service.js';
+import { clientIp } from '../common/client-ip.js';
+import {
   PaymentsService,
   stripeStatus,
   type AdminPaymentView,
@@ -81,6 +89,7 @@ export class BillingController {
     @Inject(BILLING_PROVIDER) private readonly provider: BillingProvider,
     private readonly refunds: RefundsService,
     private readonly winback: WinbackOfferService,
+    private readonly guardian: GuardianConsentService,
   ) {}
 
   /** Billing history (docs/05 Subscription), newest first. Any signed-in role. */
@@ -102,6 +111,9 @@ export class BillingController {
     @Body() body: CreateCheckoutDto,
     @Req() req: Request,
   ): Promise<CheckoutSessionResponse> {
+    // docs/09 "Guardian step": minors need a recent parent / guardian
+    // confirmation for this plan price (403 GUARDIAN_CONSENT_REQUIRED).
+    await this.guardian.assertCheckoutAllowed(actor.userId, body.planPriceId);
     const session = await this.billing.createCheckout(actor, body);
     void this.audit.record(actor, {
       action: 'billing.checkout.start',
@@ -115,6 +127,53 @@ export class BillingController {
       ...reqMeta(req),
     });
     return session;
+  }
+
+  /**
+   * docs/09 "Guardian step": does the caller need a parent / guardian
+   * confirmation before checking out this plan price?
+   */
+  @Roles('STUDENT')
+  @Get('guardian-consent')
+  guardianStatus(
+    @CurrentUser() actor: ApiUser,
+    @Query('planPriceId') planPriceId: string,
+  ): Promise<GuardianConsentStatus> {
+    if (
+      typeof planPriceId !== 'string' ||
+      !planPriceId ||
+      planPriceId.length > 100
+    )
+      throw new BadRequestException('planPriceId is required');
+    return this.guardian.status(actor.userId, planPriceId);
+  }
+
+  /**
+   * A minor's parent / guardian confirms a paid plan (name, email, "I am
+   * 18 or older and this user's parent or guardian"). Stored with IP + UA;
+   * the guardian gets an email notice. Valid 24 h for that plan price.
+   * 409 GUARDIAN_CONSENT_NOT_NEEDED for adults, 403 BIRTH_DATE_REQUIRED.
+   */
+  @Roles('STUDENT')
+  @Post('guardian-consent')
+  @HttpCode(201)
+  async guardianConsent(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: GuardianConsentDto,
+    @Req() req: Request,
+  ): Promise<GuardianConsentView> {
+    const consent = await this.guardian.record(actor.userId, body, {
+      ip: clientIp(req),
+      userAgent: (req.headers['user-agent'] as string) ?? null,
+    });
+    // No guardian name / email in the audit trail: the row holds them.
+    void this.audit.record(actor, {
+      action: 'billing.guardian_consent',
+      entity: 'GuardianConsent',
+      entityId: consent.id,
+      diff: { planPriceId: body.planPriceId, noticeSent: consent.noticeSent },
+    });
+    return consent;
   }
 
   /** docs/10 §13: offers the caller can use at checkout (day-30 win-back). */

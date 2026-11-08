@@ -29,6 +29,7 @@ import { BillingScheduler } from './billing.scheduler.js';
 import { PaymentsService } from './payments.service.js';
 import { RefundsService } from './refunds.service.js';
 import { WinbackOfferService } from './winback-offer.service.js';
+import { GuardianConsentService } from './guardian-consent.service.js';
 
 /**
  * Global billing module. Provides the BILLING_PROVIDER seam, the reusable
@@ -66,6 +67,7 @@ import { WinbackOfferService } from './winback-offer.service.js';
     PaymentsService,
     RefundsService,
     WinbackOfferService,
+    GuardianConsentService,
     {
       provide: BILLING_PROVIDER,
       useFactory: (): BillingProvider => createBillingProvider(process.env),

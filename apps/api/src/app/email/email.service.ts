@@ -7,7 +7,7 @@ import {
   type EmailProvider,
   type EmailSendResult,
 } from './email.provider.js';
-import { renderEmail } from './email-templates.js';
+import { renderEmail, type RenderedEmail } from './email-templates.js';
 import { UNSUBSCRIBE_TOKENS, UnsubscribeTokens } from './unsubscribe-token.js';
 
 export interface SendEmailInput {
@@ -55,6 +55,18 @@ export class EmailService {
 
   get settingsUrl(): string {
     return `${this.links.studentApp}/settings/notifications`;
+  }
+
+  /**
+   * A one-off notice to someone who is not a user (a parent / guardian,
+   * docs/09 "Guardian step"): already rendered, no unsubscribe link or
+   * preference check — there is no subscription to manage.
+   */
+  async sendNotice(
+    to: string,
+    message: RenderedEmail,
+  ): Promise<EmailSendResult> {
+    return this.provider.send({ to, ...message });
   }
 
   async send(input: SendEmailInput): Promise<EmailSendResult> {

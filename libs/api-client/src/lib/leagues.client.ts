@@ -12,6 +12,12 @@ export interface LeagueMember {
   level: number;
   rank: number;
   isMe: boolean;
+  /**
+   * May I open this member's profile? False for minors who aren't my
+   * friend (docs/14 "Minors"): show the name, no link. Optional for older
+   * APIs (treat missing as true).
+   */
+  profileVisible?: boolean;
   /** Avatar config + equipped items (same shape as GET /me/avatar). */
   avatar: AvatarResponse;
 }
