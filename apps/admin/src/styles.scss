@@ -195,6 +195,9 @@ a {
 }
 .table-scroll {
   overflow-x: auto;
+  /* Contain absolutely positioned .visually-hidden cells (header text), or
+     they widen the page on narrow screens. */
+  position: relative;
 }
 .stat-grid {
   display: grid;
