@@ -19,7 +19,6 @@ import {
   Mark,
   Node,
   mergeAttributes,
-  type JSONContent,
   type NodeViewRenderer,
 } from '@tiptap/core';
 import {
