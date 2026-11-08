@@ -48,12 +48,14 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'courses',
         canActivate: [sectionGuard('courses')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/courses.page').then((m) => m.CoursesPage),
       },
       {
         path: 'courses/:slug',
         canActivate: [sectionGuard('courses')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/course-detail.page').then((m) => m.CourseDetailPage),
       },
@@ -94,12 +96,14 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'categories',
         canActivate: [sectionGuard('categories')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/categories.page').then((m) => m.CategoriesPage),
       },
       {
         path: 'promotions',
         canActivate: [sectionGuard('promotions')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/promotions.page').then((m) => m.PromotionsPage),
       },
@@ -112,12 +116,14 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'items',
         canActivate: [sectionGuard('items')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/items.page').then((m) => m.ItemsPage),
       },
       {
         path: 'gamification',
         canActivate: [sectionGuard('gamification')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/gamification.page').then((m) => m.GamificationPage),
       },
@@ -182,6 +188,7 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'item-categories',
         canActivate: [sectionGuard('itemCategories')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/item-categories.page').then(
             (m) => m.ItemCategoriesPage,
@@ -195,6 +202,7 @@ export const SHELL_ROUTES: Route[] = [
       {
         path: 'settings',
         canActivate: [sectionGuard('settings')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./pages/settings.page').then((m) => m.SettingsPage),
       },

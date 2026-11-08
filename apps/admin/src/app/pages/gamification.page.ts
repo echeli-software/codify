@@ -42,6 +42,9 @@ import {
 import { AdminErrors } from '../core/errors';
 import { SLUG_PATTERN } from '../core/catalog';
 import { BadgeTestPanel } from '../shared/badge-test-panel';
+import { DirtyTracker } from '../core/dirty';
+import type { HasUnsavedChanges } from '../core/unsaved-changes';
+import { BadgeRuleBuilder } from './badge-rule-builder.component';
 
 type Tab = 'defaults' | 'badges' | 'quests' | 'operations';
 const TABS: readonly Tab[] = ['defaults', 'badges', 'quests', 'operations'];
@@ -129,6 +132,7 @@ const DEFAULT_RULE = JSON.stringify(
     Badge,
     Button,
     BadgeTestPanel,
+    BadgeRuleBuilder,
     Drawer,
     FormField,
     Icon,
@@ -696,21 +700,7 @@ const DEFAULT_RULE = JSON.stringify(
           [label]="'admin.common.active' | translate"
         />
         <div class="span-all">
-          <label class="form-label" for="b-rule">{{
-            'admin.gamification.badges.rule' | translate
-          }}</label>
-          <textarea
-            id="b-rule"
-            class="form-control mono"
-            rows="8"
-            spellcheck="false"
-            [(ngModel)]="badgeForm.rule"
-            aria-describedby="b-rule-help"
-            [attr.aria-invalid]="ruleErrors().length > 0 || null"
-          ></textarea>
-          <p class="muted small" id="b-rule-help">
-            {{ 'admin.gamification.badges.ruleHelp' | translate }}
-          </p>
+          <cdf-badge-rule-builder [(rule)]="badgeForm.rule" />
           @if (ruleErrors().length > 0) {
             <ul class="issue-list" role="alert">
               @for (e of ruleErrors(); track $index) {
@@ -908,7 +898,7 @@ const DEFAULT_RULE = JSON.stringify(
     `,
   ],
 })
-export class GamificationPage {
+export class GamificationPage implements HasUnsavedChanges {
   private readonly client = inject(GamificationClient);
   private readonly leagues = inject(LeaguesClient);
   private readonly referrals = inject(ReferralsClient);
@@ -944,6 +934,12 @@ export class GamificationPage {
 
   protected readonly badgeOpen = signal(false);
   protected badgeForm: BadgeForm = emptyBadge();
+  private readonly badgeDirty = new DirtyTracker(() => this.badgeForm);
+
+  /** docs/04 §5: unsaved badge edits (the badge builder section). */
+  hasUnsavedChanges(): boolean {
+    return this.badgeOpen() && this.badgeDirty.isDirty();
+  }
   protected readonly badgeErrors = signal<Record<string, string | undefined>>(
     {},
   );
@@ -1122,6 +1118,7 @@ export class GamificationPage {
     this.badgeErrors.set({});
     this.ruleErrors.set([]);
     this.badgeError.set(null);
+    this.badgeDirty.mark();
     this.badgeOpen.set(true);
   }
 
@@ -1168,6 +1165,7 @@ export class GamificationPage {
       this.toast.success(
         this.i18n.t('admin.gamification.badges.saved', { name: saved.name }),
       );
+      this.badgeDirty.clear();
       this.badgeOpen.set(false);
     } catch (err) {
       const p = toProblemDetails(err);

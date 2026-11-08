@@ -53,6 +53,7 @@ Sidebar
 - Filters: status, category, author, "has missing translations".
 - Bulk actions: publish, archive, change category.
 - "+ New course" button → wizard (basics → categories → first module).
+- Implemented: "has missing translations" = any course/module/lesson field with source text whose translation in another supported locale is missing or outdated (`GET /courses?missingTranslations=true`, staff). Authors come from `GET /admin/course-authors`. Bulk actions call `POST /courses/bulk` (each course audited as `course.publish` / `course.archive` / `course.update` with `bulk: true`; per-course failures are reported, not fatal).
 
 ### Catalog → Course (detail / editor)
 
@@ -66,6 +67,9 @@ Tabs:
    - Drag-to-reorder modules (collapsible) → lessons inside.
    - Each lesson: type icon, title, free toggle, est. minutes, "edit" / "duplicate" / "delete".
    - Bulk: mark first N lessons free (sets `lesson.isFree = true` on those rows; revertible). There is no separate "preview window" field — gating is uniformly `lesson.isFree`.
+
+- Implemented (`course-curriculum.component.ts`): modules collapse; modules and lessons reorder by drag (CDK; lessons can move between modules) or with move-up / move-down buttons (keyboard alternative, focus follows the row); every reorder is one atomic `PUT /courses/:id/curriculum/order` (rolled back on error). "Mark first N free" sends the exact free set (`PUT /courses/:id/free-lessons`; every other lesson becomes paid) and offers Undo with the previous set. **Duplicate** deep-copies the lesson right after itself: content, settings, every LESSON translation (titles get "(copy)"/"(cópia)") and its companion Exercise / AiPrompt / Scenario as new rows; lesson multipliers, progress, attempts and submissions are not copied. **Delete** soft-deletes the lesson (`DELETE /lessons/:id`).
+
 3. **Lessons (block editor)** — opened from a curriculum row. Full-screen.
    - `LessonBlockEditor` (Tiptap host).
    - Side panel: lesson properties (`type`, `isFree`, `baseXp`, `baseCoins`, `estimatedMinutes`, optional `Exercise` link, `Multiplier` rules attached to this lesson).
@@ -74,18 +78,22 @@ Tabs:
 4. **Promotions**
    - List of multipliers attached at course or lesson level.
    - "+ Add" → `MultiplierEditor` (kind, target XP/COINS/BOTH, value, time window, optional lesson within course).
-5. **Translations** — see "Translations" screen.
+5. **Translations** — completeness per target locale for the course, its modules and lessons (`GET /courses/:id/translations`; the lesson body counts as present in the source), with a link to the workspace (`/translations?entityType=COURSE&q=<slug>`).
 6. **Analytics**
    - Funnel: enrolled → started → 50% → completed.
    - Drop-off heatmap per lesson.
    - Free → paid conversion attributable to this course (via `EnrollmentSource`).
-7. **Audit** — last 100 actions on this course.
+7. **Audit** — last 100 actions on this course (`GET /admin/audit?entityId=<courseId>`).
+8. **Enrollments** — ADMIN sees names; TEACHER sees stable pseudonyms (`L-XXXXXXXX`, sha256 of course + user) — docs/04 §1.
+
+Tabs per role: ADMIN / TEACHER (own courses) see all; SUPPORT sees Overview, Curriculum (read-only) and Audit. Promotions is read-only for TEACHER (`GET /courses/:id/multipliers`). `?tab=` deep-links a tab. Cover: "Upload and crop" runs the `ImageCropper` (16:9, 1280 px JPEG) and uploads a COVER asset; identical bytes return the existing asset (sha256 dedupe, docs/06 §10).
 
 ### Catalog → Categories
 
 - Simple list. Slug, color token, icon, sortOrder.
 - Reorder by drag.
 - Click → edit translations + assign to plans (matrix view).
+- Implemented: drag or move up/down → `PUT /categories/order { ids }` (every live category, ADMIN, audited `category.reorder`); colour tokens are ui-tokens names shown as swatches; each row links to the translations workspace; the edit panel toggles the category on each non-all-access plan (`PATCH /plans/:id { categoryIds }`).
 
 ### Catalog → Promotions
 
@@ -93,6 +101,7 @@ Tabs:
 - Calendar view (week/month) showing active windows for `CAMPAIGN` and `COURSE_PROMO`.
 - Quick "Activate now for 24h" button on rows.
 - Effective preview: pick a user + lesson, show resolver breakdown (`PREMIUM_DEFAULT × COURSE_PROMO × STREAK_TIER = 6.0x`). Drives trust in the system.
+- Implemented: time-window filter (any / running / upcoming / ended / date range), list or calendar (Monday-first week or month; CAMPAIGN + COURSE_PROMO windows, click to edit), preview via `POST /admin/multipliers/preview` (same inputs as the reward pipeline: active rows incl. the user's own boosts, premium, streak, `multiplier.cap`). Per-user SURPRISE_BOOST rows are not listed here.
 
 ### Plans
 
@@ -112,6 +121,7 @@ Tabs:
   - Cost / required level / premium-only / limited-drop window.
   - Translations.
 - "Schedule limited drop" wizard: pick items, set window, set notification copy.
+- Implemented: table shows the category and an inline active toggle. The wizard calls `POST /admin/items/drops { itemIds, startsAt, endsAt, copy: { pt-BR, en-US: { title, body } } }` (ADMIN, audited `item.drop_schedule`): items become limited drops on that window and the copy is stored as ContentTranslation `ITEM` / `dropTitle` + `dropBody` (`{item}` = item name). The drop-announcement job uses it when the window opens; a future window clears the item's previous announcement marker. SUPPORT reads items via `GET /admin/items` (+ `/categories`) and sees the page read-only.
 
 ### Shop → Item Categories
 
@@ -120,6 +130,7 @@ Tabs:
 ### Gamification → Badges
 
 - List + create. Each badge: slug, icon, hidden flag, rule JSON (with helper builder for common rules).
+- Implemented: the builder edits `all`/`any` of event-count and metric clauses with one predicate each; other shapes stay in the JSON view (the JSON is always the source of truth). "Check rule" calls `POST /admin/badges/validate-rule { rule }` → `{ valid, problems, events, metrics }`.
 - "Test" button: pick a user, simulate, see if the badge would unlock.
 - Translations.
 
@@ -167,6 +178,9 @@ Tabs:
 ### Settings
 
 - Branding (color tokens overridable per environment for staging visibility).
+  Implemented (`settings-site.component.ts`): brand tokens (`primary*`, `accent*`) as hex overrides + an environment label badge. Stored with enabled locales as `site.branding` / `site.locales` rows of the GamificationConfig key/value table (each environment's DB holds its own; not listed by the gamification config API). `GET /api/site-config` (public, cached 60 s) is read at start-up by admin and student, which set `--cdf-color-*` on `<html>` (both themes) and hide disabled locales; `PUT /admin/site-settings` (ADMIN, audited `site.settings_update`). PATCH /me with a disabled locale → 400 `LOCALE_DISABLED`; the default locale (pt-BR) can't be disabled.
+- Default coin rates: every `earning.*` / `coins.*` gamification config key (plus `billing.firstPaymentBonusCoins`) edited generically as numeric fields, and the global `PREMIUM_DEFAULT` multiplier value.
+- Notification template defaults: there is no template store — push/email copy per kind lives in code in both locales; limited-drop copy is set per drop in the wizard. The settings page says so.
 - Default coin rates and `PREMIUM_DEFAULT` multiplier value (writes a `Multiplier` row).
 - Streak tier thresholds and bonuses.
 - Notification template defaults.
@@ -177,7 +191,7 @@ Tabs:
 ## 4. Layout & responsive
 
 - Desktop ≥ 1024px: persistent sidebar (240px), topbar (56px), content (max-width 1440px, gutters).
-- Tablet 768–1023: collapsible sidebar (icons only by default).
+- Tablet 768–1023: collapsible sidebar (icons only by default). Implemented in `AppShell`: icons-only by default on tablet widths (labels stay as accessible names / tooltips); the toggle expands it; crossing the breakpoint resets to its default; the phone drawer always shows labels.
 - Mobile < 768: drawer-style sidebar; admin not optimized for phone but must remain usable for "approve/refund on the go" tasks.
 
 ## 5. Forms & autosave
@@ -191,7 +205,7 @@ Tabs:
   `dirty`. The status line shows Saving… / Saved at HH:MM:SS (locale time) /
   paused / failed.
 - All other forms: explicit save with optimistic UI + rollback on error.
-- Unsaved-changes guard on route navigation.
+- Unsaved-changes guard on route navigation. Courses (new-course wizard), course detail (overview, cover, inline module/lesson forms), categories, promotions (multiplier editor), items (item drawer, drop wizard), item categories, gamification (badge drawer) and settings (site sections) implement `hasUnsavedChanges()` (`core/dirty.ts` snapshots); pages without it pass the guard.
 
 ## 6. Search
 
@@ -207,8 +221,9 @@ Tabs:
 ## 7. Theming & accessibility
 
 - Light + dark themes from `ui-tokens`. User preference per-account, persisted.
+  Implemented: `User.theme` (`light | dark | system | high-contrast`) via `PATCH /me { theme }` / `GET /me`; `ThemeService.setMode` saves to the account, the shell adopts the saved theme after sign-in (localStorage is only the first-paint hint).
 - All interactive elements keyboard-reachable; `Esc` closes modals; `Tab` order manually verified on lesson editor.
-- High-contrast mode via tokens override.
+- High-contrast mode via tokens override: `theme-hc` (with `theme-light`) on `<html>` — black on white, black borders, AAA violet primary, two-tone focus ring, underlined links (`libs/ui-bootstrap/src/scss/_high-contrast.scss`).
 
 ## 8. Telemetry
 
@@ -229,7 +244,7 @@ Tabs:
 ## 9. Empty / error states
 
 - Every list has an `EmptyState` with a primary CTA ("+ New course").
-- Every async area has skeletons during load and a typed error state with retry.
+- Every async area has skeletons during load and a typed error state with retry (`cdf-admin-load-error` = the shared `cdf-load-error` fed by `AdminErrors`).
 - Permission-denied states explain _which role_ would be required.
 
 ## 10. Admin operations API
@@ -248,8 +263,29 @@ All under `/api/admin`, RFC 7807 errors, mutations audited.
 | `POST /users/:id/items { itemId, reason }`                           | ADMIN                                        | Grants with `ADMIN_GRANT` (201, audited `user.item_grant`); already owned → 200 `{ alreadyOwned: true }`, nothing written.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `GET /users/:id/ledger?type=coins\|xp&cursor&limit`                  | ADMIN, SUPPORT                               | `{ type, balance, items: [{ delta, balanceAfter, source, multiplier, refType, refId }], nextCursor }`. XP `balanceAfter` is the running journal sum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `POST /badges/:id/test { userId }`                                   | ADMIN                                        | `{ wouldUnlock, alreadyEarned, awardedAt, badgeActive, mode, clauses[], events, metrics }` from the badge engine; awards nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `POST /multipliers/preview { userId, lessonId, at? }`                | ADMIN                                        | `{ at, user { isPremium, streakDays }, lesson, cap, xp, coins }`; each dimension `{ effective, uncapped, capped, components[{kind,value,description}], base, reward }`. Awards nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `POST /badges/validate-rule { rule }`                                | ADMIN                                        | `{ valid, problems[], events[], metrics[] }` (badge DSL validator).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `GET /items`, `GET /items/categories`                                | ADMIN, SUPPORT                               | Shop items / item categories (read).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `POST /items/drops`                                                  | ADMIN                                        | Limited-drop wizard (see Shop → Items). `{ itemIds, startsAt, endsAt, reannounce[] }`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `GET /course-authors`                                                | staff (TEACHER: self)                        | `[{ id, displayName, courseCount }]`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET/PUT /site-settings`                                             | ADMIN                                        | Branding + enabled locales (see Settings); public read at `GET /api/site-config`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `GET/POST /item-categories`, `PATCH/DELETE /item-categories/:slug`   | ADMIN                                        | Slug immutable; delete refused with `ITEM_CATEGORY_IN_USE` while items reference it. Names are single-locale (ItemCategory is not a TranslatableEntity).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `PATCH /users/:id/role { role, reason? }`                            | ADMIN                                        | Staff role change (docs/14 §2, §11). `role` ∈ STUDENT, TEACHER, SUPPORT, ADMIN; `reason` ≤ 500 chars. Response `{ id, email, displayName, role, previousRole, changed }`; same role → `changed: false`, nothing written. `403 ROLE_CHANGE_SELF` on your own account (so an ADMIN always remains), `404` unknown/purged user, `409 ROLE_CHANGED_CONCURRENTLY` if it changed meanwhile. Audited `user.role_changed` with `diff.before.role`, `diff.after.role`, `diff.reason`. Takes effect on the user's next request (roles are read from the DB, never from Clerk claims).                                                                                                                                                                                                                                                                                                                                                      |
+
+Course endpoints (under `/api/courses`, ADMIN or TEACHER on own courses
+unless noted; mutations audited): `POST /bulk { ids, action:
+publish|archive|setCategories, categoryIds? }` → `{ updated[], failed[{id,
+status, message}] }`; `PUT /:id/curriculum/order { modules: [{ id,
+lessonIds }] }` (must list every live module and lesson; 400
+`INVALID_CURRICULUM_ORDER`); `POST /:id/lessons/:lessonId/duplicate`; `PUT
+/:id/free-lessons { lessonIds }` → `{ freeLessonIds, previousFreeLessonIds }`;
+`GET /:id/translations`, `/:id/analytics` (funnel enrolled → started → 50 % →
+completed, per-lesson opened (90 d `lesson_open`) / completed / drop-off,
+free → paid by enrollment source), `/:id/enrollments?skip&take`,
+`/:id/multipliers`. `GET /courses?missingTranslations=true` (staff). `PUT
+/api/categories/order { ids }` (ADMIN). Asset confirm records `sha256`,
+`width`, `height`; a duplicate of the same kind returns the existing asset
+with `deduplicated: true`.
 
 `GET /api/users` also accepts `locale`, `lastSeenFrom`, `lastSeenTo` (ISO)
 and `subscriptionStatus` (a SubscriptionStatus, or `NONE` = never

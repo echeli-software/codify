@@ -226,7 +226,8 @@
       "themes": {
         "system": "System",
         "light": "Light",
-        "dark": "Dark"
+        "dark": "Dark",
+        "high-contrast": "High contrast"
       },
       "identity": "Identity",
       "userId": "User id",
@@ -273,7 +274,42 @@
       "published": "Published “{title}”.",
       "archived": "Archived “{title}”.",
       "deleted": "Deleted “{title}”.",
-      "deleteMessage": "The course will be soft-deleted and disappear from the catalog. Type “{slug}” to confirm."
+      "deleteMessage": "The course will be soft-deleted and disappear from the catalog. Type “{slug}” to confirm.",
+      "wizard": {
+        "steps": "New course steps",
+        "basics": "Basics",
+        "categories": "Categories",
+        "module": "First module",
+        "categoriesHelp": "Categories decide which plans include the course. You can change them later.",
+        "moduleHelp": "Optional — leave empty to add modules later from the curriculum.",
+        "back": "Back",
+        "next": "Next"
+      },
+      "missingTranslations": "Has missing translations",
+      "allCategories": "All categories",
+      "allAuthors": "All authors",
+      "cover": "Cover",
+      "publishedAt": "Published",
+      "notPublished": "Not published",
+      "noMatchTitle": "No courses match these filters",
+      "noMatchDescription": "Change or reset the filters to see more courses.",
+      "resetFilters": "Reset filters",
+      "bulk": {
+        "label": "Bulk actions",
+        "selected": "{count, plural, one {# course selected} other {# courses selected}}",
+        "categories": "Categories for the selected courses",
+        "setCategories": "Set categories",
+        "clear": "Clear selection",
+        "confirmMessage": "Each change is recorded in the audit log.",
+        "apply": "Apply",
+        "partial": "{ok} updated, {failed} failed (permissions or state).",
+        "done": "{count, plural, one {# course updated.} other {# courses updated.}}",
+        "confirm": {
+          "publish": "{count, plural, one {Publish # course?} other {Publish # courses?}}",
+          "archive": "{count, plural, one {Archive # course?} other {Archive # courses?}}",
+          "setCategories": "{count, plural, one {Replace the categories of # course?} other {Replace the categories of # courses?}}"
+        }
+      }
     },
     "course": {
       "course": "Course",
@@ -281,7 +317,11 @@
       "tabs": {
         "overview": "Overview",
         "curriculum": "Curriculum",
-        "promotions": "Promotions"
+        "promotions": "Promotions",
+        "translations": "Translations",
+        "analytics": "Analytics",
+        "enrollments": "Enrollments",
+        "audit": "Audit"
       },
       "basics": "Basics",
       "difficulty": "Difficulty",
@@ -327,7 +367,12 @@
       "moduleCreated": "Module “{title}” created.",
       "moduleDeleted": "Module “{title}” deleted.",
       "deleteModuleMessage": "{count, plural, =0 {The module will be removed.} one {The module and its # lesson will be removed.} other {The module and its # lessons will be removed.}}",
-      "lessonCreated": "Lesson “{title}” created."
+      "lessonCreated": "Lesson “{title}” created.",
+      "cropNew": "Upload and crop",
+      "cropHelp": "Covers are cropped to 16:9 and saved at 1280 px wide. Identical images are reused.",
+      "coverUploading": "Uploading…",
+      "coverCropped": "Cover cropped and uploaded — save to apply it.",
+      "coverDeduplicated": "This image was already uploaded; reusing it — save to apply it."
     },
     "lesson": {
       "lesson": "Lesson",
@@ -556,7 +601,32 @@
       "created": "Category “{name}” created.",
       "updated": "Category “{name}” updated.",
       "deleted": "Category “{name}” deleted.",
-      "deleteMessage": "The category will be removed from the catalog. Courses keep it in their history."
+      "deleteMessage": "The category will be removed from the catalog. Courses keep it in their history.",
+      "reorderHelp": "Drag rows (or use the arrow buttons) to set the catalog order.",
+      "noColor": "No colour",
+      "translations": "Translations",
+      "moveUp": "Move {name} up",
+      "moveDown": "Move {name} down",
+      "deleteAria": "Delete {name}",
+      "reordered": "Category order saved.",
+      "plansTitle": "Plans with this category",
+      "plansHelp": "A plan includes every course tagged with its categories.",
+      "allAccess": "All access",
+      "noPlans": "No plans yet.",
+      "planAdded": "Added to {plan}.",
+      "planRemoved": "Removed from {plan}.",
+      "colors": {
+        "primary": "Primary (violet)",
+        "accent": "Accent",
+        "success": "Success (green)",
+        "warning": "Warning (amber)",
+        "danger": "Danger (red)",
+        "info": "Info (blue)",
+        "coin": "Coin (gold)",
+        "xp": "XP",
+        "premium": "Premium",
+        "flame": "Flame (orange)"
+      }
     },
     "plans": {
       "title": "Plans",
@@ -669,6 +739,34 @@
         "RARE": "Rare",
         "EPIC": "Epic",
         "LEGENDARY": "Legendary"
+      },
+      "readOnly": "Read-only — shop items are edited by admins.",
+      "activeAria": "{name} is on sale",
+      "drops": {
+        "open": "Schedule limited drop",
+        "title": "Schedule a limited drop",
+        "steps": "Drop steps",
+        "step": {
+          "items": "Items",
+          "window": "Window",
+          "copy": "Notification"
+        },
+        "search": "Filter items",
+        "selected": "{count, plural, =0 {No item selected} one {# item selected} other {# items selected}}",
+        "noMatch": "No item matches.",
+        "windowHelp": "The items go on sale (limited) at the start and leave the shop at the end. Learners active in the last 30 days get a push when the window opens.",
+        "copyHelp": "Write the push in both languages. {item} is replaced by the item name.",
+        "pushTitle": "Push title",
+        "pushBody": "Push text",
+        "submit": "Schedule drop",
+        "done": "{count, plural, one {# item scheduled.} other {# items scheduled.}}",
+        "errors": {
+          "noItems": "Pick at least one item.",
+          "noStart": "Set when the drop starts.",
+          "endBeforeStart": "The end must be after the start.",
+          "ended": "That window has already ended.",
+          "copy": "Fill in the push title and text in both languages."
+        }
       }
     },
     "gamification": {
@@ -844,12 +942,54 @@
         "COURSE_PROMO": "Course promo",
         "LESSON_PROMO": "Lesson promo",
         "STREAK_TIER": "Streak tier",
-        "CAMPAIGN": "Campaign"
+        "CAMPAIGN": "Campaign",
+        "SURPRISE_BOOST": "Surprise boost"
       },
       "targets": {
         "XP": "XP",
         "COINS": "Coins",
         "BOTH": "XP + coins"
+      },
+      "view": "View",
+      "views": {
+        "list": "List",
+        "calendar": "Calendar"
+      },
+      "windowFilter": "Time window",
+      "range": "Overlapping dates",
+      "windows": {
+        "all": "Any time",
+        "active": "Running now",
+        "upcoming": "Upcoming",
+        "ended": "Ended",
+        "range": "Date range…"
+      },
+      "calendar": {
+        "prev": "Previous",
+        "next": "Next",
+        "today": "Today",
+        "mode": "Calendar range",
+        "week": "Week",
+        "month": "Month",
+        "help": "Shows campaign and course-promo windows (filters apply). Select one to edit it."
+      },
+      "preview": {
+        "title": "Effective multiplier preview",
+        "help": "Pick a learner and a lesson to see exactly which multipliers the reward would stack. Nothing is awarded.",
+        "user": "Learner",
+        "userPlaceholder": "Search by name or email",
+        "course": "Course",
+        "lesson": "Lesson",
+        "pickCourse": "Pick a course first",
+        "at": "At",
+        "atHelp": "Leave empty for now.",
+        "run": "Preview",
+        "context": "{user} · {lesson} · {streak}-day streak · {at}",
+        "premium": "Premium",
+        "xp": "XP",
+        "coins": "Coins",
+        "reward": "base {base} → {reward}",
+        "capped": "Capped at ×{cap} (was ×{uncapped})"
       }
     },
     "users": {
@@ -1351,6 +1491,101 @@
       "idpSyncFailed": "Suspension saved, but the sign-in provider could not be updated — the user's Clerk sessions may stay active until it is retried.",
       "idpUnbanFailed": "Unsuspension saved, but the sign-in provider could not be updated — the user may still be blocked from signing in."
     },
+    "curriculum": {
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "firstN": "Free lessons from the start",
+      "firstNHelp": "Marks the first N lessons in curriculum order free and every other lesson paid.",
+      "applyFirstN": "Mark first N free",
+      "undo": "Undo",
+      "freeSet": "{count, plural, =0 {No lesson is free now.} one {# lesson is free now.} other {# lessons are free now.}}",
+      "freeRestored": "Previous free lessons restored.",
+      "drag": "Drag to reorder",
+      "lessonCount": "{count, plural, one {# lesson} other {# lessons}}",
+      "moduleUp": "Move module {title} up",
+      "moduleDown": "Move module {title} down",
+      "lessonUp": "Move lesson {title} up",
+      "lessonDown": "Move lesson {title} down",
+      "duplicate": "Duplicate",
+      "duplicateAria": "Duplicate lesson {title}",
+      "duplicated": "Created “{title}”.",
+      "deleteLessonAria": "Delete lesson {title}",
+      "deleteLessonMessage": "The lesson leaves the course; learners keep their progress and the lesson can be restored from the database.",
+      "lessonDeleted": "Deleted “{title}”.",
+      "emptyModule": "No lessons — drop one here or add a lesson.",
+      "reordered": "Curriculum order saved."
+    },
+    "courseTabs": {
+      "translations": {
+        "title": "Translation completeness",
+        "openWorkspace": "Open in the translations workspace",
+        "source": "Source language: {locale}",
+        "pct": "{pct}% translated",
+        "counts": "{done} done · {outdated} outdated · {missing} missing",
+        "noTargets": "No other locale to translate into.",
+        "entity": "Content",
+        "fields": "Fields",
+        "types": {
+          "COURSE": "Course",
+          "MODULE": "Module",
+          "LESSON": "Lesson"
+        },
+        "status": {
+          "done": "done",
+          "outdated": "outdated",
+          "missing": "missing"
+        }
+      },
+      "analytics": {
+        "funnel": "Funnel",
+        "funnelHelp": "Started = completed at least one lesson; 50% and completed count live lessons.",
+        "steps": {
+          "enrolled": "Enrolled",
+          "started": "Started",
+          "half": "50% done",
+          "completed": "Completed"
+        },
+        "lessons": "Drop-off per lesson",
+        "noLessons": "No lessons yet",
+        "lesson": "Lesson",
+        "opened": "Opened (90 d)",
+        "completed": "Completed",
+        "dropOff": "Drop-off",
+        "conversions": "Free → paid by enrollment source",
+        "noEnrollments": "No enrollments yet.",
+        "source": "Source",
+        "enrolled": "Enrolled",
+        "converted": "Became paid",
+        "generated": "Computed at {at}"
+      },
+      "enrollments": {
+        "title": "Enrollments",
+        "total": "{count, plural, one {# learner} other {# learners}}",
+        "anonymised": "Learners are shown as pseudonyms (stable per course).",
+        "emptyTitle": "No enrollments yet",
+        "emptyDescription": "Learners appear here once they enroll in the course.",
+        "learner": "Learner",
+        "enrolledAt": "Enrolled",
+        "completed": "Lessons done",
+        "lastActivity": "Last completion",
+        "more": "Load more",
+        "sources": {
+          "SELF": "Self",
+          "PROMO": "Promo",
+          "ADMIN_GRANT": "Admin grant"
+        }
+      },
+      "audit": {
+        "title": "Recent changes",
+        "openLog": "Open in the audit log",
+        "empty": "No recorded changes",
+        "system": "System"
+      },
+      "promotions": {
+        "readOnly": "Read-only — promotions are managed by admins.",
+        "lessonLevel": "Lesson-level"
+      }
+    },
     "staff": {
       "chart": {
         "showTable": "Show data table"
@@ -1503,6 +1738,60 @@
         "started": "Announcement started.",
         "running": "Sending {version}: {notified} of {audience} notified…",
         "done": "{version}: {notified} of {audience} active accounts notified."
+      }
+    },
+    "badgeRule": {
+      "view": "Rule editor",
+      "builder": "Builder",
+      "json": "JSON",
+      "unlockWhen": "Unlock when",
+      "all": "all of these are true",
+      "any": "any of these is true",
+      "type": "Clause type",
+      "typeEvent": "Event count",
+      "typeMetric": "Metric",
+      "event": "Event",
+      "metric": "Metric",
+      "op": "Comparison",
+      "value": "Value",
+      "remove": "Remove condition",
+      "add": "Add condition",
+      "noClauses": "No conditions — the badge can only be awarded manually.",
+      "advancedOnly": "This rule uses options the builder can't show (several comparisons, filters…). Edit it in the JSON view.",
+      "check": "Check rule",
+      "valid": "The rule is valid.",
+      "notJson": "The rule isn't valid JSON."
+    },
+    "siteSettings": {
+      "saved": "Settings saved.",
+      "branding": {
+        "title": "Branding",
+        "help": "Override brand colours for this environment (e.g. a distinct primary on staging). Applies to the admin and student apps at start-up; leave a token empty to keep the built-in colour.",
+        "pick": "Pick a colour for {token}",
+        "inherit": "built-in",
+        "label": "Environment label",
+        "labelHelp": "Shown as a badge in the admin top bar, e.g. STAGING. Leave empty in production.",
+        "invalid": "Colours must be hex values like #7c4dff.",
+        "reset": "Clear overrides"
+      },
+      "locales": {
+        "title": "Languages",
+        "help": "Disabled languages disappear from the language pickers and can't be chosen as an account language. The default language is always on.",
+        "default": "default"
+      },
+      "rates": {
+        "title": "Default coin rates",
+        "help": "Earning amounts and coin limits from the gamification config, plus the premium multiplier.",
+        "allDefaults": "All gamification defaults",
+        "premium": "Premium multiplier (PREMIUM_DEFAULT)",
+        "premiumHelp": "Applied to XP and coins of paying learners.",
+        "premiumInvalid": "The premium multiplier must be at least 1.",
+        "none": "No coin-rate settings are configured on this API.",
+        "unchanged": "Nothing changed."
+      },
+      "templates": {
+        "title": "Notification templates",
+        "body": "There is no editable template store: push and email copy for each notification kind is written in code in both languages (docs/10 §3), so it ships translated and reviewed. Limited-drop pushes take their copy from the drop wizard in Shop → Items."
       }
     },
     "promoCodes": {

@@ -20,6 +20,8 @@ import {
 import { AdminOpsClient, type ItemCategoryAdmin } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { LoadError } from '../shared/load-error';
+import { DirtyTracker } from '../core/dirty';
+import type { HasUnsavedChanges } from '../core/unsaved-changes';
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
 
@@ -225,7 +227,7 @@ export function validateCategory(
     </div>
   `,
 })
-export class ItemCategoriesPage {
+export class ItemCategoriesPage implements HasUnsavedChanges {
   private readonly client = inject(AdminOpsClient);
   private readonly errors = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
@@ -239,6 +241,12 @@ export class ItemCategoriesPage {
   protected readonly formError = signal<string | null>(null);
   protected readonly fieldErrors = signal<Record<string, string>>({});
   protected draft: CategoryDraft = { slug: '', name: '', sortOrder: 0 };
+  private readonly dirty = new DirtyTracker(() => this.draft);
+
+  /** docs/04 §5: an open form with edits blocks navigation. */
+  hasUnsavedChanges(): boolean {
+    return this.editing() !== null && this.dirty.isDirty();
+  }
 
   constructor() {
     void this.load();
@@ -264,6 +272,7 @@ export class ItemCategoriesPage {
     this.draft = { slug: '', name: '', sortOrder: max + 10 };
     this.fieldErrors.set({});
     this.formError.set(null);
+    this.dirty.mark();
     this.editing.set('new');
   }
 
@@ -271,6 +280,7 @@ export class ItemCategoriesPage {
     this.draft = { slug: c.slug, name: c.name, sortOrder: c.sortOrder };
     this.fieldErrors.set({});
     this.formError.set(null);
+    this.dirty.mark();
     this.editing.set('edit');
   }
 

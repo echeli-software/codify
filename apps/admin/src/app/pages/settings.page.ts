@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
@@ -34,6 +35,7 @@ import {
 import { AdminErrors } from '../core/errors';
 import { LoadError } from '../shared/load-error';
 import { SystemNoticesComponent } from './system-notices.component';
+import { SettingsSite } from './settings-site.component';
 
 const KEY_RE = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
 
@@ -220,6 +222,7 @@ export function experimentPolicy(flags: readonly FeatureFlag[]): {
     Textarea,
     Toggle,
     SystemNoticesComponent,
+    SettingsSite,
     LocalePipe,
     TranslatePipe,
   ],
@@ -289,6 +292,9 @@ export function experimentPolicy(flags: readonly FeatureFlag[]): {
           <cdf-skeleton shape="rect" height="120px" />
         }
       </section>
+
+      <!-- Branding, locales, coin rates, templates (docs/04 Settings). -->
+      <cdf-settings-site />
 
       <section aria-labelledby="flags-title">
         <div class="section-head">
@@ -725,6 +731,12 @@ export function experimentPolicy(flags: readonly FeatureFlag[]): {
   ],
 })
 export class SettingsPage {
+  private readonly siteSettings = viewChild(SettingsSite);
+  /** Unsaved-changes guard (branding / locales / coin-rate edits). */
+  hasUnsavedChanges(): boolean {
+    return !!this.siteSettings()?.hasUnsavedChanges();
+  }
+
   protected isExperimentFlag(f: FeatureFlag): boolean {
     return isExperimentFlag(f);
   }

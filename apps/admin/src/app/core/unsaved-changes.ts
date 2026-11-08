@@ -15,7 +15,12 @@ export interface HasUnsavedChanges {
 export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (
   component,
 ) => {
-  if (!component || !component.hasUnsavedChanges()) return true;
+  if (
+    !component ||
+    typeof component.hasUnsavedChanges !== 'function' ||
+    !component.hasUnsavedChanges()
+  )
+    return true;
   const i18n = inject(I18nService);
   const confirm = inject(ConfirmDialogService);
   return confirm

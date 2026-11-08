@@ -17,6 +17,7 @@ import {
   LanguageSwitcher,
   type NavSection,
   Popover,
+  ThemeService,
   ThemeToggle,
   ToastHost,
 } from '@codify/ui-bootstrap';
@@ -24,6 +25,8 @@ import { AuthService } from '@codify/auth';
 import { navForRole } from '../core/roles';
 import { SearchPalette } from '../core/search-palette';
 import { AdminTelemetry } from '../core/telemetry';
+import { SiteConfigService } from '../core/site-config';
+import { AccountThemePersistence, AccountThemeSync } from '../core/theme-sync';
 
 /** Cmd-K on Apple platforms, Ctrl-K elsewhere (both work everywhere). */
 export function isPaletteShortcut(ev: KeyboardEvent): boolean {
@@ -64,6 +67,9 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
       [nav]="nav()"
     >
       <ng-container appShellTopbarLeft>
+        @if (envLabel(); as label) {
+          <span class="env-badge" data-testid="env-badge">{{ label }}</span>
+        }
         <button
           type="button"
           class="topbar-search"
@@ -162,6 +168,18 @@ export function isPaletteShortcut(ev: KeyboardEvent): boolean {
         text-transform: uppercase;
         letter-spacing: 0.06em;
       }
+      .env-badge {
+        display: inline-block;
+        margin-right: var(--cdf-space-2);
+        padding: 2px 8px;
+        border-radius: var(--cdf-radius-pill);
+        background: var(--cdf-color-warning);
+        color: var(--cdf-color-warning-on);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
       .topbar-search {
         display: inline-flex;
         align-items: center;
@@ -244,6 +262,9 @@ export class ShellPage {
   protected readonly user = computed(() => this.auth.user());
   protected readonly searchOpen = signal(false);
   protected readonly menuOpen = signal(false);
+  private readonly site = inject(SiteConfigService);
+  /** Environment badge from site settings (e.g. "STAGING"). */
+  protected readonly envLabel = this.site.label;
   protected readonly isMac =
     typeof navigator !== 'undefined' &&
     /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
@@ -251,6 +272,10 @@ export class ShellPage {
   constructor() {
     // docs/04 §8: page views (route + role + locale), batched.
     inject(AdminTelemetry).trackPageViews(this.router, inject(DestroyRef));
+    // docs/04 §7: theme is per account; docs/04 Settings: site branding.
+    inject(ThemeService).usePersistence(inject(AccountThemePersistence));
+    void inject(AccountThemeSync).sync();
+    void this.site.load();
   }
 
   protected onGlobalKeydown(ev: KeyboardEvent): void {

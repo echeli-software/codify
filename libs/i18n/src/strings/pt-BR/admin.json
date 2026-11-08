@@ -226,7 +226,8 @@
       "themes": {
         "system": "Sistema",
         "light": "Claro",
-        "dark": "Escuro"
+        "dark": "Escuro",
+        "high-contrast": "Alto contraste"
       },
       "identity": "Identidade",
       "userId": "Id do usuário",
@@ -273,7 +274,42 @@
       "published": "“{title}” publicado.",
       "archived": "“{title}” arquivado.",
       "deleted": "“{title}” excluído.",
-      "deleteMessage": "O curso será excluído (soft delete) e sumirá do catálogo. Digite “{slug}” para confirmar."
+      "deleteMessage": "O curso será excluído (soft delete) e sumirá do catálogo. Digite “{slug}” para confirmar.",
+      "wizard": {
+        "steps": "Etapas do novo curso",
+        "basics": "Básico",
+        "categories": "Categorias",
+        "module": "Primeiro módulo",
+        "categoriesHelp": "As categorias definem quais planos incluem o curso. Você pode mudá-las depois.",
+        "moduleHelp": "Opcional — deixe em branco para adicionar módulos depois no currículo.",
+        "back": "Voltar",
+        "next": "Avançar"
+      },
+      "missingTranslations": "Com traduções faltando",
+      "allCategories": "Todas as categorias",
+      "allAuthors": "Todos os autores",
+      "cover": "Capa",
+      "publishedAt": "Publicado em",
+      "notPublished": "Não publicado",
+      "noMatchTitle": "Nenhum curso corresponde aos filtros",
+      "noMatchDescription": "Altere ou limpe os filtros para ver mais cursos.",
+      "resetFilters": "Limpar filtros",
+      "bulk": {
+        "label": "Ações em massa",
+        "selected": "{count, plural, one {# curso selecionado} other {# cursos selecionados}}",
+        "categories": "Categorias para os cursos selecionados",
+        "setCategories": "Definir categorias",
+        "clear": "Limpar seleção",
+        "confirmMessage": "Cada alteração fica registrada no log de auditoria.",
+        "apply": "Aplicar",
+        "partial": "{ok} atualizados, {failed} falharam (permissão ou estado).",
+        "done": "{count, plural, one {# curso atualizado.} other {# cursos atualizados.}}",
+        "confirm": {
+          "publish": "{count, plural, one {Publicar # curso?} other {Publicar # cursos?}}",
+          "archive": "{count, plural, one {Arquivar # curso?} other {Arquivar # cursos?}}",
+          "setCategories": "{count, plural, one {Substituir as categorias de # curso?} other {Substituir as categorias de # cursos?}}"
+        }
+      }
     },
     "course": {
       "course": "Curso",
@@ -281,7 +317,11 @@
       "tabs": {
         "overview": "Visão geral",
         "curriculum": "Currículo",
-        "promotions": "Promoções"
+        "promotions": "Promoções",
+        "translations": "Traduções",
+        "analytics": "Análises",
+        "enrollments": "Matrículas",
+        "audit": "Auditoria"
       },
       "basics": "Básico",
       "difficulty": "Dificuldade",
@@ -327,7 +367,12 @@
       "moduleCreated": "Módulo “{title}” criado.",
       "moduleDeleted": "Módulo “{title}” excluído.",
       "deleteModuleMessage": "{count, plural, =0 {O módulo será removido.} one {O módulo e sua # aula serão removidos.} other {O módulo e suas # aulas serão removidos.}}",
-      "lessonCreated": "Aula “{title}” criada."
+      "lessonCreated": "Aula “{title}” criada.",
+      "cropNew": "Enviar e recortar",
+      "cropHelp": "As capas são recortadas em 16:9 e salvas com 1280 px de largura. Imagens idênticas são reaproveitadas.",
+      "coverUploading": "Enviando…",
+      "coverCropped": "Capa recortada e enviada — salve para aplicar.",
+      "coverDeduplicated": "Esta imagem já tinha sido enviada; reaproveitando — salve para aplicar."
     },
     "lesson": {
       "lesson": "Aula",
@@ -556,7 +601,32 @@
       "created": "Categoria “{name}” criada.",
       "updated": "Categoria “{name}” atualizada.",
       "deleted": "Categoria “{name}” excluída.",
-      "deleteMessage": "A categoria será removida do catálogo. Os cursos a mantêm no histórico."
+      "deleteMessage": "A categoria será removida do catálogo. Os cursos a mantêm no histórico.",
+      "reorderHelp": "Arraste as linhas (ou use as setas) para definir a ordem do catálogo.",
+      "noColor": "Sem cor",
+      "translations": "Traduções",
+      "moveUp": "Mover {name} para cima",
+      "moveDown": "Mover {name} para baixo",
+      "deleteAria": "Excluir {name}",
+      "reordered": "Ordem das categorias salva.",
+      "plansTitle": "Planos com esta categoria",
+      "plansHelp": "Um plano inclui todos os cursos marcados com suas categorias.",
+      "allAccess": "Acesso total",
+      "noPlans": "Ainda não há planos.",
+      "planAdded": "Adicionada a {plan}.",
+      "planRemoved": "Removida de {plan}.",
+      "colors": {
+        "primary": "Primária (violeta)",
+        "accent": "Destaque",
+        "success": "Sucesso (verde)",
+        "warning": "Aviso (âmbar)",
+        "danger": "Perigo (vermelho)",
+        "info": "Info (azul)",
+        "coin": "Moeda (dourado)",
+        "xp": "XP",
+        "premium": "Premium",
+        "flame": "Chama (laranja)"
+      }
     },
     "plans": {
       "title": "Planos",
@@ -669,6 +739,34 @@
         "RARE": "Raro",
         "EPIC": "Épico",
         "LEGENDARY": "Lendário"
+      },
+      "readOnly": "Somente leitura — itens da loja são editados por admins.",
+      "activeAria": "{name} está à venda",
+      "drops": {
+        "open": "Agendar item limitado",
+        "title": "Agendar um item limitado",
+        "steps": "Etapas do lançamento",
+        "step": {
+          "items": "Itens",
+          "window": "Janela",
+          "copy": "Notificação"
+        },
+        "search": "Filtrar itens",
+        "selected": "{count, plural, =0 {Nenhum item selecionado} one {# item selecionado} other {# itens selecionados}}",
+        "noMatch": "Nenhum item corresponde.",
+        "windowHelp": "Os itens entram à venda (limitados) no início e saem da loja no fim. Alunos ativos nos últimos 30 dias recebem um push quando a janela abre.",
+        "copyHelp": "Escreva o push nos dois idiomas. {item} é substituído pelo nome do item.",
+        "pushTitle": "Título do push",
+        "pushBody": "Texto do push",
+        "submit": "Agendar lançamento",
+        "done": "{count, plural, one {# item agendado.} other {# itens agendados.}}",
+        "errors": {
+          "noItems": "Escolha pelo menos um item.",
+          "noStart": "Defina quando o lançamento começa.",
+          "endBeforeStart": "O fim deve ser depois do início.",
+          "ended": "Essa janela já terminou.",
+          "copy": "Preencha o título e o texto do push nos dois idiomas."
+        }
       }
     },
     "gamification": {
@@ -844,12 +942,54 @@
         "COURSE_PROMO": "Promoção de curso",
         "LESSON_PROMO": "Promoção de aula",
         "STREAK_TIER": "Faixa de sequência",
-        "CAMPAIGN": "Campanha"
+        "CAMPAIGN": "Campanha",
+        "SURPRISE_BOOST": "Bônus surpresa"
       },
       "targets": {
         "XP": "XP",
         "COINS": "Moedas",
         "BOTH": "XP + moedas"
+      },
+      "view": "Visualização",
+      "views": {
+        "list": "Lista",
+        "calendar": "Calendário"
+      },
+      "windowFilter": "Janela de tempo",
+      "range": "Datas sobrepostas",
+      "windows": {
+        "all": "Qualquer data",
+        "active": "Ativas agora",
+        "upcoming": "Futuras",
+        "ended": "Encerradas",
+        "range": "Intervalo de datas…"
+      },
+      "calendar": {
+        "prev": "Anterior",
+        "next": "Próximo",
+        "today": "Hoje",
+        "mode": "Período do calendário",
+        "week": "Semana",
+        "month": "Mês",
+        "help": "Mostra as janelas de campanhas e promoções de curso (os filtros se aplicam). Selecione uma para editar."
+      },
+      "preview": {
+        "title": "Prévia do multiplicador efetivo",
+        "help": "Escolha um aluno e uma aula para ver quais multiplicadores a recompensa acumularia. Nada é concedido.",
+        "user": "Aluno",
+        "userPlaceholder": "Busque por nome ou e-mail",
+        "course": "Curso",
+        "lesson": "Aula",
+        "pickCourse": "Escolha um curso antes",
+        "at": "Em",
+        "atHelp": "Deixe em branco para agora.",
+        "run": "Ver prévia",
+        "context": "{user} · {lesson} · sequência de {streak} dias · {at}",
+        "premium": "Premium",
+        "xp": "XP",
+        "coins": "Moedas",
+        "reward": "base {base} → {reward}",
+        "capped": "Limitado a ×{cap} (era ×{uncapped})"
       }
     },
     "users": {
@@ -1351,6 +1491,101 @@
       "idpSyncFailed": "Suspensão salva, mas o provedor de login não foi atualizado — as sessões do usuário no Clerk podem continuar ativas até nova tentativa.",
       "idpUnbanFailed": "Reativação salva, mas o provedor de login não foi atualizado — o usuário ainda pode estar impedido de entrar."
     },
+    "curriculum": {
+      "expandAll": "Expandir tudo",
+      "collapseAll": "Recolher tudo",
+      "firstN": "Aulas grátis do início",
+      "firstNHelp": "Marca as N primeiras aulas (na ordem do currículo) como grátis e as demais como pagas.",
+      "applyFirstN": "Marcar as N primeiras grátis",
+      "undo": "Desfazer",
+      "freeSet": "{count, plural, =0 {Nenhuma aula é grátis agora.} one {# aula é grátis agora.} other {# aulas são grátis agora.}}",
+      "freeRestored": "Aulas grátis anteriores restauradas.",
+      "drag": "Arraste para reordenar",
+      "lessonCount": "{count, plural, one {# aula} other {# aulas}}",
+      "moduleUp": "Mover módulo {title} para cima",
+      "moduleDown": "Mover módulo {title} para baixo",
+      "lessonUp": "Mover aula {title} para cima",
+      "lessonDown": "Mover aula {title} para baixo",
+      "duplicate": "Duplicar",
+      "duplicateAria": "Duplicar aula {title}",
+      "duplicated": "“{title}” criada.",
+      "deleteLessonAria": "Excluir aula {title}",
+      "deleteLessonMessage": "A aula sai do curso; os alunos mantêm o progresso e a aula pode ser restaurada pelo banco de dados.",
+      "lessonDeleted": "“{title}” excluída.",
+      "emptyModule": "Sem aulas — solte uma aqui ou adicione uma aula.",
+      "reordered": "Ordem do currículo salva."
+    },
+    "courseTabs": {
+      "translations": {
+        "title": "Completude das traduções",
+        "openWorkspace": "Abrir no espaço de traduções",
+        "source": "Idioma de origem: {locale}",
+        "pct": "{pct}% traduzido",
+        "counts": "{done} prontas · {outdated} desatualizadas · {missing} faltando",
+        "noTargets": "Nenhum outro idioma para traduzir.",
+        "entity": "Conteúdo",
+        "fields": "Campos",
+        "types": {
+          "COURSE": "Curso",
+          "MODULE": "Módulo",
+          "LESSON": "Aula"
+        },
+        "status": {
+          "done": "pronta",
+          "outdated": "desatualizada",
+          "missing": "faltando"
+        }
+      },
+      "analytics": {
+        "funnel": "Funil",
+        "funnelHelp": "Iniciou = concluiu ao menos uma aula; 50% e concluiu contam as aulas ativas.",
+        "steps": {
+          "enrolled": "Matriculados",
+          "started": "Iniciaram",
+          "half": "50% concluído",
+          "completed": "Concluíram"
+        },
+        "lessons": "Abandono por aula",
+        "noLessons": "Ainda não há aulas",
+        "lesson": "Aula",
+        "opened": "Abriram (90 d)",
+        "completed": "Concluíram",
+        "dropOff": "Abandono",
+        "conversions": "Grátis → pago por origem da matrícula",
+        "noEnrollments": "Ainda não há matrículas.",
+        "source": "Origem",
+        "enrolled": "Matriculados",
+        "converted": "Viraram pagantes",
+        "generated": "Calculado em {at}"
+      },
+      "enrollments": {
+        "title": "Matrículas",
+        "total": "{count, plural, one {# aluno} other {# alunos}}",
+        "anonymised": "Os alunos aparecem como pseudônimos (estáveis por curso).",
+        "emptyTitle": "Ainda não há matrículas",
+        "emptyDescription": "Os alunos aparecem aqui quando se matriculam no curso.",
+        "learner": "Aluno",
+        "enrolledAt": "Matrícula",
+        "completed": "Aulas concluídas",
+        "lastActivity": "Última conclusão",
+        "more": "Carregar mais",
+        "sources": {
+          "SELF": "Própria",
+          "PROMO": "Promoção",
+          "ADMIN_GRANT": "Concessão do admin"
+        }
+      },
+      "audit": {
+        "title": "Alterações recentes",
+        "openLog": "Abrir no log de auditoria",
+        "empty": "Nenhuma alteração registrada",
+        "system": "Sistema"
+      },
+      "promotions": {
+        "readOnly": "Somente leitura — promoções são gerenciadas por admins.",
+        "lessonLevel": "Nível da aula"
+      }
+    },
     "staff": {
       "chart": {
         "showTable": "Mostrar tabela de dados"
@@ -1503,6 +1738,60 @@
         "started": "Comunicado iniciado.",
         "running": "Enviando {version}: {notified} de {audience} avisados…",
         "done": "{version}: {notified} de {audience} contas ativas avisadas."
+      }
+    },
+    "badgeRule": {
+      "view": "Editor de regra",
+      "builder": "Assistente",
+      "json": "JSON",
+      "unlockWhen": "Desbloquear quando",
+      "all": "todas forem verdadeiras",
+      "any": "qualquer uma for verdadeira",
+      "type": "Tipo da condição",
+      "typeEvent": "Contagem de evento",
+      "typeMetric": "Métrica",
+      "event": "Evento",
+      "metric": "Métrica",
+      "op": "Comparação",
+      "value": "Valor",
+      "remove": "Remover condição",
+      "add": "Adicionar condição",
+      "noClauses": "Sem condições — o emblema só pode ser concedido manualmente.",
+      "advancedOnly": "Esta regra usa opções que o assistente não mostra (várias comparações, filtros…). Edite na visualização JSON.",
+      "check": "Verificar regra",
+      "valid": "A regra é válida.",
+      "notJson": "A regra não é um JSON válido."
+    },
+    "siteSettings": {
+      "saved": "Configurações salvas.",
+      "branding": {
+        "title": "Identidade visual",
+        "help": "Sobrescreva as cores da marca neste ambiente (ex.: uma cor primária diferente no staging). Vale para o admin e o app do aluno ao abrir; deixe vazio para manter a cor padrão.",
+        "pick": "Escolher cor para {token}",
+        "inherit": "padrão",
+        "label": "Rótulo do ambiente",
+        "labelHelp": "Exibido como selo na barra superior do admin, ex.: STAGING. Deixe vazio em produção.",
+        "invalid": "As cores devem ser hexadecimais, como #7c4dff.",
+        "reset": "Limpar alterações"
+      },
+      "locales": {
+        "title": "Idiomas",
+        "help": "Idiomas desativados somem dos seletores e não podem ser escolhidos como idioma da conta. O idioma padrão fica sempre ativo.",
+        "default": "padrão"
+      },
+      "rates": {
+        "title": "Taxas padrão de moedas",
+        "help": "Valores de ganho e limites de moedas da configuração de gamificação, mais o multiplicador premium.",
+        "allDefaults": "Todos os padrões de gamificação",
+        "premium": "Multiplicador premium (PREMIUM_DEFAULT)",
+        "premiumHelp": "Aplicado a XP e moedas de alunos pagantes.",
+        "premiumInvalid": "O multiplicador premium deve ser pelo menos 1.",
+        "none": "Nenhuma taxa de moedas está configurada nesta API.",
+        "unchanged": "Nada mudou."
+      },
+      "templates": {
+        "title": "Modelos de notificação",
+        "body": "Não há um repositório de modelos editáveis: o texto de push e e-mail de cada tipo de notificação fica no código nos dois idiomas (docs/10 §3), já traduzido e revisado. Pushes de itens limitados usam o texto do assistente em Loja → Itens."
       }
     },
     "promoCodes": {

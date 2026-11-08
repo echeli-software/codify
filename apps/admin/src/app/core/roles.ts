@@ -38,7 +38,8 @@ export const SECTION_ROLES: Record<AdminSection, readonly UserRole[]> = {
   categories: ['ADMIN', 'SUPPORT'],
   promotions: ['ADMIN'],
   plans: ['ADMIN', 'SUPPORT'],
-  items: ['ADMIN'],
+  // docs/04 §1: SUPPORT views shop items (read-only).
+  items: ['ADMIN', 'SUPPORT'],
   gamification: ['ADMIN'],
   users: ['ADMIN', 'SUPPORT'],
   translations: ['ADMIN', 'TEACHER'],
@@ -71,6 +72,7 @@ export const EDIT_ROLES = {
   categories: ['ADMIN'],
   plans: ['ADMIN'],
   users: ['ADMIN', 'SUPPORT'],
+  items: ['ADMIN'],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 /**

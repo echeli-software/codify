@@ -190,7 +190,7 @@ export class ProfilePage {
 
   protected readonly themeOptions = computed<SelectOption<ThemeMode>[]>(() => {
     this.i18n.currentLocale();
-    return (['system', 'light', 'dark'] as const).map((m) => ({
+    return (['system', 'light', 'dark', 'high-contrast'] as const).map((m) => ({
       value: m,
       label: this.i18n.t(`admin.profile.themes.${m}`),
     }));

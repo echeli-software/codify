@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
@@ -32,7 +33,9 @@ import {
   ToastService,
   Toggle,
 } from '@codify/ui-bootstrap';
+import { AuthService } from '@codify/auth';
 import {
+  AdminCatalogClient,
   ItemsClient,
   type CreateItemBody,
   type Item,
@@ -42,6 +45,11 @@ import {
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { SLUG_PATTERN, isoToLocal, localToIso } from '../core/catalog';
+import { DirtyTracker } from '../core/dirty';
+import { LoadError } from '../core/load-error';
+import { EDIT_ROLES } from '../core/roles';
+import type { HasUnsavedChanges } from '../core/unsaved-changes';
+import { DropWizard } from './drop-wizard.component';
 
 const SLOTS: readonly ItemSlot[] = [
   'PET',
@@ -120,7 +128,9 @@ export function spriteRefOf(
  * Shop → Items (docs/08): catalogue table plus a drawer editor — sprite
  * from the media library (SPRITE assets) or an emoji / colour token, live
  * `ItemSpritePreview`, cost / level / premium, limited-drop window and
- * active flag. Item categories are managed inline.
+ * active flag. Item categories are managed inline. The table shows the
+ * category and an inline active toggle; "Schedule limited drop" opens the
+ * drop wizard. SUPPORT gets the list read-only (docs/04 §1).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -137,6 +147,8 @@ export function spriteRefOf(
     IconButton,
     Input,
     ItemSpritePreview,
+    LoadError,
+    DropWizard,
     RadioGroup,
     Select,
     Skeleton,
@@ -151,14 +163,29 @@ export function spriteRefOf(
           <h1>{{ 'admin.items.title' | translate }}</h1>
           <p class="muted">{{ 'admin.items.subtitle' | translate }}</p>
         </div>
-        <cdf-button
-          kind="primary"
-          (click)="startCreate()"
-          data-testid="new-item"
-        >
-          <cdf-icon name="plus" size="sm" />
-          {{ 'admin.items.new' | translate }}
-        </cdf-button>
+        @if (canEdit()) {
+          <div class="page-head__actions">
+            <cdf-button
+              kind="secondary"
+              (click)="dropOpen.set(true)"
+              [disabled]="items().length === 0"
+              data-testid="schedule-drop"
+            >
+              <cdf-icon name="calendar" size="sm" />
+              {{ 'admin.items.drops.open' | translate }}
+            </cdf-button>
+            <cdf-button
+              kind="primary"
+              (click)="startCreate()"
+              data-testid="new-item"
+            >
+              <cdf-icon name="plus" size="sm" />
+              {{ 'admin.items.new' | translate }}
+            </cdf-button>
+          </div>
+        } @else {
+          <p class="muted small">{{ 'admin.items.readOnly' | translate }}</p>
+        }
       </header>
 
       <section class="admin-card">
@@ -170,41 +197,52 @@ export function spriteRefOf(
             }}</cdf-badge>
           }
         </div>
-        <div class="form-grid cat-form">
-          <cdf-form-field
-            [label]="'admin.common.slug' | translate"
-            controlId="icat-slug"
-          >
-            <cdf-input inputId="icat-slug" [(ngModel)]="newCategory.slug" />
-          </cdf-form-field>
-          <cdf-form-field
-            [label]="'admin.common.name' | translate"
-            controlId="icat-name"
-          >
-            <cdf-input inputId="icat-name" [(ngModel)]="newCategory.name" />
-          </cdf-form-field>
-          <cdf-button
-            kind="secondary"
-            [loading]="busy() === 'category'"
-            (click)="addCategory()"
-          >
-            {{ 'admin.items.addCategory' | translate }}
-          </cdf-button>
-        </div>
+        @if (canEdit()) {
+          <div class="form-grid cat-form">
+            <cdf-form-field
+              [label]="'admin.common.slug' | translate"
+              controlId="icat-slug"
+            >
+              <cdf-input inputId="icat-slug" [(ngModel)]="newCategory.slug" />
+            </cdf-form-field>
+            <cdf-form-field
+              [label]="'admin.common.name' | translate"
+              controlId="icat-name"
+            >
+              <cdf-input inputId="icat-name" [(ngModel)]="newCategory.name" />
+            </cdf-form-field>
+            <cdf-button
+              kind="secondary"
+              [loading]="busy() === 'category'"
+              (click)="addCategory()"
+            >
+              {{ 'admin.items.addCategory' | translate }}
+            </cdf-button>
+          </div>
+        }
       </section>
 
       <section class="admin-card">
         <h2>
           {{ 'admin.items.count' | translate: { count: items().length } }}
         </h2>
-        @if (loading()) {
+        @if (loadError(); as err) {
+          <cdf-admin-load-error [error]="err" (retry)="refresh()" />
+        } @else if (loading()) {
           <cdf-skeleton shape="rect" height="160px" />
         } @else if (items().length === 0) {
           <cdf-empty-state
             icon="gift"
             [title]="'admin.items.emptyTitle' | translate"
             [description]="'admin.items.emptyDescription' | translate"
-          />
+          >
+            @if (canEdit()) {
+              <cdf-button kind="primary" (click)="startCreate()">
+                <cdf-icon name="plus" size="sm" />
+                {{ 'admin.items.new' | translate }}
+              </cdf-button>
+            }
+          </cdf-empty-state>
         } @else {
           <div class="table-scroll">
             <table class="admin-table">
@@ -217,6 +255,7 @@ export function spriteRefOf(
                   </th>
                   <th scope="col">{{ 'admin.common.name' | translate }}</th>
                   <th scope="col">{{ 'admin.items.slot' | translate }}</th>
+                  <th scope="col">{{ 'admin.items.category' | translate }}</th>
                   <th scope="col">{{ 'admin.items.rarity' | translate }}</th>
                   <th scope="col" class="num">
                     {{ 'admin.items.cost' | translate }}
@@ -225,6 +264,7 @@ export function spriteRefOf(
                     {{ 'admin.items.level' | translate }}
                   </th>
                   <th scope="col">{{ 'admin.items.drop' | translate }}</th>
+                  <th scope="col">{{ 'admin.common.active' | translate }}</th>
                   <th scope="col">
                     <span class="visually-hidden">{{
                       'admin.common.actions' | translate
@@ -275,6 +315,7 @@ export function spriteRefOf(
                       </span>
                     </td>
                     <td>{{ 'admin.items.slots.' + it.slot | translate }}</td>
+                    <td>{{ categoryName(it.categorySlug) }}</td>
                     <td>
                       <cdf-badge
                         [variant]="rarityVariant[it.rarity]"
@@ -306,25 +347,40 @@ export function spriteRefOf(
                       }
                     </td>
                     <td>
-                      <div class="row-actions">
-                        <cdf-button
-                          kind="ghost"
-                          size="sm"
-                          (click)="startEdit(it)"
-                        >
-                          {{ 'admin.common.edit' | translate }}
-                        </cdf-button>
-                        <cdf-icon-button
-                          icon="trash"
-                          size="sm"
-                          kind="danger"
-                          [ariaLabel]="
-                            'admin.items.deleteAria'
-                              | translate: { name: it.name }
-                          "
-                          (click)="remove(it)"
-                        />
-                      </div>
+                      <cdf-toggle
+                        [ngModel]="it.isActive"
+                        (ngModelChange)="toggleActive(it, $event)"
+                        [disabled]="!canEdit() || busy() === 'active:' + it.id"
+                        [attr.data-testid]="'active-' + it.slug"
+                      >
+                        <span class="visually-hidden">{{
+                          'admin.items.activeAria'
+                            | translate: { name: it.name }
+                        }}</span>
+                      </cdf-toggle>
+                    </td>
+                    <td>
+                      @if (canEdit()) {
+                        <div class="row-actions">
+                          <cdf-button
+                            kind="ghost"
+                            size="sm"
+                            (click)="startEdit(it)"
+                          >
+                            {{ 'admin.common.edit' | translate }}
+                          </cdf-button>
+                          <cdf-icon-button
+                            icon="trash"
+                            size="sm"
+                            kind="danger"
+                            [ariaLabel]="
+                              'admin.items.deleteAria'
+                                | translate: { name: it.name }
+                            "
+                            (click)="remove(it)"
+                          />
+                        </div>
+                      }
                     </td>
                   </tr>
                 }
@@ -334,6 +390,20 @@ export function spriteRefOf(
         }
       </section>
     </div>
+
+    <cdf-drawer
+      [(open)]="dropOpen"
+      size="lg"
+      [title]="'admin.items.drops.title' | translate"
+    >
+      @if (dropOpen()) {
+        <cdf-drop-wizard
+          [items]="items()"
+          (scheduled)="onDropScheduled()"
+          (cancelled)="dropOpen.set(false)"
+        />
+      }
+    </cdf-drawer>
 
     <cdf-drawer
       [(open)]="drawerOpen"
@@ -544,6 +614,10 @@ export function spriteRefOf(
   `,
   styles: [
     `
+      /* Contain visually-hidden labels so they can't widen the page. */
+      .table-scroll {
+        position: relative;
+      }
       .cat-form {
         margin-top: var(--cdf-space-3);
         align-items: end;
@@ -599,8 +673,11 @@ export function spriteRefOf(
     `,
   ],
 })
-export class ItemsPage {
+export class ItemsPage implements HasUnsavedChanges {
   private readonly client = inject(ItemsClient);
+  private readonly admin = inject(AdminCatalogClient);
+  private readonly auth = inject(AuthService);
+  private readonly dropWizard = viewChild(DropWizard);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmDialogService);
   private readonly errorsSvc = inject(AdminErrors);
@@ -610,6 +687,12 @@ export class ItemsPage {
   protected readonly items = signal<Item[]>([]);
   protected readonly categories = signal<ItemCategory[]>([]);
   protected readonly loading = signal(true);
+  protected readonly loadError = signal<unknown>(null);
+  protected readonly dropOpen = signal(false);
+  protected readonly canEdit = computed(() =>
+    this.auth.hasAnyRole(EDIT_ROLES.items),
+  );
+  private readonly dirty = new DirtyTracker(() => this.form);
   protected readonly busy = signal<string | null>(null);
   protected readonly drawerOpen = signal(false);
   protected readonly errors = signal<Record<string, string | undefined>>({});
@@ -687,20 +770,56 @@ export class ItemsPage {
     };
   }
 
-  private async refresh(): Promise<void> {
+  hasUnsavedChanges(): boolean {
+    return (
+      (this.drawerOpen() && this.dirty.isDirty()) ||
+      (this.dropOpen() && !!this.dropWizard()?.hasUnsavedChanges())
+    );
+  }
+
+  protected async refresh(): Promise<void> {
     this.loading.set(true);
+    this.loadError.set(null);
     try {
+      // GET /admin/items: ADMIN + SUPPORT (docs/04 §1).
       const [items, cats] = await Promise.all([
-        this.client.listItems(),
-        this.client.listCategories(),
+        this.admin.listShopItems(),
+        this.admin.listShopCategories(),
       ]);
       this.items.set(items);
       this.categories.set(cats);
     } catch (err) {
-      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+      this.loadError.set(err);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected categoryName(slug: string): string {
+    return this.categories().find((c) => c.slug === slug)?.name ?? slug;
+  }
+
+  /** Inline active toggle (optimistic, rolled back on error). */
+  protected async toggleActive(it: Item, isActive: boolean): Promise<void> {
+    const set = (v: boolean) =>
+      this.items.update((xs) =>
+        xs.map((x) => (x.id === it.id ? { ...x, isActive: v } : x)),
+      );
+    set(isActive);
+    this.busy.set(`active:${it.id}`);
+    try {
+      await this.client.updateItem(it.id, { isActive });
+    } catch (err) {
+      set(!isActive);
+      this.errorsSvc.toast(err, 'admin.errors.saveFailed');
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
+  protected onDropScheduled(): void {
+    this.dropOpen.set(false);
+    void this.refresh();
   }
 
   protected spriteKind(ref: string): 'emoji' | 'color' | 'url' {
@@ -718,6 +837,7 @@ export class ItemsPage {
     this.errors.set({});
     this.formError.set(null);
     this.bump();
+    this.dirty.mark();
     this.drawerOpen.set(true);
   }
 
@@ -756,6 +876,7 @@ export class ItemsPage {
     this.errors.set({});
     this.formError.set(null);
     this.bump();
+    this.dirty.mark();
     this.drawerOpen.set(true);
   }
 
@@ -809,6 +930,7 @@ export class ItemsPage {
         this.items.update((xs) => [created, ...xs]);
       }
       this.toast.success(this.i18n.t('admin.items.saved', { name: body.name }));
+      this.dirty.clear();
       this.drawerOpen.set(false);
     } catch (err) {
       this.formError.set(

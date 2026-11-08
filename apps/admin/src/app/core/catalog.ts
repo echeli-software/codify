@@ -58,3 +58,36 @@ export function isoToLocal(v: string | null | undefined): string | null {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** CSS colour for a category `colorToken` ("primary", "success", …), or null. */
+export function tokenColor(token: string | null | undefined): string | null {
+  return token && /^[a-z][a-z-]{0,30}$/.test(token)
+    ? `var(--cdf-color-${token})`
+    : null;
+}
+
+/** Kebab-case slug suggestion from a title (accents stripped, ≤ 60 chars). */
+export function slugify(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, '');
+}
+
+/** Move `items[from]` to index `to` (clamped); returns a new array. */
+export function moveItem<T>(
+  items: readonly T[],
+  from: number,
+  to: number,
+): T[] {
+  const out = [...items];
+  if (from < 0 || from >= out.length) return out;
+  const target = Math.max(0, Math.min(out.length - 1, to));
+  const [it] = out.splice(from, 1);
+  out.splice(target, 0, it);
+  return out;
+}

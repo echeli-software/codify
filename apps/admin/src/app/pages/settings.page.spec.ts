@@ -3,8 +3,10 @@ import { provideRouter } from '@angular/router';
 import { provideI18n } from '@codify/i18n';
 import { ConfirmDialogService, ToastService } from '@codify/ui-bootstrap';
 import {
+  AdminCatalogClient,
   BillingClient,
   FlagsClient,
+  GamificationClient,
   StaffToolsClient,
   type FeatureFlag,
 } from '@codify/api-client';
@@ -125,6 +127,28 @@ describe('SettingsPage', () => {
         { provide: FlagsClient, useValue: flags },
         { provide: BillingClient, useValue: billing },
         { provide: StaffToolsClient, useValue: staff },
+        // Site settings section (branding / locales / coin rates).
+        {
+          provide: AdminCatalogClient,
+          useValue: {
+            siteSettings: jest.fn(async () => ({
+              branding: { tokens: {}, label: null },
+              locales: { enabled: ['pt-BR', 'en-US'], default: 'pt-BR' },
+              brandingTokens: ['primary'],
+            })),
+            siteConfig: jest.fn(async () => ({
+              branding: { tokens: {}, label: null },
+              locales: { enabled: ['pt-BR', 'en-US'], default: 'pt-BR' },
+            })),
+          },
+        },
+        {
+          provide: GamificationClient,
+          useValue: {
+            getConfig: jest.fn(async () => []),
+            listMultipliers: jest.fn(async () => []),
+          },
+        },
         { provide: ConfirmDialogService, useValue: confirm },
         {
           provide: ToastService,
