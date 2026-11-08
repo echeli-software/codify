@@ -376,6 +376,36 @@ export {
 } from './lib/promo-codes.client.js';
 export type { SurpriseBoost } from './lib/progress.client.js';
 export type { LeagueZones, EconomyJob } from './lib/gamification.client.js';
+
+// Staff area (refunds, win-back, grants, reports, experiments, exercise dashboard).
+export type {
+  RefundEligibility,
+  RefundOutcome,
+  WinbackOffer,
+} from './lib/billing.client.js';
+export type { ExperimentPolicy } from './lib/flags.client.js';
+export {
+  StaffToolsClient,
+  type StaffGrantBody,
+  type StaffGrantResult,
+  type GrantAllowance,
+  type UserRoleChangeResult,
+  type TermsAnnouncement,
+  type ExerciseFailureVerdict,
+  type ExerciseHealthRow,
+  type RetestResult,
+  type RetestJob,
+} from './lib/staff-tools.client.js';
+export {
+  ReportsClient,
+  type OverviewReport,
+  type RetentionCohort,
+  type LeagueWeekReport,
+  type ShopWeekReport,
+  type BillingReport,
+  type CourseFunnel,
+  type LessonFunnel,
+} from './lib/reports.client.js';
 export {
   SearchClient,
   type CatalogSearchResponse,
