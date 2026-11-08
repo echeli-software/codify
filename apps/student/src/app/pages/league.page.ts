@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
   IonHeader,
@@ -84,6 +85,7 @@ export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    NgTemplateOutlet,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -201,15 +203,7 @@ export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
               [title]="'student.league.standings' | translate"
             >
               <ng-template cdfLeaderboardAvatar let-row>
-                <a
-                  class="lg__avatar"
-                  [routerLink]="['/u', row.userId]"
-                  [attr.aria-label]="
-                    'student.league.viewProfile'
-                      | translate: { name: row.displayName }
-                  "
-                  [attr.data-user-id]="row.userId"
-                >
+                <ng-template #rowAvatar>
                   @if (sprites().get(row.userId); as av) {
                     <cdf-avatar-renderer
                       [config]="av.config"
@@ -219,7 +213,29 @@ export function hasAvatar(a: AvatarResponse | null | undefined): boolean {
                   } @else {
                     <cdf-app-avatar [name]="row.displayName" size="sm" />
                   }
-                </a>
+                </ng-template>
+                @if (hiddenProfiles().has(row.userId)) {
+                  <!-- docs/14 "Minors": name only, no profile link. -->
+                  <span
+                    class="lg__avatar"
+                    [attr.data-user-id]="row.userId"
+                    data-profile-hidden="true"
+                  >
+                    <ng-container [ngTemplateOutlet]="rowAvatar" />
+                  </span>
+                } @else {
+                  <a
+                    class="lg__avatar"
+                    [routerLink]="['/u', row.userId]"
+                    [attr.aria-label]="
+                      'student.league.viewProfile'
+                        | translate: { name: row.displayName }
+                    "
+                    [attr.data-user-id]="row.userId"
+                  >
+                    <ng-container [ngTemplateOutlet]="rowAvatar" />
+                  </a>
+                }
               </ng-template>
             </cdf-leaderboard-table>
           } @else {
@@ -517,6 +533,16 @@ export class LeaguePage {
   protected readonly history = signal<LeagueHistoryEntry[]>([]);
   protected readonly sheetOpen = signal(false);
   protected readonly now = signal(Date.now());
+
+  /** Members whose profile I may not open (minors who aren't my friends). */
+  protected readonly hiddenProfiles = computed(
+    () =>
+      new Set(
+        (this.league()?.members ?? [])
+          .filter((m) => m.profileVisible === false)
+          .map((m) => m.userId),
+      ),
+  );
 
   protected readonly rows = computed<LeaderboardRow[]>(() =>
     (this.league()?.members ?? []).map((m) => ({

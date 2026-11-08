@@ -4,6 +4,7 @@ import { OfflineSyncService } from '../offline/offline-sync.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { AppSessionService } from './app-session.service';
 import { AppUpdateService } from './app-update.service';
+import { WebPushService } from './web-push.service';
 
 /**
  * App-wide services started right after the first render (lazy chunk, so
@@ -14,12 +15,14 @@ import { AppUpdateService } from './app-update.service';
  *   - TelemetryService — batching + offline buffer (docs/10 §14).
  *   - AppUpdateService — "new version → reload" for the PWA.
  *   - NativePlatformService.init — Android back button + app state.
+ *   - WebPushService.init — taps on a browser web push route in the app.
  */
 export function startPlatform(injector: Injector): void {
   injector.get(AppSessionService).start();
   injector.get(OfflineSyncService);
   injector.get(AppUpdateService).start();
   void injector.get(NativePlatformService).init();
+  injector.get(WebPushService).init();
   injector.get(TelemetryService).track('app_opened', {
     online: typeof navigator === 'undefined' || navigator.onLine,
   });

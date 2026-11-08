@@ -163,11 +163,18 @@ const COMPARE_ROWS: (keyof CompareStats)[] = [
               [label]="'student.friends.activity.optIn' | translate"
               [ngModel]="activityOptIn()"
               (ngModelChange)="setActivityOptIn($event)"
-              [disabled]="activityOptIn() === null || savingOptIn()"
+              [disabled]="
+                activityOptIn() === null || savingOptIn() || feedLocked()
+              "
               data-testid="activity-optin"
             />
             <p class="fr__muted">
-              {{ 'student.friends.activity.optInHint' | translate }}
+              {{
+                (feedLocked()
+                  ? 'student.age.minorFeed'
+                  : 'student.friends.activity.optInHint'
+                ) | translate
+              }}
             </p>
           </cdf-app-card>
 
@@ -469,6 +476,8 @@ export class FriendsPage {
   /** Null until /me loads. */
   protected readonly activityOptIn = signal<boolean | null>(null);
   protected readonly savingOptIn = signal(false);
+  /** docs/14 "Minors": under 18 (or no date of birth) can't share activity. */
+  protected readonly feedLocked = signal(false);
 
   constructor() {
     void this.refresh();
@@ -478,7 +487,9 @@ export class FriendsPage {
 
   private async loadOptIn(): Promise<void> {
     try {
-      this.activityOptIn.set((await this.me.me()).activityFeedOptIn ?? false);
+      const me = await this.me.me();
+      this.feedLocked.set(me.ageGroup !== undefined && me.ageGroup !== 'adult');
+      this.activityOptIn.set(me.activityFeedOptIn ?? false);
     } catch {
       this.activityOptIn.set(null);
     }

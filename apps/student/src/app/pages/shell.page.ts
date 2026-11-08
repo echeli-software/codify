@@ -38,6 +38,7 @@ import { SignOutConfirm } from '../platform/sign-out-confirm.component.js';
 import { StoragePrompt } from '../platform/storage-prompt.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { GlobalSearch } from '../components/global-search.component.js';
+import { BirthDateGateComponent } from '../components/birth-date/birth-date-gate.component.js';
 import { TimeZoneSync } from '../components/time-zone.js';
 import {
   ShellBreadcrumbs,
@@ -148,6 +149,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     StoragePrompt,
     SignOutConfirm,
     GlobalSearch,
+    BirthDateGateComponent,
   ],
   template: `
     <header class="bar" data-testid="shell-header">
@@ -308,6 +310,8 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     <cdf-reward-overlays />
     <cdf-storage-prompt />
     <cdf-sign-out-confirm />
+    <!-- docs/14 "Minors": one-time date-of-birth prompt before the app. -->
+    <cdf-birth-date-gate />
   `,
   styles: [
     `

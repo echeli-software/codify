@@ -8,6 +8,7 @@ import { IdentityCacheService } from '../offline/identity-cache.service.js';
 import { NetworkStatusService } from '../offline/network-status.service.js';
 import { OfflineSyncService } from '../offline/offline-sync.service.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { WebPushService } from './web-push.service.js';
 
 /**
  * Sign-in / sign-out lifecycle for the student app (docs/16 §4).
@@ -36,6 +37,7 @@ export class AppSessionService {
   private readonly native = inject(NativePlatformService);
   private readonly network = inject(NetworkStatusService);
   private readonly telemetry = inject(TelemetryService);
+  private readonly webPush = inject(WebPushService);
 
   private lastUserId: string | null = null;
   private readonly _signOutConfirm = signal(false);
@@ -90,11 +92,35 @@ export class AppSessionService {
       await this.identity.clear().catch(() => undefined);
       await this.downloads.removeAll().catch(() => undefined);
       await this.native.onSignedOut().catch(() => undefined);
+      // Browser web push: drop this account's subscription (needs the token).
+      await this.webPush.onSignedOut().catch(() => undefined);
       await this.auth.signOut();
     } finally {
       this._signingOut.set(false);
     }
     await this.router.navigateByUrl('/login');
+  }
+
+  /**
+   * The server has just deleted this account (a date of birth under 12,
+   * docs/14 "Minors"): end the auth session first, so nothing else calls
+   * the API with it, then drop every local copy of the user's data and
+   * show `redirectTo`. No telemetry — there is no account to attribute
+   * it to.
+   */
+  async endDeletedAccount(redirectTo: string): Promise<void> {
+    const userId = this.auth.user()?.id ?? null;
+    this._signingOut.set(true);
+    try {
+      await this.auth.signOut();
+      if (userId) await this.sync.clearForUser(userId).catch(() => 0);
+      await this.identity.clear().catch(() => undefined);
+      await this.downloads.removeAll().catch(() => undefined);
+      await this.native.onSignedOut().catch(() => undefined);
+    } finally {
+      this._signingOut.set(false);
+    }
+    await this.router.navigateByUrl(redirectTo);
   }
 
   private async onUser(id: string | null): Promise<void> {
@@ -116,6 +142,7 @@ export class AppSessionService {
     await this.native
       .onSignedIn(bundle?.serverUserId ?? id)
       .catch(() => undefined);
+    void this.webPush.onSignedIn().catch(() => undefined);
     void this.downloads.syncEnrolledDownloads();
   }
 

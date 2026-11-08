@@ -206,6 +206,7 @@
 
   @if (onboarding()) {
   <cdf-onboarding-flow
+    [askBirthDate]="ageGate.birthDate() === null"
     [slides]="slides()"
     [courses]="catalog()"
     [categories]="categories()"

@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
 import { AuthService } from '@codify/auth';
@@ -49,6 +49,7 @@ import {
   type AdminSubscriptionView,
   type EnrollmentView,
   type MeResponse,
+  type BirthDateCorrectionResult,
   type Plan,
   type SubscriptionStatus,
 } from '@codify/api-client';
@@ -58,6 +59,10 @@ import { CursorPager } from '../core/cursor-pager';
 import { countryName } from '../core/country';
 import { LoadError } from '../shared/load-error';
 import { UserAccountPanelComponent } from './user-account-panel.component';
+import {
+  UserAgePanelComponent,
+  ageGroupVariant,
+} from './user-age-panel.component';
 import { UserAuditTab } from './user-audit-tab.component';
 
 type Tab =
@@ -103,6 +108,7 @@ export function daysUntil(
   imports: [
     FormsModule,
     UserAccountPanelComponent,
+    UserAgePanelComponent,
     UserAuditTab,
     RouterLink,
     Avatar,
@@ -196,6 +202,13 @@ export function daysUntil(
                     <div class="muted small">
                       {{ 'admin.users.countryHelp' | translate }}
                     </div>
+                  </dd>
+                  <dt>{{ 'admin.users.ageGroup' | translate }}</dt>
+                  <dd data-testid="user-age-group">
+                    <cdf-badge [variant]="ageVariant(u.ageGroup ?? null)">{{
+                      'admin.users.ageGroups.' + (u.ageGroup ?? 'none')
+                        | translate
+                    }}</cdf-badge>
                   </dd>
                   <dt>{{ 'admin.users.joined' | translate }}</dt>
                   <dd>{{ u.createdAt | locale: 'datetime' }}</dd>
@@ -954,6 +967,13 @@ export function daysUntil(
               role="tabpanel"
               aria-labelledby="utab-account"
             >
+              <!-- docs/14 "Minors": age group + staff date correction. -->
+              <cdf-user-age-panel
+                [userId]="userId()"
+                [email]="u.email"
+                [ageGroup]="u.ageGroup ?? null"
+                (corrected)="onAgeCorrected($event)"
+              />
               <cdf-user-account-panel [userId]="userId()" [email]="u.email" />
             </section>
           }
@@ -1506,6 +1526,19 @@ export class UserDetailPage {
     return (
       !store && s.status !== 'CANCELED' && s.status !== 'INCOMPLETE_EXPIRED'
     );
+  }
+
+  protected readonly ageVariant = ageGroupVariant;
+  private readonly router = inject(Router);
+
+  /** Corrected date of birth: new age group, or gone (under 12). */
+  protected onAgeCorrected(res: BirthDateCorrectionResult): void {
+    if ('deleted' in res.after) {
+      void this.router.navigateByUrl('/users');
+      return;
+    }
+    const ageGroup = res.after.ageGroup;
+    this.user.update((u) => (u ? { ...u, ageGroup } : u));
   }
 
   /** IP-derived country (CF-IPCountry) in the admin's locale. */

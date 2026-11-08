@@ -2,10 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
+  untracked,
+  type OnInit,
 } from '@angular/core';
 import {
   CoursesClient,
@@ -18,6 +21,8 @@ import {
 import { ContentTranslatePipe, TranslatePipe } from '@codify/i18n';
 import { NativePlatformService } from '../native/native-platform.service.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { BirthDateFormComponent } from './birth-date/birth-date-form.component.js';
+import { AgeGateService } from './birth-date/birth-date.js';
 import {
   AppButton,
   Icon,
@@ -155,7 +160,9 @@ export function recommendForGoal(
 }
 
 /**
- * First-run onboarding (docs/05 Onboarding, docs/10 §2): welcome carousel →
+ * First-run onboarding (docs/05 Onboarding, docs/10 §2): date of birth
+ * (when the account has none — required, not skippable; under 12 the
+ * account is deleted and the app signs out, docs/14 "Minors") → welcome carousel →
  * goal picker → track picker → schedule (daily reminder time, pre-filled
  * 20:00; saved as `reminderMinute` and mirrored to the native local
  * reminder). Emits the chosen course (or null when skipped); the page
@@ -172,6 +179,7 @@ export function recommendForGoal(
     OnboardingCarousel,
     TranslatePipe,
     ContentTranslatePipe,
+    BirthDateFormComponent,
   ],
   template: `
     <div
@@ -182,6 +190,11 @@ export function recommendForGoal(
       data-testid="onboarding"
     >
       @switch (step()) {
+        @case ('birthDate') {
+          <section class="ob__panel" data-testid="onboarding-birth-date">
+            <cdf-birth-date-form idPrefix="ob-dob" (saved)="birthDateSaved()" />
+          </section>
+        }
         @case ('welcome') {
           <cdf-onboarding-carousel
             [slides]="slides()"
@@ -386,7 +399,9 @@ export function recommendForGoal(
     `,
   ],
 })
-export class OnboardingFlowComponent {
+export class OnboardingFlowComponent implements OnInit {
+  /** Start with the date-of-birth step (the account has none yet). */
+  readonly askBirthDate = input(false);
   readonly courses = input<CourseListItem[]>([]);
   readonly categories = input<Category[]>([]);
   /** Localized slide copy (the carousel renders strings as given). */
@@ -405,9 +420,9 @@ export class OnboardingFlowComponent {
 
   protected readonly goals = ONBOARDING_GOALS;
   protected readonly timeToMinute = timeToMinute;
-  protected readonly step = signal<'welcome' | 'goal' | 'track' | 'schedule'>(
-    'welcome',
-  );
+  protected readonly step = signal<
+    'birthDate' | 'welcome' | 'goal' | 'track' | 'schedule'
+  >('welcome');
   protected readonly time = signal(minuteToTime(DEFAULT_REMINDER_MINUTE));
   protected readonly savingSchedule = signal(false);
   private readonly course = signal<CourseListItem | null>(null);
@@ -416,6 +431,28 @@ export class OnboardingFlowComponent {
     const g = this.goal();
     return g ? recommendForGoal(g, this.courses(), this.categories()) : [];
   });
+
+  private readonly ageGate = inject(AgeGateService);
+
+  constructor() {
+    // Saved elsewhere meanwhile (another tab / device): skip the step.
+    effect(() => {
+      if (typeof this.ageGate.birthDate() === 'string')
+        untracked(() => {
+          if (this.step() === 'birthDate') this.step.set('welcome');
+        });
+    });
+  }
+
+  ngOnInit(): void {
+    if (this.askBirthDate()) this.step.set('birthDate');
+  }
+
+  /** Date of birth stored (12+): on to the welcome carousel. */
+  protected birthDateSaved(): void {
+    this.telemetry.onboardingStep('birthDate');
+    this.step.set('welcome');
+  }
 
   /** Welcome carousel finished (docs/10 §2 step 1, onboarding funnel). */
   protected carouselDone(): void {

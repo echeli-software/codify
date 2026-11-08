@@ -26,6 +26,7 @@ import {
   type UserCountryCount,
   type UserListQuery,
   type UserSubscriptionFilter,
+  type UserAgeGroupFilter,
 } from '@codify/api-client';
 import { LoadError } from '../core/load-error';
 import { COUNTRY_UNKNOWN, countryName } from '../core/country';
@@ -162,6 +163,17 @@ export function lastSeenRange(
             (ngModelChange)="onFilter(country, $event ?? '')"
           />
         </cdf-form-field>
+        <cdf-form-field
+          [label]="'admin.users.ageGroup' | translate"
+          controlId="users-age"
+        >
+          <cdf-select
+            inputId="users-age"
+            [options]="ageGroupOptions()"
+            [ngModel]="ageGroup()"
+            (ngModelChange)="onFilter(ageGroup, $event ?? '')"
+          />
+        </cdf-form-field>
       </div>
       <p class="muted small" aria-live="polite">
         @if (query() || filtered()) {
@@ -193,6 +205,7 @@ export function lastSeenRange(
                 <th scope="col">{{ 'admin.users.role' | translate }}</th>
                 <th scope="col">{{ 'admin.users.locale' | translate }}</th>
                 <th scope="col">{{ 'admin.users.country' | translate }}</th>
+                <th scope="col">{{ 'admin.users.ageGroup' | translate }}</th>
                 <th scope="col">{{ 'admin.users.lastSeen' | translate }}</th>
                 <th scope="col">{{ 'admin.users.joined' | translate }}</th>
               </tr>
@@ -221,6 +234,12 @@ export function lastSeenRange(
                     {{
                       countryLabel(u.country) ??
                         ('admin.users.countryUnknown' | translate)
+                    }}
+                  </td>
+                  <td data-testid="user-age-group">
+                    {{
+                      'admin.users.ageGroups.' + (u.ageGroup ?? 'none')
+                        | translate
                     }}
                   </td>
                   <td class="small">
@@ -287,6 +306,20 @@ export class UsersPage {
   /** ISO code, COUNTRY_UNKNOWN or '' (any). */
   protected readonly country = signal('');
   private readonly countries = signal<UserCountryCount[]>([]);
+  /** docs/14 "Minors": minor (12–17) | adult | none (not given) | '' (any). */
+  protected readonly ageGroup = signal<UserAgeGroupFilter | ''>('');
+  protected readonly ageGroupOptions = computed<
+    SelectOption<UserAgeGroupFilter | ''>[]
+  >(() => {
+    this.i18n.currentLocale();
+    return [
+      { value: '', label: this.i18n.t('admin.users.allAgeGroups') },
+      ...(['minor', 'adult', 'none'] as const).map((g) => ({
+        value: g,
+        label: this.i18n.t(`admin.users.ageGroups.${g}`),
+      })),
+    ];
+  });
   private seq = 0;
 
   /** Countries present among users (by name), then "Unknown". */
@@ -364,7 +397,8 @@ export class UsersPage {
       !!this.locale() ||
       this.lastSeen() !== 'any' ||
       !!this.subscription() ||
-      !!this.country(),
+      !!this.country() ||
+      !!this.ageGroup(),
   );
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
@@ -408,6 +442,7 @@ export class UsersPage {
         ...lastSeenRange(this.lastSeen()),
         ...(sub ? { subscriptionStatus: sub } : {}),
         ...(this.country() ? { country: this.country() } : {}),
+        ...(this.ageGroup() ? { ageGroup: this.ageGroup() || undefined } : {}),
       });
       if (seq !== this.seq) return;
       this.pageRows.set(res.items);

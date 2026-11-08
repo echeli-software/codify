@@ -87,6 +87,20 @@ export interface UpdateNotificationPreferencesBody {
  * Errors: 404 for a notification that isn't yours; 400
  * `NOTIFICATION_KIND_LOCKED` when turning off / reducing SYSTEM or BILLING.
  */
+/** GET /me/promo-prompt — the one-time "bonus event alerts" question. */
+export interface PromoPromptState {
+  /** Ask now (known adult, ≥ 1 completed lesson, never asked). */
+  show: boolean;
+  promptedAt: string | null;
+}
+
+/** POST /me/promo-prompt answer. */
+export interface PromoPromptAnswer {
+  promptedAt: string;
+  push: boolean;
+  email: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class NotificationsClient {
   private readonly http = inject(HttpClient);
@@ -159,6 +173,28 @@ export class NotificationsClient {
         `${this.base}/notification-preferences`,
         body,
       ),
+    );
+  }
+
+  /** GET /me/promo-prompt — whether to show the promo alerts card. */
+  promoPrompt(): Promise<PromoPromptState> {
+    return firstValueFrom(
+      this.http.get<PromoPromptState>(`${this.base}/promo-prompt`),
+    );
+  }
+
+  /**
+   * POST /me/promo-prompt — answer once. `push` turns PROMO push on, `email`
+   * (its own tick box) is the marketing-email consent. 409
+   * `PROMO_PROMPT_ANSWERED` after the first answer; 403
+   * `PROMO_PROMPT_NOT_ALLOWED` for minors / no date of birth.
+   */
+  answerPromoPrompt(answer: {
+    push: boolean;
+    email: boolean;
+  }): Promise<PromoPromptAnswer> {
+    return firstValueFrom(
+      this.http.post<PromoPromptAnswer>(`${this.base}/promo-prompt`, answer),
     );
   }
 }

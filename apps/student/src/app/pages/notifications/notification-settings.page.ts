@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  linkedSignal,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -44,6 +45,7 @@ import {
   type PrefsForm,
 } from './prefs-form.js';
 import { TimeZoneSetting } from '../../components/time-zone-setting.component.js';
+import { WebPushService } from '../../platform/web-push.service.js';
 
 /** One-off kinds that make no sense to toggle afterwards. */
 const HIDDEN_KINDS: ReadonlySet<NotificationKind> = new Set(['WELCOME']);
@@ -189,6 +191,60 @@ const HIDDEN_KINDS: ReadonlySet<NotificationKind> = new Set(['WELCOME']);
                 }
               </ul>
             </cdf-app-card>
+
+            <!-- docs/10 §3: browser web push (PWA only; native uses FCM). -->
+            @if (webPushSupport !== 'native') {
+              <cdf-app-card padding="normal" data-testid="web-push-settings">
+                <h2>
+                  {{
+                    'student.notifications.webPush.settingsTitle' | translate
+                  }}
+                </h2>
+                @switch (webPushSupport) {
+                  @case ('supported') {
+                    @if (webPushPermission() === 'denied') {
+                      <p class="ns__muted" data-testid="web-push-blocked">
+                        {{
+                          'student.notifications.webPush.blocked' | translate
+                        }}
+                      </p>
+                    } @else {
+                      <cdf-app-toggle
+                        name="webPush"
+                        [label]="
+                          'student.notifications.webPush.settingsToggle'
+                            | translate
+                        "
+                        [ngModel]="webPushOn()"
+                        (ngModelChange)="toggleWebPush($event)"
+                        [disabled]="webPushBusy() || !online()"
+                        data-testid="web-push-toggle"
+                      />
+                      <p class="ns__muted">
+                        {{
+                          'student.notifications.webPush.settingsHint'
+                            | translate
+                        }}
+                      </p>
+                    }
+                  }
+                  @case ('ios-install') {
+                    <p class="ns__muted" data-testid="web-push-ios-hint">
+                      {{
+                        'student.notifications.webPush.iosInstall' | translate
+                      }}
+                    </p>
+                  }
+                  @default {
+                    <p class="ns__muted" data-testid="web-push-unsupported">
+                      {{
+                        'student.notifications.webPush.unsupported' | translate
+                      }}
+                    </p>
+                  }
+                }
+              </cdf-app-card>
+            }
 
             <cdf-app-card padding="normal">
               <h2>
@@ -478,9 +534,18 @@ export class NotificationSettingsPage {
   private readonly original = signal<PrefsForm | null>(null);
   protected readonly form = signal<PrefsForm | null>(null);
 
+  // Kinds with no channel for this user (PROMO for a minor) are hidden.
   protected readonly visibleKinds = computed(() =>
-    (this.form()?.kinds ?? []).filter((k) => !HIDDEN_KINDS.has(k.kind)),
+    (this.form()?.kinds ?? []).filter(
+      (k) => !HIDDEN_KINDS.has(k.kind) && (k.channels.push || k.channels.email),
+    ),
   );
+
+  private readonly webPush = inject(WebPushService);
+  protected readonly webPushSupport = this.webPush.support();
+  protected readonly webPushPermission = this.webPush.permission;
+  protected readonly webPushOn = linkedSignal(() => this.webPush.subscribed());
+  protected readonly webPushBusy = signal(false);
   protected readonly changes = computed(() => {
     const o = this.original();
     const f = this.form();
@@ -509,6 +574,7 @@ export class NotificationSettingsPage {
   });
 
   constructor() {
+    this.webPush.init();
     void this.load();
   }
 
@@ -526,6 +592,46 @@ export class NotificationSettingsPage {
       this.form.set(null);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Settings toggle: subscribe (browser prompt on this tap) / unsubscribe. */
+  protected async toggleWebPush(on: boolean): Promise<void> {
+    if (this.webPushBusy()) return;
+    this.webPushBusy.set(true);
+    this.webPushOn.set(on);
+    try {
+      if (on) {
+        const res = await this.webPush.enable('settings');
+        if (res === 'enabled')
+          this.toast.show({
+            message: 'student.notifications.webPush.enabled',
+            kind: 'success',
+          });
+        else if (res === 'denied')
+          this.toast.show({
+            message: 'student.notifications.webPush.denied',
+            kind: 'info',
+          });
+        else
+          this.toast.show({
+            message: 'student.notifications.webPush.error',
+            kind: 'error',
+          });
+      } else {
+        await this.webPush.disable();
+        this.toast.show({
+          message: 'student.notifications.webPush.disabled',
+          kind: 'success',
+        });
+      }
+      this.telemetry.track('notification_settings_changed', {
+        channel: 'web_push',
+        enabled: this.webPush.subscribed(),
+      });
+    } finally {
+      this.webPushOn.set(this.webPush.subscribed());
+      this.webPushBusy.set(false);
     }
   }
 

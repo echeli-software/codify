@@ -998,6 +998,32 @@
         "WEEKLY_RECAP": "Weekly recap",
         "REACTIVATION": "Come-back reminders"
       },
+      "promoPrompt": {
+        "title": "Get alerts about bonus events?",
+        "body": "We'll tell you when a double XP or bonus coins event starts. You can change this any time in notification settings.",
+        "email": "Also send them to my email",
+        "accept": "Yes, alert me",
+        "decline": "No thanks",
+        "close": "Close",
+        "saved": "Done — we'll let you know when a bonus event starts.",
+        "declined": "Got it — no bonus event alerts."
+      },
+      "webPush": {
+        "promptTitle": "Turn on browser notifications?",
+        "promptBody": "Get your streak reminder and other alerts in this browser, even when Codify is closed. Your browser will ask you to allow them.",
+        "turnOn": "Turn on",
+        "notNow": "Not now",
+        "enabled": "Browser notifications are on.",
+        "disabled": "Browser notifications are off.",
+        "denied": "Notifications are blocked for Codify in your browser. You can allow them in the site settings.",
+        "error": "Couldn't turn on browser notifications. Try again later.",
+        "settingsTitle": "Browser notifications",
+        "settingsToggle": "Notifications in this browser",
+        "settingsHint": "Push notifications reach this browser even when Codify is closed. Quiet hours and your limits still apply.",
+        "blocked": "Notifications are blocked for Codify in this browser. Allow them in your browser's site settings, then come back here.",
+        "iosInstall": "On iPhone and iPad, browser notifications work once you add Codify to your Home Screen: tap Share, then “Add to Home Screen”, and open Codify from there.",
+        "unsupported": "This browser doesn't support push notifications."
+      },
       "kindHints": {
         "STREAK_REMINDER": "In the evening when your streak is at risk.",
         "DAILY_QUEST": "When you usually start, if you haven't studied yet.",
@@ -1062,7 +1088,7 @@
           },
           {
             "title": "Data we collect",
-            "body": "Account data (name, e-mail address, language, time zone) from sign-up; learning data (enrollments, lesson progress, quiz answers, code you submit to exercises, answers to AI-graded prompts, scenario choices, certificates); gamification data (XP, coins, streaks, badges, quests, league standings, shop items, avatar); social data (friends, friend requests, nudges, referral codes); billing data (plan, subscription status and payment history — card details are handled by the payment provider and never stored by us); device data (push notification tokens, app platform and version); notification settings and delivery history; and product analytics events about how the app is used. We do not collect precise location; we record only the country your IP address points to (provided by our network provider, Cloudflare, and refreshed at most once a day), to understand where our learners are and plan prices and languages."
+            "body": "Account data (name, e-mail address, date of birth, language, time zone) from sign-up; learning data (enrollments, lesson progress, quiz answers, code you submit to exercises, answers to AI-graded prompts, scenario choices, certificates); gamification data (XP, coins, streaks, badges, quests, league standings, shop items, avatar); social data (friends, friend requests, nudges, referral codes); billing data (plan, subscription status and payment history — card details are handled by the payment provider and never stored by us); device data (push notification tokens, app platform and version); notification settings and delivery history; and product analytics events about how the app is used. We do not collect precise location; we record only the country your IP address points to (provided by our network provider, Cloudflare, and refreshed at most once a day), to understand where our learners are and plan prices and languages."
           },
           {
             "title": "How we use your data",
@@ -1090,7 +1116,7 @@
           },
           {
             "title": "Children and teenagers",
-            "body": "Codify is intended for users aged [minimum age] or older. [Legal to define the minimum age and, where applicable, the parental consent process required by LGPD art. 14.]"
+            "body": "Codify is for people aged 12 and older. At sign-up we ask for your date of birth; you set it once, and only our support team can correct it. If the date shows you are under 12, the account cannot be used: it and its data are deleted at once, with no restore period, keeping only the anonymised records described in \"How long we keep data\". Users aged 12 to 17 get safer settings: their profile is visible only to their friends; they do not appear in user search or friend suggestions (league tables show their name only); they cannot share their learning activity with friends; and they get no promotional notifications or marketing e-mails and cannot opt in to them. Before a user aged 12 to 17 buys a paid plan on the website, a parent or guardian confirms the purchase with their name and e-mail address and states that they are 18 or older and the user's parent or guardian. We keep that confirmation, with its date, IP address and browser, as the record of consent (LGPD art. 14) while the account exists, and send the parent or guardian a short e-mail about it. Purchases in the App Store or Google Play follow Apple's and Google's family controls. [Legal to confirm the age threshold, the consent process and how long guardian confirmations are kept.]"
           },
           {
             "title": "Cookies and local storage",
@@ -1117,7 +1143,7 @@
           },
           {
             "title": "Your account",
-            "body": "You must give accurate information, keep your sign-in secure and be at least [minimum age] years old. You are responsible for activity on your account. One person per account."
+            "body": "You must give accurate information, including your date of birth, keep your sign-in secure and be at least 12 years old. If you are 12 to 17, some features work differently and a parent or guardian must confirm any paid plan bought on the website (see \"Children and teenagers\" in the Privacy Policy). You are responsible for activity on your account. One person per account."
           },
           {
             "title": "Free and paid plans",
@@ -1253,6 +1279,46 @@
       "necessaryOnly": "Necessary only",
       "customize": "Customize",
       "saved": "Your choices were saved on this device."
+    },
+    "age": {
+      "title": "When were you born?",
+      "body": "We use your date of birth to give you the right privacy settings for your age. You enter it once; if it is ever wrong, contact support.",
+      "legend": "Date of birth",
+      "day": "Day",
+      "month": "Month",
+      "year": "Year",
+      "chooseMonth": "Choose…",
+      "submit": "Continue",
+      "gateLabel": "Your date of birth",
+      "errors": {
+        "incomplete": "Enter the day, month and year.",
+        "invalid": "That date doesn't exist. Check the day and month.",
+        "future": "The date can't be in the future.",
+        "too_old": "Check the year.",
+        "failed": "We couldn't save your date of birth. Try again."
+      },
+      "tooYoung": {
+        "title": "Codify is for ages 12 and up",
+        "body": "You need to be at least 12 years old to use Codify, so this account can't be used. We have deleted it and the information you gave us.",
+        "later": "We'd love to see you again when you turn 12.",
+        "signedOut": "You have been signed out.",
+        "home": "Back to the home page"
+      },
+      "minorFeed": "Sharing your activity with friends isn't available for users under 18.",
+      "guardian": {
+        "title": "A parent or guardian needs to confirm",
+        "body": "You're under 18, so a parent or guardian must confirm this plan before you pay. We'll send them a short email about it.",
+        "name": "Parent or guardian's full name",
+        "email": "Their email address",
+        "confirm": "I am 18 or older and this user's parent or guardian",
+        "submit": "Confirm",
+        "done": "Confirmed by {name}. You can continue to payment.",
+        "required": "Fill in the parent or guardian's name and email, and tick the box.",
+        "ownEmail": "Use your parent's or guardian's email, not your own.",
+        "tooMany": "Too many confirmations today. Try again tomorrow.",
+        "failed": "We couldn't save the confirmation. Try again.",
+        "askParent": "You're under 18: ask a parent or guardian before you buy. The App Store and Google Play family controls apply."
+      }
     },
     "timeZone": {
       "title": "Time zone",

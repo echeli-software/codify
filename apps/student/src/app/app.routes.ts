@@ -90,6 +90,14 @@ export const appRoutes: Route[] = [
     loadComponent: () =>
       import('./pages/account/restore.page').then((m) => m.AccountRestorePage),
   },
+  // docs/14 "Minors": shown signed out after an under-12 date of birth.
+  {
+    path: 'account/too-young',
+    loadComponent: () =>
+      import('./pages/account/too-young.page').then(
+        (m) => m.AccountTooYoungPage,
+      ),
+  },
   {
     path: 'account/suspended',
     canActivate: [authGuard()],

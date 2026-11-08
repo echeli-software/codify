@@ -72,6 +72,7 @@ import {
   type LocalGoalRecord,
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
+import { AgeGateService } from '../components/birth-date/birth-date.js';
 import { StarterPetGiftComponent } from '../components/starter-pet-gift.component.js';
 import { FriendsActivityComponent } from '../components/friends-activity.component.js';
 import { NetworkStatusService } from '../offline/network-status.service.js';
@@ -271,6 +272,8 @@ export class TodayPage {
   private readonly downloads = inject(DownloadService);
   private readonly network = inject(NetworkStatusService);
   private readonly telemetry = inject(TelemetryService);
+  /** Onboarding asks for the date of birth first when the account has none. */
+  protected readonly ageGate = inject(AgeGateService);
   protected readonly sync = inject(OfflineSyncService);
   /** Epoch ms of the oldest cached section shown offline, or null. */
   protected readonly fromCache = signal<number | null>(null);
@@ -454,7 +457,13 @@ export class TodayPage {
       this.loadGoal(),
     ]);
     if (totalXp !== null && enrollments !== null)
-      void this.maybeOnboard(totalXp, enrollments);
+      void this.maybeOnboard(totalXp, enrollments).finally(() =>
+        // The shell's date-of-birth prompt waits for this decision.
+        this.ageGate.todayOnboarding.set(
+          this.onboarding() ? 'onboarding' : 'none',
+        ),
+      );
+    else this.ageGate.todayOnboarding.set('none');
   }
 
   /** Canonical XP / coins / streak + today's quests. */
@@ -609,6 +618,7 @@ export class TodayPage {
     course: CourseListItem | null;
   }): Promise<void> {
     this.onboarding.set(false);
+    this.ageGate.todayOnboarding.set('none');
     // docs/05 §9 funnel (docs/10 §2 onboarding steps).
     this.telemetry.onboardingStep('goal', { goal: ev.goal ?? 'skipped' });
     this.telemetry.onboardingStep('track', {

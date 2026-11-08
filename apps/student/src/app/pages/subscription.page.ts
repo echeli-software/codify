@@ -21,6 +21,7 @@ import {
   BillingClient,
   PlansClient,
   ProblemDetailsError,
+  type GuardianConsentStatus,
   type MySubscriptionResponse,
   type RefundEligibility,
   type WinbackOffer,
@@ -57,6 +58,7 @@ import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { activePrices, annualSavings } from './shared/plan-view.js';
 import { BillingHistoryComponent } from './billing/billing-history.component.js';
 import { CheckoutVisit } from './billing/checkout-visit.js';
+import { GuardianConsentComponent } from './billing/guardian-consent.component.js';
 import {
   currentSubscription,
   discountedCents,
@@ -107,6 +109,7 @@ const CANCEL_REASONS = [
     TranslatePipe,
     LocalePipe,
     BillingHistoryComponent,
+    GuardianConsentComponent,
   ],
   template: `
     <ion-header>
@@ -464,6 +467,28 @@ const CANCEL_REASONS = [
                 }}
               </p>
             }
+            <!-- docs/09 "Guardian step": minors (12–17). -->
+            @if (guardianFor(sel.price.id); as g) {
+              @if (isNative) {
+                @if (g.ageGroup === 'minor') {
+                  <p class="sb__note" data-testid="guardian-ask-parent">
+                    {{ 'student.age.guardian.askParent' | translate }}
+                  </p>
+                }
+              } @else if (g.consent; as c) {
+                <p class="sb__note" data-testid="guardian-confirmed">
+                  {{
+                    'student.age.guardian.done'
+                      | translate: { name: c.guardianName }
+                  }}
+                </p>
+              } @else if (g.required && g.ageGroup === 'minor') {
+                <cdf-guardian-consent
+                  [planPriceId]="sel.price.id"
+                  (confirmedConsent)="loadGuardian(sel.price.id)"
+                />
+              }
+            }
             @if (isNative) {
               <p class="sb__note">
                 {{ 'student.billing.storeCheckout' | translate }}
@@ -510,6 +535,7 @@ const CANCEL_REASONS = [
             <cdf-app-button
               kind="primary"
               [loading]="checkingOut()"
+              [disabled]="guardianBlocks()"
               (buttonClick)="checkout()"
               data-testid="checkout-btn"
             >
@@ -869,6 +895,18 @@ export class SubscriptionPage {
   protected readonly method = signal<PaymentMethod>('card');
   protected readonly checkoutOpen = signal(false);
   protected readonly checkingOut = signal(false);
+  /** docs/09 "Guardian step": the guardian status for the selected price. */
+  protected readonly guardian = signal<
+    (GuardianConsentStatus & { priceId: string }) | null
+  >(null);
+  /** Web checkout waits for a minor's guardian confirmation. */
+  protected readonly guardianBlocks = computed(() => {
+    const g = this.guardian();
+    const sel = this.selected();
+    return (
+      !this.isNative && !!g && !!sel && g.priceId === sel.price.id && g.required
+    );
+  });
   protected readonly confirmOpen = signal(false);
   protected readonly busy = signal(false);
   protected readonly portalLoading = signal(false);
@@ -1092,6 +1130,23 @@ export class SubscriptionPage {
     this.method.set('card');
     this.checkoutOpen.set(true);
     this.visit.checkoutShown(plan.id, price, this.isNative);
+    void this.loadGuardian(price.id);
+  }
+
+  protected guardianFor(priceId: string): GuardianConsentStatus | null {
+    const g = this.guardian();
+    return g && g.priceId === priceId ? g : null;
+  }
+
+  /** Does this price need a parent / guardian confirmation first? */
+  protected async loadGuardian(priceId: string): Promise<void> {
+    try {
+      const status = await this.billing.guardianConsentStatus(priceId);
+      this.guardian.set({ ...status, priceId });
+    } catch {
+      // Unknown: checkout itself answers 403 GUARDIAN_CONSENT_REQUIRED.
+      this.guardian.set(null);
+    }
   }
 
   protected priceLabel(p: PlanPrice, noInstallments: boolean): string {
@@ -1177,6 +1232,12 @@ export class SubscriptionPage {
     } catch (err) {
       // The offer expired / was used meanwhile: drop it and let them retry.
       if (
+        err instanceof ProblemDetailsError &&
+        err.code === 'GUARDIAN_CONSENT_REQUIRED'
+      ) {
+        // Expired (24 h) or never given: show the guardian step.
+        await this.loadGuardian(sel.price.id);
+      } else if (
         err instanceof ProblemDetailsError &&
         err.code === 'OFFER_NOT_AVAILABLE'
       ) {

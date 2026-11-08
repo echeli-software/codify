@@ -993,6 +993,28 @@
       }
     },
     "users": {
+      "ageGroup": "Age group",
+      "allAgeGroups": "All age groups",
+      "ageGroups": {
+        "minor": "Under 18",
+        "adult": "Adult",
+        "none": "Not given"
+      },
+      "age": {
+        "title": "Age",
+        "help": "Users aged 12–17 get the minor defaults (private profile, no discovery, no activity sharing, no marketing, guardian confirmation for web checkout). Staff see the age group, never the date of birth.",
+        "dateLabel": "Correct date of birth",
+        "dateHelp": "Only when the user (or a parent) shows it is wrong. A date under 12 deletes the account at once.",
+        "reasonHelp": "Optional — e.g. the support ticket. Audited; the dates are not.",
+        "correct": "Correct date of birth",
+        "invalidDate": "Enter a real date, not in the future and at most 120 years ago.",
+        "confirmTitle": "Correct this user's date of birth?",
+        "confirmMessage": "The age group and the minor defaults follow the new date. The change is audited with the age groups only.",
+        "confirmDelete": "This date is under 12. The account and its data will be deleted at once, with no restore period. This cannot be undone.",
+        "confirmDeleteLabel": "Delete the account",
+        "done": "Date of birth corrected.",
+        "deleted": "The account was deleted: the user is under 12."
+      },
       "title": "Users",
       "subtitle": "Students and staff: profiles, subscriptions and course access.",
       "search": "Search users",

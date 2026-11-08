@@ -993,6 +993,28 @@
       }
     },
     "users": {
+      "ageGroup": "Faixa etária",
+      "allAgeGroups": "Todas as faixas etárias",
+      "ageGroups": {
+        "minor": "Menor de 18",
+        "adult": "Adulto",
+        "none": "Não informada"
+      },
+      "age": {
+        "title": "Idade",
+        "help": "Usuários de 12 a 17 anos têm as configurações para menores (perfil privado, fora da descoberta, sem compartilhar atividade, sem marketing, confirmação do responsável no checkout web). A equipe vê a faixa etária, nunca a data de nascimento.",
+        "dateLabel": "Corrigir data de nascimento",
+        "dateHelp": "Só quando o usuário (ou o responsável) mostrar que está errada. Uma data de menos de 12 anos exclui a conta na hora.",
+        "reasonHelp": "Opcional — por exemplo, o chamado de suporte. Fica na auditoria; as datas não.",
+        "correct": "Corrigir data de nascimento",
+        "invalidDate": "Informe uma data real, que não esteja no futuro e de no máximo 120 anos atrás.",
+        "confirmTitle": "Corrigir a data de nascimento deste usuário?",
+        "confirmMessage": "A faixa etária e as configurações para menores seguem a nova data. A mudança fica na auditoria só com as faixas etárias.",
+        "confirmDelete": "Esta data é de menos de 12 anos. A conta e seus dados serão excluídos na hora, sem período de restauração. Não dá para desfazer.",
+        "confirmDeleteLabel": "Excluir a conta",
+        "done": "Data de nascimento corrigida.",
+        "deleted": "A conta foi excluída: o usuário tem menos de 12 anos."
+      },
       "title": "Usuários",
       "subtitle": "Alunos e equipe: perfis, assinaturas e acesso a cursos.",
       "search": "Buscar usuários",

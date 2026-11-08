@@ -998,6 +998,32 @@
         "WEEKLY_RECAP": "Resumo semanal",
         "REACTIVATION": "Lembretes de retorno"
       },
+      "promoPrompt": {
+        "title": "Quer receber avisos de eventos bônus?",
+        "body": "Avisamos quando começar um evento de XP em dobro ou de moedas extras. Você pode mudar isso quando quiser nas preferências de notificação.",
+        "email": "Enviar também para o meu email",
+        "accept": "Sim, quero receber",
+        "decline": "Agora não",
+        "close": "Fechar",
+        "saved": "Pronto — avisaremos quando começar um evento bônus.",
+        "declined": "Entendido — sem avisos de eventos bônus."
+      },
+      "webPush": {
+        "promptTitle": "Ativar notificações do navegador?",
+        "promptBody": "Receba o lembrete da sua sequência e outros avisos neste navegador, mesmo com o Codify fechado. O navegador vai pedir sua permissão.",
+        "turnOn": "Ativar",
+        "notNow": "Agora não",
+        "enabled": "Notificações do navegador ativadas.",
+        "disabled": "Notificações do navegador desativadas.",
+        "denied": "As notificações do Codify estão bloqueadas no seu navegador. Você pode liberá-las nas configurações do site.",
+        "error": "Não foi possível ativar as notificações do navegador. Tente novamente mais tarde.",
+        "settingsTitle": "Notificações do navegador",
+        "settingsToggle": "Notificações neste navegador",
+        "settingsHint": "As notificações push chegam a este navegador mesmo com o Codify fechado. O horário de silêncio e seus limites continuam valendo.",
+        "blocked": "As notificações do Codify estão bloqueadas neste navegador. Libere-as nas configurações do site do navegador e volte aqui.",
+        "iosInstall": "No iPhone e no iPad, as notificações do navegador funcionam depois que você adiciona o Codify à Tela de Início: toque em Compartilhar, depois em “Adicionar à Tela de Início”, e abra o Codify por lá.",
+        "unsupported": "Este navegador não é compatível com notificações push."
+      },
       "kindHints": {
         "STREAK_REMINDER": "À noite, quando sua sequência estiver em risco.",
         "DAILY_QUEST": "No horário em que você costuma começar, se ainda não estudou.",
@@ -1062,7 +1088,7 @@
           },
           {
             "title": "Dados que coletamos",
-            "body": "Dados de conta (nome, e-mail, idioma, fuso horário) do cadastro; dados de aprendizado (matrículas, progresso nas aulas, respostas de quizzes, código enviado em exercícios, respostas a prompts corrigidos por IA, escolhas em cenários, certificados); dados de gamificação (XP, moedas, sequências, medalhas, missões, ligas, itens da loja, avatar); dados sociais (amigos, convites, cutucadas, códigos de indicação); dados de cobrança (plano, situação da assinatura e histórico de pagamentos — os dados do cartão são tratados pelo provedor de pagamento e nunca armazenados por nós); dados do dispositivo (tokens de notificação, plataforma e versão do app); preferências e histórico de notificações; e eventos de uso do produto. Não coletamos localização precisa; registramos apenas o país indicado pelo seu endereço IP (informado pelo nosso provedor de rede, a Cloudflare, e atualizado no máximo uma vez por dia), para entender onde estão nossos alunos e planejar preços e idiomas."
+            "body": "Dados de conta (nome, e-mail, data de nascimento, idioma, fuso horário) do cadastro; dados de aprendizado (matrículas, progresso nas aulas, respostas de quizzes, código enviado em exercícios, respostas a prompts corrigidos por IA, escolhas em cenários, certificados); dados de gamificação (XP, moedas, sequências, medalhas, missões, ligas, itens da loja, avatar); dados sociais (amigos, convites, cutucadas, códigos de indicação); dados de cobrança (plano, situação da assinatura e histórico de pagamentos — os dados do cartão são tratados pelo provedor de pagamento e nunca armazenados por nós); dados do dispositivo (tokens de notificação, plataforma e versão do app); preferências e histórico de notificações; e eventos de uso do produto. Não coletamos localização precisa; registramos apenas o país indicado pelo seu endereço IP (informado pelo nosso provedor de rede, a Cloudflare, e atualizado no máximo uma vez por dia), para entender onde estão nossos alunos e planejar preços e idiomas."
           },
           {
             "title": "Como usamos seus dados",
@@ -1090,7 +1116,7 @@
           },
           {
             "title": "Crianças e adolescentes",
-            "body": "A Codify é destinada a pessoas com [idade mínima] anos ou mais. [Jurídico deve definir a idade mínima e, se aplicável, o processo de consentimento dos responsáveis exigido pelo art. 14 da LGPD.]"
+            "body": "A Codify é destinada a pessoas com 12 anos ou mais. No cadastro pedimos sua data de nascimento; você a informa uma única vez, e só nossa equipe de suporte pode corrigi-la. Se a data indicar menos de 12 anos, a conta não pode ser usada: ela e seus dados são excluídos na hora, sem período de restauração, mantendo apenas os registros anonimizados descritos em \"Por quanto tempo guardamos\". Usuários de 12 a 17 anos têm configurações mais seguras: o perfil fica visível só para os amigos; eles não aparecem na busca de usuários nem nas sugestões de amizade (nas ligas aparece só o nome); não podem compartilhar a atividade de estudo com amigos; e não recebem notificações promocionais nem e-mails de marketing, nem podem ativá-los. Antes que um usuário de 12 a 17 anos assine um plano pago pelo site, um pai, mãe ou responsável confirma a compra com nome e e-mail e declara ter 18 anos ou mais e ser o responsável pelo usuário. Guardamos essa confirmação, com data, endereço IP e navegador, como registro do consentimento (art. 14 da LGPD) enquanto a conta existir, e enviamos ao responsável um e-mail curto avisando. Compras na App Store ou no Google Play seguem os controles parentais da Apple e do Google. [Jurídico deve confirmar a idade mínima, o processo de consentimento e por quanto tempo guardar as confirmações dos responsáveis.]"
           },
           {
             "title": "Cookies e armazenamento local",
@@ -1117,7 +1143,7 @@
           },
           {
             "title": "Sua conta",
-            "body": "Você deve informar dados verdadeiros, manter seu acesso seguro e ter pelo menos [idade mínima] anos. Você é responsável pela atividade na sua conta. Uma conta por pessoa."
+            "body": "Você deve informar dados verdadeiros, incluindo sua data de nascimento, manter seu acesso seguro e ter pelo menos 12 anos. Se você tem de 12 a 17 anos, alguns recursos funcionam de outro jeito e um pai, mãe ou responsável precisa confirmar qualquer plano pago assinado pelo site (veja \"Crianças e adolescentes\" na Política de Privacidade). Você é responsável pela atividade na sua conta. Uma conta por pessoa."
           },
           {
             "title": "Planos gratuitos e pagos",
@@ -1253,6 +1279,46 @@
       "necessaryOnly": "Só os necessários",
       "customize": "Personalizar",
       "saved": "Suas escolhas foram salvas neste dispositivo."
+    },
+    "age": {
+      "title": "Quando você nasceu?",
+      "body": "Usamos sua data de nascimento para aplicar as configurações de privacidade certas para a sua idade. Você informa uma única vez; se estiver errada, fale com o suporte.",
+      "legend": "Data de nascimento",
+      "day": "Dia",
+      "month": "Mês",
+      "year": "Ano",
+      "chooseMonth": "Escolha…",
+      "submit": "Continuar",
+      "gateLabel": "Sua data de nascimento",
+      "errors": {
+        "incomplete": "Informe o dia, o mês e o ano.",
+        "invalid": "Essa data não existe. Confira o dia e o mês.",
+        "future": "A data não pode estar no futuro.",
+        "too_old": "Confira o ano.",
+        "failed": "Não conseguimos salvar sua data de nascimento. Tente de novo."
+      },
+      "tooYoung": {
+        "title": "A Codify é para maiores de 12 anos",
+        "body": "É preciso ter pelo menos 12 anos para usar a Codify, então esta conta não pode ser usada. Nós a excluímos, junto com as informações que você nos deu.",
+        "later": "Vamos adorar ver você de novo quando fizer 12 anos.",
+        "signedOut": "Você saiu da sua conta.",
+        "home": "Voltar para a página inicial"
+      },
+      "minorFeed": "Compartilhar sua atividade com amigos não está disponível para menores de 18 anos.",
+      "guardian": {
+        "title": "Um pai, mãe ou responsável precisa confirmar",
+        "body": "Você tem menos de 18 anos, então um pai, mãe ou responsável precisa confirmar este plano antes do pagamento. Vamos enviar um e-mail curto para essa pessoa.",
+        "name": "Nome completo do responsável",
+        "email": "E-mail do responsável",
+        "confirm": "Tenho 18 anos ou mais e sou pai, mãe ou responsável por este usuário",
+        "submit": "Confirmar",
+        "done": "Confirmado por {name}. Você já pode seguir para o pagamento.",
+        "required": "Preencha o nome e o e-mail do responsável e marque a caixa.",
+        "ownEmail": "Use o e-mail do seu responsável, não o seu.",
+        "tooMany": "Muitas confirmações hoje. Tente de novo amanhã.",
+        "failed": "Não conseguimos salvar a confirmação. Tente de novo.",
+        "askParent": "Você tem menos de 18 anos: peça a um pai, mãe ou responsável antes de comprar. Valem os controles parentais da App Store e do Google Play."
+      }
     },
     "timeZone": {
       "title": "Fuso horário",
