@@ -681,3 +681,133 @@ describe('PushService.sendToUser — per-user rules (docs/10 §3)', () => {
     ).toEqual(new Date('2026-10-05T03:00:00Z'));
   });
 });
+
+describe('PushService — browser web push (Phase 14)', () => {
+  const sub = (n: number) => ({
+    endpoint: `https://fcm.googleapis.com/fcm/send/web-${n}`,
+    p256dh: `k${n}`,
+    auth: `a${n}`,
+  });
+
+  function setupWeb(
+    user: Record<string, unknown>,
+    web: { enabled?: boolean; expired?: string[] } = {},
+  ) {
+    const { prisma, provider, log } = setup(user);
+    const webPrisma = {
+      ...prisma,
+      webPushSubscription: {
+        deleteMany: jest.fn(
+          async ({ where }: { where: { endpoint: { in: string[] } } }) => ({
+            count: where.endpoint.in.length,
+          }),
+        ),
+      },
+    };
+    const webPush = {
+      enabled: web.enabled ?? true,
+      send: jest.fn(async (targets: { endpoint: string }[]) => ({
+        sent: targets.length - (web.expired?.length ?? 0),
+        failed: web.expired?.length ?? 0,
+        expiredEndpoints: web.expired ?? [],
+      })),
+    };
+    const svc = new PushService(
+      webPrisma as never,
+      provider,
+      null,
+      null,
+      webPush as never,
+    );
+    return { svc, provider, webPush, prisma: webPrisma, log };
+  }
+
+  it('delivers the same message to native tokens and browser subscriptions', async () => {
+    const { svc, provider, webPush } = setupWeb({
+      ...baseUser,
+      deviceTokens: [{ token: 'a' }],
+      webPushSubscriptions: [sub(1), sub(2)],
+    });
+    const res = await svc.sendToUser(
+      'u1',
+      { title: 'T', body: 'B', data: { url: '/today' } },
+      { now: NOON, kind: 'STREAK_REMINDER' },
+    );
+    expect(res).toEqual({ status: 'sent', sent: 3, failed: 0, pruned: 0 });
+    expect(provider.send).toHaveBeenCalledWith([
+      { token: 'a', title: 'T', body: 'B', data: { url: '/today' } },
+    ]);
+    expect(webPush.send).toHaveBeenCalledWith([sub(1), sub(2)], {
+      title: 'T',
+      body: 'B',
+      data: { url: '/today' },
+    });
+  });
+
+  it('a browser-only user is reachable; quiet hours still hold the push', async () => {
+    const user = {
+      ...baseUser,
+      deviceTokens: [],
+      webPushSubscriptions: [sub(1)],
+    };
+    const noon = setupWeb(user);
+    expect(
+      (
+        await noon.svc.sendToUser('u1', msg, {
+          now: NOON,
+          kind: 'STREAK_REMINDER',
+        })
+      ).status,
+    ).toBe('sent');
+    expect(noon.provider.send).not.toHaveBeenCalled();
+    expect(noon.webPush.send).toHaveBeenCalledTimes(1);
+
+    const night = setupWeb(user);
+    expect(
+      await night.svc.sendToUser('u1', msg, {
+        now: MIDNIGHT,
+        kind: 'STREAK_REMINDER',
+      }),
+    ).toEqual({ status: 'quiet_hours', retryAfterMinutes: 8 * 60 });
+    expect(night.webPush.send).not.toHaveBeenCalled();
+  });
+
+  it('deletes subscriptions the push service answered 404 / 410 for', async () => {
+    const { svc, prisma } = setupWeb(
+      { ...baseUser, deviceTokens: [], webPushSubscriptions: [sub(1), sub(2)] },
+      { expired: [sub(2).endpoint] },
+    );
+    const res = await svc.sendToUser('u1', msg, { now: NOON });
+    expect(res).toEqual({ status: 'sent', sent: 1, failed: 1, pruned: 1 });
+    expect(prisma.webPushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { endpoint: { in: [sub(2).endpoint] } },
+    });
+  });
+
+  it('ignores browser subscriptions while web push is off (no VAPID keys)', async () => {
+    const { svc, webPush } = setupWeb(
+      { ...baseUser, deviceTokens: [], webPushSubscriptions: [sub(1)] },
+      { enabled: false },
+    );
+    expect((await svc.sendToUser('u1', msg, { now: NOON })).status).toBe(
+      'no_devices',
+    );
+    expect(webPush.send).not.toHaveBeenCalled();
+  });
+
+  it('a disabled kind never reaches the browser', async () => {
+    const { svc, webPush } = setupWeb({
+      ...baseUser,
+      deviceTokens: [],
+      webPushSubscriptions: [sub(1)],
+      notificationPrefs: [
+        { kind: 'STREAK_REMINDER', pushEnabled: false, fewerLevel: 0 },
+      ],
+    });
+    expect(
+      (await svc.sendToUser('u1', msg, { now: NOON, kind: 'STREAK_REMINDER' }))
+        .status,
+    ).toBe('disabled');
+    expect(webPush.send).not.toHaveBeenCalled();
+  });
+});

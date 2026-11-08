@@ -4,6 +4,7 @@ import { streakReminderCopy } from '../email/copy.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationService } from './notification.service.js';
+import { HAS_PUSH_TARGET } from './push.service.js';
 import { isWithinQuietHours, localClock, quietWindow } from './quiet-hours.js';
 
 export interface StreakReminderResult {
@@ -67,7 +68,7 @@ export class StreakReminderService {
         user: {
           deletedAt: null,
           dormantAt: null,
-          deviceTokens: { some: {} },
+          ...HAS_PUSH_TARGET,
           notificationPrefs: {
             none: { kind: 'STREAK_REMINDER', pushEnabled: false },
           },
@@ -82,6 +83,7 @@ export class StreakReminderService {
             quietHoursStart: true,
             quietHoursEnd: true,
             deviceTokens: { select: { token: true } },
+            _count: { select: { webPushSubscriptions: true } },
           },
         },
       },
@@ -114,7 +116,11 @@ export class StreakReminderService {
         today.date,
       );
       if (live.currentDays <= 0) continue;
-      if (s.user.deviceTokens.length === 0) continue;
+      if (
+        s.user.deviceTokens.length === 0 &&
+        !(s.user._count?.webPushSubscriptions ?? 0)
+      )
+        continue;
 
       if (scheduled) {
         if (

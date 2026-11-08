@@ -26,6 +26,7 @@ import { AccessService } from '../billing/access.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
 import { UserPushService } from '../gamification/user-push.service.js';
+import { HAS_PUSH_TARGET } from '../notifications/push.service.js';
 import { jobsEnabled, ENGAGEMENT_CRONS } from '../gamification/jobs.js';
 import {
   ContentLocalizer,
@@ -432,7 +433,7 @@ export class ItemsService {
           lastSeenAt: {
             gte: new Date(now.getTime() - DROP_AUDIENCE_ACTIVE_MS),
           },
-          deviceTokens: { some: {} },
+          ...HAS_PUSH_TARGET,
         },
         select: { id: true },
       });

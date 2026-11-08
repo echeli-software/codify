@@ -15,6 +15,7 @@ function fakeDb() {
   const t: Record<string, Row[]> = {
     user: [],
     deviceToken: [],
+    webPushSubscription: [],
     notification: [],
     notificationPreference: [],
     friendNudge: [],
@@ -100,6 +101,7 @@ function seed() {
   );
   for (const id of ['gone', 'grace', 'live']) {
     db.t['deviceToken'].push({ userId: id });
+    db.t['webPushSubscription'].push({ userId: id });
     db.t['notification'].push({ userId: id });
     db.t['notificationPreference'].push({ userId: id });
     db.t['analyticsEvent'].push({ userId: id });
@@ -165,6 +167,7 @@ describe('AccountPurgeService', () => {
       db.t[table].filter((r) => r['userId'] === id);
     for (const table of [
       'deviceToken',
+      'webPushSubscription',
       'notification',
       'notificationPreference',
       'analyticsEvent',

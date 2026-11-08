@@ -48,6 +48,9 @@ const filter = new ProblemDetailsFilter(
       CORS_ORIGINS: 'a',
       REDIS_URL: 'redis://x',
       FIREBASE_SERVICE_ACCOUNT_JSON: 'x',
+      VAPID_PUBLIC_KEY: 'p',
+      VAPID_PRIVATE_KEY: 'k',
+      VAPID_SUBJECT: 'mailto:ops@codify.test',
     }),
   ),
 );

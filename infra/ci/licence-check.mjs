@@ -39,6 +39,11 @@ const APPROVED = {
   // part of the API bundle; used unmodified.
   elkjs:
     'EPL-2.0 via prisma → @prisma/studio-core — dev tool, unmodified (approved 2026-11)',
+  // Mozilla Public License 2.0 (file-level copyleft: only changes to its own
+  // files would have to be shared). The API's Web Push (VAPID) sender, used
+  // unmodified as a library (Phase 14).
+  'web-push':
+    'MPL-2.0 — Web Push sender used unmodified as a library (approved 2026-11)',
 };
 
 /** "(MPL-2.0 OR Apache-2.0)" → OK if any alternative is allowed; "A AND B" → all. */

@@ -27,6 +27,11 @@ import {
   quietWindow,
 } from './quiet-hours.js';
 import { recordServerEvent } from './server-analytics.js';
+import {
+  WEB_PUSH_PROVIDER,
+  type WebPushProvider,
+  type WebPushTarget,
+} from './web-push.provider.js';
 
 export type { PushKind } from './push-deferral.js';
 
@@ -99,6 +104,15 @@ export type PushSkipReason =
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * `User` filter for jobs that pre-select push recipients: a native device
+ * token or a browser web push subscription. Spread it into a `where` that
+ * has no other top-level `OR`.
+ */
+export const HAS_PUSH_TARGET = {
+  OR: [{ deviceTokens: { some: {} } }, { webPushSubscriptions: { some: {} } }],
+} satisfies Prisma.UserWhereInput;
+
+/**
  * The one place push notifications are delivered from (callers go through
  * NotificationService, which also writes the inbox row). Resolves the
  * user's devices and applies the docs/10 §3 delivery rules in the user's
@@ -116,7 +130,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * PUSH Notification row (`sentAt` / `scheduledFor`); skips emit a
  * server-side `push_skipped` analytics event. Delivery goes through the
  * configured PushProvider (FCM in prod, DevPushProvider locally) and
- * tokens the provider reports as permanently invalid are pruned.
+ * tokens the provider reports as permanently invalid are pruned. Browser
+ * web push subscriptions (`WebPushSubscription`, VAPID) are delivered to
+ * alongside the native tokens — same message, same rules, one cap slot for
+ * the push — and subscriptions the push service answers 404/410 for are
+ * deleted.
  */
 @Injectable()
 export class PushService {
@@ -130,6 +148,9 @@ export class PushService {
     @Inject(PUSH_DEFERRER)
     private readonly deferrer: PushDeferrer | null = null,
     @Optional() @Inject(REDIS_CLIENT) redis: RedisClient = null,
+    @Optional()
+    @Inject(WEB_PUSH_PROVIDER)
+    private readonly webPush: WebPushProvider | null = null,
   ) {
     this.caps = new PushCapStore(redis);
   }
@@ -150,6 +171,9 @@ export class PushService {
         pushDailyCap: true,
         pushWeeklyOptIn: true,
         deviceTokens: { select: { token: true } },
+        webPushSubscriptions: {
+          select: { endpoint: true, p256dh: true, auth: true },
+        },
         notificationPrefs: {
           select: { kind: true, pushEnabled: true, fewerLevel: true },
         },
@@ -185,7 +209,11 @@ export class PushService {
         status: 'disabled',
       });
     }
-    if (user.deviceTokens.length === 0) {
+    // Web subscriptions count only while web push is configured (VAPID).
+    const webTargets: WebPushTarget[] = this.webPush?.enabled
+      ? (user.webPushSubscriptions ?? [])
+      : [];
+    if (user.deviceTokens.length === 0 && webTargets.length === 0) {
       return this.skip(userId, kind, 'no_devices', opts.notificationId, {
         status: 'no_devices',
       });
@@ -238,6 +266,7 @@ export class PushService {
     try {
       result = await this.deliver(
         user.deviceTokens.map((d) => ({ token: d.token, ...message })),
+        { targets: webTargets, content: message },
       );
     } catch (err) {
       await this.caps.release(reservation);
@@ -465,15 +494,47 @@ export class PushService {
     }
   }
 
-  /** Send a batch and prune invalid tokens. Shared with batch jobs. */
+  /**
+   * Send a batch and prune invalid tokens / expired web subscriptions.
+   * Shared with batch jobs. `web.targets` (browser subscriptions) get
+   * `web.content` as a web push when web push is configured.
+   */
   async deliver(
     messages: PushMessage[],
+    web?: {
+      targets: readonly WebPushTarget[];
+      content: Omit<PushMessage, 'token'>;
+    },
   ): Promise<PushSendResult & { pruned: number }> {
-    if (messages.length === 0)
-      return { sent: 0, failed: 0, invalidTokens: [], pruned: 0 };
-    const result = await this.provider.send(messages);
-    const pruned = await this.prune(result.invalidTokens);
-    return { ...result, pruned };
+    const native =
+      messages.length === 0
+        ? { sent: 0, failed: 0, invalidTokens: [] as string[] }
+        : await this.provider.send(messages);
+    let pruned = await this.prune(native.invalidTokens);
+    let sent = native.sent;
+    let failed = native.failed;
+    if (web && web.targets.length > 0 && this.webPush?.enabled) {
+      const w = await this.webPush.send(web.targets, {
+        title: web.content.title,
+        body: web.content.body,
+        ...(web.content.data ? { data: web.content.data } : {}),
+      });
+      sent += w.sent;
+      failed += w.failed;
+      pruned += await this.pruneWeb(w.expiredEndpoints);
+    }
+    return { sent, failed, invalidTokens: native.invalidTokens, pruned };
+  }
+
+  /** Delete web push subscriptions the push service reported gone. */
+  async pruneWeb(endpoints: readonly string[]): Promise<number> {
+    if (endpoints.length === 0) return 0;
+    const { count } = await this.prisma.webPushSubscription.deleteMany({
+      where: { endpoint: { in: [...endpoints] } },
+    });
+    if (count)
+      this.logger.log(`Pruned ${count} expired web push subscription(s)`);
+    return count;
   }
 
   async prune(tokens: string[]): Promise<number> {

@@ -139,6 +139,7 @@ export class ClerkWebhookService {
           });
         }
         await tx.deviceToken.deleteMany({ where: { userId: user.id } });
+        await tx.webPushSubscription.deleteMany({ where: { userId: user.id } });
         this.logger.log(`Soft-deleted user ${user.id} (Clerk user.deleted)`);
         return { received: true, action: 'user_deleted' };
       }

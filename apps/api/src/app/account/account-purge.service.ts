@@ -124,6 +124,7 @@ export class AccountPurgeService {
 
       const mine = { userId };
       await tx.deviceToken.deleteMany({ where: mine });
+      await tx.webPushSubscription.deleteMany({ where: mine });
       await tx.notification.deleteMany({ where: mine });
       await tx.notificationPreference.deleteMany({ where: mine });
       await tx.friendNudge.deleteMany({

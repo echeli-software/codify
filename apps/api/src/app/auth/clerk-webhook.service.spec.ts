@@ -58,6 +58,7 @@ function fakePrisma(users: U[]) {
       ),
     },
     deviceToken: { deleteMany: jest.fn(async () => ({ count: 2 })) },
+    webPushSubscription: { deleteMany: jest.fn(async () => ({ count: 1 })) },
   };
   const prisma = {
     ...tx,

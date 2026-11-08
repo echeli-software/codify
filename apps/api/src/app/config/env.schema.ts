@@ -11,8 +11,9 @@ import { z } from 'zod';
  *
  * Production rules (superRefine below) enforce the "never silently fall
  * back in production" policy from the worker brief / docs/14: real auth,
- * webhook verification, CORS allowlist, Redis-backed rate limits and FCM
- * credentials are all mandatory when NODE_ENV=production.
+ * webhook verification, CORS allowlist, Redis-backed rate limits, FCM
+ * credentials and the web push VAPID keys are all mandatory when
+ * NODE_ENV=production.
  */
 
 const optionalString = z.string().trim().min(1).optional();
@@ -111,6 +112,17 @@ export const envSchema = z
     /** Base64-encoded Firebase service-account JSON. */
     FIREBASE_SERVICE_ACCOUNT_JSON: optionalString,
 
+    // ─── Web push (VAPID, student PWA) ───────────────────────────────────
+    /** VAPID key pair (base64url, `npx web-push generate-vapid-keys`). */
+    VAPID_PUBLIC_KEY: optionalString,
+    VAPID_PRIVATE_KEY: optionalString,
+    /** Contact for the push services: `mailto:` or `https://` URL. */
+    VAPID_SUBJECT: z
+      .string()
+      .trim()
+      .regex(/^(mailto:|https:\/\/)/, 'must be a mailto: or https:// URL')
+      .optional(),
+
     // ─── Jobs ────────────────────────────────────────────────────────────
     JOBS_ENABLED: boolFlag(true),
 
@@ -153,6 +165,21 @@ export const envSchema = z
       'FIREBASE_SERVICE_ACCOUNT_JSON',
       !!env.FIREBASE_SERVICE_ACCOUNT_JSON,
       'is required in production (FCM push delivery)',
+    );
+    need(
+      'VAPID_PUBLIC_KEY',
+      !!env.VAPID_PUBLIC_KEY,
+      'is required in production (web push for the PWA)',
+    );
+    need(
+      'VAPID_PRIVATE_KEY',
+      !!env.VAPID_PRIVATE_KEY,
+      'is required in production (web push for the PWA)',
+    );
+    need(
+      'VAPID_SUBJECT',
+      !!env.VAPID_SUBJECT,
+      'is required in production (web push contact, mailto: or https://)',
     );
     need(
       'THROTTLE_ENABLED',

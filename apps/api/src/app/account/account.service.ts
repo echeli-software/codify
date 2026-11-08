@@ -129,6 +129,9 @@ export class AccountService {
     );
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.deviceToken.deleteMany({ where: { userId: actor.userId } });
+      await tx.webPushSubscription.deleteMany({
+        where: { userId: actor.userId },
+      });
       return tx.user.update({
         where: { id: actor.userId },
         data: { deletedAt: now, deletionRequestedAt: now },
@@ -207,8 +210,9 @@ export class AccountService {
         { now },
       );
     }
-    // Suspended accounts get no pushes.
+    // Suspended accounts get no pushes (native or browser).
     await this.prisma.deviceToken.deleteMany({ where: { userId } });
+    await this.prisma.webPushSubscription.deleteMany({ where: { userId } });
     const after = await this.adminStatus(userId, now);
     return {
       before,

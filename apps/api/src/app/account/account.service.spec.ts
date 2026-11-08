@@ -78,6 +78,9 @@ function setup(users: Partial<UserRow>[]) {
         return { count: before - deviceTokens.length };
       }),
     },
+    webPushSubscription: {
+      deleteMany: jest.fn(async () => ({ count: 0 })),
+    },
     $transaction: jest.fn(
       async (fn: (tx: unknown) => unknown): Promise<unknown> => fn(prisma),
     ),

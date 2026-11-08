@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { jobsEnabled } from '../gamification/jobs.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { HAS_PUSH_TARGET } from '../notifications/push.service.js';
 import {
   isWithinQuietHours,
   localClock,
@@ -74,7 +75,7 @@ export class Day2PetPushService {
           gte: new Date(now.getTime() - 3 * DAY_MS),
           lte: new Date(now.getTime() - 6 * 60 * 60 * 1000),
         },
-        deviceTokens: { some: {} },
+        ...HAS_PUSH_TARGET,
         notificationPrefs: {
           none: { kind: 'STREAK_REMINDER', pushEnabled: false },
         },

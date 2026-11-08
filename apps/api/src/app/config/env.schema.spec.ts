@@ -17,6 +17,9 @@ const PROD_OK = {
   CLERK_WEBHOOK_SIGNING_SECRET: 'whsec_x',
   CORS_ORIGINS: 'https://app.codify.app,https://admin.codify.app',
   FIREBASE_SERVICE_ACCOUNT_JSON: 'e30=',
+  VAPID_PUBLIC_KEY: 'BPublicKey',
+  VAPID_PRIVATE_KEY: 'privateKey',
+  VAPID_SUBJECT: 'mailto:ops@codify.app',
 };
 
 describe('parseEnv', () => {
@@ -95,9 +98,18 @@ describe('parseEnv', () => {
         'CORS_ORIGINS',
         'REDIS_URL',
         'FIREBASE_SERVICE_ACCOUNT_JSON',
+        'VAPID_PUBLIC_KEY',
+        'VAPID_PRIVATE_KEY',
+        'VAPID_SUBJECT',
         'ALLOW_DEV_AUTH',
       ]),
     );
+  });
+
+  it('rejects a VAPID_SUBJECT that is not mailto: / https://', () => {
+    expect(() =>
+      parseEnv({ DATABASE_URL: DB, VAPID_SUBJECT: 'ops@codify.app' }),
+    ).toThrow('VAPID_SUBJECT');
   });
 
   it('accepts a complete production env', () => {

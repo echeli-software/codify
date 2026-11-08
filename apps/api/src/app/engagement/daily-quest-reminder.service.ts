@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { dailyQuestReminderCopy } from '../email/copy.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { HAS_PUSH_TARGET } from '../notifications/push.service.js';
 import {
   isWithinQuietHours,
   localClock,
@@ -81,7 +82,7 @@ export class DailyQuestReminderService {
           dormantAt: null,
           suspendedAt: null,
           lastSeenAt: { gte: new Date(now.getTime() - ACTIVE_DAYS * DAY_MS) },
-          deviceTokens: { some: {} },
+          ...HAS_PUSH_TARGET,
           notificationPrefs: {
             none: { kind: 'DAILY_QUEST', pushEnabled: false },
           },
