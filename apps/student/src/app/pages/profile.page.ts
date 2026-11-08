@@ -47,6 +47,7 @@ import { AppSessionService } from '../platform/app-session.service.js';
 import { ProfileCertificatesComponent } from '../components/profile-certificates.component.js';
 import { ReferralCardComponent } from '../components/referral-card.component.js';
 import { equippedSprites } from './shared/avatar.js';
+import { PromoCodeRedeem } from '../components/promotions/promo-code-redeem.component.js';
 
 interface NavLink {
   path: string;
@@ -127,6 +128,7 @@ const STAT_TILES: {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PromoCodeRedeem,
     FormsModule,
     RouterLink,
     IonHeader,
@@ -229,6 +231,9 @@ const STAT_TILES: {
 
           <cdf-referral-card />
           <cdf-profile-certificates />
+          <cdf-app-card padding="normal">
+            <cdf-promo-code-redeem />
+          </cdf-app-card>
 
           <h2>{{ 'student.profile.account' | translate }}</h2>
           <cdf-app-card padding="normal">
