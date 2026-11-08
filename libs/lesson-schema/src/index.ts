@@ -3,6 +3,9 @@
 export {
   LESSON_DOC_VERSION,
   EMBED_PROVIDERS,
+  EMBED_ASPECT_RATIOS,
+  IMAGE_ALIGNS,
+  QUIZ_KINDS,
   type CalloutKind,
   type LessonDoc,
   type BlockNode,
@@ -21,8 +24,12 @@ export {
   type DividerNode,
   type ImageNode,
   type ImageWidth,
+  type ImageAlign,
   type EmbedNode,
   type EmbedProvider,
+  type EmbedAspectRatio,
+  type EmbedMeta,
+  type VideoBlockNode,
   type TableNode,
   type TableRowNode,
   type TableHeaderNode,
@@ -85,8 +92,11 @@ export {
   isAllowedHref,
   isAllowedImageSrc,
   embedSrcFor,
+  canonicalEmbedUrl,
+  embedAspectRatioCss,
   parseEmbedUrl,
   EMBED_PROVIDER_LABELS,
+  OEMBED_ENDPOINTS,
   type ParsedEmbed,
 } from './lib/urls.js';
 export {
@@ -97,6 +107,14 @@ export {
   hashQuizAnswer,
   buildQuizAnswerHashes,
   checkQuizAnswerHash,
+  sanitizeQuizAnswer,
+  isQuizAnswered,
+  quizKeyTokens,
+  matchToken,
+  parseMatchToken,
+  orderAnswerTokens,
+  orderFromTokens,
+  stableShuffle,
   DEFAULT_QUIZ_PASS_PCT,
   type QuizAnswers,
   type QuizGradeResult,
@@ -110,5 +128,6 @@ export {
   type BlockVisitor,
   type LessonDocRefs,
 } from './lib/walk.js';
+export { lessonStructureIssues } from './lib/structure.js';
 export { emptyLessonDoc } from './lib/empty.js';
 export { kitchenSinkLessonDoc } from './lib/fixtures.js';

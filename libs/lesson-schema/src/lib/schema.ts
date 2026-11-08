@@ -14,7 +14,13 @@
 
 import { z } from 'zod';
 import { embedSrcFor, isAllowedHref, isAllowedImageSrc } from './urls.js';
-import { EMBED_PROVIDERS, type NestableBlockNode } from './types.js';
+import {
+  EMBED_ASPECT_RATIOS,
+  EMBED_PROVIDERS,
+  IMAGE_ALIGNS,
+  QUIZ_KINDS,
+  type NestableBlockNode,
+} from './types.js';
 
 // Explicit type for the recursive edges so TS doesn't chase the cycle.
 type NestableArray = z.ZodArray<z.ZodType<NestableBlockNode>>;
@@ -90,6 +96,7 @@ const CodeBlock = z.object({
       .string()
       .regex(/^[\d,\s-]*$/, 'Use line numbers and ranges, e.g. "3,7-9"')
       .nullish(),
+    copyable: z.boolean().nullish(),
   }),
   content: z.array(PlainTextNode).optional(),
 });
@@ -106,6 +113,7 @@ const Image = z.object({
     caption: z.string().max(500).nullish(),
     assetId: ID.nullish(),
     width: z.enum(['full', 'wide', 'inline']).nullish(),
+    align: z.enum(IMAGE_ALIGNS).nullish(),
   }),
 });
 
@@ -198,6 +206,22 @@ const Embed = z
       provider: z.enum(EMBED_PROVIDERS),
       url: z.string(),
       title: z.string().trim().min(1, 'Embeds need a title').max(200),
+      aspectRatio: z.enum(EMBED_ASPECT_RATIOS).nullish(),
+      meta: z
+        .object({
+          title: z.string().max(300).nullish(),
+          authorName: z.string().max(200).nullish(),
+          providerName: z.string().max(100).nullish(),
+          thumbnailUrl: z
+            .string()
+            .max(2048)
+            .refine((v) => v.startsWith('https://') && isAllowedImageSrc(v), {
+              message: 'Thumbnail must be an https URL',
+            })
+            .nullish(),
+          fetchedAt: z.string().max(40).nullish(),
+        })
+        .nullish(),
     }),
   })
   .superRefine((node, ctx) => {
@@ -210,59 +234,105 @@ const Embed = z
     }
   });
 
+const QuizOptionSchema = z.object({
+  id: ID,
+  text: z.string().trim().min(1, 'Option text is required').max(500),
+});
+
+/** `left:right` token of a match quiz key/answer. */
+const PAIR = /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64})$/;
+
 export const quizAttrsSchema = z
   .object({
     id: ID,
     question: z.string().trim().min(1, 'Quiz question is required').max(1000),
-    kind: z.enum(['single', 'multiple']),
+    kind: z.enum(QUIZ_KINDS),
     options: z
-      .array(
-        z.object({
-          id: ID,
-          text: z.string().trim().min(1, 'Option text is required').max(500),
-        }),
-      )
+      .array(QuizOptionSchema)
       .min(2, 'A quiz needs at least 2 options')
       .max(10, 'A quiz can have at most 10 options'),
-    correctOptionIds: z.array(ID).min(1, 'Mark at least one option as correct'),
+    targets: z
+      .array(QuizOptionSchema)
+      .max(12, 'A match quiz can have at most 12 answers')
+      .nullish(),
+    correctOptionIds: z
+      .array(z.string().max(130))
+      .min(1, 'Mark at least one option as correct'),
     explanation: z.string().max(2000).nullish(),
   })
   .superRefine((q, ctx) => {
+    const issue = (path: (string | number)[], message: string) =>
+      ctx.addIssue({ code: 'custom', path, message });
     const ids = q.options.map((o) => o.id);
-    if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['options'],
-        message: 'Option ids must be unique',
+    if (new Set(ids).size !== ids.length)
+      issue(['options'], 'Option ids must be unique');
+    if (new Set(q.correctOptionIds).size !== q.correctOptionIds.length)
+      issue(['correctOptionIds'], 'Duplicate correct option ids');
+
+    if (q.kind === 'match') {
+      const targets = q.targets ?? [];
+      const targetIds = targets.map((t) => t.id);
+      if (targets.length < q.options.length)
+        issue(['targets'], 'Every left-hand item needs a matching answer');
+      if (new Set(targetIds).size !== targetIds.length)
+        issue(['targets'], 'Answer ids must be unique');
+      const lefts = new Set<string>();
+      const rights = new Set<string>();
+      q.correctOptionIds.forEach((token, i) => {
+        const m = PAIR.exec(token);
+        if (!m || !ids.includes(m[1]) || !targetIds.includes(m[2])) {
+          issue(['correctOptionIds', i], `Unknown pair "${token}"`);
+          return;
+        }
+        if (lefts.has(m[1]) || rights.has(m[2]))
+          issue(['correctOptionIds', i], 'Each item and answer pairs once');
+        lefts.add(m[1]);
+        rights.add(m[2]);
       });
+      if (lefts.size !== ids.length)
+        issue(['correctOptionIds'], 'Pair every left-hand item with an answer');
+      return;
     }
+    if (q.targets && q.targets.length > 0)
+      issue(['targets'], 'Only match quizzes have answers on the right');
+
     const unknown = q.correctOptionIds.filter((id) => !ids.includes(id));
-    if (unknown.length) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['correctOptionIds'],
-        message: `Unknown option ids: ${unknown.join(', ')}`,
-      });
+    if (unknown.length)
+      issue(['correctOptionIds'], `Unknown option ids: ${unknown.join(', ')}`);
+    if (q.kind === 'order') {
+      if (q.correctOptionIds.length !== ids.length)
+        issue(
+          ['correctOptionIds'],
+          'Order quizzes list every option in the correct order',
+        );
+      return;
     }
-    if (new Set(q.correctOptionIds).size !== q.correctOptionIds.length) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['correctOptionIds'],
-        message: 'Duplicate correct option ids',
-      });
-    }
-    if (q.kind === 'single' && q.correctOptionIds.length !== 1) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['correctOptionIds'],
-        message: 'Single-choice quizzes need exactly one correct option',
-      });
-    }
+    if (q.kind === 'single' && q.correctOptionIds.length !== 1)
+      issue(
+        ['correctOptionIds'],
+        'Single-choice quizzes need exactly one correct option',
+      );
   });
 
 const Quiz = z.object({
   type: z.literal('quiz'),
   attrs: quizAttrsSchema,
+});
+
+const VideoBlock = z.object({
+  type: z.literal('videoBlock'),
+  attrs: z.object({
+    assetId: ID.nullish(),
+    title: z.string().trim().min(1, 'Videos need a title').max(200),
+    caption: z.string().max(500).nullish(),
+    posterSrc: z
+      .string()
+      .refine(isAllowedImageSrc, {
+        message: 'Poster must be an http(s) URL or a /relative path',
+      })
+      .nullish(),
+    durationSec: z.number().int().min(0).max(86_400).nullish(),
+  }),
 });
 
 const ExerciseRef = z.object({
@@ -293,6 +363,7 @@ const RootBlock = z.discriminatedUnion('type', [
   Callout,
   Table,
   Embed,
+  VideoBlock,
   Quiz,
   ExerciseRef,
   AiPromptRef,

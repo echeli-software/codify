@@ -10,7 +10,9 @@
  *   - Images: `http(s):` URLs or same-origin paths. No `data:` URIs (they
  *     bypass the asset pipeline and can smuggle SVG script).
  *   - Embeds: provider allowlist; the iframe `src` is never the author's URL
- *     but is rebuilt from the ids parsed out of it (`embedSrcFor`).
+ *     but is rebuilt from the ids parsed out of it (`embedSrcFor`). The
+ *     same goes for the oEmbed lookup (`OEMBED_ENDPOINTS` + the canonical
+ *     URL), so the server only ever contacts fixed provider hosts.
  */
 
 import { EMBED_PROVIDERS, type EmbedProvider } from './types.js';
@@ -69,9 +71,11 @@ export interface ParsedEmbed {
   provider: EmbedProvider;
   /** Canonical iframe src rebuilt from the parsed ids. */
   embedSrc: string;
+  /** Canonical public page URL rebuilt from the parsed ids (oEmbed input). */
+  canonicalUrl: string;
 }
 
-type EmbedParser = (url: URL) => string | null;
+type EmbedParser = (url: URL) => { src: string; canonical: string } | null;
 
 const YT_ID = /^[A-Za-z0-9_-]{11}$/;
 
@@ -109,7 +113,10 @@ const PARSERS: Record<EmbedProvider, EmbedParser> = {
     const start =
       seconds(url.searchParams.get('start')) ??
       seconds(url.searchParams.get('t'));
-    return `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ''}`;
+    return {
+      src: `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ''}`,
+      canonical: `https://www.youtube.com/watch?v=${id}`,
+    };
   },
   vimeo: (url) => {
     let id: string | undefined;
@@ -125,7 +132,10 @@ const PARSERS: Record<EmbedProvider, EmbedParser> = {
       hash = h && /^[a-f0-9]{6,20}$/.test(h) ? h : null;
     }
     if (!id) return null;
-    return `https://player.vimeo.com/video/${id}${hash ? `?h=${hash}` : ''}`;
+    return {
+      src: `https://player.vimeo.com/video/${id}${hash ? `?h=${hash}` : ''}`,
+      canonical: `https://vimeo.com/${id}${hash ? `/${hash}` : ''}`,
+    };
   },
   codepen: (url) => {
     if (!hostIn(url, ['codepen.io'])) return null;
@@ -134,7 +144,10 @@ const PARSERS: Record<EmbedProvider, EmbedParser> = {
         url.pathname,
       );
     if (!m) return null;
-    return `https://codepen.io/${m[1]}/embed/${m[2]}?default-tab=result`;
+    return {
+      src: `https://codepen.io/${m[1]}/embed/${m[2]}?default-tab=result`,
+      canonical: `https://codepen.io/${m[1]}/pen/${m[2]}`,
+    };
   },
   codesandbox: (url) => {
     if (!hostIn(url, ['codesandbox.io'])) return null;
@@ -143,13 +156,60 @@ const PARSERS: Record<EmbedProvider, EmbedParser> = {
         url.pathname,
       );
     if (!m) return null;
-    return `https://codesandbox.io/embed/${m[1]}`;
+    return {
+      src: `https://codesandbox.io/embed/${m[1]}`,
+      canonical: `https://codesandbox.io/s/${m[1]}`,
+    };
   },
   loom: (url) => {
     if (!hostIn(url, ['loom.com', 'www.loom.com'])) return null;
     const m = /^\/(?:share|embed)\/([A-Za-z0-9]{8,64})\/?$/.exec(url.pathname);
     if (!m) return null;
-    return `https://www.loom.com/embed/${m[1]}`;
+    return {
+      src: `https://www.loom.com/embed/${m[1]}`,
+      canonical: `https://www.loom.com/share/${m[1]}`,
+    };
+  },
+  stackblitz: (url) => {
+    if (!hostIn(url, ['stackblitz.com', 'www.stackblitz.com'])) return null;
+    // stackblitz.com/edit/<project> or /github/<owner>/<repo>[/tree/<ref>/<path>]
+    const edit = /^\/edit\/([A-Za-z0-9_-]{1,80})\/?$/.exec(url.pathname);
+    const gh =
+      /^\/github\/([A-Za-z0-9_.-]{1,64})\/([A-Za-z0-9_.-]{1,100})(\/tree\/[A-Za-z0-9_./-]{1,200})?\/?$/.exec(
+        url.pathname,
+      );
+    let path: string;
+    if (edit) path = `/edit/${edit[1]}`;
+    else if (gh && !(gh[3] ?? '').includes('..'))
+      path = `/github/${gh[1]}/${gh[2]}${gh[3] ?? ''}`;
+    else return null;
+    const file = url.searchParams.get('file');
+    const fileParam =
+      file && /^[A-Za-z0-9_./-]{1,200}$/.test(file) && !file.includes('..')
+        ? `&file=${encodeURIComponent(file)}`
+        : '';
+    return {
+      src: `https://stackblitz.com${path}?embed=1${fileParam}`,
+      canonical: `https://stackblitz.com${path}`,
+    };
+  },
+  figma: (url) => {
+    if (!hostIn(url, ['figma.com', 'www.figma.com'])) return null;
+    const m =
+      /^\/(file|design|proto|board)\/([A-Za-z0-9]{10,64})(?:\/[^/?#]{0,200})?\/?$/.exec(
+        url.pathname,
+      );
+    if (!m) return null;
+    const node = url.searchParams.get('node-id');
+    const nodeParam =
+      node && /^[0-9]{1,10}[-:][0-9]{1,10}$/.test(node)
+        ? `?node-id=${encodeURIComponent(node)}`
+        : '';
+    const canonical = `https://www.figma.com/${m[1]}/${m[2]}${nodeParam}`;
+    return {
+      src: `https://www.figma.com/embed?embed_host=codify&url=${encodeURIComponent(canonical)}`,
+      canonical,
+    };
   },
 };
 
@@ -171,7 +231,18 @@ export function embedSrcFor(provider: unknown, rawUrl: unknown): string | null {
   if (!(EMBED_PROVIDERS as readonly unknown[]).includes(provider)) return null;
   const url = parseHttpsUrl(rawUrl);
   if (!url) return null;
-  return PARSERS[provider as EmbedProvider](url);
+  return PARSERS[provider as EmbedProvider](url)?.src ?? null;
+}
+
+/** Canonical public URL for `url` under `provider` (null = not that provider). */
+export function canonicalEmbedUrl(
+  provider: unknown,
+  rawUrl: unknown,
+): string | null {
+  if (!(EMBED_PROVIDERS as readonly unknown[]).includes(provider)) return null;
+  const url = parseHttpsUrl(rawUrl);
+  if (!url) return null;
+  return PARSERS[provider as EmbedProvider](url)?.canonical ?? null;
 }
 
 /** Detect the provider for a pasted URL (editor convenience). */
@@ -179,8 +250,9 @@ export function parseEmbedUrl(rawUrl: unknown): ParsedEmbed | null {
   const url = parseHttpsUrl(rawUrl);
   if (!url) return null;
   for (const provider of EMBED_PROVIDERS) {
-    const embedSrc = PARSERS[provider](url);
-    if (embedSrc) return { provider, embedSrc };
+    const parsed = PARSERS[provider](url);
+    if (parsed)
+      return { provider, embedSrc: parsed.src, canonicalUrl: parsed.canonical };
   }
   return null;
 }
@@ -192,4 +264,31 @@ export const EMBED_PROVIDER_LABELS: Record<EmbedProvider, string> = {
   codepen: 'CodePen',
   codesandbox: 'CodeSandbox',
   loom: 'Loom',
+  stackblitz: 'StackBlitz',
+  figma: 'Figma',
 };
+
+/**
+ * Providers with a public oEmbed endpoint: the FIXED endpoint (our host,
+ * never the author's) the API queries on save, given the canonical URL.
+ * StackBlitz has none.
+ */
+export const OEMBED_ENDPOINTS: Partial<
+  Record<EmbedProvider, (canonicalUrl: string) => string>
+> = {
+  youtube: (u) =>
+    `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u)}`,
+  vimeo: (u) =>
+    `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(u)}`,
+  codepen: (u) =>
+    `https://codepen.io/api/oembed?format=json&url=${encodeURIComponent(u)}`,
+  loom: (u) => `https://www.loom.com/v1/oembed?url=${encodeURIComponent(u)}`,
+  figma: (u) => `https://www.figma.com/api/oembed?url=${encodeURIComponent(u)}`,
+};
+
+/** CSS `aspect-ratio` value for an embed's `aspectRatio` attr (default 16 / 9). */
+export function embedAspectRatioCss(ratio: unknown): string {
+  const m =
+    typeof ratio === 'string' ? /^(\d{1,2}):(\d{1,2})$/.exec(ratio) : null;
+  return m ? `${m[1]} / ${m[2]}` : '16 / 9';
+}

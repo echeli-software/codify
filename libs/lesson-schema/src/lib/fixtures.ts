@@ -161,6 +161,7 @@ export function kitchenSinkLessonDoc(): LessonDoc {
           language: 'typescript',
           showLineNumbers: true,
           highlightLines: '2',
+          copyable: true,
         },
         content: [
           {
@@ -178,6 +179,7 @@ export function kitchenSinkLessonDoc(): LessonDoc {
           caption: 'The component tree for the demo app.',
           assetId: '0192f3a4-sample',
           width: 'wide',
+          align: 'center',
         },
       },
       {
@@ -186,6 +188,17 @@ export function kitchenSinkLessonDoc(): LessonDoc {
           provider: 'youtube',
           url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
           title: 'Intro video',
+          aspectRatio: '16:9',
+        },
+      },
+      {
+        type: 'videoBlock',
+        attrs: {
+          assetId: null,
+          title: 'Signals in five minutes',
+          caption: 'A short walkthrough of the demo.',
+          posterSrc: null,
+          durationSec: 300,
         },
       },
       {
@@ -277,6 +290,41 @@ export function kitchenSinkLessonDoc(): LessonDoc {
             { id: 'c', text: '@loop' },
           ],
           correctOptionIds: ['a', 'b'],
+          explanation: null,
+        },
+      },
+      {
+        type: 'quiz',
+        attrs: {
+          id: 'q3',
+          question: 'Match each API to what it does.',
+          kind: 'match',
+          options: [
+            { id: 'a', text: 'signal()' },
+            { id: 'b', text: 'computed()' },
+            { id: 'c', text: 'effect()' },
+          ],
+          targets: [
+            { id: 'x', text: 'Writable state' },
+            { id: 'y', text: 'Derived, read-only value' },
+            { id: 'z', text: 'Runs a side effect' },
+          ],
+          correctOptionIds: ['a:x', 'b:y', 'c:z'],
+          explanation: null,
+        },
+      },
+      {
+        type: 'quiz',
+        attrs: {
+          id: 'q4',
+          question: 'Put the steps of a change-detection cycle in order.',
+          kind: 'order',
+          options: [
+            { id: 'a', text: 'A signal is set' },
+            { id: 'b', text: 'Dependents are marked dirty' },
+            { id: 'c', text: 'The template re-renders' },
+          ],
+          correctOptionIds: ['a', 'b', 'c'],
           explanation: null,
         },
       },

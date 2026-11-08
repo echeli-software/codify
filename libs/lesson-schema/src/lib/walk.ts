@@ -70,6 +70,9 @@ export function collectLessonRefs(
         if (node.attrs.assetId) out.assetIds.add(node.attrs.assetId);
         if (node.attrs.src) out.imageSrcs.add(node.attrs.src);
         break;
+      case 'videoBlock':
+        if (node.attrs.posterSrc) out.imageSrcs.add(node.attrs.posterSrc);
+        break;
       default:
         break;
     }

@@ -555,3 +555,125 @@ describe('registry', () => {
     ]);
   });
 });
+
+describe('lessonDocSchema — round-3 attrs', () => {
+  const one = (block: unknown) => ok(doc([block]));
+
+  it('image align', () => {
+    const img = (align: unknown) => ({
+      type: 'image',
+      attrs: { src: '/a.png', alt: 'A', align },
+    });
+    expect(one(img('left'))).toBe(true);
+    expect(one(img(null))).toBe(true);
+    expect(one(img('justify'))).toBe(false);
+  });
+
+  it('code block copyable', () => {
+    expect(
+      one({
+        type: 'codeBlock',
+        attrs: { language: 'ts', copyable: false, highlightLines: '1,3-4' },
+      }),
+    ).toBe(true);
+    expect(
+      one({ type: 'codeBlock', attrs: { language: 'ts', copyable: 'yes' } }),
+    ).toBe(false);
+  });
+
+  const embed = (attrs: Record<string, unknown>) => ({
+    type: 'embed',
+    attrs: {
+      provider: 'youtube',
+      url: 'https://youtu.be/dQw4w9WgXcQ',
+      title: 'T',
+      ...attrs,
+    },
+  });
+
+  it('embed aspectRatio + server metadata', () => {
+    expect(one(embed({ aspectRatio: '4:3' }))).toBe(true);
+    expect(one(embed({ aspectRatio: '5:4' }))).toBe(false);
+    expect(
+      one(
+        embed({
+          meta: {
+            title: 'Video',
+            authorName: 'Me',
+            thumbnailUrl: 'https://i.ytimg.com/vi/x/hq.jpg',
+          },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      one(embed({ meta: { thumbnailUrl: 'http://i.ytimg.com/vi/x/hq.jpg' } })),
+    ).toBe(false);
+    expect(one(embed({ meta: { thumbnailUrl: 'javascript:alert(1)' } }))).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    ['stackblitz', 'https://stackblitz.com/edit/angular-signals-demo'],
+    [
+      'stackblitz',
+      'https://stackblitz.com/github/angular/angular/tree/main/packages',
+    ],
+    ['figma', 'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/My-Design'],
+    [
+      'figma',
+      'https://www.figma.com/design/AbCdEfGhIjKlMnOpQrStUv/x?node-id=1-2',
+    ],
+  ])('accepts %s embed %s', (provider, url) =>
+    expect(one(embed({ provider, url }))).toBe(true),
+  );
+
+  it.each([
+    ['stackblitz', 'https://stackblitz.com/'],
+    ['stackblitz', 'https://stackblitz.com.evil.io/edit/x'],
+    ['stackblitz', 'https://stackblitz.com/github/only-owner'],
+    ['figma', 'https://figma.com.evil.io/file/AbCdEfGhIjKlMnOpQrStUv'],
+    ['figma', 'https://www.figma.com/community/file/123'],
+  ])('rejects %s embed %s', (provider, url) =>
+    expect(one(embed({ provider, url }))).toBe(false),
+  );
+
+  it('rebuilds stackblitz / figma iframe srcs and canonical URLs', () => {
+    expect(
+      embedSrcFor(
+        'stackblitz',
+        'https://stackblitz.com/edit/demo?file=src%2Fmain.ts&evil=1',
+      ),
+    ).toBe('https://stackblitz.com/edit/demo?embed=1&file=src%2Fmain.ts');
+    expect(
+      parseEmbedUrl(
+        'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/Name?node-id=1-2&t=xyz',
+      ),
+    ).toEqual({
+      provider: 'figma',
+      canonicalUrl:
+        'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv?node-id=1-2',
+      embedSrc:
+        'https://www.figma.com/embed?embed_host=codify&url=https%3A%2F%2Fwww.figma.com%2Ffile%2FAbCdEfGhIjKlMnOpQrStUv%3Fnode-id%3D1-2',
+    });
+  });
+
+  it('video block', () => {
+    expect(one({ type: 'videoBlock', attrs: { title: 'Intro' } })).toBe(true);
+    expect(one({ type: 'videoBlock', attrs: { title: '' } })).toBe(false);
+    expect(
+      one({ type: 'videoBlock', attrs: { title: 'x', posterSrc: 'data:x' } }),
+    ).toBe(false);
+    // Root only.
+    expect(
+      ok(
+        doc([
+          {
+            type: 'blockquote',
+            content: [{ type: 'videoBlock', attrs: { title: 'x' } }],
+          },
+        ]),
+      ),
+    ).toBe(false);
+  });
+});
