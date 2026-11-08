@@ -131,6 +131,7 @@ Restore drill: quarterly. Restore latest dump to a throwaway DB, run `prisma db 
 - **Logs**: Loki via Grafana Cloud free tier. Structured JSON logs from Nest (Pino), shipped by a **Grafana Alloy** agent on each VPS (`infra/observability`; Alloy replaced Vector so one agent does logs + metrics). pino's numeric level becomes the `level` label; `/api/health` lines are dropped.
 - **Metrics**: Alloy's built-in node + cAdvisor exporters, remote-written to Grafana Cloud Prometheus.
 - **Tracing**: OpenTelemetry SDK in Nest; spans exported to Grafana Cloud.
+  - As built: no OpenTelemetry yet. Requests are correlated by the request id in every pino log line and in Sentry events. Adding the SDK waits for the OTel backend, which needs the Grafana Cloud account from the release checklist (`docs/runbooks/release-checklist.md` §1).
 - **Errors**: Sentry for both apps + API. Source maps uploaded on build.
 - **Uptime**: BetterStack or UptimeRobot for external probes (API health, admin login, student PWA load).
 - **Dashboards**:

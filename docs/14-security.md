@@ -26,6 +26,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
 - All API inputs validated with zod / class-validator at the controller boundary.
 - Payloads rejected with 400 + structured RFC 7807 error before hitting service code.
 - File uploads: MIME sniffed (not just declared); size capped per type; SVGs sanitized via DOMPurify before storage.
+  - As built: SVG is rejected outright (`400 ASSET_TYPE_NOT_ALLOWED`, "SVG uploads are not accepted") instead of sanitized; this rule wins over the SVG sprites in docs/08. Allowed per kind (`apps/api/src/app/assets/asset-rules.ts`): IMAGE PNG/JPEG/WebP/GIF ≤ 5 MB, COVER PNG/JPEG/WebP ≤ 8 MB, SPRITE PNG/WebP ≤ 1 MB, OTHER PDF ≤ 10 MB; the bytes are sniffed on confirm.
 - Block editor JSON validated against `lessonDocSchema` (zod).
 
 ## 4. Output safety
@@ -77,6 +78,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
   - Coin spend (item purchase, chest purchase).
 - Stored in Redis (24h) + `IdempotencyRecord` (audit-ready).
 - Replays return the original response.
+- As built: no Redis store; Postgres unique constraints carry it. Lesson completion takes no key and is idempotent on `Progress (userId, lessonId)` (replay → `409 LESSON_ALREADY_COMPLETED`, nothing granted). Every ledger write has a unique `idempotencyKey` (e.g. `lesson_reward:<userId>:<lessonId>`). `Idempotency-Key` (8–128 chars of `[A-Za-z0-9_.:-]`) is honoured on `POST /exercises/:id/submit`, quiz attempts and scenario runs, stored as `Submission.idempotencyKey` or an `IdempotencyRecord`; a replay returns the original result. Checkout and item purchase don't read the header.
 
 ## 9. Sandboxing — see [12-code-execution.md](./12-code-execution.md)
 
@@ -146,8 +148,8 @@ Purge job (`AccountPurgeService`, daily 03:17 UTC, behind `JOBS_ENABLED`): accou
 - **Data residency**: BR DB primary; backups in same region; no cross-region transfer of PII without explicit consent flow (which we don't currently need).
 - **Cookies**: minimal — auth + analytics. Banner on first visit (web only) with granular toggles.
   - _As built_ (`apps/student/src/app/components/consent-banner.component.ts`,
-    `telemetry/consent.ts`): first web visit shows *Accept all* / *Necessary
-    only* / *Customize* (necessary — always on; product analytics; error
+    `telemetry/consent.ts`): first web visit shows _Accept all_ / _Necessary
+    only_ / _Customize_ (necessary — always on; product analytics; error
     reporting) with a link to `/privacy`; the choice is stored only in
     localStorage (`codify.consent.v1`, versioned). Until analytics is allowed
     `TelemetryService` drops events (nothing is buffered); Sentry is only

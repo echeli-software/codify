@@ -57,7 +57,7 @@ Order of evaluation:
 
 1. `lesson.isFree` → granted (`free_lesson`).
 2. Course is fully free (every lesson `isFree`) → granted (`free_course`).
-3. Active `Enrollment` of source `GIFT` or `PROMO` → granted (`enrollment`).
+3. Active `Enrollment` of source `GIFT` or `PROMO` → granted (`enrollment`). As built the sources are `SELF | PROMO | ADMIN_GRANT`: `PROMO` and `ADMIN_GRANT` grant access until `accessUntil` (null = no expiry); `SELF` (student enrolled themselves) never grants paid access (`enrollmentGrantsAccess` in `@codify/domain`).
 4. **Access-granting subscription** (see status table below) whose plan includes one of the course's categories → granted (`subscription`).
 5. Otherwise → not granted with `requiredPlans`.
 
@@ -86,7 +86,7 @@ Free preview ([04-admin-app.md §3](./04-admin-app.md) "Bulk: mark first N lesso
 - Brazilian payment methods activated: cards, PIX, Boleto.
 - Tax: enable Stripe Tax for non-BR customers; for BR, charge inclusive of taxes (we set prices accordingly; Brazilian SaaS typically does not add tax line items).
 - Statement descriptor: "CODIFY" (8 chars max effective).
-- Webhook endpoint: `https://api.codify.app/v1/webhooks/stripe`, signing secret stored as env var.
+- Webhook endpoint: `https://api.codify.app/api/webhooks/stripe`, signing secret stored as env var.
 
 ### Products & prices
 
@@ -111,6 +111,20 @@ UI shows: "R$ 478,80 ou em até 12x de R$ 39,90 sem juros".
   - **PIX → card upgrade**: user pays first month with PIX, optionally adds a card for auto-renew.
 - Default subscription path on the student app pushes card-first; PIX presented as alternative with the renewal caveat shown clearly.
 
+**As built.** PIX (and Boleto) are offered only on the **BRL annual** price:
+`POST /api/billing/checkout-session` refuses them on any other price
+("PIX and Boleto are only available for the BRL annual plan"). Checkout
+runs in `payment` mode; on `checkout.session.completed` /
+`async_payment_succeeded` the webhook creates a one-year, non-renewing
+subscription (`cancelAtPeriodEnd: true`, keyed by the Checkout Session id
+`cs_…`). Renewal is manual: the daily billing job
+(`sendRenewalReminders`) sends one `BILLING` push ("renew with PIX") in the
+7 days before `currentPeriodEnd`, skipped when the user already holds a
+later-ending subscription (renewed, or moved to card). Renewing is a new
+checkout; an unpaid prepay simply ends at period end (no `PAST_DUE`).
+Monthly PIX with a QR per renewal and the "first month by PIX, then card"
+flow are not built (roadmap risk table: revisit recurring PIX later).
+
 ### Boleto
 
 - Available as one-shot for full-year prepayment. Slow confirmation (1–3 business days). Not used for recurring.
@@ -120,7 +134,7 @@ UI shows: "R$ 478,80 ou em até 12x de R$ 39,90 sem juros".
 ### New subscription (card path)
 
 1. Student taps "Subscribe" on a plan.
-2. Client calls `POST /v1/billing/checkout-session` with `{ planPriceId, paymentMethod: 'card' }`.
+2. Client calls `POST /api/billing/checkout-session` with `{ planPriceId, paymentMethod: 'card' }`.
 3. API verifies user, creates Stripe Checkout Session (with `customer` lookup or creation), returns `url`.
 4. Client opens Stripe Checkout (Capacitor: in-app browser; web: hosted page).
 5. Stripe processes payment, redirects to `https://codify.app/billing/success?session_id=...`.
@@ -129,15 +143,15 @@ UI shows: "R$ 478,80 ou em até 12x de R$ 39,90 sem juros".
 
 ### New subscription (PIX path)
 
-1. As above, with `paymentMethod: 'pix'`.
+1. As above, with `paymentMethod: 'pix'` on the BRL annual price (other prices are refused).
 2. Checkout session shows QR + key.
 3. Webhook `checkout.session.async_payment_succeeded` confirms (usually < 5 min).
-4. Subscription created `ACTIVE`. We schedule a `BILLING` notification for renewal day prompting next PIX.
+4. Subscription created `ACTIVE` for one year, not renewing (`cancelAtPeriodEnd`); the renewal reminder below prompts the next PIX payment.
 
 ### Renewal
 
 - Card: Stripe auto-charges; on success → `invoice.paid` → continue. On fail → `invoice.payment_failed` → status `PAST_DUE`; Stripe smart retries; we email + push.
-- PIX: 7 days before renewal we send PIX QR notification. If unpaid by renewal day, subscription `PAST_DUE`.
+- PIX / Boleto (annual prepay): once in the 7 days before the period ends we push a "renew with PIX" reminder; renewing is a new checkout. If not renewed, the subscription ends at period end (no `PAST_DUE`).
 - Recovery: once paid, status returns to `ACTIVE`.
 
 ### Plan change
@@ -170,7 +184,7 @@ Dev checkouts (`POST /billing/dev/complete-checkout`) now log the Payment Stripe
 
 ## 6. Webhook handling
 
-Endpoint: `POST /v1/webhooks/stripe`.
+Endpoint: `POST /api/webhooks/stripe`.
 
 Steps:
 

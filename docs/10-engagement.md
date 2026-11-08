@@ -75,18 +75,18 @@ off; caps / dormancy apply through NotificationService.
 
 ### Default kinds & timing
 
-| Kind              | Channel                          | Default trigger                                                 | Quiet hours                 |
-| ----------------- | -------------------------------- | --------------------------------------------------------------- | --------------------------- |
-| `STREAK_REMINDER` | Push                             | 2h before user-local midnight if no completion today            | Respect quiet hours setting |
-| `DAILY_QUEST`     | Push                             | 30min after user's typical session start time, if no completion | Respect quiet hours         |
-| `FRIEND_NUDGE`    | Push (rate-limited 1/friend/day) | When a friend nudges                                            | Respect quiet hours         |
-| `LEAGUE_RESULT`   | Push                             | Monday 09:00 user-local                                         | Respect quiet hours         |
-| `ITEM_DROP`       | Push                             | At drop start (subject to opt-in)                               | Respect quiet hours         |
-| `PROMO`           | Push                             | Campaign start (subject to opt-in, default off)                 | Respect quiet hours         |
-| `BILLING`         | Push + Email                     | On payment failure / before renewal (PIX)                       | Respect (email anytime)     |
-| `SYSTEM`          | Push                             | Critical (account suspended, terms update)                      | No quiet-hours override     |
+| Kind              | Channel                          | Default trigger                                                                               | Quiet hours                 |
+| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------- |
+| `STREAK_REMINDER` | Push                             | 2h before user-local midnight if no completion today (as built: 20:00–22:00 local, see below) | Respect quiet hours setting |
+| `DAILY_QUEST`     | Push                             | 30min after user's typical session start time, if no completion                               | Respect quiet hours         |
+| `FRIEND_NUDGE`    | Push (rate-limited 1/friend/day) | When a friend nudges                                                                          | Respect quiet hours         |
+| `LEAGUE_RESULT`   | Push                             | Monday 09:00 user-local                                                                       | Respect quiet hours         |
+| `ITEM_DROP`       | Push                             | At drop start (subject to opt-in)                                                             | Respect quiet hours         |
+| `PROMO`           | Push                             | Campaign start (subject to opt-in, default off)                                               | Respect quiet hours         |
+| `BILLING`         | Push + Email                     | On payment failure / before renewal (PIX)                                                     | Respect (email anytime)     |
+| `SYSTEM`          | Push                             | Critical (account suspended, terms update)                                                    | No quiet-hours override     |
 
-Timing implementation: `LEAGUE_RESULT` is sent by an hourly job once the member's local clock passes 09:00 on the
+Timing implementation: `STREAK_REMINDER` uses the window 20:00–22:00 user-local instead of 22:00–24:00, because 22:00 is inside the default quiet hours (22:00–08:00, see Quiet hours), where the job skips the user, so a 22:00–24:00 reminder would never reach anyone on the defaults. An hourly job (`StreakReminderService`, `EVENING_SLOT`) reminds users with a live streak and no streak-satisfying action today whose local time is in the window and outside their own quiet hours, once per local day. `LEAGUE_RESULT` is sent by an hourly job once the member's local clock passes 09:00 on the
 Monday the week ended (the rollover itself sends nothing); `PROMO` by a 15-minute job when a campaign or course promo
 starts, only to users who turned PROMO push on (docs/07 §15).
 
@@ -422,23 +422,23 @@ Common props on every event (added by the client SDK): `platform`
 
 **Reward**
 
-| Event                                                    | When                                         | Props                                                                                        |
-| -------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----- | ---------------- | ------------------------- |
-| `reward_granted`                                         | Server granted XP/coins (server-side)        | `source`, `xp`, `coins`, `multiplierEffective`, `multiplierCapped`, `lessonId?`, `courseId?` |
-| `reward_celebration_shown`                               | RewardOrchestrator played a celebration      | `kind` (`lesson                                                                              | level_up | badge | streak_milestone | league`), `reducedMotion` |
-| `level_up`                                               | Level increased                              | `newLevel`                                                                                   |
-| `streak_extended` / `streak_freeze_used` / `streak_lost` | Streak day counted / freeze consumed / reset | `days`, `freezesLeft`                                                                        |
-| `streak_milestone`                                       | One-time milestone paid                      | `days`, `coins`, `xp`                                                                        |
-| `quest_complete`                                         | Daily quest completed                        | `questTemplateId`, `kind`, `difficulty`                                                      |
-| `badge_unlocked`                                         | Badge awarded                                | `badgeSlug`                                                                                  |
-| `league_viewed`                                          | League screen opened                         | `tier`, `rank`, `cohortSize`                                                                 |
-| `league_result_viewed`                                   | Last-week result card seen                   | `tier`, `newTier`, `promoted`, `demoted`, `finalRank`                                        |
-| `shop_view` / `item_purchase` / `item_equip`             | Shop browsed / bought / equipped             | `itemId`, `rarity`, `costCoins`, `equipOnPurchase`                                           |
-| `avatar_randomize` / `starter_pet_offered` / `starter_pet_claimed` | Dressing-room Random / gift sheet shown / gift opened | `itemId?`, `named?` |
-| `friend_compare_viewed` / `activity_feed_opt_in`         | Compare sheet opened / sharing toggled       | `optIn?`                                                                                     |
-| `skill_tree_viewed`                                      | Skill tree opened                            | `topics`, `gold`                                                                             |
-| `local_reminder_scheduled`                               | Native backup reminder scheduled             | `minute`                                                                                     |
-| `promo_banner_view`                                      | Campaign/promo banner shown                  | `multiplierId`, `kind`, `value`                                                              |
+| Event                                                              | When                                                  | Props                                                                                        |
+| ------------------------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----- | ---------------- | ------------------------- |
+| `reward_granted`                                                   | Server granted XP/coins (server-side)                 | `source`, `xp`, `coins`, `multiplierEffective`, `multiplierCapped`, `lessonId?`, `courseId?` |
+| `reward_celebration_shown`                                         | RewardOrchestrator played a celebration               | `kind` (`lesson                                                                              | level_up | badge | streak_milestone | league`), `reducedMotion` |
+| `level_up`                                                         | Level increased                                       | `newLevel`                                                                                   |
+| `streak_extended` / `streak_freeze_used` / `streak_lost`           | Streak day counted / freeze consumed / reset          | `days`, `freezesLeft`                                                                        |
+| `streak_milestone`                                                 | One-time milestone paid                               | `days`, `coins`, `xp`                                                                        |
+| `quest_complete`                                                   | Daily quest completed                                 | `questTemplateId`, `kind`, `difficulty`                                                      |
+| `badge_unlocked`                                                   | Badge awarded                                         | `badgeSlug`                                                                                  |
+| `league_viewed`                                                    | League screen opened                                  | `tier`, `rank`, `cohortSize`                                                                 |
+| `league_result_viewed`                                             | Last-week result card seen                            | `tier`, `newTier`, `promoted`, `demoted`, `finalRank`                                        |
+| `shop_view` / `item_purchase` / `item_equip`                       | Shop browsed / bought / equipped                      | `itemId`, `rarity`, `costCoins`, `equipOnPurchase`                                           |
+| `avatar_randomize` / `starter_pet_offered` / `starter_pet_claimed` | Dressing-room Random / gift sheet shown / gift opened | `itemId?`, `named?`                                                                          |
+| `friend_compare_viewed` / `activity_feed_opt_in`                   | Compare sheet opened / sharing toggled                | `optIn?`                                                                                     |
+| `skill_tree_viewed`                                                | Skill tree opened                                     | `topics`, `gold`                                                                             |
+| `local_reminder_scheduled`                                         | Native backup reminder scheduled                      | `minute`                                                                                     |
+| `promo_banner_view`                                                | Campaign/promo banner shown                           | `multiplierId`, `kind`, `value`                                                              |
 
 **Download / sync (offline, docs/16)**
 
@@ -496,19 +496,19 @@ Common props on every event (added by the client SDK): `platform`
 
 **Navigation / funnel (student app)**
 
-| Event | When | Props |
-| --- | --- | --- |
-| `page_view` | Route shown | `route` (pattern, e.g. `/lessons/:id`) |
-| `screen_time` | Left a route / tab hidden | `route`, `durationMs` |
-| `onboarding_step_complete` | Onboarding step finished | `step` (`goal` / `track` / …), step props |
-| `paywall_cta_tap` | Paywall call-to-action tapped | `source`, `planId?`, `lessonId?` |
-| `catalog_search` / `global_search` | Catalog / header search answered | `results` or `courses`, `lessons`, `length` |
-| `download_offer_accepted` | Post-enrollment download prompt | `courseId`, `what` (`course` / `next`) |
-| `offline_session_minutes` | Back online after ≥ 1 min offline | `minutes` |
-| `lesson_progress_seen` | Lesson opened offline (sent on sync) | `lessonId`, `courseId` |
-| `queue_depth_on_flush` | Offline queue flush starts | `queueDepth`, `manual` |
-| `consent_updated` | Web consent saved (if analytics allowed) | `analytics`, `errors` |
-| `timezone_detected` | Device time zone applied | `changed` |
+| Event                              | When                                     | Props                                       |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------- |
+| `page_view`                        | Route shown                              | `route` (pattern, e.g. `/lessons/:id`)      |
+| `screen_time`                      | Left a route / tab hidden                | `route`, `durationMs`                       |
+| `onboarding_step_complete`         | Onboarding step finished                 | `step` (`goal` / `track` / …), step props   |
+| `paywall_cta_tap`                  | Paywall call-to-action tapped            | `source`, `planId?`, `lessonId?`            |
+| `catalog_search` / `global_search` | Catalog / header search answered         | `results` or `courses`, `lessons`, `length` |
+| `download_offer_accepted`          | Post-enrollment download prompt          | `courseId`, `what` (`course` / `next`)      |
+| `offline_session_minutes`          | Back online after ≥ 1 min offline        | `minutes`                                   |
+| `lesson_progress_seen`             | Lesson opened offline (sent on sync)     | `lessonId`, `courseId`                      |
+| `queue_depth_on_flush`             | Offline queue flush starts               | `queueDepth`, `manual`                      |
+| `consent_updated`                  | Web consent saved (if analytics allowed) | `analytics`, `errors`                       |
+| `timezone_detected`                | Device time zone applied                 | `changed`                                   |
 
 The client maps names that predate this catalogue to it
 (`TelemetryService.LEGACY_EVENT_NAMES`): `download_started|completed|failed` →

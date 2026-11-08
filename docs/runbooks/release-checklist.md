@@ -26,6 +26,9 @@ Follow `infra/README.md` §0–5.
       `vps-judge0-01`, `vps-staging-01`, managed Postgres prod + staging,
       Cloudflare DNS/WAF/Pages) — §1–2.
 - [ ] Judge0 host up with egress locked down — §3.
+- [ ] Judge0 sandbox image built on the Judge0 host from `infra/judge0/image`
+      (adds Python and the TypeScript/JavaScript runtimes the exercises use;
+      `infra/judge0/README.md` step 5).
 - [ ] Coolify on prod and staging with the API, worker and Redis resources — §4.
 - [ ] Observability agent shipping logs + metrics — §5.
 - [ ] R2 buckets `codify-staging-assets` / `codify-prod-assets` with public
@@ -51,7 +54,17 @@ Follow `infra/README.md` §0–5.
       staging); `ALLOW_DEV_AUTH` unset and `THROTTLE_ENABLED` on (the boot
       guard enforces both).
 - [ ] Frontend build variables: `STAGING_/PROD_API_URL`,
-      `STAGING_/PROD_CLERK_PUBLISHABLE_KEY`, Pages project names.
+      `STAGING_/PROD_CLERK_PUBLISHABLE_KEY`, Pages project names,
+      `SENTRY_DSN_STUDENT` / `SENTRY_DSN_ADMIN`.
+- [ ] Clerk: MFA available, and the session token carries the `fva`
+      claim. Without it every `ADMIN` / `SUPPORT` request fails closed with
+      `MFA_REQUIRED` (docs/14 §1; `STAFF_MFA_ROLES`,
+      `STAFF_SESSION_MAX_HOURS`). Set the instance's session maximum
+      lifetime too.
+- [ ] Stripe win-back coupon (and promotion code) created;
+      `STRIPE_WINBACK_COUPON` / `STRIPE_WINBACK_PROMOTION_CODE` set and
+      `WINBACK_PERCENT_OFF` equal to the coupon's percentage (the app shows
+      that number).
 
 ## 3. Staging deploy — Ops
 
@@ -122,7 +135,7 @@ Run on a phone (390 px) and a desktop, in pt-BR and en-US.
 - [ ] `pnpm audit --prod` reviewed; no known critical vulnerabilities in
       runtime dependencies.
 - [ ] Admin accounts: only the people who need them, each with the right
-      role; Clerk MFA enforced for `ADMIN` (docs/14).
+      role; Clerk MFA enforced for `ADMIN` and `SUPPORT` (docs/14).
 - [ ] Secrets stored only in GitHub environments / Coolify, never in the
       repo; rotation owner named.
 

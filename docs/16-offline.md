@@ -104,7 +104,7 @@ For a course download we fetch and store:
 | Module + course metadata                                                                         | IndexedDB                                               | Same                                                     |
 | Inline images referenced by `LessonDoc` (resolved through CDN)                                   | Capacitor Filesystem (mobile) / Cache Storage API (web) | Render lesson without network                            |
 | `ContentTranslation` rows for enabled locale(s)                                                  | IndexedDB                                               | Localized read                                           |
-| Quiz answer keys for offline grading                                                             | IndexedDB (encrypted at rest with a device key)         | Local quiz scoring                                       |
+| Quiz answer hashes for offline grading (as built: never the plain key, see §9)                   | IndexedDB                                               | Local quiz scoring                                       |
 | Scenario tree definitions                                                                        | IndexedDB                                               | Local scenario play                                      |
 | Exercise stubs (starter code, visible tests, language) — **not** solutions, **not** hidden tests | IndexedDB                                               | Allow code editing offline; submission queued for online |
 
@@ -223,7 +223,7 @@ These are the rules that prevent double-counting and weird divergence:
 
 - Server enforces uniqueness on `Progress (userId, lessonId)`.
 - First successful completion wins; subsequent completions return the existing reward without re-crediting (`409 Conflict` with the original `Progress` payload).
-- Idempotency-Key prevents network-retry double-counts within a single device.
+- Idempotency-Key prevents network-retry double-counts within a single device. As built: `POST /lessons/:id/complete` does not read the header; the unique constraint covers retries too (a retry gets the same `409`).
 - The unique constraint prevents cross-device double-counts (Device A and Device B both completed offline → whichever flushes first wins; the other gets `409` and removes from queue).
 - The non-winning device's UI reconciles to the canonical state and may show a brief "Already completed elsewhere" toast.
 
@@ -308,6 +308,7 @@ sign-out and untouched by "Remove all downloads". `cdf-item-sprite` and
 
 - We don't encrypt user content (lessons) — they're already accessible to the user.
 - Quiz answer keys are stored with light obfuscation (XOR with a per-device key) to discourage casual cheating, not as a security boundary. The honest path is: server reconciles scores anyway, and rewards are server-credited.
+  - As built: the plain key never reaches the client. `GET /lessons/:id/offline-bundle` ships the doc with answers stripped (`stripQuizAnswers`) plus `quizAnswerHashes { algorithm: 'sha256', salt, hashes }`: one SHA-256 per quiz over `salt NUL quizId NUL sorted unique answer tokens` (joined by U+0001), with a fresh random salt per bundle (`buildQuizAnswerHashes` in `@codify/lesson-schema`). The student app hashes the learner's answer the same way (`apps/student/src/app/offline/quiz-hash.ts`) for instant feedback. Option sets are small, so this is obfuscation, not secrecy; the server re-grades every attempt on sync (docs/06 §Quiz).
 
 ## 10. UX details
 
@@ -403,13 +404,13 @@ holds `lesson_complete`, `quiz_attempt`, `scenario_complete`, `avatar_equip`,
 event keeps `clientEventId` (Idempotency-Key) + `clientTimestamp`; queued
 completions also carry a local reward `estimate` (lesson base XP / coins).
 
-| Kind | Replayed as | Notes |
-| --- | --- | --- |
-| `scenario_complete` | `POST /scenarios/:id/complete` `{ path, clientTimestamp }` + `Idempotency-Key` | Played from the downloaded graph; the server walks and scores the path again. A replayed key returns the recorded run (`replayed: true`, no new row, no cooldown). Best local play per lesson (a completed path beats a partial one). |
-| `avatar_equip` | `PUT /avatar/equip` per slot with `clientTimestamp` | One coalesced event per user, latest change per slot. Server: last-write-wins against `EquippedItem.updatedAt` (stored = the client time); an older write answers `stale: true` and changes nothing; the client toasts "changed on another device". |
-| `avatar_config_update` | `PUT /avatar/config` with `clientTimestamp` | Merged patch; LWW against `User.avatarUpdatedAt`. `OfflineSyncService.queueAvatarEquip/queueAvatarConfig` are the entry points for the dressing room. Edge: an unequip removes the row, so a later-synced *older* equip of that slot still applies. |
-| `preference_update` | `PATCH /me` | Merged; used for the locale switch and the time-zone setting while offline. |
-| `lesson_progress_seen` | analytics event `lesson_progress_seen` with the original time | A lesson opened from the download while offline. |
+| Kind                   | Replayed as                                                                    | Notes                                                                                                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scenario_complete`    | `POST /scenarios/:id/complete` `{ path, clientTimestamp }` + `Idempotency-Key` | Played from the downloaded graph; the server walks and scores the path again. A replayed key returns the recorded run (`replayed: true`, no new row, no cooldown). Best local play per lesson (a completed path beats a partial one).               |
+| `avatar_equip`         | `PUT /avatar/equip` per slot with `clientTimestamp`                            | One coalesced event per user, latest change per slot. Server: last-write-wins against `EquippedItem.updatedAt` (stored = the client time); an older write answers `stale: true` and changes nothing; the client toasts "changed on another device". |
+| `avatar_config_update` | `PUT /avatar/config` with `clientTimestamp`                                    | Merged patch; LWW against `User.avatarUpdatedAt`. `OfflineSyncService.queueAvatarEquip/queueAvatarConfig` are the entry points for the dressing room. Edge: an unequip removes the row, so a later-synced _older_ equip of that slot still applies. |
+| `preference_update`    | `PATCH /me`                                                                    | Merged; used for the locale switch and the time-zone setting while offline.                                                                                                                                                                         |
+| `lesson_progress_seen` | analytics event `lesson_progress_seen` with the original time                  | A lesson opened from the download while offline.                                                                                                                                                                                                    |
 
 **Offline lists.** Catalog (per filter set), Today (summary, quests,
 enrollments, catalog, categories, league, avatar, continue-card course +
@@ -417,7 +418,7 @@ progress) and My courses keep their last successful response in
 localStorage, scoped by user id (`offline/response-cache.ts`), and render it
 offline with an "Offline · showing what you saw …" chip. The lesson player
 saves the course curriculum (`course-cache.ts`) so the outline, position and
-"Next" work offline; offline, "Next" skips to the next *downloaded* lesson.
+"Next" work offline; offline, "Next" skips to the next _downloaded_ lesson.
 
 **Estimates.** `OfflineSyncService.pendingEstimate` sums the estimates of
 queued completions that will count (lesson completes, locally-correct quiz
@@ -435,8 +436,8 @@ or hidden tests). Offline the exercise is shown read-only with "Connect to
 run code".
 
 **Download prompt.** Enrolling on the course page (without auto-download)
-shows "Want to read this course offline? Download it now." with *Download
-course* / *Download the next 3 lessons* / *Not now*.
+shows "Want to read this course offline? Download it now." with _Download
+course_ / _Download the next 3 lessons_ / _Not now_.
 
 **Telemetry.** `offline_queue_enqueued`, `queue_depth_on_flush`,
 `sync_flush` (`sent`, `succeeded`, `conflicts`, `failed`, `halted`),

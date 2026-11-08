@@ -102,7 +102,7 @@ Submission and, on a pass, completes the lesson through
 `ProgressService.recordCompletion` (`EXERCISE_PASS`, first pass only).
 `/run` and `/submit` answer `LANGUAGE_NOT_SUPPORTED` for web exercises.
 
-**Trust model.** The verdict of a browser exercise is *client-attested*: the
+**Trust model.** The verdict of a browser exercise is _client-attested_: the
 server has no browser to re-run DOM / style checks, so a modified client can
 report a pass. That is accepted because the reward is the same small,
 non-monetary first-completion XP / coins as any lesson (paid once per lesson,
@@ -173,13 +173,13 @@ Authoring is in admin's exercise editor (Monaco). Test fields are JSON; validati
 ## 6. Submission flow
 
 1. Student presses "Submit" in `ExerciseRunner`.
-2. Client `POST /v1/exercises/:id/submissions` with `{ code }` and `Idempotency-Key`.
+2. Client `POST /api/exercises/:id/submit` with `{ code }` and `Idempotency-Key`.
 3. API:
    - Verifies access to the parent lesson.
    - Persists `Submission` row with verdict `PENDING` (transient — not in initial enum; we use `ERROR` if worker dies before update — handled by reconciliation).
    - Enqueues a `submission.run` job in BullMQ.
    - Returns `{ submissionId }`.
-4. Client polls `GET /v1/submissions/:id` (or subscribes to a websocket; v1 is poll, 1s interval, max 10s).
+4. Client polls `GET /api/submissions/:id` (or subscribes to a websocket; v1 is poll, 1s interval, max 10s).
 5. Worker:
    - Pulls from queue. Sets `Submission.status = RUNNING`.
    - Builds the full source = user code + harness.

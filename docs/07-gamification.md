@@ -45,14 +45,14 @@ This is the user's stated requirement: premium has a configurable rate, specific
 
 ### Multiplier types (the `MultiplierKind` enum)
 
-| Kind               | Bind to                      | Use case                                                                |
-| ------------------ | ---------------------------- | ----------------------------------------------------------------------- |
-| `PREMIUM_DEFAULT`  | None (global)                | Paid-user default. Default value 2.00; admin can set to 1.5 or 3.0 etc. |
-| `COURSE_PROMO`     | `Course`                     | "Boost engagement on the new React course: 4x coins for two weeks"      |
-| `LESSON_PROMO`     | `Lesson`                     | "This capstone lesson awards 5x XP"                                     |
-| `STREAK_TIER`      | `streakDaysMin` (e.g. 7, 30) | "Once you hit a 30-day streak, every reward is 1.5x"                    |
-| `LEAGUE_PROMOTION` | None                         | Single-event boost on rank-up                                           |
-| `CAMPAIGN`         | None (time-bounded)          | "Double-XP weekend" platform-wide                                       |
+| Kind              | Bind to                      | Use case                                                                |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| `PREMIUM_DEFAULT` | None (global)                | Paid-user default. Default value 2.00; admin can set to 1.5 or 3.0 etc. |
+| `COURSE_PROMO`    | `Course`                     | "Boost engagement on the new React course: 4x coins for two weeks"      |
+| `LESSON_PROMO`    | `Lesson`                     | "This capstone lesson awards 5x XP"                                     |
+| `STREAK_TIER`     | `streakDaysMin` (e.g. 7, 30) | "Once you hit a 30-day streak, every reward is 1.5x"                    |
+| `SURPRISE_BOOST`  | User (short-lived row)       | "Next 15 minutes 2x XP" after a lucky completion (§15, docs/10 §6)      |
+| `CAMPAIGN`        | None (time-bounded)          | "Double-XP weekend" platform-wide                                       |
 
 Each multiplier has:
 
@@ -71,7 +71,9 @@ For any reward event, `libs/domain/multipliers.resolveMultiplier({ user, lesson,
 2. `STREAK_TIER` (highest tier the user qualifies for)
 3. `COURSE_PROMO` ⊕ `LESSON_PROMO` (the more specific wins; never both)
 4. `CAMPAIGN` (if any active)
-5. `LEAGUE_PROMOTION` (only on the league-promotion event itself)
+5. `SURPRISE_BOOST` (the user's live boost, if any)
+
+As built: there is no `LEAGUE_PROMOTION` multiplier (not in `MultiplierKind` in the schema or `@codify/domain`). The league promotion reward is a flat grant at rollover: `GamificationConfig` `league.promotionReward` (default 50 XP + 100 coins + 1 freeze) and `league.rank1Reward` (25 XP + 50 coins), paid un-multiplied as XP source `LEAGUE_PROMOTION` / coin source `WEEKLY_LEAGUE` (§9).
 
 Example for a 30-day-streak premium user doing a 4x-promo lesson during a 2x campaign:
 
@@ -228,6 +230,7 @@ The single most powerful retention lever after streak.
 - Weekly cohorts of ~30 users, sharded by `(tier, weekStart, cohortKey)`.
 - Tiers: Bronze → Silver → Gold → Platinum → Diamond. New users start at Bronze.
 - Sharding: assigned at week-start by hashing `userId + weekStart`, ensuring stable assignment without database hot rows.
+  - As built: cohorts fill first-come. A user joins on their first XP of the week (or when opening the league), at the tier carried from last week, into the first cohort of that (tier, week) with fewer than 30 members; a new cohort (random `cohortKey`) opens when all are full (`LeagueAccumulatorService.ensureMembership`).
 - Weekly XP from all sources accumulates into `LeagueMembership.weeklyXp`.
 - At week end (rollover job runs Monday 00:05 UTC; `weekStart` always refers to UTC Monday 00:00):
   - Top 7 promote to next tier.
@@ -316,6 +319,7 @@ QUEUE
 
 - All reward writes use Postgres transactions.
 - Idempotency: every mutating reward call requires `Idempotency-Key` (UUID v4). Stored in Redis (24h) + `IdempotencyRecord` (audit).
+  - As built: no Redis store. Lesson completion is idempotent on the `Progress (userId, lessonId)` unique constraint (no key needed; replay → `409 LESSON_ALREADY_COMPLETED`), every ledger row carries a unique `idempotencyKey`, and exercise / quiz / scenario submissions honour `Idempotency-Key` from Postgres (docs/14 §8).
 - Per-source daily caps configurable in `GamificationConfig` rows; admin-editable.
 - Rate limit: max 10 reward events per user per minute (well above legitimate use).
 - Cooldown on retake-XP for exercises (1 per day per exercise).

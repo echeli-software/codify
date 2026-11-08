@@ -6,8 +6,8 @@ PostgreSQL 16 via Prisma 5. Single tenant. UUID primary keys (v7 for time-orderi
 
 - **IDs**: `String @id @default(dbgenerated("uuid_generate_v7()"))`. Enable extension `uuid-ossp` and a `uuidv7()` SQL function (we ship a small migration).
 - **Timestamps**: every table has `createdAt` (DEFAULT now()) and, where mutable, `updatedAt` (managed by Prisma).
-- **Soft delete**: only on `User`, `Course`, `Module`, `Lesson`, `Item`, `Category`, `Plan`. Use `deletedAt: DateTime?` and a Prisma middleware to filter. Everything else hard-deletes.
-  - Implemented as explicit `deletedAt: null` filters in each read path (no middleware). Deleting a module sets `deletedAt` on the module and its live lessons and parks the module at a negative `order` so its `(courseId, order)` slot frees up; progress, XP history and translations are kept.
+- **Soft delete**: only on `User`, `Course`, `Module`, `Lesson`, `Item`, `Category`, `Plan`. Use `deletedAt: DateTime?`, filtered manually. Everything else hard-deletes.
+  - Implemented as explicit `deletedAt: null` filters in each read path (no Prisma middleware or client extension); a new query on these models must add the filter itself. Deleting a module sets `deletedAt` on the module and its live lessons and parks the module at a negative `order` so its `(courseId, order)` slot frees up; progress, XP history and translations are kept.
   - `ContentTranslation` has no FK (polymorphic), so translations are only removed where a translatable entity is genuinely hard-deleted. Today that is only item categories (`DELETE /admin/item-categories/:slug`, same transaction). Badges and quest templates are deactivated (`isActive=false`), never deleted. Any new hard-delete path for a `TranslatableEntity` must delete its `ContentTranslation` rows in the same transaction.
 - **Money**: `Int` cents, never `Float`. Currency code stored separately (`String` ISO-4217).
 - **Locale**: BCP-47 strings (`pt-BR`, `en-US`).
@@ -299,46 +299,45 @@ model Subscription {
   @@index([stripeCustomerId])
 }
 
+// As built: subscription access is computed from Subscription (docs/09 §3),
+// and free lessons/courses from Lesson.isFree, so neither is an enrollment
+// source. Only PROMO / ADMIN_GRANT enrollments grant paid access.
 enum EnrollmentSource {
-  PLAN          /// Granted by an active subscription
-  FREE          /// Course flagged free entirely
-  GIFT          /// Manually granted
+  SELF          /// Student enrolled themselves (tracking only, never grants paid access)
   PROMO         /// Granted by a promotional code
+  ADMIN_GRANT   /// Granted by staff
 }
 
 model Enrollment {
-  id        String           @id @default(dbgenerated("uuid_generate_v7()"))
-  userId    String
-  user      User             @relation(fields: [userId], references: [id])
-  courseId  String
-  course    Course           @relation(fields: [courseId], references: [id])
-  source    EnrollmentSource
-  startedAt DateTime         @default(now())
+  id          String           @id @default(dbgenerated("uuid_generate_v7()"))
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  source      EnrollmentSource @default(SELF)
+  accessUntil DateTime?        /// PROMO / ADMIN_GRANT paid access ends here (null = no expiry)
+  createdAt   DateTime         @default(now())
 
   @@unique([userId, courseId])
   @@index([courseId])
 }
 
-enum ProgressStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-}
-
+// As built: Progress is a completion record. A row exists only once the
+// lesson is complete, and the (userId, lessonId) unique constraint is the
+// double-award guard. Scores and attempts live in QuizAttempt / Submission /
+// ScenarioRun, not here.
 model Progress {
-  id           String         @id @default(dbgenerated("uuid_generate_v7()"))
+  id           String   @id @default(dbgenerated("uuid_generate_v7()"))
   userId       String
-  user         User           @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lessonId     String
-  lesson       Lesson         @relation(fields: [lessonId], references: [id])
-  status       ProgressStatus @default(IN_PROGRESS)
-  scorePct     Int?           /// 0-100 for quiz/exercise lessons
-  attemptCount Int            @default(0)
-  lastSeenAt   DateTime       @default(now())
-  completedAt  DateTime?
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt  DateTime @default(now())
+  xpAwarded    Int
+  coinsAwarded Int
 
   @@unique([userId, lessonId])
-  @@index([userId, completedAt])
+  @@index([userId, completedAt(sort: Desc)])
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -421,6 +420,7 @@ model Streak {
 
 enum MultiplierKind {
   PREMIUM_DEFAULT     /// Global default for paid users
+  SURPRISE_BOOST      /// Per-user, short-lived ("next 15 minutes 2x XP", docs/10 §6)
   COURSE_PROMO        /// Bound to a Course
   LESSON_PROMO        /// Bound to a Lesson
   STREAK_TIER         /// Auto-applied at streak thresholds
@@ -894,7 +894,8 @@ model AuditLog {
 
 // ─────────────────────────────────────────────────────────────────────
 // Idempotency keys (Redis-backed primarily; this is for long-term audit
-// of billing/gamification critical paths)
+// of billing/gamification critical paths). As built: Postgres only, no
+// Redis layer; see "IdempotencyRecord table vs Redis-only" below.
 // ─────────────────────────────────────────────────────────────────────
 
 model IdempotencyRecord {
@@ -932,6 +933,8 @@ Configurable multipliers live as rows. The multiplier resolver (see [07-gamifica
 
 ### `IdempotencyRecord` table vs Redis-only
 
+As built: there is no Redis idempotency cache; Postgres unique constraints do all of it. Lesson completion relies on `Progress (userId, lessonId)`, ledger rows on the unique `XpEvent` / `CoinTransaction.idempotencyKey`, exercise submissions on `Submission.idempotencyKey`, and quiz / scenario replays, webhooks and once-only jobs on `IdempotencyRecord` rows. The original design follows.
+
 Postgres is authoritative; Redis is a hot-path cache. On a write: Postgres unique constraint on `key` is the source of truth — duplicate keys fail there. Redis is populated optimistically for fast lookups but a Redis miss falls back to Postgres. If Redis-write succeeds and Postgres-write fails, the request fails (caller retries with same key); if Postgres succeeds and Redis fails, a background tickle re-populates Redis. The unique constraint guarantees no double-execution regardless of cache state.
 
 ### `Asset` model
@@ -944,7 +947,7 @@ Beyond the indexes declared inline:
 
 - `XpEvent (userId, createdAt DESC)` — feed query for "your recent activity".
 - `CoinTransaction (userId, createdAt DESC)` — same.
-- `Progress (userId, completedAt DESC) WHERE completedAt IS NOT NULL` — partial index, used for streak calculation and "today's lessons".
+- `Progress (userId, completedAt DESC)` — used for streak calculation and "today's lessons" (as built a plain index: every Progress row is a completion).
 - `LeagueMembership (leagueId, weeklyXp DESC)` — leaderboard ranking.
 - `Notification (userId, scheduledFor) WHERE sentAt IS NULL` — partial, used by the scheduler.
 

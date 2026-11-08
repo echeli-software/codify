@@ -28,6 +28,8 @@ Bottom of stack
 
 `emote` is a special slot — equipping it just plays a one-shot animation (used as profile flair, in chat reactions later).
 
+**As built:** `ItemSlot` has a single `ACCESSORY` (no front/back split): `PET, BACKGROUND, TOP, BOTTOM, SHOES, HAT, HAIR, GLASSES, ACCESSORY, FRAME, EMOTE`. `cdf-avatar-renderer` draws it in the front-accessory position (above `TOP`, below `HAIR`, anchored on the chest), so back items such as backpacks or wings have no slot of their own.
+
 ## 3. Asset format
 
 - **SVG** preferred. Single-file per item, with named groups so we can recolor/restyle.
@@ -36,6 +38,8 @@ Bottom of stack
 - **Recolorable asset variants** (later): assets can include `data-recolor="primary|secondary"` groups; user can pick a color from a palette per-slot.
 
 Fallback: PNG sprite sheets supported but discouraged (no scaling, no recoloring).
+
+**As built:** SVG uploads are rejected (docs/14 §3 wins), so uploaded sprites are PNG or WebP (≤ 1 MB). Vector art exists only where the client draws it: the base body, inline `color:` tokens and the rarity glow `<filter>` in `cdf-avatar-renderer`.
 
 **Sprite references (as built).** `Item.spriteAssetId` is either an inline
 token rendered by the client (`emoji:🧢`, `color:#ffd700`), the id of an
@@ -256,6 +260,7 @@ Spending:
 
 - Designers deliver SVG following a per-slot template (256×256, anchor doc).
 - Admin uploads → API validates SVG (DOMPurify sanitize, canvas size, anchor presence) → stores in R2 → creates `Item`.
+  - As built: the admin sprite picker accepts `image/png,image/webp`; the API rejects SVG, checks the sniffed type and size, and records width/height without enforcing a canvas size or anchors.
 - Admin previews on the avatar via `ItemSpritePreview`.
 - Translations added per locale.
 - Schedule "go live" via `dropStartsAt`.

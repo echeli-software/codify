@@ -116,7 +116,7 @@ Tabs per role: ADMIN / TEACHER (own courses) see all; SUPPORT sees Overview, Cur
 
 - DataTable: thumbnail, slug, slot, category, rarity, costCoins, requiredLevel, premiumOnly badge, drop window, active toggle.
 - Detail:
-  - Sprite upload (`AssetPicker`, accepts SVG, validates dimensions and slot anchor).
+  - Sprite upload (`AssetPicker`, accepts SVG, validates dimensions and slot anchor). As built: PNG/WebP only (SVG is rejected, docs/14 §3); dimensions are recorded, not validated against the slot anchor.
   - Live preview via `ItemSpritePreview` over a sample avatar.
   - Cost / required level / premium-only / limited-drop window.
   - Translations.
@@ -197,6 +197,7 @@ Tabs per role: ADMIN / TEACHER (own courses) see all; SUPPORT sees Overview, Cur
 ## 5. Forms & autosave
 
 - Reactive forms with zod validation via a shared `zodControlAdapter`.
+  As built: there is no `zodControlAdapter`. Admin forms are mostly template-driven (`FormsModule` + `[(ngModel)]` on a plain form object; `ReactiveFormsModule` only on the lessons and translations pages). Each page checks required / format fields on submit into an `errors` signal shown through `cdf-form-field [error]`; the API stays authoritative (class-validator DTOs behind the global `ValidationPipe`, problem+json 400s mapped by `AdminErrors`). zod is used where the schema itself is shared: `lessonDocSchema` (API save + editor) and `quizAttrsSchema` (quiz block editor, `safeParse`).
 - Autosave on lesson editor (5s debounce, visible "Saved at HH:MM:SS").
   Implemented in `core/autosave.ts`: every edit restarts the 5 s timer; no
   autosave while the title is empty or while the API's last content
