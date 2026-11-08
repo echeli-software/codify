@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  InjectionToken,
   type ElementRef,
   afterNextRender,
   effect,
@@ -14,8 +15,19 @@ import {
 } from '@angular/core';
 import { TranslatePipe } from '@codify/i18n';
 
-type MonacoModule = typeof import('./monaco-setup');
-type StandaloneEditor = ReturnType<MonacoModule['monaco']['editor']['create']>;
+/** The slice of Monaco's API the editor uses (`editor.api`). */
+export type MonacoApi = typeof import('monaco-editor/editor/editor.api.js');
+type MonacoModule = { monaco: MonacoApi };
+type StandaloneEditor = ReturnType<MonacoApi['editor']['create']>;
+
+/**
+ * Loads Monaco (a dynamic `import()` of the app's monaco-setup module, so
+ * it stays a lazy chunk of the app). Without it — Storybook, tests — the
+ * editor keeps the plain textarea. The student app provides it.
+ */
+export const MONACO_LOADER = new InjectionToken<() => Promise<MonacoModule>>(
+  'MONACO_LOADER',
+);
 
 let monacoPromise: Promise<MonacoModule> | null = null;
 
@@ -39,9 +51,11 @@ function loadMonacoCss(): Promise<void> {
   });
 }
 
-/** Lazy-load Monaco once per page (dynamic import → separate chunk). */
-export function loadMonaco(): Promise<MonacoModule> {
-  monacoPromise ??= Promise.all([import('./monaco-setup'), loadMonacoCss()])
+/** Lazy-load Monaco once per page through the app's loader. */
+export function loadMonaco(
+  loader: () => Promise<MonacoModule>,
+): Promise<MonacoModule> {
+  monacoPromise ??= Promise.all([loader(), loadMonacoCss()])
     .then(([m]) => m)
     .catch((err: unknown) => {
       monacoPromise = null;
@@ -187,15 +201,17 @@ export class CodeEditor {
   protected readonly ready = signal(false);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+  private readonly loader = inject(MONACO_LOADER, { optional: true });
   private editor: StandaloneEditor | null = null;
-  private monaco: MonacoModule['monaco'] | null = null;
+  private monaco: MonacoApi | null = null;
   private applying = false;
   private destroyed = false;
 
   constructor() {
     afterNextRender(() => {
-      if (this.plain() || !preferMonaco()) return;
-      loadMonaco()
+      const loader = this.loader;
+      if (!loader || this.plain() || !preferMonaco()) return;
+      loadMonaco(loader)
         .then((m) => {
           if (!this.destroyed) this.mount(m.monaco);
         })
@@ -243,7 +259,7 @@ export class CodeEditor {
     );
   }
 
-  private mount(monaco: MonacoModule['monaco']): void {
+  private mount(monaco: MonacoApi): void {
     this.monaco = monaco;
     const ed = monaco.editor.create(this.host().nativeElement, {
       value: this.value(),

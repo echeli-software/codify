@@ -13,7 +13,10 @@ const meta: Meta<CodeEditor> = {
 export default meta;
 type Story = StoryObj<CodeEditor>;
 
-/** Monaco on devices with a fine pointer; textarea on touch-only devices. */
+/**
+ * The app provides `MONACO_LOADER` (Monaco on devices with a fine pointer);
+ * Storybook doesn't, so stories show the textarea fallback.
+ */
 export const Default: Story = {};
 export const ReadOnly: Story = { args: { readonly: true } };
 export const Html: Story = {

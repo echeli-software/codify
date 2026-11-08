@@ -48,6 +48,7 @@ import {
   EmptyState,
   ErrorState,
   Icon,
+  MONACO_LOADER,
   OfflineState,
   PaywallSheet,
   XpBadge,
@@ -129,7 +130,14 @@ interface Neighbour {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   // docs/16 §8: downloaded lesson images render from the device on native.
-  providers: [provideNativeLessonImages()],
+  // docs/05 Exercise: Monaco for the code editor, as a lazy chunk.
+  providers: [
+    provideNativeLessonImages(),
+    {
+      provide: MONACO_LOADER,
+      useValue: () => import('../components/code-editor/monaco-setup'),
+    },
+  ],
   imports: [
     PromoBadge,
     RouterLink,
@@ -297,7 +305,10 @@ interface Neighbour {
                       </p>
                     }
                     <h1>{{ l.title }}</h1>
-                    <cdf-promo-badge [courseId]="l.courseId" [lessonId]="l.id" />
+                    <cdf-promo-badge
+                      [courseId]="l.courseId"
+                      [lessonId]="l.id"
+                    />
                     <p class="lp__meta">
                       @if (l.estimatedMinutes) {
                         <span

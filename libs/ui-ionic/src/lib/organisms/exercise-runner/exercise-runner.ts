@@ -73,6 +73,7 @@ let runnerSeq = 0;
         <cdf-code-editor
           class="cdf-runner__editor"
           [inputId]="editorId"
+          [label]="'ui.exercise.editor' | translate"
           [value]="code()"
           (valueChange)="code.set($event)"
           [language]="ex.language"

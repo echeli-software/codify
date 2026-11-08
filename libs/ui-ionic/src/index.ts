@@ -174,6 +174,8 @@ export {
 } from './lib/organisms/celebration-overlay/celebration-overlay.js';
 export {
   CodeEditor,
+  MONACO_LOADER,
+  type MonacoApi,
   loadMonaco,
   monacoLanguage,
   preferMonaco,

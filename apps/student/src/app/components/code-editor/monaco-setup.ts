@@ -1,7 +1,8 @@
 /**
- * Monaco bootstrap for the student exercise editor — only reached through
- * the dynamic `import()` in `loadMonaco()`, so it lands in a lazy chunk and
- * never in the initial bundle. Slim `editor.api` + the contributions a
+ * Monaco bootstrap for the student exercise editor (`cdf-code-editor` in
+ * ui-ionic) — only reached through the dynamic `import()` of
+ * `MONACO_LOADER` (app.config), so it lands in a lazy chunk and never in the
+ * initial bundle; Storybook / tests never load it. Slim `editor.api` + the contributions a
  * learner needs; Monarch grammars for JS / TS / Python / HTML / CSS (no
  * language-service workers).
  */
