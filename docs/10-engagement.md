@@ -74,6 +74,10 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
 | `BILLING`         | Push + Email                     | On payment failure / before renewal (PIX)                       | Respect (email anytime)     |
 | `SYSTEM`          | Push                             | Critical (account suspended, terms update)                      | No quiet-hours override     |
 
+Timing implementation: `LEAGUE_RESULT` is sent by an hourly job once the member's local clock passes 09:00 on the
+Monday the week ended (the rollover itself sends nothing); `PROMO` by a 15-minute job when a campaign or course promo
+starts, only to users who turned PROMO push on (docs/07 §15).
+
 ### Time-of-day learning
 
 - We track session-start times. After 7 days of data, the daily quest reminder shifts to a personalized window.
@@ -217,6 +221,8 @@ Used carefully:
 
 - **Mystery chests** with **published drop tables** (see [07-gamification.md §10](./07-gamification.md)).
 - **Surprise XP boosts**: rare, ≤ 2/week, "next 15 minutes 2x XP — go!". Calibrated so a user who happens to be in-session sees them; non-spam.
+  Implemented as a per-user `SURPRISE_BOOST` multiplier started after a completion (`boost.surprise`: 10 % chance,
+  2x XP, 15 min, ≤ 2 per rolling 7 days); the app shows a countdown chip (docs/07 §15).
 
 We deliberately **do not** use:
 

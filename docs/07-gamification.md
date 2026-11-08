@@ -347,3 +347,90 @@ Weekly tuning rituals:
 ## 14. Anti-patterns
 
 Two gamification-specific commitments: paid premium gives multipliers (never levels or unlocks of advancement), and we monetize _no_ form of streak-loss. The full review checklist for any feature touching engagement lives in [10-engagement.md §8](./10-engagement.md).
+
+## 15. Implementation notes (economy)
+
+How the rules above are implemented; every number is a `GamificationConfig`
+key (admin: Gamification → Defaults; League zone sizes on the Leagues page).
+
+- **Lesson base reward** (`earning.byLessonType`, default = the §2 table;
+  CAPSTONE 25/12). `Lesson.baseXp` / `baseCoins` keep their column defaults
+  (10 / 5) — so the rule, per field, is: a value an author changed away
+  from 10 XP / 5 coins wins; a value still at the column default uses the
+  per-type default (`lessonBaseReward` in `@codify/domain`). An author who
+  wants exactly 10 XP on a non-reading lesson uses 9 or 11.
+- **Quiz bonuses**: a passing quiz pays its base as `LESSON_COMPLETE`; a
+  100 % score adds `earning.quizPerfectBonus` (10 / 5) as its own
+  `QUIZ_PERFECT` ledger rows; `earning.quizPerQuestionBonus` (default 0 =
+  off; the docs give no amount) pays per correct answer. Both are
+  multiplied like the completion and appear as breakdown lines.
+- **Retakes**: an exercise / AI-prompt pass of an already-completed lesson
+  pays `earning.retake` (5 / 2, source `RETAKE`) once per lesson per
+  user-local day. A scenario run that reaches an ending the user never
+  reached before pays `earning.scenarioBranch` (10 / 5, source
+  `SCENARIO_BRANCH`), at most `dailyCap` (3) per scenario per local day —
+  the first completion counts when it was today. Both count for the
+  streak, XP / exercise / streak quests and badges, not lesson-count
+  quests. Responses carry the reward with `alreadyCompleted: true,
+retake: true`.
+- **Daily coin caps** (`coins.dailyCaps`, default `{ LESSON_COMPLETE: 200 }`,
+  user-local day): the part of a grant over the cap goes to the user's
+  `CoinBonusPool` for the UTC week (cap `coins.weeklyPoolCap`, 500); the
+  rest is dropped. Rewards report `coinCap { requested, pooled, dropped }`
+  and a `DAILY_CAP` breakdown line. An hourly job pays closed weeks' pools
+  as `WEEKLY_BONUS`. Admin grants, promo codes, league rewards and pool
+  payouts are never capped.
+- **Streaks**: `Streak.lastActivityDate` is the last _covered_ local day.
+  Missed days use banked freezes one each; when they run out the streak is
+  lost (`currentDays = 0`, the freezes are used up). The summary, reminders
+  and the reward pipeline all read the _effective_ streak
+  (`settleStreak` / `effectiveStreak`); an hourly job writes it back
+  (and records server-side `streak_freeze_used` / `streak_lost`). Streak
+  reminders only go to live streaks.
+- **Multipliers**: per-user `SURPRISE_BOOST` rows (category 5 of the
+  resolver) — after a completion, `boost.surprise.chancePct` (10 %) starts
+  a 15-minute 2x XP boost, at most 2 per rolling 7 days; never listed by
+  `/multipliers*`. The breakdown lists each factor with `appliesTo`
+  (`xp` / `coins` / `both`).
+- **Streak cosmetics**: reaching 30 / 100 / 365 days grants
+  `streak-30-flame-frame`, `streak-100-blaze-hat`, `streak-365-phoenix-pet`
+  (category `streak-rewards`, inactive = never sold) as `UserItem` source
+  `PROMO`; the milestone in the reward carries the item.
+- **Badges** `where` filters: `scorePct` (numeric predicate; ai_prompt_pass,
+  quiz_pass, exercise_pass) and `afterStreakLost: true` (any lesson event;
+  counted at most once). Unknown filters / misuse are listed as validation
+  errors.
+- **Leagues**: zone sizes `league.zones` `{ cohortSize, promote, demote,
+minCohortForDemotion }` (default 30 / 7 / 5 / 5). LEAGUE_RESULT is sent by
+  an hourly job once the member's local clock passes 09:00 on the Monday the
+  week ended (docs/10 §3), not at rollover.
+- **Promo codes** (docs/08 §12): `PromoCode` rows (stored upper-case),
+  redeemed once per user, inside `startsAt`/`endsAt` and
+  `maxRedemptions`, as a `PROMO_CODE` coin row. API:
+
+  | Method | Path                         | Auth           | Body                                                                                       | Response                                                                                                                                                                        |
+  | ------ | ---------------------------- | -------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | GET    | `/api/admin/promo-codes`     | ADMIN          | —                                                                                          | `PromoCode[]` (+ `redeemableNow`)                                                                                                                                               |
+  | POST   | `/api/admin/promo-codes`     | ADMIN, audited | `{ code, coins (1–10 000), maxRedemptions?, startsAt?, endsAt?, isActive?, description? }` | the code; 409 `PROMO_CODE_TAKEN`                                                                                                                                                |
+  | PATCH  | `/api/admin/promo-codes/:id` | ADMIN, audited | same minus `code`                                                                          | the code                                                                                                                                                                        |
+  | DELETE | `/api/admin/promo-codes/:id` | ADMIN, audited | —                                                                                          | `{ deleted }` (a redeemed code is deactivated)                                                                                                                                  |
+  | POST   | `/api/me/promo-codes/redeem` | STUDENT        | `{ code }`                                                                                 | `{ code, coins, totals }`; 404 `PROMO_CODE_NOT_FOUND`, 400 `_NOT_STARTED`, 410 `_EXPIRED`, 409 `_ALREADY_REDEEMED` / `_EXHAUSTED`, 429 `_RATE_LIMITED` (10 failed tries / hour) |
+
+- **Jobs** (behind `JOBS_ENABLED`, idempotent; ADMIN trigger
+  `POST /api/admin/gamification/jobs/{streak-settle|weekly-bonus|promo-announce|league-results}/run`):
+  streak settlement hourly :10, bonus payout hourly :20, PROMO announcement
+  every 15 min (campaigns / course promos that started in the last 24 h →
+  users who turned PROMO push on), LEAGUE_RESULT hourly :03.
+- **Summary** `GET /api/gamification/summary` also returns
+  `streak.activeToday`, `surpriseBoost` and `weeklyBonusPool`.
+- **Client** (§11): the first reward plays immediately; only follow-ups
+  inside 800 ms collapse. Streak milestone and league promotion get a
+  celebration card (league: also a banner kept into the next route,
+  triggered once from `/league/last-week`), quests and bonus lines go on the
+  toast, every 3rd lesson in a session gets a micro-celebration, XP
+  sparkles fly to the XP counter and a flame burst plays on the streak
+  counter when a day is saved (all skipped under reduced motion).
+- **Seed**: migration `20261108120000_gamification_defaults` (data only,
+  idempotent) inserts PREMIUM_DEFAULT 2.0, the §6 streak tiers, 9 starter
+  quest templates (20 coins), the 6 §7 starter badges and the streak
+  cosmetics, with en-US translations.
