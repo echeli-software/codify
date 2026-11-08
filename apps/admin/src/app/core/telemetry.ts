@@ -58,11 +58,15 @@ export const FEATURE_RULES: readonly {
   },
   {
     method: 'POST',
-    path: /^\/admin\/users\/([^/]+)\/(?:coins|coin-grants|coins\/grant)$/,
+    // POST /admin/users/:id/grants { coins?, xp?, reason } (docs/04 Users).
+    path: /^\/admin\/users\/([^/]+)\/grants$/,
     event: 'coins_granted',
     props: (req) => {
-      const amount = (req.body as { amount?: unknown } | null)?.amount;
-      return typeof amount === 'number' ? { amount } : {};
+      const body = req.body as { coins?: unknown; xp?: unknown } | null;
+      return {
+        ...(typeof body?.coins === 'number' ? { amount: body.coins } : {}),
+        ...(typeof body?.xp === 'number' ? { xp: body.xp } : {}),
+      };
     },
   },
   {

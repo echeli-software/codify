@@ -153,6 +153,14 @@ export const SHELL_ROUTES: Route[] = [
           import('./pages/analytics.page').then((m) => m.AnalyticsPage),
       },
       {
+        path: 'exercise-health',
+        canActivate: [sectionGuard('exerciseHealth')],
+        loadComponent: () =>
+          import('./pages/exercise-health.page').then(
+            (m) => m.ExerciseHealthPage,
+          ),
+      },
+      {
         path: 'audit',
         canActivate: [sectionGuard('audit')],
         loadComponent: () =>

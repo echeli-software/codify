@@ -34,6 +34,9 @@ import {
 import {
   AdminOpsClient,
   BillingClient,
+  StaffToolsClient,
+  type ApiUserRole,
+  type GrantAllowance,
   CoursesClient,
   EnrollmentsClient,
   ItemsClient,
@@ -209,6 +212,50 @@ export function daysUntil(
                   {{ 'admin.users.profileReadOnly' | translate }}
                 </p>
               </div>
+              @if (isAdmin() && !isSelf()) {
+                <div
+                  class="admin-card"
+                  aria-labelledby="role-title"
+                  data-testid="role-change"
+                >
+                  <h2 id="role-title">
+                    {{ 'admin.staff.role.title' | translate }}
+                  </h2>
+                  <div class="form-grid">
+                    <cdf-form-field
+                      [label]="'admin.staff.role.newRole' | translate"
+                      controlId="role-select"
+                    >
+                      <cdf-select
+                        inputId="role-select"
+                        [options]="roleOptions()"
+                        [(ngModel)]="roleDraft"
+                      />
+                    </cdf-form-field>
+                    <cdf-form-field
+                      [label]="'admin.common.reason' | translate"
+                      [help]="'admin.common.reasonHelp' | translate"
+                      controlId="role-reason"
+                    >
+                      <cdf-input
+                        inputId="role-reason"
+                        [(ngModel)]="roleReason"
+                      />
+                    </cdf-form-field>
+                  </div>
+                  <div class="form-actions">
+                    <cdf-button
+                      kind="danger"
+                      [disabled]="roleDraft === u.role"
+                      [loading]="busy() === 'role'"
+                      (click)="changeRole()"
+                      data-testid="change-role"
+                    >
+                      {{ 'admin.staff.role.change' | translate }}
+                    </cdf-button>
+                  </div>
+                </div>
+              }
             </section>
           }
           @case ('subscriptions') {
@@ -697,6 +744,85 @@ export function daysUntil(
               role="tabpanel"
               aria-labelledby="utab-ledger"
             >
+              <div
+                class="admin-card"
+                aria-labelledby="grant-title"
+                data-testid="grant-form"
+              >
+                <h2 id="grant-title">
+                  {{ 'admin.staff.grant.title' | translate }}
+                </h2>
+                @if (allowance(); as al) {
+                  <p class="muted small" data-testid="grant-allowance">
+                    {{
+                      'admin.staff.grant.allowance'
+                        | translate
+                          : {
+                              used: al.usedToday.coins,
+                              limit: al.limit.coins,
+                            }
+                    }}
+                    @if (al.maxCoinsPerGrant !== null) {
+                      ·
+                      {{
+                        'admin.staff.grant.perGrantCap'
+                          | translate: { cap: al.maxCoinsPerGrant }
+                      }}
+                    }
+                  </p>
+                }
+                <div class="form-grid">
+                  <cdf-form-field
+                    [label]="'admin.staff.grant.coins' | translate"
+                    controlId="grant-coins"
+                    [error]="grantFormErrors()['coins'] ?? null"
+                  >
+                    <cdf-input
+                      inputId="grant-coins"
+                      type="number"
+                      [(ngModel)]="coinGrant.coins"
+                    />
+                  </cdf-form-field>
+                  @if (isAdmin()) {
+                    <cdf-form-field
+                      [label]="'admin.staff.grant.xp' | translate"
+                      controlId="grant-xp"
+                      [error]="grantFormErrors()['xp'] ?? null"
+                    >
+                      <cdf-input
+                        inputId="grant-xp"
+                        type="number"
+                        [(ngModel)]="coinGrant.xp"
+                      />
+                    </cdf-form-field>
+                  }
+                  <cdf-form-field
+                    class="span-all"
+                    [label]="'admin.common.reason' | translate"
+                    [help]="'admin.common.reasonHelp' | translate"
+                    controlId="grant-coin-reason"
+                    [error]="grantFormErrors()['reason'] ?? null"
+                  >
+                    <cdf-input
+                      inputId="grant-coin-reason"
+                      [(ngModel)]="coinGrant.reason"
+                    />
+                  </cdf-form-field>
+                </div>
+                <div class="form-actions">
+                  <cdf-button
+                    kind="primary"
+                    [loading]="busy() === 'coins'"
+                    (click)="grantCoins()"
+                    data-testid="grant-coins"
+                  >
+                    {{ 'admin.staff.grant.submit' | translate }}
+                  </cdf-button>
+                </div>
+                @if (coinGrantError(); as e) {
+                  <p class="form-error" role="alert">{{ e }}</p>
+                }
+              </div>
               <div class="admin-card">
                 <header class="section-head">
                   <h2>{{ 'admin.users.ledger.title' | translate }}</h2>
@@ -811,7 +937,7 @@ export function daysUntil(
               role="tabpanel"
               aria-labelledby="utab-account"
             >
-              <cdf-user-account-panel [userId]="userId()" />
+              <cdf-user-account-panel [userId]="userId()" [email]="u.email" />
             </section>
           }
         }
@@ -894,6 +1020,7 @@ export class UserDetailPage {
   private readonly auth = inject(AuthService);
   private readonly adminOps = inject(AdminOpsClient);
   private readonly itemsClient = inject(ItemsClient);
+  private readonly staffTools = inject(StaffToolsClient);
 
   protected readonly tabs: readonly Tab[] = [
     'profile',
@@ -904,6 +1031,33 @@ export class UserDetailPage {
     'account',
   ];
   protected readonly isAdmin = computed(() => this.auth.role() === 'ADMIN');
+  /** Staff can't change their own role (403 ROLE_CHANGE_SELF). */
+  protected readonly isSelf = computed(() => {
+    const me = this.auth.user();
+    const u = this.user();
+    return (
+      !!me && (me.id === this.userId() || (!!u && me.email === u.email))
+    );
+  });
+  protected roleDraft: ApiUserRole = 'STUDENT';
+  protected roleReason = '';
+  protected readonly roleOptions = computed<SelectOption<ApiUserRole>[]>(() => {
+    this.i18n.currentLocale();
+    return (['STUDENT', 'TEACHER', 'SUPPORT', 'ADMIN'] as const).map((r) => ({
+      value: r,
+      label: this.i18n.t(`admin.roles.${r}`),
+    }));
+  });
+  protected coinGrant = {
+    coins: null as number | null,
+    xp: null as number | null,
+    reason: '',
+  };
+  protected readonly grantFormErrors = signal<
+    Record<string, string | undefined>
+  >({});
+  protected readonly coinGrantError = signal<string | null>(null);
+  protected readonly allowance = signal<GrantAllowance | null>(null);
   protected readonly inventory = signal<UserInventoryEntry[] | null>(null);
   protected readonly invError = signal<string | null>(null);
   protected readonly items = signal<
@@ -1020,7 +1174,9 @@ export class UserDetailPage {
     this.ledger.set(null);
     this.ledgerPager.reset();
     try {
-      this.user.set(await this.usersClient.detail(id));
+      const detail = await this.usersClient.detail(id);
+      this.user.set(detail);
+      this.roleDraft = detail.role;
     } catch (err) {
       if (err instanceof ProblemDetailsError && err.isNotFound)
         this.notFound.set(true);
@@ -1043,6 +1199,7 @@ export class UserDetailPage {
     } else if (t === 'ledger') {
       this.loadedTabs.add(t);
       void this.loadLedger(undefined);
+      void this.loadAllowance();
     }
   }
 
@@ -1101,6 +1258,136 @@ export class UserDetailPage {
       this.itemError.set(
         this.errorsSvc.message(err, 'admin.errors.saveFailed'),
       );
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
+  private async loadAllowance(): Promise<void> {
+    try {
+      this.allowance.set(await this.staffTools.grantAllowance());
+    } catch {
+      this.allowance.set(null);
+    }
+  }
+
+  /**
+   * docs/14 §18: destructive / money actions on a user ask for the user's
+   * email typed back before they run.
+   */
+  protected typedConfirm(
+    titleKey: string,
+    messageKey: string,
+    confirmKey: string,
+    params: Record<string, unknown> = {},
+  ): Promise<boolean | null> {
+    const u = this.user();
+    return this.confirm.open({
+      title: this.i18n.t(titleKey, params),
+      message: this.i18n.t(messageKey, params),
+      confirmLabel: this.i18n.t(confirmKey),
+      confirmKind: 'danger',
+      ...(u ? { typeToConfirm: u.email } : {}),
+    });
+  }
+
+  /** Manual coin / XP grant (docs/04 Users; SUPPORT ≤ 1,000 coins, no XP). */
+  protected async grantCoins(): Promise<void> {
+    const errs: Record<string, string> = {};
+    const coins = Math.round(Number(this.coinGrant.coins ?? 0));
+    const xp = this.isAdmin() ? Math.round(Number(this.coinGrant.xp ?? 0)) : 0;
+    const reason = this.coinGrant.reason.trim();
+    if (!Number.isFinite(coins) || coins < 0)
+      errs['coins'] = this.i18n.t('admin.common.invalidNumber');
+    if (!Number.isFinite(xp) || xp < 0)
+      errs['xp'] = this.i18n.t('admin.common.invalidNumber');
+    if (!errs['coins'] && !errs['xp'] && coins === 0 && xp === 0)
+      errs['coins'] = this.i18n.t('admin.staff.grant.empty');
+    const cap = this.allowance()?.maxCoinsPerGrant ?? null;
+    if (cap !== null && coins > cap)
+      errs['coins'] = this.i18n.t('admin.staff.grant.overCap', { cap });
+    if (reason.length < 3)
+      errs['reason'] = this.i18n.t('admin.users.inv.reasonRequired');
+    this.grantFormErrors.set(errs);
+    if (Object.keys(errs).length) return;
+    const ok = await this.typedConfirm(
+      'admin.staff.grant.confirmTitle',
+      'admin.staff.grant.confirmMessage',
+      'admin.staff.grant.submit',
+      { coins, xp, name: this.user()?.displayName ?? '' },
+    );
+    if (!ok) return;
+    this.busy.set('coins');
+    this.coinGrantError.set(null);
+    try {
+      const res = await this.staffTools.grant(this.userId(), {
+        ...(coins > 0 ? { coins } : {}),
+        ...(xp > 0 ? { xp } : {}),
+        reason,
+      });
+      this.user.update((u) =>
+        u ? { ...u, coins: res.after.coins, totalXp: res.after.totalXp } : u,
+      );
+      this.allowance.update((a) =>
+        a
+          ? {
+              ...a,
+              usedToday: {
+                coins: a.usedToday.coins + res.coins,
+                xp: a.usedToday.xp + res.xp,
+              },
+            }
+          : a,
+      );
+      this.coinGrant = { coins: null, xp: null, reason: '' };
+      this.toast.success(
+        this.i18n.t('admin.staff.grant.done', { coins: res.coins, xp: res.xp }),
+      );
+      this.ledgerPager.reset();
+      void this.loadLedger(undefined);
+    } catch (err) {
+      this.coinGrantError.set(
+        this.errorsSvc.message(err, 'admin.errors.saveFailed'),
+      );
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
+  /** Role change (docs/14 §11; ADMIN, never your own account). */
+  protected async changeRole(): Promise<void> {
+    const u = this.user();
+    if (!u || this.roleDraft === u.role) return;
+    const role = this.roleDraft;
+    const ok = await this.typedConfirm(
+      'admin.staff.role.confirmTitle',
+      'admin.staff.role.confirmMessage',
+      'admin.staff.role.change',
+      {
+        name: u.displayName,
+        from: this.i18n.t(`admin.roles.${u.role}`),
+        to: this.i18n.t(`admin.roles.${role}`),
+      },
+    );
+    if (!ok) return;
+    this.busy.set('role');
+    try {
+      const res = await this.staffTools.changeRole(
+        u.id,
+        role,
+        this.roleReason.trim() || undefined,
+      );
+      this.user.update((x) => (x ? { ...x, role: res.role } : x));
+      this.roleDraft = res.role;
+      this.roleReason = '';
+      this.toast.success(
+        this.i18n.t('admin.staff.role.changed', {
+          role: this.i18n.t(`admin.roles.${res.role}`),
+        }),
+      );
+    } catch (err) {
+      this.roleDraft = u.role;
+      this.errorsSvc.toast(err, 'admin.errors.actionFailed');
     } finally {
       this.busy.set(null);
     }

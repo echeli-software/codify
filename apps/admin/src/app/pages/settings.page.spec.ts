@@ -5,10 +5,12 @@ import { ConfirmDialogService, ToastService } from '@codify/ui-bootstrap';
 import {
   BillingClient,
   FlagsClient,
+  StaffToolsClient,
   type FeatureFlag,
 } from '@codify/api-client';
 import {
   SettingsPage,
+  experimentPolicy,
   draftFrom,
   emptyDraft,
   validateFlag,
@@ -89,6 +91,20 @@ describe('SettingsPage', () => {
       update: jest.fn(async (key, b) => flag({ key, ...b })),
       remove: jest.fn().mockResolvedValue({ deleted: true, key: 'exp.card' }),
     };
+    const staff = {
+      announceTerms: jest.fn(async () => ({
+        version: 'v1',
+        audience: 3,
+        notified: 0,
+        running: true,
+      })),
+      termsStatus: jest.fn(async () => ({
+        version: 'v1',
+        audience: 3,
+        notified: 3,
+        running: false,
+      })),
+    };
     const billing = {
       stripeStatus: jest.fn().mockResolvedValue({
         mode: 'dev',
@@ -108,6 +124,7 @@ describe('SettingsPage', () => {
         provideI18n(),
         { provide: FlagsClient, useValue: flags },
         { provide: BillingClient, useValue: billing },
+        { provide: StaffToolsClient, useValue: staff },
         { provide: ConfirmDialogService, useValue: confirm },
         {
           provide: ToastService,
@@ -181,5 +198,25 @@ describe('SettingsPage', () => {
     await page.remove(flag());
     expect(confirm.open).toHaveBeenCalled();
     expect(flags.remove).toHaveBeenCalledWith('exp.card');
+  });
+});
+
+describe('experiment policy (docs/10 §9)', () => {
+  it('reports the global hold-out and the per-surface priority order', () => {
+    const p = experimentPolicy([
+      flag({
+        key: 'experiments.global_holdout',
+        value: { enabled: true, holdoutPct: 5 },
+      }),
+      flag({ key: 'exp.newer', createdAt: '2026-11-03T00:00:00.000Z' }),
+      flag({ key: 'exp.older', createdAt: '2026-10-01T00:00:00.000Z' }),
+      flag({ key: 'exp.off', value: { enabled: false, variants: { a: 1 } } }),
+      flag({ key: 'plain', value: { enabled: true } }),
+    ]);
+    expect(p.globalHoldoutPct).toBe(5);
+    expect(p.surfaces).toEqual([
+      { surface: 'student', experiments: ['exp.older', 'exp.newer'] },
+    ]);
+    expect(experimentPolicy([]).globalHoldoutPct).toBe(0);
   });
 });

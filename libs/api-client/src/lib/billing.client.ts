@@ -131,6 +131,49 @@ export interface StripeStatus {
   webhookUrl: string | null;
 }
 
+/** GET /billing/refund-eligibility (docs/09 §5 self-serve refund). */
+export interface RefundEligibility {
+  eligible: boolean;
+  reason:
+    | 'NO_PAYMENT'
+    | 'STORE_PURCHASE'
+    | 'WINDOW_PASSED'
+    | 'ALREADY_USED'
+    | 'ALREADY_REFUNDED'
+    | null;
+  windowDays: number;
+  payment: {
+    id: string;
+    amountCents: number;
+    currency: string;
+    paidAt: string;
+    planName: string | null;
+  } | null;
+  deadline: string | null;
+}
+
+/** Result of a self-serve or staff refund. */
+export interface RefundOutcome {
+  paymentId: string;
+  refund: { id: string; status: string; amountCents: number; currency: string };
+  before: { status: PaymentStatus; refundedCents: number };
+  /** With Stripe this changes when the charge.refunded webhook lands. */
+  after: { status: PaymentStatus; refundedCents: number };
+  accessEnded: boolean;
+  /** Staff refunds: the SUPPORT cap applied (null for ADMIN). */
+  capCents?: number | null;
+}
+
+/** GET /billing/offers → the day-30 win-back offer (docs/10 §13). */
+export interface WinbackOffer {
+  offer: 'winback';
+  eligible: boolean;
+  reason: 'NO_OFFER' | 'SUBSCRIBED' | 'USED' | 'NOT_CONFIGURED' | null;
+  percentOff: number;
+  appliesTo: 'MONTHLY' | 'ANNUAL';
+  expiresAt: string | null;
+}
+
 /** Mirrors @codify/domain AccessResult — the paywall verdict for a lesson. */
 export interface LessonAccess {
   granted: boolean;
@@ -158,6 +201,8 @@ export class BillingClient {
     paymentMethod?: PaymentMethod;
     successUrl?: string;
     cancelUrl?: string;
+    /** Apply the win-back discount (annual prices; 409 OFFER_NOT_AVAILABLE). */
+    offer?: 'winback';
   }): Promise<CheckoutSessionResponse> {
     return firstValueFrom(
       this.http.post<CheckoutSessionResponse>(
@@ -291,6 +336,51 @@ export class BillingClient {
     return firstValueFrom(
       this.http.post<AdminSubscriptionView>(
         `${this.config.baseUrl}/billing/admin/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+        body,
+        { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /** Offers the signed-in student can use at checkout. */
+  offers(): Promise<{ winback: WinbackOffer }> {
+    return firstValueFrom(
+      this.http.get<{ winback: WinbackOffer }>(
+        `${this.config.baseUrl}/billing/offers`,
+      ),
+    );
+  }
+
+  refundEligibility(): Promise<RefundEligibility> {
+    return firstValueFrom(
+      this.http.get<RefundEligibility>(
+        `${this.config.baseUrl}/billing/refund-eligibility`,
+      ),
+    );
+  }
+
+  /** Self-serve refund of the first payment (typed confirmation "REFUND"). */
+  requestRefund(body: {
+    confirm: 'REFUND';
+    reason?: string;
+  }): Promise<RefundOutcome> {
+    return firstValueFrom(
+      this.http.post<RefundOutcome>(
+        `${this.config.baseUrl}/billing/refund`,
+        body,
+        { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /** SUPPORT (≤ one month of the plan) / ADMIN: refund a payment. */
+  adminRefund(
+    paymentId: string,
+    body: { amountCents?: number; reason: string },
+  ): Promise<RefundOutcome> {
+    return firstValueFrom(
+      this.http.post<RefundOutcome>(
+        `${this.config.baseUrl}/billing/admin/payments/${encodeURIComponent(paymentId)}/refund`,
         body,
         { context: withIdempotency() },
       ),

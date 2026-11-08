@@ -33,8 +33,15 @@ describe('featureEventFor', () => {
       featureEventFor(req('POST', '/api/admin/users/u1/suspend', {}))?.name,
     ).toBe('user_suspended');
     expect(
-      featureEventFor(req('POST', '/api/admin/users/u1/coins', { amount: 50 })),
+      featureEventFor(
+        req('POST', '/api/admin/users/u1/grants', { coins: 50, reason: 'x' }),
+      ),
     ).toEqual({ name: 'coins_granted', props: { amount: 50 } });
+    expect(
+      featureEventFor(
+        req('POST', '/api/admin/users/u1/grants', { xp: 5, reason: 'x' }),
+      ),
+    ).toEqual({ name: 'coins_granted', props: { xp: 5 } });
     expect(
       featureEventFor(
         req('PUT', '/api/admin/translations', { items: [1, 2, 3] }),

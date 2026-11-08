@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -32,6 +33,7 @@ import {
 } from '@codify/api-client';
 import { AdminErrors } from '../core/errors';
 import { LoadError } from '../shared/load-error';
+import { SystemNoticesComponent } from './system-notices.component';
 
 const KEY_RE = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
 
@@ -152,6 +154,50 @@ export function variantSummary(
     .join(' · ');
 }
 
+/** Built-in global hold-out flag (docs/10 §9). */
+export const GLOBAL_HOLDOUT_KEY = 'experiments.global_holdout';
+
+/** An engagement experiment: active, on, with a positive-weight variant. */
+export function isExperimentFlag(f: FeatureFlag): boolean {
+  return (
+    f.key !== GLOBAL_HOLDOUT_KEY &&
+    f.isActive &&
+    f.value.enabled &&
+    Object.values(f.value.variants ?? {}).some((w) => w > 0)
+  );
+}
+
+/**
+ * The experiment policy as the API applies it: the global hold-out % and,
+ * per surface, the experiments in priority order (oldest first, then key).
+ */
+export function experimentPolicy(flags: readonly FeatureFlag[]): {
+  globalHoldoutPct: number;
+  surfaces: { surface: string; experiments: string[] }[];
+} {
+  const h = flags.find((f) => f.key === GLOBAL_HOLDOUT_KEY);
+  const globalHoldoutPct =
+    h && h.isActive && h.value.enabled ? (h.value.holdoutPct ?? 0) : 0;
+  const by = new Map<string, FeatureFlag[]>();
+  for (const f of flags.filter(isExperimentFlag)) {
+    const sf = f.value.surface ?? 'default';
+    by.set(sf, [...(by.get(sf) ?? []), f]);
+  }
+  const surfaces = [...by.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([surface, list]) => ({
+      surface,
+      experiments: [...list]
+        .sort(
+          (a, b) =>
+            a.createdAt.localeCompare(b.createdAt) ||
+            (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+        )
+        .map((f) => f.key),
+    }));
+  return { globalHoldoutPct, surfaces };
+}
+
 /**
  * Settings (docs/04 §Settings, ADMIN): feature flags + experiments
  * (docs/10 §9) with rollout / holdout / weighted variants, and a read-only
@@ -173,6 +219,7 @@ export function variantSummary(
     Skeleton,
     Textarea,
     Toggle,
+    SystemNoticesComponent,
     LocalePipe,
     TranslatePipe,
   ],
@@ -434,6 +481,49 @@ export function variantSummary(
           <cdf-load-error [message]="e" (retry)="load()" />
         } @else if (flags() === null) {
           <cdf-skeleton shape="rect" height="200px" />
+        }
+        @if (flags() && flags()!.length > 0 && !editing()) {
+          <div class="admin-card policy" data-testid="experiment-policy">
+            <h3>{{ 'admin.staff.flags.policyTitle' | translate }}</h3>
+            <p class="small">
+              {{
+                (policy().globalHoldoutPct > 0
+                  ? 'admin.staff.flags.globalHoldout'
+                  : 'admin.staff.flags.globalHoldoutOff'
+                )
+                  | translate
+                    : { pct: policy().globalHoldoutPct, key: holdoutKey }
+              }}
+            </p>
+            <p class="muted small">
+              {{ 'admin.staff.flags.onePerSurface' | translate }}
+            </p>
+            @if (policy().surfaces.length === 0) {
+              <p class="muted small">
+                {{ 'admin.staff.flags.noExperiments' | translate }}
+              </p>
+            } @else {
+              <ul class="small">
+                @for (sf of policy().surfaces; track sf.surface) {
+                  <li>
+                    <strong>{{ sf.surface }}</strong
+                    >:
+                    @for (k of sf.experiments; track k; let i = $index) {
+                      <span class="mono">{{ k }}</span>
+                      @if (i === 0) {
+                        <span class="muted">
+                          ({{ 'admin.staff.flags.priority' | translate }})</span
+                        >
+                      }
+                      {{ $last ? '' : ' → ' }}
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+        @if (error() || flags() === null) {
         } @else if (flags()!.length === 0) {
           <cdf-empty-state
             icon="gear"
@@ -489,6 +579,11 @@ export function variantSummary(
                           'admin.settings.flags.builtIn' | translate
                         }}</cdf-badge>
                       }
+                      @if (isExperimentFlag(f)) {
+                        <cdf-badge variant="info" [subtle]="true">{{
+                          'admin.staff.flags.experiment' | translate
+                        }}</cdf-badge>
+                      }
                     </td>
                     <td class="num">
                       {{
@@ -532,6 +627,8 @@ export function variantSummary(
           </div>
         }
       </section>
+
+      <cdf-system-notices />
     </div>
   `,
   styles: [
@@ -628,6 +725,10 @@ export function variantSummary(
   ],
 })
 export class SettingsPage {
+  protected isExperimentFlag(f: FeatureFlag): boolean {
+    return isExperimentFlag(f);
+  }
+
   private readonly flagsClient = inject(FlagsClient);
   private readonly billing = inject(BillingClient);
   private readonly errors = inject(AdminErrors);
@@ -636,6 +737,11 @@ export class SettingsPage {
   private readonly confirm = inject(ConfirmDialogService);
 
   protected readonly flags = signal<FeatureFlag[] | null>(null);
+  protected readonly holdoutKey = GLOBAL_HOLDOUT_KEY;
+  /** docs/10 §9 policy, from the current rows (same rule as the API). */
+  protected readonly policy = computed(() =>
+    experimentPolicy(this.flags() ?? []),
+  );
   protected readonly error = signal<string | null>(null);
   protected readonly stripe = signal<StripeStatus | null>(null);
   protected readonly stripeError = signal<string | null>(null);

@@ -28,8 +28,10 @@ export interface FeatureFlag {
   value: FeatureFlagValue;
   description: string | null;
   isActive: boolean;
-  /** Built-in flags (leagues/friends/shop) can be disabled but not deleted. */
+  /** Built-in flags (leagues/friends/shop, global hold-out) can be disabled but not deleted. */
   builtIn: boolean;
+  /** Has weighted variants → an experiment under the policy (docs/10 §9). */
+  experiment?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +41,15 @@ export interface CreateFeatureFlagBody {
   value: FeatureFlagValue;
   description?: string | null;
   isActive?: boolean;
+}
+
+/** docs/10 §9 experiment policy, as returned with the admin list. */
+export interface ExperimentPolicy {
+  globalHoldoutKey: string;
+  /** Effective global hold-out % (0 when off). */
+  globalHoldoutPct: number;
+  /** Experiments per surface, highest priority (oldest) first. */
+  surfaces: { surface: string; experiments: string[] }[];
 }
 
 export type UpdateFeatureFlagBody = Partial<Omit<CreateFeatureFlagBody, 'key'>>;
@@ -62,9 +73,9 @@ export class FlagsClient {
     return res.flags;
   }
 
-  list(): Promise<{ items: FeatureFlag[] }> {
+  list(): Promise<{ items: FeatureFlag[]; policy?: ExperimentPolicy }> {
     return firstValueFrom(
-      this.http.get<{ items: FeatureFlag[] }>(
+      this.http.get<{ items: FeatureFlag[]; policy?: ExperimentPolicy }>(
         `${this.config.baseUrl}/admin/feature-flags`,
       ),
     );

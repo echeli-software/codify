@@ -17,6 +17,7 @@ export type AdminSection =
   | 'translations'
   | 'media'
   | 'analytics'
+  | 'exerciseHealth'
   | 'profile'
   | 'audit'
   | 'leagues'
@@ -41,7 +42,10 @@ export const SECTION_ROLES: Record<AdminSection, readonly UserRole[]> = {
   users: ['ADMIN', 'SUPPORT'],
   translations: ['ADMIN', 'TEACHER'],
   media: ['ADMIN', 'TEACHER'],
-  analytics: ['ADMIN'],
+  // docs/04 §2: TEACHER sees Analytics for own courses (course funnels).
+  analytics: ['ADMIN', 'TEACHER'],
+  // docs/12 §11 exercise dashboard + bulk re-test.
+  exerciseHealth: ['ADMIN'],
   profile: ['ADMIN', 'TEACHER', 'SUPPORT'],
   // docs/04 §1: SUPPORT views the log, TEACHER sees only own actions.
   audit: ['ADMIN', 'TEACHER', 'SUPPORT'],
@@ -191,6 +195,12 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         labelKey: 'admin.nav.analytics',
         icon: 'eye',
         link: '/analytics',
+      },
+      {
+        section: 'exerciseHealth',
+        labelKey: 'admin.nav.exerciseHealth',
+        icon: 'file',
+        link: '/exercise-health',
       },
       {
         section: 'audit',

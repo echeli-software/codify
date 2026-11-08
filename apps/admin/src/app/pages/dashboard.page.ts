@@ -214,6 +214,11 @@ import { LoadError } from '../shared/load-error';
               </h2>
               <p class="muted small">
                 {{ 'admin.dashboard.dropOffHelp' | translate }}
+                <a
+                  routerLink="/analytics"
+                  data-testid="teacher-analytics-link"
+                  >{{ 'admin.staff.analytics.fullFunnels' | translate }}</a
+                >
               </p>
               @if (t.topDropOffLessons.length === 0) {
                 <p class="muted small">

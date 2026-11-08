@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
@@ -8,13 +9,20 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
+import { AuthService } from '@codify/auth';
+import {
+  I18nService,
+  LocalePipe,
+  TranslatePipe,
+  formatForLocale,
+} from '@codify/i18n';
 import {
   Badge,
   Button,
   ConfirmDialogService,
   FormField,
   Icon,
+  Input,
   Skeleton,
   Textarea,
   ToastService,
@@ -73,6 +81,7 @@ export const SUSPEND_REASON_MAX = 500;
     Button,
     FormField,
     Icon,
+    Input,
     LoadError,
     Skeleton,
     Textarea,
@@ -211,6 +220,11 @@ export const SUSPEND_REASON_MAX = 500;
                     'admin.account.payments.receipt' | translate
                   }}</span>
                 </th>
+                <th scope="col">
+                  <span class="visually-hidden">{{
+                    'admin.common.actions' | translate
+                  }}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -254,7 +268,76 @@ export const SUSPEND_REASON_MAX = 500;
                       >
                     }
                   </td>
+                  <td>
+                    @if (p.provider !== 'STRIPE') {
+                      <span class="muted small" data-testid="store-refund">{{
+                        'admin.staff.refund.storeManaged' | translate
+                      }}</span>
+                    } @else if (refundable(p)) {
+                      <cdf-button
+                        kind="secondary"
+                        size="sm"
+                        (click)="openRefund(p)"
+                        [attr.data-refund]="p.id"
+                        >{{
+                          'admin.staff.refund.action' | translate
+                        }}</cdf-button
+                      >
+                    }
+                  </td>
                 </tr>
+                @if (refundFor() === p.id) {
+                  <tr class="refund-row">
+                    <td colspan="7">
+                      <form
+                        class="refund"
+                        (submit)="refund($event, p)"
+                        data-testid="refund-form"
+                      >
+                        <cdf-form-field
+                          [label]="
+                            'admin.staff.refund.amount'
+                              | translate: { currency: p.currency }
+                          "
+                          [help]="refundHelp(p)"
+                          [error]="refundErrors()['amount'] ?? null"
+                        >
+                          <cdf-input
+                            name="refundAmount"
+                            type="number"
+                            [(ngModel)]="refundAmount"
+                          />
+                        </cdf-form-field>
+                        <cdf-form-field
+                          [label]="'admin.common.reason' | translate"
+                          [help]="'admin.common.reasonHelp' | translate"
+                          [error]="refundErrors()['reason'] ?? null"
+                        >
+                          <cdf-input
+                            name="refundReason"
+                            [(ngModel)]="refundReason"
+                          />
+                        </cdf-form-field>
+                        <div class="refund__actions">
+                          <cdf-button
+                            kind="danger"
+                            type="submit"
+                            [loading]="busy()"
+                            data-testid="refund-submit"
+                            >{{
+                              'admin.staff.refund.submit' | translate
+                            }}</cdf-button
+                          >
+                          <cdf-button
+                            kind="ghost"
+                            (click)="refundFor.set(null)"
+                            >{{ 'admin.common.close' | translate }}</cdf-button
+                          >
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
@@ -316,6 +399,19 @@ export const SUSPEND_REASON_MAX = 500;
       .suspend cdf-form-field {
         align-self: stretch;
       }
+      .refund {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--cdf-space-3);
+      }
+      .refund cdf-form-field {
+        flex: 1 1 200px;
+      }
+      .refund__actions {
+        display: flex;
+        gap: var(--cdf-space-2);
+      }
       @media (max-width: 575px) {
         .kv {
           grid-template-columns: 1fr;
@@ -326,6 +422,8 @@ export const SUSPEND_REASON_MAX = 500;
 })
 export class UserAccountPanelComponent {
   readonly userId = input.required<string>();
+  /** The user's email — typed back to confirm destructive actions (docs/14 §18). */
+  readonly email = input<string | null>(null);
 
   private readonly account = inject(AccountClient);
   private readonly billing = inject(BillingClient);
@@ -333,6 +431,16 @@ export class UserAccountPanelComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmDialogService);
+  private readonly auth = inject(AuthService);
+
+  /** docs/14 §2: SUPPORT refunds ≤ one month (the API enforces the cap). */
+  protected readonly isSupport = computed(() => this.auth.role() === 'SUPPORT');
+  protected readonly refundFor = signal<string | null>(null);
+  protected readonly refundErrors = signal<Record<string, string | undefined>>(
+    {},
+  );
+  protected refundAmount: number | null = null;
+  protected refundReason = '';
 
   protected readonly status = signal<AdminAccountStatusView | null>(null);
   protected readonly statusError = signal<string | null>(null);
@@ -425,6 +533,7 @@ export class UserAccountPanelComponent {
       message: this.i18n.t('admin.account.suspendConfirmMessage'),
       confirmLabel: this.i18n.t('admin.account.suspend'),
       confirmKind: 'danger',
+      ...this.typed(),
     });
     if (!ok) return;
     this.busy.set(true);
@@ -436,6 +545,94 @@ export class UserAccountPanelComponent {
       // Saved here, but the Clerk ban failed (audited server-side).
       if (res.warning)
         this.toast.warn(this.i18n.t('admin.account.idpSyncFailed'));
+    } catch (err) {
+      this.errors.toast(err, 'admin.errors.actionFailed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Typed confirmation with the user's email, when known. */
+  private typed(): { typeToConfirm?: string } {
+    const email = this.email();
+    return email ? { typeToConfirm: email } : {};
+  }
+
+  protected refundable(p: AdminPaymentView): boolean {
+    return (
+      (p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED') &&
+      p.amountCents - p.refundedCents > 0
+    );
+  }
+
+  protected refundHelp(p: AdminPaymentView): string {
+    const remaining = formatForLocale(
+      p.amountCents - p.refundedCents,
+      this.i18n.currentLocale(),
+      'currency',
+      p.currency,
+    );
+    return this.i18n.t(
+      this.isSupport()
+        ? 'admin.staff.refund.helpSupport'
+        : 'admin.staff.refund.help',
+      { remaining },
+    );
+  }
+
+  protected openRefund(p: AdminPaymentView): void {
+    this.refundAmount = (p.amountCents - p.refundedCents) / 100;
+    this.refundReason = '';
+    this.refundErrors.set({});
+    this.refundFor.set(p.id);
+  }
+
+  /** Staff refund (docs/09 §5): amount in major units, typed confirmation. */
+  protected async refund(ev: Event, p: AdminPaymentView): Promise<void> {
+    ev.preventDefault();
+    const errs: Record<string, string> = {};
+    const remaining = p.amountCents - p.refundedCents;
+    const cents = Math.round(Number(this.refundAmount) * 100);
+    if (!Number.isFinite(cents) || cents < 1 || cents > remaining)
+      errs['amount'] = this.i18n.t('admin.staff.refund.invalidAmount');
+    const reason = this.refundReason.trim();
+    if (reason.length < 3)
+      errs['reason'] = this.i18n.t('admin.account.reasonRequired');
+    this.refundErrors.set(errs);
+    if (Object.keys(errs).length) return;
+    const amount = formatForLocale(
+      cents,
+      this.i18n.currentLocale(),
+      'currency',
+      p.currency,
+    );
+    const ok = await this.confirm.open({
+      title: this.i18n.t('admin.staff.refund.confirmTitle', { amount }),
+      message: this.i18n.t('admin.staff.refund.confirmMessage', { amount }),
+      confirmLabel: this.i18n.t('admin.staff.refund.submit'),
+      confirmKind: 'danger',
+      ...this.typed(),
+    });
+    if (!ok) return;
+    this.busy.set(true);
+    try {
+      const res = await this.billing.adminRefund(p.id, {
+        amountCents: cents,
+        reason,
+      });
+      this.payments.update((list) =>
+        (list ?? []).map((x) =>
+          x.id === p.id
+            ? {
+                ...x,
+                status: res.after.status,
+                refundedCents: res.after.refundedCents,
+              }
+            : x,
+        ),
+      );
+      this.refundFor.set(null);
+      this.toast.success(this.i18n.t('admin.staff.refund.done', { amount }));
     } catch (err) {
       this.errors.toast(err, 'admin.errors.actionFailed');
     } finally {
