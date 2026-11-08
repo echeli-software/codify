@@ -170,8 +170,7 @@ from the public footer, the sign-in screen and Settings.
       reviewed.
 - [ ] Feature flags set for launch (`leagues.enabled`, `friends.enabled`,
       `shop.enabled`, any experiments).
-- [ ] Open product decisions settled or explicitly deferred: day-30 win-back
-      offer (today it only links to the subscription page), PROMO
+- [ ] Open product decisions settled or explicitly deferred: PROMO
       notifications, web push, user country field.
 
 ## 10. Mobile — Mobile
