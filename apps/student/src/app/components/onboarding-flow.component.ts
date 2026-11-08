@@ -12,6 +12,8 @@ import {
   NotificationsClient,
   type Category,
   type CourseListItem,
+  type MeResponse,
+  type OnboardingGoal,
 } from '@codify/api-client';
 import { ContentTranslatePipe, TranslatePipe } from '@codify/i18n';
 import { NativePlatformService } from '../native/native-platform.service.js';
@@ -24,7 +26,8 @@ import {
   type OnboardingSlide,
 } from '@codify/ui-ionic';
 
-export type OnboardingGoal = 'career' | 'newTech' | 'ai' | 'softSkills';
+/** Stored on the account as `User.onboardingGoal` (PATCH /me). */
+export type { OnboardingGoal };
 
 export const ONBOARDING_GOALS: { id: OnboardingGoal; icon: IconName }[] = [
   { id: 'career', icon: 'rocket' },
@@ -32,6 +35,54 @@ export const ONBOARDING_GOALS: { id: OnboardingGoal; icon: IconName }[] = [
   { id: 'ai', icon: 'sparkles' },
   { id: 'softSkills', icon: 'chat-ellipses' },
 ];
+
+/** `v` when it is one of the four goals, else null (exported for tests). */
+export function asOnboardingGoal(v: unknown): OnboardingGoal | null {
+  return ONBOARDING_GOALS.some((g) => g.id === v)
+    ? (v as OnboardingGoal)
+    : null;
+}
+
+/**
+ * The goal this device saved at onboarding (a JSON localStorage record
+ * `{ goal, at, synced? }`); `synced` = already sent to the account.
+ */
+export interface LocalGoalRecord {
+  goal: OnboardingGoal | null;
+  synced: boolean;
+}
+
+/** Parse the device's onboarding record (exported for tests). */
+export function readGoalRecord(raw: string | null): LocalGoalRecord {
+  try {
+    const v = raw
+      ? (JSON.parse(raw) as { goal?: unknown; synced?: unknown })
+      : null;
+    return { goal: asOnboardingGoal(v?.goal), synced: v?.synced === true };
+  } catch {
+    return { goal: null, synced: false };
+  }
+}
+
+/**
+ * The goal ranking "Recommended next" (LRN-10): the account's
+ * (`GET /me` `onboardingGoal`) wins; with none there, the one this device
+ * saved at onboarding. `migrate` = send the device's goal up — only when
+ * the server answered with none and it was never sent before. `me` null
+ * (offline / failed) or without the field (older API) = unknown.
+ */
+export function resolveOnboardingGoal(
+  me: Pick<MeResponse, 'onboardingGoal'> | null,
+  local: LocalGoalRecord,
+): { goal: OnboardingGoal | null; migrate: boolean } {
+  const known = !!me && me.onboardingGoal !== undefined;
+  const server = known ? asOnboardingGoal(me?.onboardingGoal) : null;
+  if (server) return { goal: server, migrate: false };
+  return {
+    goal: local.goal,
+    migrate: known && !!local.goal && !local.synced,
+  };
+}
 
 const GOAL_HINTS: Record<OnboardingGoal, RegExp> = {
   career: /(web|front|back|program|javascript|python|code)/i,

@@ -58,6 +58,7 @@ import {
   type Category,
   type CourseListItem,
   type CurrentLeague,
+  type MeResponse,
   type MyEnrollment,
   type QuestView,
 } from '@codify/api-client';
@@ -65,7 +66,10 @@ import { AppToastService } from '../platform/app-toast.service.js';
 import {
   OnboardingFlowComponent,
   firstLessonRoute,
+  readGoalRecord,
   recommendForGoal,
+  resolveOnboardingGoal,
+  type LocalGoalRecord,
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
 import { StarterPetGiftComponent } from '../components/starter-pet-gift.component.js';
@@ -188,16 +192,12 @@ export function recommendCourses(
   return ranked.slice(0, limit);
 }
 
-/** The goal picked during onboarding on this device (localStorage). */
+/**
+ * The goal picked during onboarding on this device (localStorage) — the
+ * fallback when the account has none (`User.onboardingGoal`, LRN-10).
+ */
 export function storedGoal(raw: string | null): OnboardingGoal | null {
-  try {
-    const g = raw ? (JSON.parse(raw) as { goal?: unknown }).goal : null;
-    return g === 'career' || g === 'newTech' || g === 'ai' || g === 'softSkills'
-      ? g
-      : null;
-  } catch {
-    return null;
-  }
+  return readGoalRecord(raw).goal;
 }
 
 /** Should first-run onboarding show? New accounts with no XP and no courses. */
@@ -378,11 +378,54 @@ export class TodayPage {
   }
 
   private readGoal(): OnboardingGoal | null {
+    return this.readGoalRecord().goal;
+  }
+
+  private readGoalRecord(): LocalGoalRecord {
     const key = this.onboardingKey();
     try {
-      return key ? storedGoal(localStorage.getItem(key)) : null;
+      return readGoalRecord(key ? localStorage.getItem(key) : null);
     } catch {
-      return null;
+      return { goal: null, synced: false };
+    }
+  }
+
+  /** Remember that the device's goal reached the account (migrate once). */
+  private markGoalSynced(): void {
+    const key = this.onboardingKey();
+    try {
+      const raw = key ? localStorage.getItem(key) : null;
+      if (key && raw)
+        localStorage.setItem(
+          key,
+          JSON.stringify({ ...JSON.parse(raw), synced: true }),
+        );
+    } catch {
+      // Storage unavailable: the account copy is what counts.
+    }
+  }
+
+  /**
+   * "Recommended next" goal (LRN-10): the account's `onboardingGoal`, else
+   * this device's onboarding pick — sent up once when the account has none
+   * (goals picked before the server stored them, or saved offline).
+   */
+  private async loadGoal(): Promise<void> {
+    const local = this.readGoalRecord();
+    let me: MeResponse | null = null;
+    try {
+      me = await this.cached('me', () => this.meClient.me());
+    } catch {
+      me = null;
+    }
+    const { goal, migrate } = resolveOnboardingGoal(me, local);
+    this.goal.set(goal);
+    if (!migrate || !goal || !this.network.online()) return;
+    try {
+      await this.meClient.update({ onboardingGoal: goal });
+      this.markGoalSynced();
+    } catch {
+      // Not sent: the next Today load tries again.
     }
   }
 
@@ -408,6 +451,7 @@ export class TodayPage {
       this.loadLearning(),
       this.loadLeague(),
       this.loadAvatar(),
+      this.loadGoal(),
     ]);
     if (totalXp !== null && enrollments !== null)
       void this.maybeOnboard(totalXp, enrollments);
@@ -582,9 +626,19 @@ export class TodayPage {
     } catch {
       // Storage unavailable: the server flag below still applies.
     }
-    this.meClient.update({ onboarded: true }).catch(() => {
-      // Offline: the local key keeps it dismissed on this device.
-    });
+    // The goal goes to the account too (LRN-10); offline, the local record
+    // (synced: false) is migrated up by a later Today load.
+    this.meClient
+      .update({
+        onboarded: true,
+        ...(ev.goal ? { onboardingGoal: ev.goal } : {}),
+      })
+      .then(() => {
+        if (ev.goal) this.markGoalSynced();
+      })
+      .catch(() => {
+        // Offline: the local key keeps it dismissed on this device.
+      });
     if (!ev.course) return;
     try {
       await this.enrollments.enroll(ev.course.id);

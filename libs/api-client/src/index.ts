@@ -233,6 +233,7 @@ export type {
   ApiUserRole,
   MeResponse,
   UpdateMeBody,
+  OnboardingGoal,
   AdminUserListItem,
   AdminUserListResponse,
   HealthResponse,

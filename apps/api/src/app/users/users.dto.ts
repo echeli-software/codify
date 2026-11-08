@@ -52,6 +52,15 @@ export const USER_THEMES = [
 ] as const;
 export type UserTheme = (typeof USER_THEMES)[number];
 
+/** Learning goal picked at onboarding (docs/05 "Recommended next"). */
+export const ONBOARDING_GOALS = [
+  'career',
+  'newTech',
+  'ai',
+  'softSkills',
+] as const;
+export type OnboardingGoal = (typeof ONBOARDING_GOALS)[number];
+
 export class UpdateMeDto {
   @IsOptional()
   @IsString()
@@ -110,6 +119,15 @@ export class UpdateMeDto {
   @ValidateIf((_o, v) => v !== null)
   @IsIn(USER_THEMES)
   theme?: UserTheme | null;
+
+  /**
+   * Onboarding goal ranking "Recommended next" (docs/05 Today); null
+   * clears it.
+   */
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsIn(ONBOARDING_GOALS)
+  onboardingGoal?: OnboardingGoal | null;
 }
 
 /** Public shape returned by /api/me. Excludes deletedAt + clerkId. */
@@ -135,6 +153,8 @@ export interface MeResponse {
   activityFeedOptIn: boolean;
   /** Staff UI theme preference (docs/04 §7), null = system. */
   theme: UserTheme | null;
+  /** Onboarding goal (docs/05 "Recommended next"), null = none picked. */
+  onboardingGoal: OnboardingGoal | null;
 }
 
 export interface AdminUserListItem {

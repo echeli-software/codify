@@ -24,4 +24,12 @@ describe('UpdateMeDto', () => {
     expect(errorsFor({ quietHoursStart: 1440 })).toEqual(['quietHoursStart']);
     expect(errorsFor({ quietHoursEnd: 1440 })).toEqual(['quietHoursEnd']);
   });
+
+  it('accepts the four onboarding goals or null, nothing else', () => {
+    for (const goal of ['career', 'newTech', 'ai', 'softSkills', null])
+      expect(errorsFor({ onboardingGoal: goal })).toEqual([]);
+    expect(errorsFor({ onboardingGoal: 'money' })).toEqual(['onboardingGoal']);
+    expect(errorsFor({ onboardingGoal: '' })).toEqual(['onboardingGoal']);
+    expect(errorsFor({ onboardingGoal: 3 })).toEqual(['onboardingGoal']);
+  });
 });

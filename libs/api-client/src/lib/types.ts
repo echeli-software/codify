@@ -7,6 +7,9 @@
 
 export type ApiUserRole = 'STUDENT' | 'TEACHER' | 'SUPPORT' | 'ADMIN';
 
+/** Learning goal picked at onboarding; ranks "Recommended next". */
+export type OnboardingGoal = 'career' | 'newTech' | 'ai' | 'softSkills';
+
 export interface MeResponse {
   id: string;
   email: string;
@@ -27,6 +30,8 @@ export interface MeResponse {
   petName?: string | null;
   /** Friends may see this user's learning activity (docs/10 §5). */
   activityFeedOptIn?: boolean;
+  /** Onboarding goal; null = none stored. Optional for older APIs. */
+  onboardingGoal?: OnboardingGoal | null;
 }
 
 export interface UpdateMeBody {
@@ -42,6 +47,8 @@ export interface UpdateMeBody {
   petName?: string | null;
   /** Share learning activity with friends (docs/10 §5). */
   activityFeedOptIn?: boolean;
+  /** Onboarding goal (one of four); null clears it. */
+  onboardingGoal?: OnboardingGoal | null;
 }
 
 export interface AdminUserListItem {

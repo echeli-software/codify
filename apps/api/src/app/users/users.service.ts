@@ -36,6 +36,7 @@ const ME_FIELDS = {
   petName: true,
   activityFeedOptIn: true,
   theme: true,
+  onboardingGoal: true,
 } as const;
 
 @Injectable()
@@ -195,6 +196,7 @@ function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
     petName: u.petName ?? null,
     activityFeedOptIn: u.activityFeedOptIn,
     theme: (u.theme as MeResponse['theme']) ?? null,
+    onboardingGoal: (u.onboardingGoal as MeResponse['onboardingGoal']) ?? null,
   };
 }
 

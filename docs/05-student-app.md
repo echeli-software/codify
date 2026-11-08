@@ -102,6 +102,11 @@ chars; published content, titles only, in the caller's locale) →
 `{ courses: [{ id, slug, title }], lessons: [{ id, title, type, isFree,
 courseId, courseSlug, courseTitle }] }`. Today's "Recommended next" ranks
 courses by the onboarding goal and the categories of enrolled courses.
+The goal (`career` | `newTech` | `ai` | `softSkills`) is stored on the
+account as `User.onboardingGoal`: `PATCH /me { onboardingGoal }` (one of
+the four, `null` clears it) at onboarding, returned by `GET /me`. Today
+reads it from `/me`; when the account has none it uses the goal the device
+saved at onboarding (localStorage) and sends that up once.
 
 ### Learn → Course detail
 

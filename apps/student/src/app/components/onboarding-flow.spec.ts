@@ -1,7 +1,10 @@
 import {
   DEFAULT_REMINDER_MINUTE,
+  asOnboardingGoal,
   firstLessonRoute,
   minuteToTime,
+  readGoalRecord,
+  resolveOnboardingGoal,
   timeToMinute,
 } from './onboarding-flow.component';
 
@@ -73,5 +76,76 @@ describe('firstLessonRoute (docs/05 onboarding step 5)', () => {
       '/courses',
       'js',
     ]);
+  });
+});
+
+describe('onboarding goal on the account (LRN-10)', () => {
+  it('accepts only the four goals', () => {
+    expect(asOnboardingGoal('ai')).toBe('ai');
+    expect(asOnboardingGoal('softSkills')).toBe('softSkills');
+    expect(asOnboardingGoal('money')).toBeNull();
+    expect(asOnboardingGoal(null)).toBeNull();
+  });
+
+  it('parses the device record, tolerating junk', () => {
+    expect(readGoalRecord('{"goal":"career","at":"x"}')).toEqual({
+      goal: 'career',
+      synced: false,
+    });
+    expect(readGoalRecord('{"goal":"ai","synced":true}')).toEqual({
+      goal: 'ai',
+      synced: true,
+    });
+    expect(readGoalRecord('{"goal":"nope"}')).toEqual({
+      goal: null,
+      synced: false,
+    });
+    expect(readGoalRecord('not json')).toEqual({ goal: null, synced: false });
+    expect(readGoalRecord(null)).toEqual({ goal: null, synced: false });
+  });
+
+  it('the account goal wins over the device one', () => {
+    expect(
+      resolveOnboardingGoal(
+        { onboardingGoal: 'ai' },
+        { goal: 'career', synced: false },
+      ),
+    ).toEqual({ goal: 'ai', migrate: false });
+  });
+
+  it('falls back to the device goal and migrates it up once', () => {
+    expect(
+      resolveOnboardingGoal(
+        { onboardingGoal: null },
+        { goal: 'career', synced: false },
+      ),
+    ).toEqual({ goal: 'career', migrate: true });
+    // Already sent once (e.g. cleared on the account since): fall back only.
+    expect(
+      resolveOnboardingGoal(
+        { onboardingGoal: null },
+        { goal: 'career', synced: true },
+      ),
+    ).toEqual({ goal: 'career', migrate: false });
+    expect(
+      resolveOnboardingGoal(
+        { onboardingGoal: null },
+        { goal: null, synced: false },
+      ),
+    ).toEqual({ goal: null, migrate: false });
+  });
+
+  it('never migrates when the account state is unknown', () => {
+    const local = { goal: 'newTech' as const, synced: false };
+    // Offline / failed GET /me.
+    expect(resolveOnboardingGoal(null, local)).toEqual({
+      goal: 'newTech',
+      migrate: false,
+    });
+    // Older API without the field.
+    expect(resolveOnboardingGoal({}, local)).toEqual({
+      goal: 'newTech',
+      migrate: false,
+    });
   });
 });
