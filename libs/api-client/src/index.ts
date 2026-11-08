@@ -366,3 +366,13 @@ export {
   type SkillNode,
   type SkillNodeState,
 } from './lib/mastery.client.js';
+export {
+  PromoCodesClient,
+  type PromoCode,
+  type CreatePromoCodeBody,
+  type UpdatePromoCodeBody,
+  type RedeemPromoCodeResult,
+  type PromoCodeErrorCode,
+} from './lib/promo-codes.client.js';
+export type { SurpriseBoost } from './lib/progress.client.js';
+export type { LeagueZones, EconomyJob } from './lib/gamification.client.js';

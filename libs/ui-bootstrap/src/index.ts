@@ -223,3 +223,12 @@ export {
   type AvatarSprite,
   type AvatarConfigLike,
 } from '@codify/ui-ionic/avatar-renderer';
+// Authoring (round 3): code-block languages for pickers, lazy highlighted code.
+export {
+  CODE_LANGUAGES,
+  canonicalCodeLanguage,
+  codeLanguageLabel,
+  parseHighlightLines,
+  type CodeLanguage,
+} from './lib/organisms/lesson-block-renderer/code/code-languages.js';
+export { LessonCodeBlock } from './lib/organisms/lesson-block-renderer/code/lesson-code-block.js';

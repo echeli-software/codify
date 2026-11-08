@@ -28,7 +28,8 @@
       "streakTier": "Streak boost",
       "coursePromo": "Course promo",
       "lessonPromo": "Lesson promo",
-      "campaign": "Event boost"
+      "campaign": "Event boost",
+      "surpriseBoost": "Surprise boost"
     },
     "badge": {
       "unlocked": "Badge unlocked!",
@@ -38,6 +39,57 @@
       "promoted": "Promoted to {tier}!",
       "demoted": "Moved to {tier}",
       "rank": "Rank #{rank}"
+    },
+    "reward": {
+      "xpBoosted": "XP boosted: {parts}",
+      "coinsBoosted": "Coins boosted: {parts}",
+      "bonusLine": "{label}: {amounts}",
+      "bonus": {
+        "quizPerfect": "Perfect quiz",
+        "quizQuestions": "Correct answers",
+        "streakMilestone": "Streak milestone"
+      },
+      "pooled": "{count} coins saved to your weekly bonus (daily limit reached)",
+      "quest": "Daily quest complete: {title}",
+      "micro": "{count} lessons this session — you're on a roll!",
+      "boostStarted": "Surprise! {value}x XP for the next {minutes} min",
+      "streakMilestone": "{days}-day streak!",
+      "milestoneItem": "New exclusive item: {name}",
+      "milestoneEyebrow": "Streak milestone",
+      "leagueEyebrow": "League promotion",
+      "leaguePromoted": "You're in the {tier} league!",
+      "bannerDismiss": "Dismiss"
+    },
+    "boost": {
+      "chip": "{value}x XP",
+      "label": "Surprise boost: {value}x XP, {time} left"
+    },
+    "promo": {
+      "corner": "{value}x {what}",
+      "xp": "XP",
+      "coins": "coins",
+      "both": "XP + coins",
+      "banner": "{value}x {what} event",
+      "bannerEnds": "{value}x {what} event — ends {end}",
+      "bannerCourse": "{value}x {what} on selected courses",
+      "dismiss": "Hide event banner",
+      "cornerLabel": "Promotion: {value}x {what}"
+    },
+    "promoCode": {
+      "title": "Have a promo code?",
+      "label": "Promo code",
+      "placeholder": "e.g. WELCOME50",
+      "submit": "Redeem",
+      "success": "+{coins} coins added!",
+      "errors": {
+        "PROMO_CODE_NOT_FOUND": "That code isn't valid.",
+        "PROMO_CODE_NOT_STARTED": "That code isn't active yet.",
+        "PROMO_CODE_EXPIRED": "That code has expired.",
+        "PROMO_CODE_ALREADY_REDEEMED": "You already used this code.",
+        "PROMO_CODE_EXHAUSTED": "This code has been fully claimed.",
+        "PROMO_CODE_RATE_LIMITED": "Too many tries — try again in an hour.",
+        "generic": "Couldn't redeem the code. Try again."
+      }
     }
   }
 }

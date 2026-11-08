@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_CLIENT_CONFIG } from './api-config.js';
 import { withIdempotency } from './idempotency.js';
-import type { StreakInfo } from './progress.client.js';
+import type { StreakInfo, SurpriseBoost } from './progress.client.js';
 
 export type QuestKind =
   | 'LESSON_COUNT'
@@ -16,7 +16,15 @@ export interface GamificationSummary {
   totalXp: number;
   level: number;
   coins: number;
-  streak: StreakInfo;
+  /**
+   * The effective streak (docs/07 §6): a lost streak reads 0 right away;
+   * `activeToday` = today already counted.
+   */
+  streak: StreakInfo & { activeToday?: boolean };
+  /** Running surprise XP boost, if any (docs/10 §6). */
+  surpriseBoost?: SurpriseBoost | null;
+  /** Coins held back by the daily caps this week (paid when it closes). */
+  weeklyBonusPool?: { weekStart: string; coins: number };
 }
 
 export interface QuestView {
@@ -102,7 +110,9 @@ export type MultiplierKind =
   | 'COURSE_PROMO'
   | 'LESSON_PROMO'
   | 'STREAK_TIER'
-  | 'CAMPAIGN';
+  | 'CAMPAIGN'
+  /** Per-user boosts; never listed by the multipliers endpoints. */
+  | 'SURPRISE_BOOST';
 export type MultiplierTarget = 'XP' | 'COINS' | 'BOTH';
 
 export interface Multiplier {
@@ -147,7 +157,36 @@ export interface GamificationConfigValues {
   'quest.dailyCount': number;
   'referral.reward': RewardAmount;
   'referral.claimWindowDays': number;
+  'earning.byLessonType': Record<string, RewardAmount>;
+  'earning.quizPerfectBonus': RewardAmount;
+  'earning.quizPerQuestionBonus': RewardAmount;
+  'earning.retake': RewardAmount;
+  'earning.scenarioBranch': RewardAmount & { dailyCap: number };
+  'coins.dailyCaps': Record<string, number>;
+  'coins.weeklyPoolCap': number;
+  'league.zones': LeagueZones;
+  'boost.surprise': {
+    chancePct: number;
+    value: number;
+    minutes: number;
+    maxPerWeek: number;
+  };
 }
+
+/** `league.zones`: promotion / relegation zone sizes (docs/07 §9). */
+export interface LeagueZones {
+  cohortSize: number;
+  promote: number;
+  demote: number;
+  minCohortForDemotion: number;
+}
+
+/** POST /admin/gamification/jobs/:job/run (ADMIN). */
+export type EconomyJob =
+  | 'streak-settle'
+  | 'weekly-bonus'
+  | 'promo-announce'
+  | 'league-results';
 
 export type GamificationConfigKey = keyof GamificationConfigValues;
 
@@ -321,6 +360,17 @@ export class GamificationClient {
         {
           context: withIdempotency(),
         },
+      ),
+    );
+  }
+
+  /** ADMIN: run an economy job now (idempotent; same code as the cron). */
+  runEconomyJob(job: EconomyJob): Promise<Record<string, number>> {
+    return firstValueFrom(
+      this.http.post<Record<string, number>>(
+        `${this.base}/admin/gamification/jobs/${encodeURIComponent(job)}/run`,
+        {},
+        { context: withIdempotency() },
       ),
     );
   }

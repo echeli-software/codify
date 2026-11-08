@@ -1,4 +1,5 @@
 import type { CoinSource, XpSource } from '@prisma/client';
+import type { CompletedQuest } from './quests.service.js';
 
 /** One line in the reward breakdown shown on the client toast. */
 export interface RewardBreakdownEntry {
@@ -89,6 +90,11 @@ export interface RewardResult {
   coinCap?: CoinCapInfo | null;
   /** A surprise boost that started with this event (applies to later rewards). */
   surpriseBoost?: SurpriseBoostInfo | null;
+  /**
+   * Daily quests this event completed (same list as the response's
+   * `questsCompleted`), so the client celebration needs only the reward.
+   */
+  questsCompleted?: CompletedQuest[];
 }
 
 export interface GrantRewardParams {

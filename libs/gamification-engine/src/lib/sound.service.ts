@@ -65,6 +65,7 @@ export const CUE_FOR_KIND: Readonly<Record<RewardKind, SoundCue>> = {
   badgeUnlock: 'badge',
   leaguePromotion: 'levelUp',
   mysteryChestOpen: 'chest',
+  promoCode: 'reward',
 };
 
 /** Total length of a cue in seconds. */

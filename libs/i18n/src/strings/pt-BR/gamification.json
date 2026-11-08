@@ -28,7 +28,8 @@
       "streakTier": "Impulso de ofensiva",
       "coursePromo": "Promoção do curso",
       "lessonPromo": "Promoção da aula",
-      "campaign": "Evento especial"
+      "campaign": "Evento especial",
+      "surpriseBoost": "Turbo surpresa"
     },
     "badge": {
       "unlocked": "Conquista desbloqueada!",
@@ -38,6 +39,57 @@
       "promoted": "Promovido para {tier}!",
       "demoted": "Rebaixado para {tier}",
       "rank": "Posição #{rank}"
+    },
+    "reward": {
+      "xpBoosted": "XP turbinado: {parts}",
+      "coinsBoosted": "Moedas turbinadas: {parts}",
+      "bonusLine": "{label}: {amounts}",
+      "bonus": {
+        "quizPerfect": "Quiz perfeito",
+        "quizQuestions": "Respostas certas",
+        "streakMilestone": "Marco de ofensiva"
+      },
+      "pooled": "{count} moedas guardadas no seu bônus semanal (limite diário atingido)",
+      "quest": "Missão diária concluída: {title}",
+      "micro": "{count} lições nesta sessão — que ritmo!",
+      "boostStarted": "Surpresa! {value}x XP nos próximos {minutes} min",
+      "streakMilestone": "Ofensiva de {days} dias!",
+      "milestoneItem": "Novo item exclusivo: {name}",
+      "milestoneEyebrow": "Marco de ofensiva",
+      "leagueEyebrow": "Promoção de liga",
+      "leaguePromoted": "Você subiu para a liga {tier}!",
+      "bannerDismiss": "Fechar"
+    },
+    "boost": {
+      "chip": "{value}x XP",
+      "label": "Turbo surpresa: {value}x XP, faltam {time}"
+    },
+    "promo": {
+      "corner": "{value}x {what}",
+      "xp": "XP",
+      "coins": "moedas",
+      "both": "XP + moedas",
+      "banner": "Evento {value}x {what}",
+      "bannerEnds": "Evento {value}x {what} — termina {end}",
+      "bannerCourse": "{value}x {what} em cursos selecionados",
+      "dismiss": "Ocultar faixa do evento",
+      "cornerLabel": "Promoção: {value}x {what}"
+    },
+    "promoCode": {
+      "title": "Tem um código promocional?",
+      "label": "Código promocional",
+      "placeholder": "ex.: BEMVINDO50",
+      "submit": "Resgatar",
+      "success": "+{coins} moedas adicionadas!",
+      "errors": {
+        "PROMO_CODE_NOT_FOUND": "Esse código não é válido.",
+        "PROMO_CODE_NOT_STARTED": "Esse código ainda não está ativo.",
+        "PROMO_CODE_EXPIRED": "Esse código expirou.",
+        "PROMO_CODE_ALREADY_REDEEMED": "Você já usou este código.",
+        "PROMO_CODE_EXHAUSTED": "Este código já foi todo resgatado.",
+        "PROMO_CODE_RATE_LIMITED": "Muitas tentativas — tente de novo em uma hora.",
+        "generic": "Não foi possível resgatar o código. Tente de novo."
+      }
     }
   }
 }

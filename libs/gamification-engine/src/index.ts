@@ -9,6 +9,8 @@ export {
   REWARD_COLLAPSE_WINDOW_MS,
   COUNTER_TWEEN_MS,
   REDUCED_TWEEN_MS,
+  MICRO_CELEBRATION_EVERY,
+  bonusLines,
   collapse,
   multiplierParts,
 } from './lib/reward-orchestrator.service.js';
@@ -46,6 +48,8 @@ export {
   type OverlayKind,
   type LevelUpOverlay,
   type BadgeUnlockOverlay,
+  type StreakMilestoneOverlay,
+  type LeaguePromotionOverlay,
 } from './lib/overlay/overlay-host.service.js';
 
 // Animation primitives
@@ -63,3 +67,15 @@ export {
   type ConfettiOptions,
   type ConfettiParticle,
 } from './lib/animation/confetti.js';
+export {
+  XpTarget,
+  StreakTarget,
+  xpSparkle,
+  flameBurst,
+  planSparkles,
+  planFlameBurst,
+  currentXpTarget,
+  currentStreakTarget,
+  type SparkleParticle,
+  type FlameParticle,
+} from './lib/animation/sparkle.js';

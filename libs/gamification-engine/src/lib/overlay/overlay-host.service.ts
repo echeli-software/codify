@@ -1,7 +1,16 @@
 import { Injectable, signal } from '@angular/core';
-import type { BadgeRef, LevelUpInfo } from '../types.js';
+import type {
+  BadgeRef,
+  LeaguePromotionRef,
+  LevelUpInfo,
+  StreakMilestoneRef,
+} from '../types.js';
 
-export type OverlayKind = 'level-up' | 'badge-unlock';
+export type OverlayKind =
+  | 'level-up'
+  | 'badge-unlock'
+  | 'streak-milestone'
+  | 'league-promotion';
 
 export interface LevelUpOverlay {
   kind: 'level-up';
@@ -13,7 +22,24 @@ export interface BadgeUnlockOverlay {
   badge: BadgeRef;
 }
 
-export type OverlayState = LevelUpOverlay | BadgeUnlockOverlay | null;
+export interface StreakMilestoneOverlay {
+  kind: 'streak-milestone';
+  milestone: StreakMilestoneRef;
+}
+
+export interface LeaguePromotionOverlay {
+  kind: 'league-promotion';
+  promotion: LeaguePromotionRef;
+  xp: number;
+  coins: number;
+}
+
+export type OverlayState =
+  | LevelUpOverlay
+  | BadgeUnlockOverlay
+  | StreakMilestoneOverlay
+  | LeaguePromotionOverlay
+  | null;
 
 interface Pending {
   state: Exclude<OverlayState, null>;
@@ -49,6 +75,17 @@ export class OverlayHostService {
 
   showBadgeUnlock(badge: BadgeRef): Promise<void> {
     return this.show({ kind: 'badge-unlock', badge });
+  }
+
+  showStreakMilestone(milestone: StreakMilestoneRef): Promise<void> {
+    return this.show({ kind: 'streak-milestone', milestone });
+  }
+
+  showLeaguePromotion(
+    promotion: LeaguePromotionRef,
+    reward: { xp: number; coins: number },
+  ): Promise<void> {
+    return this.show({ kind: 'league-promotion', promotion, ...reward });
   }
 
   /** Called by the host component when the user dismisses the overlay. */

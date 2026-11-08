@@ -382,6 +382,7 @@ export class ProgressService {
           afterStreakLost: granted.streak?.restartedAfterLoss ?? false,
         });
 
+        granted.questsCompleted = questsCompleted;
         // docs/10 §6: a rare surprise boost for the rest of the session.
         granted.surpriseBoost = await this.gamification.maybeStartSurpriseBoost(
           tx,
@@ -561,6 +562,7 @@ export class ProgressService {
           coins: finalUser.coins,
           level: levelFromXp(finalUser.totalXp),
         };
+        granted.questsCompleted = questsCompleted;
         return { granted, questsCompleted, badgesUnlocked };
       });
       await this.localizeRewards(out.questsCompleted, out.badgesUnlocked);

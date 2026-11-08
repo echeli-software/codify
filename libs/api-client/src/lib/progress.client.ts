@@ -17,16 +17,39 @@ export interface UserTotals {
 }
 
 export interface RewardBreakdownEntry {
+  /**
+   * `base`, a multiplier kind, or a bonus line: `QUIZ_PERFECT`,
+   * `QUIZ_QUESTIONS`, `STREAK_MILESTONE`, `DAILY_CAP` (negative coins held
+   * back by the daily cap; `pooled` of them go to the weekly bonus pool).
+   */
   source: string;
   xp?: number;
   coins?: number;
   multiplier?: number;
+  /** Multiplier lines: the side the factor applies to. */
+  appliesTo?: 'xp' | 'coins' | 'both';
+  pooled?: number;
 }
 
 export interface StreakInfo {
   currentDays: number;
   longestDays: number;
   freezesAvailable: number;
+  /** Reward responses: this event counted a new streak day. */
+  extended?: boolean;
+  /** Reward responses: freezes consumed to cover missed days. */
+  freezesUsed?: number;
+  /** Reward responses: a lost streak restarted at 1. */
+  restartedAfterLoss?: boolean;
+}
+
+/** A running per-user surprise XP boost (docs/10 §6). */
+export interface SurpriseBoost {
+  id: string;
+  value: number;
+  target: 'XP' | 'COINS' | 'BOTH';
+  startsAt: string;
+  endsAt: string;
 }
 
 /** Canonical reward — fed straight into RewardOrchestrator.grant(). */
@@ -40,11 +63,24 @@ export interface RewardResult {
   totals: { totalXp: number; coins: number; level: number };
   levelUp: { newLevel: number; xpForNextLevel: number } | null;
   streak: StreakInfo | null;
-  streakMilestone?: { days: number; xp: number; coins: number } | null;
+  streakMilestone?: {
+    days: number;
+    xp: number;
+    coins: number;
+    /** Exclusive cosmetic granted with the milestone (30/100/365 days). */
+    item?: { id: string; slug: string; name: string } | null;
+  } | null;
+  /** Daily coin cap: coins pooled for the week / dropped (docs/07 §5). */
+  coinCap?: { requested: number; pooled: number; dropped: number } | null;
+  /** A surprise boost that started with this reward. */
+  surpriseBoost?: SurpriseBoost | null;
+  /** Daily quests completed by this reward. */
+  questsCompleted?: CompletedQuest[];
 }
 
 export interface CompletedQuest {
   id: string;
+  templateId?: string;
   title: string;
   xpReward: number;
   coinReward: number;
@@ -70,7 +106,9 @@ export interface CompleteLessonResponse {
 export interface CompleteLessonBody {
   /**
    * Device time of an offline completion (ISO-8601), so the streak credits
-   * the right local day. Server rejects > 5 min ahead or > 72 h old (400).
+   * the right local day. Times older than 24 h or in the future are
+   * clamped to "now" by the server (docs/16 §8); only an unparseable value
+   * is a 400 INVALID_CLIENT_TIMESTAMP.
    */
   clientTimestamp?: string;
 }
