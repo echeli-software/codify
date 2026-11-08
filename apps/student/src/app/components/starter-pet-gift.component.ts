@@ -86,8 +86,8 @@ const DISMISS_KEY = 'codify.starterPet.later.';
             </cdf-app-button>
             <cdf-app-button
               kind="primary"
-              type="submit"
               [loading]="claiming()"
+              (buttonClick)="claim()"
               data-testid="starter-pet-claim"
             >
               {{ 'student.starterPet.claim' | translate }}
