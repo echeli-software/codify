@@ -346,3 +346,23 @@ export type {
   TranslationImportRowError,
   TranslationImportReport,
 } from './lib/translations.client.js';
+// Social (round 3): starter pet, league history, friends compare/activity, mastery.
+export type {
+  StarterPetStatus,
+  ClaimStarterPetResponse,
+} from './lib/items.client.js';
+export type {
+  LeagueHistoryEntry,
+  CompareStats,
+  FriendCompare,
+  ActivityFeedEntry,
+} from './lib/leagues.client.js';
+export {
+  MasteryClient,
+  type MasteryView,
+  type MasteryTopic,
+  type MasteryCourse,
+  type MasteryLevel,
+  type SkillNode,
+  type SkillNodeState,
+} from './lib/mastery.client.js';

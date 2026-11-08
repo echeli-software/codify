@@ -23,6 +23,10 @@ export interface MeResponse {
   /** Running totals updated by Progress completions. */
   totalXp: number;
   coins: number;
+  /** Name of the user's pet (docs/08 §10). Optional for older APIs. */
+  petName?: string | null;
+  /** Friends may see this user's learning activity (docs/10 §5). */
+  activityFeedOptIn?: boolean;
 }
 
 export interface UpdateMeBody {
@@ -34,6 +38,10 @@ export interface UpdateMeBody {
   marketingEmailOptIn?: boolean;
   /** `true` marks first-run onboarding finished (sets `onboardedAt` once). */
   onboarded?: boolean;
+  /** Pet name (max 30 chars); null or "" clears it. */
+  petName?: string | null;
+  /** Share learning activity with friends (docs/10 §5). */
+  activityFeedOptIn?: boolean;
 }
 
 export interface AdminUserListItem {

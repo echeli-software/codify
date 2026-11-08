@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -183,9 +185,38 @@ export class EquipDto {
 }
 
 export class SaveAvatarConfigDto {
+  /**
+   * A (partial) AvatarConfig patch (docs/08 §5): `baseBodyId`, `skinTone`,
+   * `baseHairStyle`, `baseHairColor`, `eyeColor`, `pose`, each from its
+   * curated palette (`@codify/ui-core` avatar). Unknown keys / values →
+   * 400 `avatar.config_invalid`. Merged over the stored config.
+   */
   @IsObject()
   @Type(() => Object)
   config!: Record<string, unknown>;
+}
+
+/** `POST /avatar/random` — shuffle equipment from the owned set. */
+export class RandomizeAvatarDto {
+  /** Only these slots (default: every slot except EMOTE). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ITEM_SLOTS.length)
+  @IsIn(ITEM_SLOTS, { each: true })
+  slots?: (typeof ITEM_SLOTS)[number][];
+
+  /** Also shuffle the free base look (skin tone is kept). */
+  @IsOptional()
+  @IsBoolean()
+  look?: boolean;
+}
+
+/** `POST /avatar/starter-pet` — claim the onboarding gift (docs/10 §2). */
+export class ClaimStarterPetDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 30)
+  petName?: string;
 }
 
 export interface ItemResponse {
@@ -236,8 +267,26 @@ export interface EquippedRef {
 }
 
 export interface AvatarResponse {
+  /** The full AvatarConfig (stored values, defaults for missing ones). */
   config: Record<string, unknown> | null;
   equipped: Partial<Record<(typeof ITEM_SLOTS)[number], EquippedRef>>;
+  /** The user's name for their pet (`User.petName`), if set. */
+  petName?: string | null;
+}
+
+export interface StarterPetStatus {
+  /** The ONBOARDING gift was already given. */
+  claimed: boolean;
+  /** Not claimed yet and the first lesson is done → the gift can be opened. */
+  eligible: boolean;
+  item: ItemResponse | null;
+  petName: string | null;
+}
+
+export interface ClaimStarterPetResponse extends StarterPetStatus {
+  /** True when this call did nothing new (already claimed earlier). */
+  alreadyClaimed: boolean;
+  avatar: AvatarResponse;
 }
 
 export interface PurchaseResponse {

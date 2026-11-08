@@ -27,6 +27,8 @@ const ME_FIELDS = {
   createdAt: true,
   totalXp: true,
   coins: true,
+  petName: true,
+  activityFeedOptIn: true,
 } as const;
 
 @Injectable()
@@ -43,7 +45,7 @@ export class UsersService {
   }
 
   async update(userId: string, patch: UpdateMeDto): Promise<MeResponse> {
-    const { onboarded, ...fields } = patch;
+    const { onboarded, petName, ...fields } = patch;
     if (onboarded === true) {
       // Only the first completion stamps the date.
       await this.prisma.user.updateMany({
@@ -53,7 +55,10 @@ export class UsersService {
     }
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: { ...fields },
+      data: {
+        ...fields,
+        ...(petName !== undefined ? { petName: cleanPetName(petName) } : {}),
+      },
       select: ME_FIELDS,
     });
     return toMeResponse(user);
@@ -168,5 +173,13 @@ function toMeResponse(u: Pick<User, keyof typeof ME_FIELDS>): MeResponse {
     createdAt: u.createdAt.toISOString(),
     totalXp: u.totalXp,
     coins: u.coins,
+    petName: u.petName ?? null,
+    activityFeedOptIn: u.activityFeedOptIn,
   };
+}
+
+/** Collapsed whitespace, max 30 chars; blank → null. */
+function cleanPetName(name: string | null): string | null {
+  const v = (name ?? '').replace(/\s+/g, ' ').trim();
+  return v ? v.slice(0, 30) : null;
 }

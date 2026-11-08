@@ -17,15 +17,20 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ItemsService } from './items.service.js';
+import { StarterPetService } from './starter-pet.service.js';
 import {
   CreateItemCategoryDto,
+  ClaimStarterPetDto,
   CreateItemDto,
   EquipDto,
+  RandomizeAvatarDto,
   PurchaseDto,
   SaveAvatarConfigDto,
   ShopQueryDto,
   UpdateItemDto,
   type AvatarResponse,
+  type ClaimStarterPetResponse,
+  type StarterPetStatus,
   type InventoryItem,
   type ItemResponse,
   type PurchaseResponse,
@@ -42,6 +47,7 @@ export class ItemsController {
   constructor(
     private readonly items: ItemsService,
     private readonly audit: AuditService,
+    private readonly starterPets: StarterPetService,
   ) {}
 
   // ─── Student ───────────────────────────────────────────────────────────
@@ -113,6 +119,38 @@ export class ItemsController {
     @Body() body: EquipDto,
   ): Promise<AvatarResponse> {
     return this.items.equip(actor.userId, body.slot, body.itemId ?? null);
+  }
+
+  /** "Random" in the dressing room: shuffle equipment from the owned set. */
+  @Roles('STUDENT')
+  @Post('avatar/random')
+  @HttpCode(200)
+  randomize(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: RandomizeAvatarDto,
+  ): Promise<AvatarResponse> {
+    return this.items.randomize(actor.userId, {
+      slots: body?.slots,
+      look: body?.look,
+    });
+  }
+
+  /** The onboarding starter pet: claimed / eligible (docs/10 §2). */
+  @Roles('STUDENT')
+  @Get('avatar/starter-pet')
+  starterPet(@CurrentUser() actor: ApiUser): Promise<StarterPetStatus> {
+    return this.starterPets.status(actor.userId);
+  }
+
+  /** Open the starter-pet gift (idempotent) and optionally name it. */
+  @Roles('STUDENT')
+  @Post('avatar/starter-pet')
+  @HttpCode(200)
+  claimStarterPet(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: ClaimStarterPetDto,
+  ): Promise<ClaimStarterPetResponse> {
+    return this.starterPets.claim(actor.userId, { petName: body?.petName });
   }
 
   // ─── Admin ─────────────────────────────────────────────────────────────

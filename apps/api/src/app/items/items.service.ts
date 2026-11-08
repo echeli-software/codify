@@ -14,7 +14,12 @@ import {
   isItemAvailable,
   validateDropWindow,
 } from '@codify/domain';
-import { levelFromXp } from '@codify/ui-core';
+import {
+  levelFromXp,
+  normalizeAvatarConfig,
+  randomAvatarConfig,
+  validateAvatarConfig,
+} from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from '../billing/access.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
@@ -51,6 +56,19 @@ const RARITY_ORDER: Record<string, number> = {
   EPIC: 3,
   LEGENDARY: 4,
 };
+/** Slots "Random" shuffles by default (EMOTE is a one-shot, docs/08 §2). */
+const RANDOM_SLOTS: ItemSlot[] = [
+  'PET',
+  'BACKGROUND',
+  'TOP',
+  'BOTTOM',
+  'SHOES',
+  'HAT',
+  'HAIR',
+  'GLASSES',
+  'ACCESSORY',
+  'FRAME',
+];
 /** Never announce a drop that went live longer ago than this. */
 const DROP_ANNOUNCE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 /** Drop pushes go to students seen in the last 30 days. */
@@ -470,7 +488,7 @@ export class ItemsService {
     const [user, equipped] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
-        select: { avatarConfig: true },
+        select: { avatarConfig: true, petName: true },
       }),
       this.prisma.equippedItem.findMany({
         where: { userId },
@@ -493,8 +511,10 @@ export class ItemsService {
     }
     await this.localizeEquipped(map);
     return {
-      config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
+      // The full AvatarConfig: stored values, defaults for missing ones.
+      config: { ...normalizeAvatarConfig(user.avatarConfig) },
       equipped: map,
+      petName: user.petName ?? null,
     };
   }
 
@@ -502,9 +522,26 @@ export class ItemsService {
     userId: string,
     config: Record<string, unknown>,
   ): Promise<AvatarResponse> {
+    // AvatarConfig patch (docs/08 §5): known keys, curated values only.
+    const valid = validateAvatarConfig(config);
+    if (!valid.ok)
+      throw new BadRequestException({
+        code: 'avatar.config_invalid',
+        message: 'Invalid avatar settings',
+        errors: valid.errors,
+      });
+    const stored = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { avatarConfig: true },
+    });
+    // The patch is merged over the stored (normalized) config.
+    const merged = {
+      ...normalizeAvatarConfig(stored.avatarConfig),
+      ...valid.value,
+    };
     await this.prisma.user.update({
       where: { id: userId },
-      data: { avatarConfig: config as Prisma.InputJsonValue },
+      data: { avatarConfig: merged as unknown as Prisma.InputJsonValue },
     });
     return this.getAvatar(userId);
   }
@@ -533,6 +570,62 @@ export class ItemsService {
       create: { userId, slot, itemId },
       update: { itemId },
     });
+    return this.getAvatar(userId);
+  }
+
+  /**
+   * "Random" (docs/08 §9): equip a random owned item in every slot that has
+   * owned items (EMOTE is transient and skipped unless asked for); with
+   * `look` also a random base look — the skin tone is personal and kept.
+   */
+  async randomize(
+    userId: string,
+    opts: { slots?: ItemSlot[]; look?: boolean } = {},
+    rng: () => number = Math.random,
+  ): Promise<AvatarResponse> {
+    const slots: ItemSlot[] = opts.slots?.length ? opts.slots : RANDOM_SLOTS;
+    const owned = await this.prisma.userItem.findMany({
+      where: { userId, item: { deletedAt: null, slot: { in: slots } } },
+      select: { itemId: true, item: { select: { slot: true } } },
+      orderBy: { acquiredAt: 'asc' },
+    });
+    const bySlot = new Map<ItemSlot, string[]>();
+    for (const o of owned) {
+      const list = bySlot.get(o.item.slot) ?? [];
+      list.push(o.itemId);
+      bySlot.set(o.item.slot, list);
+    }
+    const now = new Date();
+    const writes: Prisma.PrismaPromise<unknown>[] = [...bySlot].map(
+      ([slot, ids]) => {
+        const itemId =
+          ids[Math.min(ids.length - 1, Math.floor(rng() * ids.length))];
+        return this.prisma.equippedItem.upsert({
+          where: { userId_slot: { userId, slot } },
+          create: { userId, slot, itemId },
+          update: { itemId, updatedAt: now },
+        });
+      },
+    );
+    if (opts.look) {
+      const user = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { avatarConfig: true },
+      });
+      const look = randomAvatarConfig(rng, {
+        skinTone: normalizeAvatarConfig(user.avatarConfig).skinTone,
+      });
+      writes.push(
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            avatarConfig: look as unknown as Prisma.InputJsonValue,
+            avatarUpdatedAt: now,
+          },
+        }),
+      );
+    }
+    if (writes.length) await this.prisma.$transaction(writes);
     return this.getAvatar(userId);
   }
 
@@ -654,7 +747,7 @@ function purchaseError(reason: string) {
   }
 }
 
-function toItemResponse(i: Item, urls: SpriteUrlMap): ItemResponse {
+export function toItemResponse(i: Item, urls: SpriteUrlMap): ItemResponse {
   return {
     id: i.id,
     slug: i.slug,

@@ -23,6 +23,7 @@ import { LeaguesModule } from './leagues/leagues.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { ModulesModule } from './modules/modules.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { MasteryModule } from './mastery/mastery.module.js';
 import { EngagementModule } from './engagement/engagement.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -84,6 +85,7 @@ import { FlagsModule } from './flags/flags.module.js';
     AdminOpsModule,
     AccountModule,
     FlagsModule,
+    MasteryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

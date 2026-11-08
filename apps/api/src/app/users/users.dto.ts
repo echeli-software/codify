@@ -9,6 +9,7 @@ import {
   Max,
   Min,
   registerDecorator,
+  ValidateIf,
   type ValidationOptions,
 } from 'class-validator';
 
@@ -82,6 +83,18 @@ export class UpdateMeDto {
   @IsOptional()
   @IsBoolean()
   onboarded?: boolean;
+
+  /** Name of the user's pet (docs/08 §10); null or "" clears it. */
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  @Length(0, 30)
+  petName?: string | null;
+
+  /** Opt in to sharing learning activity with friends (docs/10 §5). */
+  @IsOptional()
+  @IsBoolean()
+  activityFeedOptIn?: boolean;
 }
 
 /** Public shape returned by /api/me. Excludes deletedAt + clerkId. */
@@ -101,6 +114,10 @@ export interface MeResponse {
   /** Running gamification totals; cached on the student client. */
   totalXp: number;
   coins: number;
+  /** Name of the user's pet (docs/08 §10). */
+  petName: string | null;
+  /** Friends may see this user's learning activity (docs/10 §5). */
+  activityFeedOptIn: boolean;
 }
 
 export interface AdminUserListItem {
