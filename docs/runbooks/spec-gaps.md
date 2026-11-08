@@ -11,17 +11,17 @@ itself.
 
 ## FIX — bugs to fix before staging (owner: Platform)
 
-| ID    | Gap                                                                                                                                                             | Spec                  | Status                                                                  |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------- |
-| FIX-1 | Deleting a module hard-deletes its lessons and students' progress (DB cascade); translations of deleted content are never cleaned up                            | 02 Conventions        | ✅                                                                      |
-| FIX-2 | Deploy runbooks name env vars the code doesn't read (`CLERK_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT`) and omit required ones (Resend, `CLERK_AUTHORIZED_PARTIES`) | 13 §16, infra/coolify | ✅ (a stray `FCM_SERVICE_ACCOUNT` mention is left in docs/17-mobile.md) |
-| FIX-3 | Exercise limits allowed by the API (10 s / 512 MB) exceed Judge0's caps (5 s / 256 MB) → every submission of such an exercise fails                             | 12 §3                 | ✅                                                                      |
-| FIX-4 | Client IP wrong behind Cloudflare + Coolify proxy (trusts 1 hop, ignores `CF-Connecting-IP`) → rate limits and audit IPs                                        | 14 §7, §11            | ✅                                                                      |
-| FIX-5 | AI grading falls back to the heuristic in production when the LLM fails, and still pays rewards                                                                 | 17                    | ✅                                                                      |
-| FIX-6 | Translated lesson bodies are served without `lessonDocSchema` validation or a block-structure check                                                             | 14 §3, 11 §3          | ✅                                                                      |
-| FIX-7 | Broken streaks keep getting nightly "N-day streak" reminders; summary shows the stale count                                                                     | 07 §6, 10 §3          | ✅                                                                      |
-| FIX-8 | No gamification defaults are seeded (PREMIUM_DEFAULT 2.0, streak tiers, quest templates, starter badges)                                                        | 07 §3, §6–8, 02 seed  | ✅                                                                      |
-| FIX-9 | User time zone is never detected or editable → everyone uses São Paulo day boundaries                                                                           | 11 §6                 | ✅                                                                      |
+| ID    | Gap                                                                                                                                                             | Spec                  | Status |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------ |
+| FIX-1 | Deleting a module hard-deletes its lessons and students' progress (DB cascade); translations of deleted content are never cleaned up                            | 02 Conventions        | ✅     |
+| FIX-2 | Deploy runbooks name env vars the code doesn't read (`CLERK_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT`) and omit required ones (Resend, `CLERK_AUTHORIZED_PARTIES`) | 13 §16, infra/coolify | ✅     |
+| FIX-3 | Exercise limits allowed by the API (10 s / 512 MB) exceed Judge0's caps (5 s / 256 MB) → every submission of such an exercise fails                             | 12 §3                 | ✅     |
+| FIX-4 | Client IP wrong behind Cloudflare + Coolify proxy (trusts 1 hop, ignores `CF-Connecting-IP`) → rate limits and audit IPs                                        | 14 §7, §11            | ✅     |
+| FIX-5 | AI grading falls back to the heuristic in production when the LLM fails, and still pays rewards                                                                 | 17                    | ✅     |
+| FIX-6 | Translated lesson bodies are served without `lessonDocSchema` validation or a block-structure check                                                             | 14 §3, 11 §3          | ✅     |
+| FIX-7 | Broken streaks keep getting nightly "N-day streak" reminders; summary shows the stale count                                                                     | 07 §6, 10 §3          | ✅     |
+| FIX-8 | No gamification defaults are seeded (PREMIUM_DEFAULT 2.0, streak tiers, quest templates, starter badges)                                                        | 07 §3, §6–8, 02 seed  | ✅     |
+| FIX-9 | User time zone is never detected or editable → everyone uses São Paulo day boundaries                                                                           | 11 §6                 | ✅     |
 
 ## SEC — security and platform (owner: Platform)
 
@@ -147,7 +147,12 @@ lesson completion idempotent on (user, lesson) instead of a Redis
 Idempotency-Key store; library layout differences (docs/03); ItemSlot
 single ACCESSORY; RTL plumbing; docs/19 ownership matrix out of date;
 monthly/manual PIX renewal (roadmap risk table defers it); zod form
-adapter. ⬜ until docs are updated.
+adapter. 📝 Docs updated 2026-11-08 to describe what is built (PIX is an
+annual prepay with manual renewal; the zod adapter doesn't exist — forms
+validate on submit, the API's class-validator is the real check;
+`SURPRISE_BOOST` replaces `LEAGUE_PROMOTION`). Still open in the docs/14
+§8 note: checkout and item purchase don't read `Idempotency-Key` (item
+purchase is idempotent through the ownership constraint).
 
 ⏸ Deferred by the spec: mystery chests (07 §10), cohort challenges
 (10 §5). Needs accounts: dashboard deploy-status indicator (GitHub API),

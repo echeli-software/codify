@@ -140,4 +140,4 @@ store-console accounts, and physical devices:
   disclosure) and **App Store / Play submission + approval** (acceptance #3).
 
 The seams are all in place so the real providers/keys drop in behind env vars
-(`REVENUECAT_WEBHOOK_AUTH`, `FCM_SERVICE_ACCOUNT`) without touching callers.
+(`REVENUECAT_WEBHOOK_AUTH`, `FIREBASE_SERVICE_ACCOUNT_JSON`) without touching callers.
