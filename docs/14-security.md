@@ -173,6 +173,7 @@ Purge job (`AccountPurgeService`, daily 03:17 UTC, behind `JOBS_ENABLED`): accou
 - `pnpm audit` in CI; high/critical fail the build.
 - License check in CI; copyleft licenses (AGPL, etc.) blocked unless approved.
 - SBOM generated on release.
+- As built (`.github/workflows/ci.yml`): `node infra/ci/audit-check.mjs` runs `pnpm audit --prod` and fails on any high/critical advisory not accepted in `infra/ci/audit-allowlist.json` (each entry: reason + expiry ≤ 90 days; expired entries fail, fixed ones are reported as stale). The 2026-11-08 baseline (49 advisories: Angular 21.2 patches, the Express stack under `@nestjs/platform-express` incl. `proxy-addr`/`multer`/`body-parser`, `zod`, editor libs, build tooling pulled in by `@sentry/node` and `prisma`) needs dependency upgrades in the root `package.json`. `node infra/ci/licence-check.mjs` checks `pnpm licenses list --prod` against a permissive allow-list (MIT, ISC, Apache-2.0, BSD, 0BSD, BlueOak, Unlicense, CC0, CC-BY-4.0 data, …; `A OR B` passes if one side does); `sentry` (FSL-1.1-Apache-2.0, via `@sentry/node`) is the one approved exception.
 
 ## 17. Logging & sensitive data
 

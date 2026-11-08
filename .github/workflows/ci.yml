@@ -67,6 +67,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # docs/14 §16: `pnpm audit --prod` — high/critical fail unless accepted
+      # (reason + expiry) in infra/ci/audit-allowlist.json — and the
+      # production licence allow-list (copyleft blocked unless approved).
+      - name: Dependency audit
+        run: node infra/ci/audit-check.mjs
+      - name: Licence check
+        run: node infra/ci/licence-check.mjs
+
       # Prisma 7 does not generate the client on install; the API's types and
       # tests need it before typecheck/test run.
       - run: pnpm prisma:generate
