@@ -37,11 +37,21 @@ export class RetryAfterInterceptor implements NestInterceptor {
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       catchError((err: unknown) => {
-        if (err instanceof RateLimitedException) {
+        // RateLimitedException (429) and RetryLaterException (503) both
+        // carry `retryAfterSec`.
+        if (
+          err instanceof HttpException &&
+          typeof (err as { retryAfterSec?: unknown }).retryAfterSec === 'number'
+        ) {
           const res = ctx.switchToHttp().getResponse<Response>();
           res.setHeader(
             'Retry-After',
-            String(Math.max(1, Math.ceil(err.retryAfterSec))),
+            String(
+              Math.max(
+                1,
+                Math.ceil((err as { retryAfterSec: number }).retryAfterSec),
+              ),
+            ),
           );
         }
         return throwError(() => err);

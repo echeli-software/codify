@@ -10,6 +10,7 @@ import {
   rubricHash,
 } from './ai-grading.service.js';
 import type { AiGrader, JudgeOutcome } from './ai-grading.provider.js';
+import { GraderUnavailableException } from './ai-grading.provider.js';
 
 const teacher: ApiUser = {
   userId: 't1',
@@ -207,6 +208,20 @@ describe('AiGradingService.submit', () => {
     const res = await service.submit('u1', 'p1', 'try');
     expect(res.gradedBy).toBe('HEURISTIC');
     expect(cacheWrites).toHaveLength(0);
+  });
+
+  it('a production LLM failure (503 GRADER_UNAVAILABLE) records nothing and grants nothing', async () => {
+    const { service, created, cacheWrites, judge, recordCompletion } = setup();
+    judge.mockRejectedValueOnce(new GraderUnavailableException());
+    await expect(
+      service.submit('u1', 'p1', 'Always try/catch so the app does not crash'),
+    ).rejects.toMatchObject({
+      status: 503,
+      response: { code: 'GRADER_UNAVAILABLE' },
+    });
+    expect(created).toHaveLength(0);
+    expect(cacheWrites).toHaveLength(0);
+    expect(recordCompletion).not.toHaveBeenCalled();
   });
 
   it('CAPSTONE lessons complete with refType capstone / capstone_pass', async () => {

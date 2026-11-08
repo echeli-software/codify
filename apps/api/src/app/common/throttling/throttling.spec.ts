@@ -4,6 +4,7 @@ import { ThrottlerException, ThrottlerStorageService } from '@nestjs/throttler';
 import { RedisThrottlerStorage } from './redis-throttler.storage.js';
 import {
   AiThrottle,
+  CodeSubmitThrottle,
   CodeThrottle,
   NoThrottle,
   RewardThrottle,
@@ -21,6 +22,12 @@ class Ctl {
     return 1;
   }
   @CodeThrottle() code() {
+    return 1;
+  }
+  @CodeSubmitThrottle() submit() {
+    return 1;
+  }
+  @RewardThrottle() @CodeThrottle() stacked() {
     return 1;
   }
   @NoThrottle() health() {
@@ -49,6 +56,8 @@ describe('throttle groups', () => {
     expect(throttleGroupsOf(ctx('ai'))).toEqual(['ai']);
     expect(throttleGroupsOf(ctx('code'))).toEqual(['code']);
     expect(throttleGroupsOf(ctx('plain'))).toEqual([]);
+    expect(throttleGroupsOf(ctx('submit')).sort()).toEqual(['code', 'reward']);
+    expect(throttleGroupsOf(ctx('stacked')).sort()).toEqual(['code', 'reward']);
   });
 
   it('applies opt-in throttlers only to their group; default + ip apply everywhere', () => {
@@ -58,6 +67,14 @@ describe('throttle groups', () => {
     expect(active('reward')).toEqual(['default', 'ip', 'reward']);
     expect(active('ai')).toEqual(['default', 'ip', 'ai-minute', 'ai-day']);
     expect(active('code')).toEqual(['default', 'ip', 'code-burst', 'code-day']);
+    // Exercise submit counts in both the code and the reward buckets.
+    expect(active('submit')).toEqual([
+      'default',
+      'ip',
+      'reward',
+      'code-burst',
+      'code-day',
+    ]);
   });
 
   it('matches the docs/14 §7 limits', () => {
@@ -115,6 +132,19 @@ describe('UserThrottlerGuard', () => {
     const other = { ip: '9.9.9.9', user: { userId: 'u-other' }, headers: {} };
     await expect(g.canActivate(ctx('reward', other, res))).resolves.toBe(true);
     await expect(g.canActivate(ctx('plain', req, res))).resolves.toBe(true);
+  });
+
+  it('exercise submit shares the 10/min reward bucket with other reward routes', async () => {
+    const g = guard({ 'code-burst': 1000 });
+    await g.onModuleInit();
+    const res = { header: () => undefined };
+    const req = { ip: '9.9.9.8', user: { userId: 'u-mixed' }, headers: {} };
+    for (let i = 0; i < 9; i++)
+      await expect(g.canActivate(ctx('reward', req, res))).resolves.toBe(true);
+    await expect(g.canActivate(ctx('submit', req, res))).resolves.toBe(true);
+    await expect(g.canActivate(ctx('submit', req, res))).rejects.toBeInstanceOf(
+      ThrottlerException,
+    );
   });
 
   it('can be switched off outside production with THROTTLE_ENABLED=false', async () => {

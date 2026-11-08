@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -32,7 +33,11 @@ import {
   UpdateExerciseDto,
 } from './exercises.dto.js';
 import { RetryAfterInterceptor } from './rate-limit.js';
-import { CodeThrottle } from '../common/throttling/throttle.decorators.js';
+import {
+  CodeSubmitThrottle,
+  CodeThrottle,
+} from '../common/throttling/throttle.decorators.js';
+import { CodeQueueGuard } from './judge0-backlog.js';
 
 function toInput(
   dto: CreateExerciseDto | UpdateExerciseDto,
@@ -148,6 +153,7 @@ export class ExercisesController {
   @CodeThrottle()
   @Roles('STUDENT')
   @Post('exercises/:id/run')
+  @UseGuards(CodeQueueGuard)
   run(
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
@@ -156,9 +162,12 @@ export class ExercisesController {
     return this.exercises.run(actor.userId, id, body.code);
   }
 
-  @CodeThrottle()
+  // Code limits + the 10/min reward-event group (docs/14 §7); 503
+  // CODE_QUEUE_BUSY when the Judge0 backlog is over CODE_QUEUE_MAX_BACKLOG.
+  @CodeSubmitThrottle()
   @Roles('STUDENT')
   @Post('exercises/:id/submit')
+  @UseGuards(CodeQueueGuard)
   @UseInterceptors(RetryAfterInterceptor)
   async submit(
     @CurrentUser() actor: ApiUser,

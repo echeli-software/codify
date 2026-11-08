@@ -183,6 +183,8 @@ hiddenRevealed }`, hidden tests anonymised (`hidden-N`, no args / values /
 - Per-language global: throttle if Judge0 queue depth exceeds threshold.
 - IP rate limit on the submissions endpoint (in addition to user).
 
+As built: `POST /exercises/:id/run` and `/submit` check the backlog of the `code-submissions` queue (jobs waiting for a Judge0 worker; one global queue, not per language). At `CODE_QUEUE_MAX_BACKLOG` (default 100, matching Judge0's `MAX_QUEUE_SIZE`; `0` disables) they answer `503 { code: "CODE_QUEUE_BUSY", retryAfter }` + `Retry-After` (5–60 s, from the excess over `SUBMISSION_WORKER_CONCURRENCY`) before anything is stored. Submit also counts in the 10/min reward-event group (docs/14 §7).
+
 ## 8. Storage & retention
 
 - `Submission` rows kept indefinitely for analytics aggregates (verdict, scorePct, timestamps).

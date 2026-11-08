@@ -363,7 +363,9 @@
         "noAttempts": "Você usou todas as tentativas desta atividade.",
         "runnerUnavailable": "O executor de código está indisponível agora. Tente mais tarde.",
         "invalidPath": "Não foi possível registrar essa jogada. Jogue o cenário de novo.",
-        "duplicate": "Isso já foi enviado."
+        "duplicate": "Isso já foi enviado.",
+        "graderUnavailable": "{seconds, plural, =0 {O corretor de IA está ocupado. Nada foi registrado — tente de novo em instantes.} one {O corretor de IA está ocupado. Nada foi registrado — tente de novo em # segundo.} other {O corretor de IA está ocupado. Nada foi registrado — tente de novo em # segundos.}}",
+        "queueBusy": "{seconds, plural, =0 {Muita gente executando código agora. Tente de novo em instantes.} one {Muita gente executando código agora. Tente de novo em # segundo.} other {Muita gente executando código agora. Tente de novo em # segundos.}}"
       }
     },
     "course": {

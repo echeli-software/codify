@@ -17,6 +17,13 @@ import { SubmissionProcessor } from './submission.processor.js';
 import { SUBMISSION_ENQUEUER, SUBMISSION_QUEUE } from './submission-queue.js';
 import { BullSubmissionEnqueuer } from './bull-submission-enqueuer.js';
 import { SubmissionSweeper } from './submission-sweeper.js';
+import {
+  BullCodeBacklog,
+  CODE_BACKLOG,
+  CODE_BACKLOG_POLICY,
+  CodeQueueGuard,
+  codeBacklogPolicyFromEnv,
+} from './judge0-backlog.js';
 
 /**
  * Exercises module (docs/12). CODE_EXECUTOR selects Judge0 when JUDGE0_URL
@@ -42,6 +49,13 @@ import { SubmissionSweeper } from './submission-sweeper.js';
       useFactory: () => createCodeExecutor(process.env),
     },
     { provide: SUBMISSION_ENQUEUER, useClass: BullSubmissionEnqueuer },
+    // Judge0 backlog throttle (docs/12 §7).
+    { provide: CODE_BACKLOG, useClass: BullCodeBacklog },
+    {
+      provide: CODE_BACKLOG_POLICY,
+      useFactory: () => codeBacklogPolicyFromEnv(process.env),
+    },
+    CodeQueueGuard,
     {
       provide: SUBMISSION_TIMINGS,
       useFactory: () => submissionTimingsFromEnv(process.env),

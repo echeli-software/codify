@@ -65,6 +65,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
   - AI-prompt grading: 5/min/user, 60/day/user.
   - Code submission: 1/3s/user, 200/day/user.
 - Exceeded → 429 with `Retry-After`.
+- As built: throttle groups stack per route (`@CodeSubmitThrottle()` = code + reward), so `POST /exercises/:id/submit` is limited by 1/3 s, 200/day **and** the shared 10/min reward bucket. A Judge0 backlog over `CODE_QUEUE_MAX_BACKLOG` answers `503 CODE_QUEUE_BUSY` + `Retry-After` (docs/12 §7).
 - **Client IP** (`apps/api/src/app/common/client-ip.ts`, one function for rate-limit trackers, audit rows and the request context): production chain is client → Cloudflare → Coolify proxy → API. Express resolves `req.ip` through `TRUST_PROXY` (default in production: `loopback, linklocal, uniquelocal`, i.e. the Coolify proxy on the Docker network), which yields the Cloudflare edge; only when that address is inside the Cloudflare ranges (built-in list, `CLOUDFLARE_IP_RANGES` overrides) is `CF-Connecting-IP` used. A request that reaches the origin directly can't spoof its IP with the header. `TRUST_CLOUDFLARE=false` disables the header entirely. Logs never carry IPs (§17).
 
 ## 8. Idempotency

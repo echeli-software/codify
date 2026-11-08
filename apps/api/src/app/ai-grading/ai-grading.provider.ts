@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { RetryLaterException } from '../common/retry-later.js';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   normalizeForMatch,
@@ -13,8 +14,11 @@ import {
  *
  *   - AnthropicGrader — selected when ANTHROPIC_API_KEY is set. One request
  *     per submission judges every `llm` criterion; output is forced through
- *     a tool definition (JSON), temperature 0, ~8 s timeout. On any API
- *     failure it falls back to the heuristic and reports gradedBy HEURISTIC.
+ *     a tool definition (JSON), temperature 0, ~8 s timeout. On an API
+ *     failure in production it throws GraderUnavailableException (503
+ *     GRADER_UNAVAILABLE + Retry-After): nothing is recorded or granted and
+ *     the student resubmits (docs/17). Outside production it falls back to
+ *     the heuristic and reports gradedBy HEURISTIC.
  *   - DevHeuristicGrader — local/dev: checks the response covers the
  *     criterion's `concepts`, deterministic and offline.
  *
@@ -22,6 +26,23 @@ import {
  */
 
 export const AI_GRADER = Symbol('AI_GRADER');
+
+/** Seconds a student is asked to wait after an LLM grading failure. */
+export const GRADER_RETRY_AFTER_SEC = 30;
+
+/**
+ * The LLM grader failed in production. Never answered with the heuristic
+ * there: a pass would pay rewards for an answer nobody actually graded.
+ */
+export class GraderUnavailableException extends RetryLaterException {
+  constructor(retryAfterSec = GRADER_RETRY_AFTER_SEC) {
+    super(
+      'GRADER_UNAVAILABLE',
+      'The AI grader is unavailable right now; nothing was recorded. Try again shortly.',
+      retryAfterSec,
+    );
+  }
+}
 
 export interface GradeContext {
   promptText: string;
@@ -114,6 +135,12 @@ export interface MessagesClient {
 export interface AnthropicGraderOptions {
   model?: string;
   timeoutMs?: number;
+  /**
+   * Answer with the heuristic when the API fails (dev / staging without a
+   * reliable key). False in production: failures become 503
+   * GRADER_UNAVAILABLE.
+   */
+  fallbackToHeuristic?: boolean;
 }
 
 const GRADE_TOOL: Anthropic.Tool = {
@@ -204,6 +231,7 @@ export class AnthropicGrader implements AiGrader {
   private readonly log = new Logger('AnthropicGrader');
   readonly model: string;
   private readonly timeoutMs: number;
+  private readonly fallbackToHeuristic: boolean;
 
   constructor(
     private readonly client: MessagesClient,
@@ -211,6 +239,7 @@ export class AnthropicGrader implements AiGrader {
   ) {
     this.model = opts.model || DEFAULT_AI_GRADER_MODEL;
     this.timeoutMs = opts.timeoutMs ?? 8000;
+    this.fallbackToHeuristic = opts.fallbackToHeuristic ?? false;
   }
 
   async judge(
@@ -224,8 +253,14 @@ export class AnthropicGrader implements AiGrader {
       const results = await this.callModel(response, criteria, ctx);
       return { results, gradedBy: 'LLM', fallback: false };
     } catch (err) {
+      if (!this.fallbackToHeuristic) {
+        this.log.error(
+          `LLM grading failed (${(err as Error).message}) — answering 503 GRADER_UNAVAILABLE`,
+        );
+        throw new GraderUnavailableException();
+      }
       this.log.warn(
-        `LLM grading failed (${(err as Error).message}) — falling back to the heuristic grader`,
+        `LLM grading failed (${(err as Error).message}) — falling back to the heuristic grader (non-production)`,
       );
       return {
         results: heuristicResults(response, criteria),
@@ -313,6 +348,11 @@ export function createAiGrader(
     const grader = new AnthropicGrader(client, {
       model: env['AI_GRADER_MODEL']?.trim() || DEFAULT_AI_GRADER_MODEL,
       timeoutMs: Number(env['AI_GRADER_TIMEOUT_MS']) || 8000,
+      // Never in production; AI_GRADER_FALLBACK=false turns it off in
+      // dev/staging too (to exercise the 503 path).
+      fallbackToHeuristic:
+        env['NODE_ENV'] !== 'production' &&
+        env['AI_GRADER_FALLBACK']?.trim().toLowerCase() !== 'false',
     });
     log.log(`LLM grader: Anthropic ${grader.model}`);
     return grader;

@@ -1,8 +1,4 @@
-import {
-  type ExecutionContext,
-  SetMetadata,
-  applyDecorators,
-} from '@nestjs/common';
+import { type ExecutionContext, applyDecorators } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 
 /**
@@ -26,8 +22,26 @@ export const THROTTLER_NAMES = [
   'code-day',
 ] as const;
 
-const tagGroup = (group: ThrottleGroup) =>
-  SetMetadata(THROTTLE_GROUPS_KEY, [group]);
+/**
+ * Add `group` to the handler's (or class's) groups. Groups stack, so one
+ * route can sit in several buckets — e.g. exercise submit is both `code`
+ * (1/3 s, 200/day) and `reward` (10/min), docs/14 §7.
+ */
+const tagGroup =
+  (group: ThrottleGroup) =>
+  (
+    target: object,
+    _key?: string | symbol,
+    descriptor?: PropertyDescriptor,
+  ): void => {
+    const holder = (descriptor?.value ?? target) as object;
+    const existing =
+      (Reflect.getMetadata(THROTTLE_GROUPS_KEY, holder) as
+        | ThrottleGroup[]
+        | undefined) ?? [];
+    if (!existing.includes(group))
+      Reflect.defineMetadata(THROTTLE_GROUPS_KEY, [...existing, group], holder);
+  };
 
 /** Reward-event endpoints (lesson complete, quiz/exercise/scenario pass, purchases): 10/min/user. */
 export const RewardThrottle = () => applyDecorators(tagGroup('reward'));
@@ -37,6 +51,10 @@ export const AiThrottle = () => applyDecorators(tagGroup('ai'));
 
 /** Code execution (run/submit): 1 per 3s and 200/day per user. */
 export const CodeThrottle = () => applyDecorators(tagGroup('code'));
+
+/** Exercise submit: code limits + the reward-event group (docs/14 §7). */
+export const CodeSubmitThrottle = () =>
+  applyDecorators(tagGroup('code'), tagGroup('reward'));
 
 /** Exempt a route/controller from every throttler (health probes, provider webhooks). */
 export const NoThrottle = () =>

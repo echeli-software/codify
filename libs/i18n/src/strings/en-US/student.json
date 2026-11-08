@@ -363,7 +363,9 @@
         "noAttempts": "You've used all your attempts for this activity.",
         "runnerUnavailable": "The code runner is unavailable right now. Try again later.",
         "invalidPath": "That play-through couldn't be recorded. Replay the scenario.",
-        "duplicate": "That was already submitted."
+        "duplicate": "That was already submitted.",
+        "graderUnavailable": "{seconds, plural, =0 {The AI grader is busy. Nothing was recorded — try again in a moment.} one {The AI grader is busy. Nothing was recorded — try again in # second.} other {The AI grader is busy. Nothing was recorded — try again in # seconds.}}",
+        "queueBusy": "{seconds, plural, =0 {Lots of people are running code right now. Try again in a moment.} one {Lots of people are running code right now. Try again in # second.} other {Lots of people are running code right now. Try again in # seconds.}}"
       }
     },
     "course": {

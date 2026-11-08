@@ -21,6 +21,9 @@ const CODE_KEYS: Record<string, string> = {
   INVALID_SCENARIO_PATH: 'student.runner.errors.invalidPath',
   IDEMPOTENCY_KEY_REUSED: 'student.runner.errors.duplicate',
   SUBMISSION_TIMEOUT: 'student.exercise.gradingTimeout',
+  // 503 + Retry-After: nothing was recorded, the student just resubmits.
+  GRADER_UNAVAILABLE: 'student.runner.errors.graderUnavailable',
+  CODE_QUEUE_BUSY: 'student.runner.errors.queueBusy',
 };
 
 /**

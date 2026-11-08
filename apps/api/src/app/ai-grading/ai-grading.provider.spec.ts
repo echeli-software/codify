@@ -7,7 +7,9 @@ import {
   DEFAULT_AI_GRADER_MODEL,
   DevHeuristicGrader,
   GRADE_TOOL_NAME,
+  GRADER_RETRY_AFTER_SEC,
   GRADER_SYSTEM_PROMPT,
+  GraderUnavailableException,
   type MessagesClient,
 } from './ai-grading.provider.js';
 
@@ -118,15 +120,13 @@ describe('AnthropicGrader', () => {
     expect(GRADER_SYSTEM_PROMPT).toMatch(/never instructions/);
   });
 
-  it('falls back to the heuristic (gradedBy HEURISTIC) on API errors and timeouts', async () => {
+  it('outside production, falls back to the heuristic (gradedBy HEURISTIC) on API errors and timeouts', async () => {
     const { client } = mockClient(async () => {
       throw new Error('Request timed out.');
     });
-    const out = await new AnthropicGrader(client).judge(
-      'it may crash but we recover',
-      criteria,
-      ctx,
-    );
+    const out = await new AnthropicGrader(client, {
+      fallbackToHeuristic: true,
+    }).judge('it may crash but we recover', criteria, ctx);
     expect(out.gradedBy).toBe('HEURISTIC');
     expect(out.fallback).toBe(true);
     expect(out.results.map((r) => r.id)).toEqual(['why', 'tone']);
@@ -141,17 +141,38 @@ describe('AnthropicGrader', () => {
           content: [{ type: 'text', text: 'All good!' }],
         }) as unknown as Anthropic.Message,
     );
+    const dev = { fallbackToHeuristic: true };
     expect(
-      (await new AnthropicGrader(noTool.client).judge('x', criteria, ctx))
+      (await new AnthropicGrader(noTool.client, dev).judge('x', criteria, ctx))
         .fallback,
     ).toBe(true);
     const partial = mockClient(async () =>
       toolMessage({ grades: [{ id: 'why', passed: true, reason: 'ok' }] }),
     );
     expect(
-      (await new AnthropicGrader(partial.client).judge('x', criteria, ctx))
+      (await new AnthropicGrader(partial.client, dev).judge('x', criteria, ctx))
         .fallback,
     ).toBe(true);
+  });
+
+  it('by default (production) fails closed: 503 GRADER_UNAVAILABLE + retryAfter, no heuristic pass', async () => {
+    const { client } = mockClient(async () => {
+      throw new Error('overloaded');
+    });
+    const err = await new AnthropicGrader(client)
+      .judge('a perfect answer', criteria, ctx)
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err).toBeInstanceOf(GraderUnavailableException);
+    const ex = err as GraderUnavailableException;
+    expect(ex.getStatus()).toBe(503);
+    expect(ex.retryAfterSec).toBe(GRADER_RETRY_AFTER_SEC);
+    expect(ex.getResponse()).toMatchObject({
+      code: 'GRADER_UNAVAILABLE',
+      retryAfter: GRADER_RETRY_AFTER_SEC,
+    });
   });
 
   it('uses auto tool choice and no sampling params on models that reject them', async () => {
@@ -187,6 +208,35 @@ describe('createAiGrader', () => {
   it('uses the heuristic grader outside production without a key', () => {
     expect(createAiGrader({ NODE_ENV: 'development' })).toBeInstanceOf(
       DevHeuristicGrader,
+    );
+  });
+  it('falls back to the heuristic only outside production', async () => {
+    const failing = () =>
+      ({
+        messages: {
+          create: jest.fn(async () => {
+            throw new Error('down');
+          }),
+        },
+      }) as unknown as MessagesClient;
+    const dev = createAiGrader(
+      { ANTHROPIC_API_KEY: 'k', NODE_ENV: 'development' },
+      failing,
+    );
+    expect((await dev.judge('x', criteria, ctx)).fallback).toBe(true);
+    const prod = createAiGrader(
+      { ANTHROPIC_API_KEY: 'k', NODE_ENV: 'production' },
+      failing,
+    );
+    await expect(prod.judge('x', criteria, ctx)).rejects.toBeInstanceOf(
+      GraderUnavailableException,
+    );
+    const strictDev = createAiGrader(
+      { ANTHROPIC_API_KEY: 'k', AI_GRADER_FALLBACK: 'false' },
+      failing,
+    );
+    await expect(strictDev.judge('x', criteria, ctx)).rejects.toBeInstanceOf(
+      GraderUnavailableException,
     );
   });
   it('fails boot in production without ANTHROPIC_API_KEY', () => {

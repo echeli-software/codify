@@ -27,6 +27,17 @@ exposes rubric **labels only** — never the keyword/regex/concept config.
 Admin authors the rubric (`/lessons/:id/ai-prompt`) and can **preview** — grade
 a sample answer through the exact student pipeline.
 
+**LLM failure policy.** In production (`NODE_ENV=production`) a failed model
+call (timeout, API error, missing tool call, a criterion without a grade) is
+**never** answered by the heuristic: the submit returns
+`503 { code: "GRADER_UNAVAILABLE", retryAfter: 30 }` with a `Retry-After`
+header, no `AiSubmission` row is written (the attempt doesn't count), nothing
+is cached and no reward is granted. The student app shows a translated "the AI
+grader is busy, nothing was recorded, try again in N s" message
+(`student.runner.errors.graderUnavailable`). Outside production the heuristic
+fallback stays (graded `HEURISTIC`, never cached) so dev/staging keep working
+with a flaky or missing key.
+
 ## Scenario lessons
 
 A scenario is a directed graph of dialogue nodes; each choice either advances
@@ -61,8 +72,6 @@ client-side and `POST /scenarios/:id/complete` records each play-through. The
 
 ## Deferred
 
-- **Real LLM grader** (`AI_GRADER` `llm` mode behind `ANTHROPIC_API_KEY`) — the
-  seam + dev heuristic are in place; the production model call is not wired.
 - **Structured rubric / visual scenario-graph builders** — admin editors use
   validated JSON for the rubric + graph (consistent with the exercise editor);
   drag-and-drop builders are a future enhancement.
