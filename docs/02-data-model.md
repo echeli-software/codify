@@ -6,7 +6,9 @@ PostgreSQL 16 via Prisma 5. Single tenant. UUID primary keys (v7 for time-orderi
 
 - **IDs**: `String @id @default(dbgenerated("uuid_generate_v7()"))`. Enable extension `uuid-ossp` and a `uuidv7()` SQL function (we ship a small migration).
 - **Timestamps**: every table has `createdAt` (DEFAULT now()) and, where mutable, `updatedAt` (managed by Prisma).
-- **Soft delete**: only on `User`, `Course`, `Lesson`, `Item`. Use `deletedAt: DateTime?` and a Prisma middleware to filter. Everything else hard-deletes.
+- **Soft delete**: only on `User`, `Course`, `Module`, `Lesson`, `Item`, `Category`, `Plan`. Use `deletedAt: DateTime?` and a Prisma middleware to filter. Everything else hard-deletes.
+  - Implemented as explicit `deletedAt: null` filters in each read path (no middleware). Deleting a module sets `deletedAt` on the module and its live lessons and parks the module at a negative `order` so its `(courseId, order)` slot frees up; progress, XP history and translations are kept.
+  - `ContentTranslation` has no FK (polymorphic), so translations are only removed where a translatable entity is genuinely hard-deleted. Today that is only item categories (`DELETE /admin/item-categories/:slug`, same transaction). Badges and quest templates are deactivated (`isActive=false`), never deleted. Any new hard-delete path for a `TranslatableEntity` must delete its `ContentTranslation` rows in the same transaction.
 - **Money**: `Int` cents, never `Float`. Currency code stored separately (`String` ISO-4217).
 - **Locale**: BCP-47 strings (`pt-BR`, `en-US`).
 - **Enums**: Prisma enums for closed sets; `String` for open sets that admins extend (e.g. `Badge.slug`).

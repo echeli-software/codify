@@ -74,7 +74,7 @@ export class CoursesService {
         include: {
           author: { select: { displayName: true } },
           categories: { select: { categoryId: true } },
-          _count: { select: { modules: true } },
+          _count: { select: { modules: { where: { deletedAt: null } } } },
         },
       }),
       this.prisma.course.count({ where }),
@@ -98,7 +98,7 @@ export class CoursesService {
     // lessons groupBy moduleId). Keeps it O(2) regardless of page size.
     const courseModules = courseIds.length
       ? await this.prisma.module.findMany({
-          where: { courseId: { in: courseIds } },
+          where: { courseId: { in: courseIds }, deletedAt: null },
           select: { id: true, courseId: true },
         })
       : [];
@@ -168,6 +168,7 @@ export class CoursesService {
         author: { select: { displayName: true } },
         categories: { select: { categoryId: true } },
         modules: {
+          where: { deletedAt: null },
           orderBy: { order: 'asc' },
           include: {
             lessons: {
@@ -479,7 +480,7 @@ export class CoursesService {
       include: {
         author: { select: { displayName: true } },
         categories: { select: { categoryId: true } },
-        _count: { select: { modules: true } },
+        _count: { select: { modules: { where: { deletedAt: null } } } },
       },
     });
     const translations = await this.prisma.contentTranslation.findMany({
@@ -490,7 +491,7 @@ export class CoursesService {
       },
     });
     const lessonCount = await this.prisma.lesson.count({
-      where: { deletedAt: null, module: { courseId: id } },
+      where: { deletedAt: null, module: { courseId: id, deletedAt: null } },
     });
     return toListItem(
       course as never,

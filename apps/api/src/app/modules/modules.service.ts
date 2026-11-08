@@ -6,8 +6,18 @@ import {
 } from '@nestjs/common';
 import type { Course, Module as PrismaModule } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import type { CreateModuleDto, ModuleResponse, UpdateModuleDto } from './modules.dto.js';
+import type {
+  CreateModuleDto,
+  ModuleResponse,
+  UpdateModuleDto,
+} from './modules.dto.js';
+
+/** Lesson count per module, ignoring soft-deleted lessons. */
+const LIVE_LESSON_COUNT = {
+  _count: { select: { lessons: { where: { deletedAt: null } } } },
+} as const;
 
 @Injectable()
 export class ModulesService {
@@ -20,9 +30,9 @@ export class ModulesService {
   ): Promise<ModuleResponse[]> {
     const course = await this.requireCourseAccess(actor, courseId, 'read');
     const modules = await this.prisma.module.findMany({
-      where: { courseId: course.id },
+      where: { courseId: course.id, deletedAt: null },
       orderBy: { order: 'asc' },
-      include: { _count: { select: { lessons: true } } },
+      include: LIVE_LESSON_COUNT,
     });
     return this.attachTitles(modules, locale, course.sourceLocale);
   }
@@ -65,8 +75,8 @@ export class ModulesService {
     id: string,
     patch: UpdateModuleDto,
   ): Promise<ModuleResponse> {
-    const target = await this.prisma.module.findUnique({
-      where: { id },
+    const target = await this.prisma.module.findFirst({
+      where: { id, deletedAt: null },
       include: { course: true },
     });
     if (!target) throw new NotFoundException('Module not found');
@@ -75,9 +85,12 @@ export class ModulesService {
     await this.prisma.$transaction(async (tx) => {
       if (typeof patch.order === 'number' && patch.order !== target.order) {
         const collision = await tx.module.findUnique({
-          where: { courseId_order: { courseId: target.courseId, order: patch.order } },
+          where: {
+            courseId_order: { courseId: target.courseId, order: patch.order },
+          },
         });
-        if (collision) throw new ConflictException(`Module order ${patch.order} taken`);
+        if (collision)
+          throw new ConflictException(`Module order ${patch.order} taken`);
         await tx.module.update({ where: { id }, data: { order: patch.order } });
       }
       if (patch.title !== undefined) {
@@ -113,21 +126,55 @@ export class ModulesService {
     return this.byId(id, target.course.sourceLocale);
   }
 
+  /**
+   * Soft delete (docs/02 Conventions). The module and its live lessons get
+   * `deletedAt`; lessons, students' Progress rows and ContentTranslation
+   * rows are kept, so completions, XP history and certificates stay intact.
+   * The module is parked at a negative `order` so its slot in the
+   * (courseId, order) unique index is free for a new module. Every read
+   * path filters `Module.deletedAt` / `Lesson.deletedAt`.
+   */
   async remove(actor: ApiUser, id: string): Promise<void> {
-    const target = await this.prisma.module.findUnique({
-      where: { id },
+    const target = await this.prisma.module.findFirst({
+      where: { id, deletedAt: null },
       include: { course: true },
     });
     if (!target) throw new NotFoundException('Module not found');
     await this.requireCourseAccess(actor, target.courseId, 'write');
-    // Cascade is configured on Module → Lessons.
-    await this.prisma.module.delete({ where: { id } });
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const now = new Date();
+          const lowest = await tx.module.findFirst({
+            where: { courseId: target.courseId },
+            orderBy: { order: 'asc' },
+            select: { order: true },
+          });
+          await tx.module.update({
+            where: { id },
+            data: {
+              deletedAt: now,
+              order: Math.min(lowest?.order ?? 0, 0) - 1,
+            },
+          });
+          await tx.lesson.updateMany({
+            where: { moduleId: id, deletedAt: null },
+            data: { deletedAt: now },
+          });
+        });
+        return;
+      } catch (err) {
+        // Two concurrent deletes in one course can pick the same parking
+        // slot; the loser retries with a fresh minimum.
+        if (!isUniqueViolation(err) || attempt >= 2) throw err;
+      }
+    }
   }
 
   private async byId(id: string, locale: string): Promise<ModuleResponse> {
     const m = await this.prisma.module.findUniqueOrThrow({
       where: { id },
-      include: { _count: { select: { lessons: true } } },
+      include: LIVE_LESSON_COUNT,
     });
     const list = await this.attachTitles([m], locale, locale);
     if (!list[0]) throw new NotFoundException('Module not found');
@@ -173,7 +220,7 @@ export class ModulesService {
 
   private async nextOrder(courseId: string): Promise<number> {
     const top = await this.prisma.module.findFirst({
-      where: { courseId },
+      where: { courseId, deletedAt: null },
       orderBy: { order: 'desc' },
       select: { order: true },
     });
@@ -199,7 +246,9 @@ export class ModulesService {
         throw new ForbiddenException('Only ADMIN/TEACHER can edit modules');
       }
       if (actor.role === 'TEACHER' && course.authorId !== actor.userId) {
-        throw new ForbiddenException('Teachers can only edit their own courses');
+        throw new ForbiddenException(
+          'Teachers can only edit their own courses',
+        );
       }
     } else if (actor.role === 'STUDENT' && course.status !== 'PUBLISHED') {
       throw new NotFoundException('Course not found');
@@ -207,4 +256,3 @@ export class ModulesService {
     return course;
   }
 }
-

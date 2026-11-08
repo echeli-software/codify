@@ -20,6 +20,8 @@ function setup(items = 0) {
       update: jest.fn(async () => ({ ...row(items), name: 'Caps' })),
       delete: jest.fn(async () => ({})),
     },
+    contentTranslation: { deleteMany: jest.fn(async () => ({ count: 1 })) },
+    $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
   };
   return {
     svc: new ItemCategoriesAdminService(prisma as unknown as PrismaService),
@@ -72,6 +74,10 @@ describe('ItemCategoriesAdminService', () => {
     await svc.remove('hats');
     expect(prisma.itemCategory.delete).toHaveBeenCalledWith({
       where: { slug: 'hats' },
+    });
+    // Hard delete → its translations are cleaned up in the same transaction.
+    expect(prisma.contentTranslation.deleteMany).toHaveBeenCalledWith({
+      where: { entityType: 'ITEM_CATEGORY', entityId: 'hats' },
     });
   });
 

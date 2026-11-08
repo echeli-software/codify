@@ -399,7 +399,11 @@ export class TranslationsService {
       }
       case 'MODULE': {
         const rows = await this.prisma.module.findMany({
-          where: { course: { deletedAt: null, ...authorFilter }, ...idFilter },
+          where: {
+            deletedAt: null,
+            course: { deletedAt: null, ...authorFilter },
+            ...idFilter,
+          },
           select: {
             id: true,
             order: true,
@@ -421,7 +425,10 @@ export class TranslationsService {
         const rows = await this.prisma.lesson.findMany({
           where: {
             deletedAt: null,
-            module: { course: { deletedAt: null, ...authorFilter } },
+            module: {
+              deletedAt: null,
+              course: { deletedAt: null, ...authorFilter },
+            },
             ...idFilter,
           },
           select: {

@@ -110,7 +110,14 @@ export class ItemCategoriesAdminService {
       });
     if (before.itemCount > 0) throw inUse();
     try {
-      await this.prisma.itemCategory.delete({ where: { slug } });
+      // Hard delete: its ITEM_CATEGORY translations (entityId = slug) go too,
+      // so a later category with the same slug starts clean.
+      await this.prisma.$transaction([
+        this.prisma.itemCategory.delete({ where: { slug } }),
+        this.prisma.contentTranslation.deleteMany({
+          where: { entityType: 'ITEM_CATEGORY', entityId: slug },
+        }),
+      ]);
     } catch (err) {
       // An item created meanwhile trips the FK (P2003).
       if ((err as { code?: string })?.code === 'P2003') throw inUse();

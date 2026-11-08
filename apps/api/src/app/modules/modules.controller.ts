@@ -15,12 +15,16 @@ import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { CreateModuleDto, UpdateModuleDto, type ModuleResponse } from './modules.dto.js';
+import {
+  CreateModuleDto,
+  UpdateModuleDto,
+  type ModuleResponse,
+} from './modules.dto.js';
 import { ModulesService } from './modules.service.js';
 
 const DEFAULT_LOCALE = 'pt-BR';
 function pickLocale(h: string | undefined): string {
-  return (h?.split(',')[0]?.trim()) || DEFAULT_LOCALE;
+  return h?.split(',')[0]?.trim() || DEFAULT_LOCALE;
 }
 
 /**
@@ -42,7 +46,11 @@ export class ModulesController {
     @Param('courseId') courseId: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<ModuleResponse[]> {
-    return this.modules.listForCourse(actor, courseId, pickLocale(acceptLanguage));
+    return this.modules.listForCourse(
+      actor,
+      courseId,
+      pickLocale(acceptLanguage),
+    );
   }
 
   @Roles('ADMIN', 'TEACHER')

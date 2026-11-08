@@ -221,7 +221,7 @@ export class LessonsService {
       throw new NotFoundException('Course not found');
     }
     const rows = await this.prisma.lesson.findMany({
-      where: { deletedAt: null, module: { courseId } },
+      where: { deletedAt: null, module: { courseId, deletedAt: null } },
       select: { id: true, updatedAt: true },
       orderBy: [{ module: { order: 'asc' } }, { order: 'asc' }],
     });
@@ -348,7 +348,7 @@ export class LessonsService {
       where: { id, deletedAt: null },
       include: { module: { include: { course: true } } },
     });
-    if (!l || l.module.course.deletedAt) {
+    if (!l || l.module.deletedAt || l.module.course.deletedAt) {
       throw new NotFoundException('Lesson not found');
     }
     return l;
@@ -528,7 +528,7 @@ export class LessonsService {
       where: { id: moduleId },
       include: { course: true },
     });
-    if (!m) throw new NotFoundException('Module not found');
+    if (!m || m.deletedAt) throw new NotFoundException('Module not found');
     if (m.course.deletedAt) throw new NotFoundException('Course not found');
     if (mode === 'write') {
       if (actor.role !== 'ADMIN' && actor.role !== 'TEACHER') {
