@@ -623,6 +623,31 @@
         "errorTitle": "Não deu certo",
         "errorBody": "Não conseguimos confirmar uma assinatura a partir deste link.",
         "back": "Voltar aos planos"
+      },
+      "refund": {
+        "action": "Pedir reembolso",
+        "title": "Reembolsar seu primeiro pagamento?",
+        "amount": "Devolvemos {amount} para a forma de pagamento que você usou.",
+        "accessEnds": "Sua assinatura termina na hora e você perde o acesso às aulas pagas.",
+        "once": "O reembolso pelo app só pode ser usado uma vez por conta.",
+        "deadline": "Disponível até {date}.",
+        "typeToConfirm": "Digite {word} para confirmar",
+        "keep": "Manter minha assinatura",
+        "confirm": "Reembolsar e cancelar",
+        "done": "Reembolso de {amount} solicitado. Pode levar alguns dias para aparecer na sua fatura.",
+        "notEligible": "Este pagamento não pode mais ser reembolsado por aqui. Fale com o suporte se precisar de ajuda.",
+        "storeApple": "Reembolsos de compras na App Store são feitos pela Apple (reportaproblem.apple.com).",
+        "storeGoogle": "Reembolsos de compras no Google Play são feitos pelo Google na Play Store.",
+        "storeGeneric": "Compras na App Store e no Google Play são reembolsadas pela Apple ou pelo Google."
+      },
+      "winback": {
+        "title": "Que bom te ver de volta: {pct}% de desconto no plano anual",
+        "body": "Uma oferta única para você continuar de onde parou: {pct}% de desconto em qualquer plano anual.",
+        "bodyUntil": "Uma oferta única para você continuar de onde parou: {pct}% de desconto em qualquer plano anual, até {date}.",
+        "cta": "Ver planos anuais",
+        "badge": "{pct}% off",
+        "applied": "Oferta de boas-vindas aplicada: {pct}% de desconto.",
+        "unavailable": "Esta oferta não está mais disponível na sua conta."
       }
     },
     "shop": {

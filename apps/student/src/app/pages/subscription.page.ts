@@ -18,7 +18,10 @@ import {
 import {
   BillingClient,
   PlansClient,
+  ProblemDetailsError,
   type MySubscriptionResponse,
+  type RefundEligibility,
+  type WinbackOffer,
   type PaymentMethod,
   type Plan,
   type PlanPrice,
@@ -53,9 +56,14 @@ import { activePrices, annualSavings } from './shared/plan-view.js';
 import { BillingHistoryComponent } from './billing/billing-history.component.js';
 import {
   currentSubscription,
+  discountedCents,
   methodsFor,
+  refundAvailable,
   subscriptionActions,
 } from './billing/subscription-view.js';
+
+/** The word typed back to confirm a self-service refund (docs/09 §5). */
+export const REFUND_CONFIRM_WORD = 'REFUND';
 
 const CANCEL_REASONS = [
   'tooExpensive',
@@ -116,6 +124,42 @@ const CANCEL_REASONS = [
             <cdf-app-skeleton shape="rect" [height]="160" />
             <cdf-app-skeleton shape="rect" [height]="240" />
           } @else {
+            @if (winback(); as w) {
+              <div class="sb__offer" role="status" data-testid="winback-offer">
+                <cdf-icon name="gift" size="md" />
+                <div>
+                  <strong>{{
+                    'student.billing.winback.title'
+                      | translate: { pct: w.percentOff }
+                  }}</strong>
+                  <p>
+                    {{
+                      (w.expiresAt
+                        ? 'student.billing.winback.bodyUntil'
+                        : 'student.billing.winback.body'
+                      )
+                        | translate
+                          : {
+                              pct: w.percentOff,
+                              date: (w.expiresAt | locale: 'date' : 'long'),
+                            }
+                    }}
+                  </p>
+                </div>
+                <cdf-app-button
+                  kind="primary"
+                  size="sm"
+                  (buttonClick)="period.set('ANNUAL')"
+                  data-testid="winback-show"
+                >
+                  {{ 'student.billing.winback.cta' | translate }}
+                </cdf-app-button>
+              </div>
+            } @else if (offerGone()) {
+              <p class="sb__note" role="status" data-testid="winback-gone">
+                {{ 'student.billing.winback.unavailable' | translate }}
+              </p>
+            }
             @if (sub(); as s) {
               @if (actions(); as a) {
                 @if (a.pastDue) {
@@ -273,7 +317,26 @@ const CANCEL_REASONS = [
                         {{ 'student.billing.cancel' | translate }}
                       </cdf-app-button>
                     }
+                    @if (canRefund()) {
+                      <cdf-app-button
+                        kind="ghost"
+                        (buttonClick)="openRefund()"
+                        data-testid="refund-btn"
+                      >
+                        {{ 'student.billing.refund.action' | translate }}
+                      </cdf-app-button>
+                    }
                   </div>
+                  @if (a.store) {
+                    <p class="sb__note" data-testid="store-refund-note">
+                      {{
+                        (a.store === 'APPLE'
+                          ? 'student.billing.refund.storeApple'
+                          : 'student.billing.refund.storeGoogle'
+                        ) | translate
+                      }}
+                    </p>
+                  }
                 </cdf-app-card>
               }
             } @else {
@@ -336,7 +399,7 @@ const CANCEL_REASONS = [
                       [attr.data-price-id]="o.price.id"
                       [name]="o.plan.name"
                       [description]="o.plan.tagline ?? o.plan.description"
-                      [amountCents]="o.price.amountCents"
+                      [amountCents]="o.amountCents"
                       [currency]="o.price.currency"
                       [period]="
                         o.price.period === 'ANNUAL' ? 'annual' : 'monthly'
@@ -382,6 +445,14 @@ const CANCEL_REASONS = [
             <p class="sb__price">
               {{ priceLabel(sel.price, method() !== 'card') }}
             </p>
+            @if (offerFor(sel.price); as w) {
+              <p class="sb__note sb__note--offer" data-testid="winback-applied">
+                {{
+                  'student.billing.winback.applied'
+                    | translate: { pct: w.percentOff }
+                }}
+              </p>
+            }
             @if (sel.plan.trialDays > 0 && method() === 'card') {
               <p class="sb__note">
                 {{
@@ -495,6 +566,71 @@ const CANCEL_REASONS = [
               data-testid="confirm-cancel-btn"
             >
               {{ 'student.billing.confirm.cancel' | translate }}
+            </cdf-app-button>
+          </div>
+        </cdf-bottom-sheet>
+      }
+      <!-- Self-service refund: what happens, then the word typed back. -->
+      @if (canRefund() ? refundInfo() : null; as r) {
+        <cdf-bottom-sheet
+          [open]="refundOpen()"
+          (openChange)="refundOpen.set($event)"
+          [title]="'student.billing.refund.title' | translate"
+        >
+          <div class="sb__confirm" data-testid="refund-sheet">
+            <ul>
+              <li>
+                {{
+                  'student.billing.refund.amount'
+                    | translate
+                      : {
+                          amount:
+                            (r.payment!.amountCents
+                            | locale: 'currency' : r.payment!.currency),
+                        }
+                }}
+              </li>
+              <li>{{ 'student.billing.refund.accessEnds' | translate }}</li>
+              <li>{{ 'student.billing.refund.once' | translate }}</li>
+              <li>
+                {{
+                  'student.billing.refund.deadline'
+                    | translate
+                      : { date: (r.deadline | locale: 'date' : 'long') }
+                }}
+              </li>
+            </ul>
+            <label class="sb__reason">
+              <span>{{
+                'student.billing.refund.typeToConfirm'
+                  | translate: { word: confirmWord }
+              }}</span>
+              <input
+                type="text"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                [(ngModel)]="refundTyped"
+                name="refundTyped"
+                data-testid="refund-typed"
+              />
+            </label>
+          </div>
+          <div sheetFooter class="sb__sheet-actions">
+            <cdf-app-button
+              kind="secondary"
+              (buttonClick)="refundOpen.set(false)"
+            >
+              {{ 'student.billing.refund.keep' | translate }}
+            </cdf-app-button>
+            <cdf-app-button
+              kind="danger"
+              [disabled]="refundTyped.trim().toUpperCase() !== confirmWord"
+              [loading]="busy()"
+              (buttonClick)="refund()"
+              data-testid="refund-confirm"
+            >
+              {{ 'student.billing.refund.confirm' | translate }}
             </cdf-app-button>
           </div>
         </cdf-bottom-sheet>
@@ -670,6 +806,34 @@ const CANCEL_REASONS = [
         gap: 4px;
         font-size: var(--cdf-font-size-sm);
       }
+      .sb__offer {
+        display: flex;
+        gap: var(--cdf-space-2);
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: var(--cdf-space-3);
+        border-radius: 12px;
+        border: 1px solid var(--cdf-color-primary);
+        background: var(--cdf-color-primary-subtle);
+      }
+      .sb__offer > div {
+        flex: 1 1 200px;
+      }
+      .sb__offer p {
+        margin: 4px 0 0;
+      }
+      .sb__note--offer {
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+      }
+      .sb__reason input {
+        font: inherit;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+      }
       .sb__reason select {
         font: inherit;
         padding: 8px;
@@ -707,6 +871,21 @@ export class SubscriptionPage {
   protected readonly portalLoading = signal(false);
   protected readonly restoreLoading = signal(false);
   protected reason = '';
+  protected readonly confirmWord = REFUND_CONFIRM_WORD;
+  protected refundTyped = '';
+  protected readonly refundOpen = signal(false);
+  protected readonly refundInfo = signal<RefundEligibility | null>(null);
+  protected readonly offer = signal<WinbackOffer | null>(null);
+  /** Arrived with ?offer=winback but the offer can't be used (any more). */
+  protected readonly offerGone = signal(false);
+  /** The win-back offer, when this user can use it (web checkout only). */
+  protected readonly winback = computed(() => {
+    const o = this.offer();
+    return o?.eligible && !this.isNative ? o : null;
+  });
+  protected readonly canRefund = computed(() =>
+    refundAvailable(this.refundInfo(), this.sub(), this.isNative),
+  );
 
   /** Inside the Capacitor shell → store IAP + "Restore purchases". */
   protected get isNative(): boolean {
@@ -738,18 +917,26 @@ export class SubscriptionPage {
         const price = prices.find((p) => p.period === want) ?? prices[0];
         if (!price) return null;
         const savings = annualSavings(plan, price);
+        const w = this.offerFor(price);
         return {
           plan,
           price,
+          amountCents: w
+            ? discountedCents(price.amountCents, w.percentOff)
+            : price.amountCents,
           installments:
             price.period === 'ANNUAL' && (price.maxInstallments ?? 0) > 1
               ? price.maxInstallments
               : null,
-          badge: savings
-            ? this.i18n.t('student.plans.save', {
-                pct: Math.round(savings * 100),
+          badge: w
+            ? this.i18n.t('student.billing.winback.badge', {
+                pct: w.percentOff,
               })
-            : null,
+            : savings
+              ? this.i18n.t('student.plans.save', {
+                  pct: Math.round(savings * 100),
+                })
+              : null,
         };
       })
       .filter((o): o is NonNullable<typeof o> => o !== null);
@@ -774,11 +961,92 @@ export class SubscriptionPage {
     } finally {
       this.loading.set(false);
     }
+    if (!this.isNative) await this.loadExtras();
+  }
+
+  /** Refund eligibility + offers; optional — the page works without them. */
+  private async loadExtras(): Promise<void> {
+    const safe = <T>(f: () => Promise<T>) =>
+      Promise.resolve()
+        .then(f)
+        .catch(() => null);
+    const [refund, offers] = await Promise.all([
+      safe(() => this.billing.refundEligibility()),
+      safe(() => this.billing.offers()),
+    ]);
+    this.refundInfo.set(refund);
+    this.offer.set(offers?.winback ?? null);
+  }
+
+  /** The win-back discount for a price, if it applies (annual only). */
+  protected offerFor(price: PlanPrice): WinbackOffer | null {
+    const w = this.winback();
+    return w && price.period === w.appliesTo ? w : null;
+  }
+
+  protected openRefund(): void {
+    this.refundTyped = '';
+    this.refundOpen.set(true);
+  }
+
+  /** docs/09 §5: full refund of the first payment; access ends now. */
+  protected async refund(): Promise<void> {
+    if (this.refundTyped.trim().toUpperCase() !== REFUND_CONFIRM_WORD) return;
+    this.busy.set(true);
+    try {
+      const res = await this.billing.requestRefund({
+        confirm: REFUND_CONFIRM_WORD,
+      });
+      this.telemetry.track('refund_request', {
+        amountCents: res.refund.amountCents,
+        currency: res.refund.currency,
+      });
+      this.refundOpen.set(false);
+      this.toast.show({
+        message: 'student.billing.refund.done',
+        kind: 'success',
+        params: {
+          amount: formatForLocale(
+            res.refund.amountCents,
+            this.i18n.currentLocale(),
+            'currency',
+            res.refund.currency,
+          ),
+        },
+      });
+      await this.load();
+    } catch (err) {
+      const code = err instanceof ProblemDetailsError ? err.code : null;
+      if (code === 'REFUND_NOT_ELIGIBLE' || code === 'STORE_REFUND') {
+        this.refundOpen.set(false);
+        this.toast.show({
+          message:
+            code === 'STORE_REFUND'
+              ? 'student.billing.refund.storeGeneric'
+              : 'student.billing.refund.notEligible',
+          kind: 'warning',
+        });
+        await this.loadExtras();
+      } else {
+        this.toast.error(err);
+      }
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** `?price=` (from a paywall) preselects a price; `?checkout=canceled` returns from checkout. */
   private applyQuery(): void {
     const qp = this.route.snapshot.queryParamMap;
+    if (qp.get('offer') === 'winback') {
+      const w = this.winback();
+      if (w) {
+        this.period.set('ANNUAL');
+        this.telemetry.track('winback_offer_view', { pct: w.percentOff });
+      } else if (!this.isNative) {
+        this.offerGone.set(true);
+      }
+    }
     if (qp.get('checkout') === 'canceled') {
       this.telemetry.track('checkout_cancel', {
         planId: qp.get('plan'),
@@ -809,10 +1077,14 @@ export class SubscriptionPage {
   }
 
   protected priceLabel(p: PlanPrice, noInstallments: boolean): string {
+    const w = this.offerFor(p);
     return formatPrice(
       {
         currency: p.currency,
-        amountCents: p.amountCents,
+        // The win-back price when the offer applies (shown before Stripe).
+        amountCents: w
+          ? discountedCents(p.amountCents, w.percentOff)
+          : p.amountCents,
         period: p.period,
         maxInstallments: p.maxInstallments,
       },
@@ -877,12 +1149,26 @@ export class SubscriptionPage {
       const res = await this.billing.createCheckout({
         planPriceId: sel.price.id,
         paymentMethod: this.method(),
+        ...(this.offerFor(sel.price) ? { offer: 'winback' as const } : {}),
         successUrl: `${origin}/billing/success?${ctx}`,
         cancelUrl: `${origin}/subscription?checkout=canceled&${ctx}`,
       });
       window.location.href = res.url;
     } catch (err) {
-      this.toast.error(err);
+      // The offer expired / was used meanwhile: drop it and let them retry.
+      if (
+        err instanceof ProblemDetailsError &&
+        err.code === 'OFFER_NOT_AVAILABLE'
+      ) {
+        this.offer.set(null);
+        this.offerGone.set(true);
+        this.toast.show({
+          message: 'student.billing.winback.unavailable',
+          kind: 'warning',
+        });
+      } else {
+        this.toast.error(err);
+      }
       this.checkingOut.set(false);
     }
   }

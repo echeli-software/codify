@@ -75,3 +75,30 @@ export function methodsFor(
   if (native) return [];
   return supportsPrepay(price) ? ['card', 'pix', 'boleto'] : ['card'];
 }
+
+/** Price after a percentage discount (win-back offer), rounded to the cent. */
+export function discountedCents(
+  amountCents: number,
+  percentOff: number,
+): number {
+  return Math.round((amountCents * (100 - percentOff)) / 100);
+}
+
+/**
+ * docs/09 §5 self-service refund: offered on the web for an eligible first
+ * payment while the web subscription it paid for is still shown. Store
+ * purchases are refunded by Apple / Google (never offered here).
+ */
+export function refundAvailable(
+  eligibility: { eligible: boolean; payment: unknown | null } | null,
+  sub: Pick<SubscriptionView, 'source'> | null,
+  native: boolean,
+): boolean {
+  return (
+    !native &&
+    !!eligibility?.eligible &&
+    !!eligibility.payment &&
+    !!sub &&
+    sub.source === 'STRIPE_WEB'
+  );
+}

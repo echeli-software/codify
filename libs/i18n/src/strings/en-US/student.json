@@ -623,6 +623,31 @@
         "errorTitle": "That didn't complete",
         "errorBody": "We couldn't confirm a subscription from this link.",
         "back": "Back to plans"
+      },
+      "refund": {
+        "action": "Request a refund",
+        "title": "Refund your first payment?",
+        "amount": "We refund {amount} to the payment method you used.",
+        "accessEnds": "Your subscription ends right away and you lose access to paid lessons.",
+        "once": "A self-service refund can be used only once per account.",
+        "deadline": "Available until {date}.",
+        "typeToConfirm": "Type {word} to confirm",
+        "keep": "Keep my subscription",
+        "confirm": "Refund and cancel",
+        "done": "Refund of {amount} requested. It may take a few days to show on your statement.",
+        "notEligible": "This payment can no longer be refunded here. Contact support if you need help.",
+        "storeApple": "Refunds for App Store purchases are handled by Apple (reportaproblem.apple.com).",
+        "storeGoogle": "Refunds for Google Play purchases are handled by Google in the Play Store.",
+        "storeGeneric": "App Store and Google Play purchases are refunded by Apple or Google."
+      },
+      "winback": {
+        "title": "Welcome back: {pct}% off the annual plan",
+        "body": "A one-time offer to pick up where you left off: {pct}% off any annual plan.",
+        "bodyUntil": "A one-time offer to pick up where you left off: {pct}% off any annual plan, until {date}.",
+        "cta": "See annual plans",
+        "badge": "{pct}% off",
+        "applied": "Welcome-back offer applied: {pct}% off.",
+        "unavailable": "This offer is no longer available on your account."
       }
     },
     "shop": {
