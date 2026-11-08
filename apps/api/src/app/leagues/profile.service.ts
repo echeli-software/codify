@@ -3,6 +3,7 @@ import { levelFromXp, tierForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
+import { coursesCompleted } from './learner-stats.js';
 
 export interface PublicProfile {
   userId: string;
@@ -10,6 +11,8 @@ export interface PublicProfile {
   level: number;
   tier: string;
   totalXp: number;
+  /** The user's name for their pet (docs/08 §10). */
+  petName: string | null;
   avatar: {
     config: Record<string, unknown> | null;
     equipped: Record<
@@ -33,6 +36,8 @@ export interface PublicProfile {
     streakDays: number;
     longestStreak: number;
     friends: number;
+    coursesCompleted: number;
+    itemsOwned: number;
   };
 }
 
@@ -52,26 +57,39 @@ export class ProfileService {
         displayName: true,
         totalXp: true,
         avatarConfig: true,
+        petName: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
 
-    const [equipped, userBadges, lessonsCompleted, streak, friendsA, friendsB] =
-      await Promise.all([
-        this.prisma.equippedItem.findMany({
-          where: { userId },
-          include: { item: true },
-        }),
-        this.prisma.userBadge.findMany({
-          where: { userId },
-          include: { badge: true },
-          orderBy: { awardedAt: 'desc' },
-        }),
-        this.prisma.progress.count({ where: { userId } }),
-        this.prisma.streak.findUnique({ where: { userId } }),
-        this.prisma.friendship.count({ where: { userAId: userId } }),
-        this.prisma.friendship.count({ where: { userBId: userId } }),
-      ]);
+    const [
+      equipped,
+      userBadges,
+      lessonsCompleted,
+      streak,
+      friendsA,
+      friendsB,
+      courses,
+      itemsOwned,
+    ] = await Promise.all([
+      this.prisma.equippedItem.findMany({
+        where: { userId },
+        include: { item: true },
+      }),
+      this.prisma.userBadge.findMany({
+        where: { userId },
+        include: { badge: true },
+        orderBy: { awardedAt: 'desc' },
+      }),
+      this.prisma.progress.count({ where: { userId } }),
+      this.prisma.streak.findUnique({ where: { userId } }),
+      this.prisma.friendship.count({ where: { userAId: userId } }),
+      this.prisma.friendship.count({ where: { userBId: userId } }),
+      coursesCompleted(this.prisma, [userId]),
+      this.prisma.userItem.count({
+        where: { userId, item: { deletedAt: null } },
+      }),
+    ]);
 
     const spriteUrls = await loadSpriteUrls(
       this.prisma,
@@ -117,6 +135,7 @@ export class ProfileService {
       level,
       tier: tierForLevel(level),
       totalXp: user.totalXp,
+      petName: user.petName ?? null,
       avatar: {
         config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
         equipped: equippedMap,
@@ -133,6 +152,8 @@ export class ProfileService {
         streakDays: streak?.currentDays ?? 0,
         longestStreak: streak?.longestDays ?? 0,
         friends: friendsA + friendsB,
+        coursesCompleted: courses.get(userId) ?? 0,
+        itemsOwned,
       },
     };
   }

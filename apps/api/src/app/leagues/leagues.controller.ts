@@ -1,5 +1,14 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { IsBoolean, IsEmail, IsISO8601, IsOptional } from 'class-validator';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEmail,
+  IsISO8601,
+  IsInt,
+  IsOptional,
+  Max,
+  Min,
+} from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
@@ -8,11 +17,14 @@ import {
   LeaguesService,
   type CurrentLeagueView,
   type LastWeekResultView,
+  type LeagueHistoryEntry,
   type RolloverSummary,
 } from './leagues.service.js';
 import {
   FriendsService,
   type AcceptInviteResult,
+  type ActivityFeedEntry,
+  type FriendCompareView,
   type FriendInviteView,
   type FriendRequestView,
   type FriendView,
@@ -27,6 +39,14 @@ class SendFriendRequestDto {
 class RespondDto {
   @IsBoolean()
   accept!: boolean;
+}
+class LimitQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(52)
+  limit?: number;
 }
 class RolloverDto {
   @IsOptional()
@@ -57,6 +77,17 @@ export class LeaguesController {
     return this.leagues.getLastWeek(actor.userId);
   }
 
+  /** My finished league weeks, newest first (docs/05 League "Past weeks"). */
+  @Roles('STUDENT')
+  @RequireFeature('leagues.enabled')
+  @Get('history')
+  history(
+    @CurrentUser() actor: ApiUser,
+    @Query() query: LimitQueryDto,
+  ): Promise<LeagueHistoryEntry[]> {
+    return this.leagues.getHistory(actor.userId, query.limit ?? 12);
+  }
+
   @Roles('ADMIN')
   @Post('rollover')
   async rollover(
@@ -83,6 +114,16 @@ export class FriendsController {
   @Get()
   list(@CurrentUser() actor: ApiUser): Promise<FriendView[]> {
     return this.friends.list(actor.userId);
+  }
+
+  /** Opted-in friends' recent completions + badges (docs/10 §5). */
+  @Roles('STUDENT')
+  @Get('activity')
+  activity(
+    @CurrentUser() actor: ApiUser,
+    @Query() query: LimitQueryDto,
+  ): Promise<ActivityFeedEntry[]> {
+    return this.friends.activity(actor.userId, query.limit ?? 20);
   }
 
   @Roles('STUDENT')
@@ -124,6 +165,16 @@ export class FriendsController {
     @Param('code') code: string,
   ): Promise<AcceptInviteResult> {
     return this.friends.acceptInvite(actor.userId, code);
+  }
+
+  /** Side-by-side stats with a friend; 403 FRIEND_REQUIRED otherwise. */
+  @Roles('STUDENT')
+  @Get(':id/compare')
+  compare(
+    @CurrentUser() actor: ApiUser,
+    @Param('id') id: string,
+  ): Promise<FriendCompareView> {
+    return this.friends.compare(actor.userId, id);
   }
 
   @Roles('STUDENT')

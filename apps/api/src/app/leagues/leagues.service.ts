@@ -67,6 +67,19 @@ export interface LastWeekResultView {
   weekStart: string;
 }
 
+/** One finished week in `GET /league/history` (docs/05 League "Past weeks"). */
+export interface LeagueHistoryEntry {
+  weekStart: string;
+  tier: LeagueTier;
+  /** Tier for the week after (promotion / relegation applied). */
+  newTier: LeagueTier;
+  finalRank: number;
+  cohortSize: number;
+  weeklyXp: number;
+  promoted: boolean;
+  demoted: boolean;
+}
+
 export interface RolloverSummary {
   weekStart: string;
   leaguesProcessed: number;
@@ -241,6 +254,43 @@ export class LeaguesService {
       freezeAwarded: promoted && promo.freeze > 0,
       weekStart: weekStart.toISOString(),
     };
+  }
+
+  /**
+   * The caller's finished league weeks, newest first (`limit` ≤ 52):
+   * memberships of weeks before the current one that the rollover ranked.
+   */
+  async getHistory(
+    userId: string,
+    limit = 12,
+    now: Date = new Date(),
+  ): Promise<LeagueHistoryEntry[]> {
+    const rows = await this.prisma.leagueMembership.findMany({
+      where: {
+        userId,
+        finalRank: { not: null },
+        league: { weekStart: { lt: currentWeekStart(now) } },
+      },
+      include: {
+        league: { include: { _count: { select: { members: true } } } },
+      },
+      orderBy: { league: { weekStart: 'desc' } },
+      take: Math.min(Math.max(limit, 1), 52),
+    });
+    return rows.map((m) => {
+      const promoted = m.promoted ?? false;
+      const demoted = m.demoted ?? false;
+      return {
+        weekStart: m.league.weekStart.toISOString(),
+        tier: m.league.tier,
+        newTier: nextTierAfter(m.league.tier, promoted, demoted),
+        finalRank: m.finalRank ?? 0,
+        cohortSize: m.league._count.members,
+        weeklyXp: m.weeklyXp,
+        promoted,
+        demoted,
+      };
+    });
   }
 
   /**

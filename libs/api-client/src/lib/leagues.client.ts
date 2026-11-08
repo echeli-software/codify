@@ -84,6 +84,8 @@ export interface PublicProfile {
   level: number;
   tier: string;
   totalXp: number;
+  /** The user's pet name (docs/08 §10). Optional for older APIs. */
+  petName?: string | null;
   avatar: {
     config: Record<string, unknown> | null;
     equipped: Record<
@@ -108,7 +110,56 @@ export interface PublicProfile {
     streakDays: number;
     longestStreak: number;
     friends: number;
+    /** Courses with every lesson completed. Optional for older APIs. */
+    coursesCompleted?: number;
+    /** Owned cosmetic items. Optional for older APIs. */
+    itemsOwned?: number;
   };
+}
+
+/** GET /league/history — one finished week. */
+export interface LeagueHistoryEntry {
+  weekStart: string;
+  tier: LeagueTier;
+  newTier: LeagueTier;
+  finalRank: number;
+  cohortSize: number;
+  weeklyXp: number;
+  promoted: boolean;
+  demoted: boolean;
+}
+
+/** One side of GET /friends/:id/compare. */
+export interface CompareStats {
+  userId: string;
+  displayName: string;
+  level: number;
+  totalXp: number;
+  weeklyXp: number;
+  streakDays: number;
+  longestStreak: number;
+  lessonsCompleted: number;
+  coursesCompleted: number;
+  badges: number;
+}
+
+export interface FriendCompare {
+  me: CompareStats;
+  friend: CompareStats;
+}
+
+/** GET /friends/activity — opted-in friends' recent activity. */
+export interface ActivityFeedEntry {
+  id: string;
+  kind: 'LESSON_COMPLETED' | 'BADGE_UNLOCKED';
+  userId: string;
+  displayName: string;
+  at: string;
+  lessonId?: string;
+  lessonTitle?: string | null;
+  courseTitle?: string | null;
+  badgeName?: string;
+  badgeIcon?: string | null;
 }
 
 /** Typed client for /api/league, /api/friends, /api/users/:id/profile. */
@@ -206,6 +257,33 @@ export class LeaguesClient {
         {},
         { context: withIdempotency() },
       ),
+    );
+  }
+
+  /** My finished league weeks, newest first (max 52). */
+  history(limit = 12): Promise<LeagueHistoryEntry[]> {
+    return firstValueFrom(
+      this.http.get<LeagueHistoryEntry[]>(`${this.base}/league/history`, {
+        params: { limit: String(limit) },
+      }),
+    );
+  }
+
+  /** Side-by-side stats with a friend; 403 `FRIEND_REQUIRED` otherwise. */
+  compare(friendId: string): Promise<FriendCompare> {
+    return firstValueFrom(
+      this.http.get<FriendCompare>(
+        `${this.base}/friends/${encodeURIComponent(friendId)}/compare`,
+      ),
+    );
+  }
+
+  /** Opted-in friends' recent lessons + badges (docs/10 §5). */
+  activity(limit = 20): Promise<ActivityFeedEntry[]> {
+    return firstValueFrom(
+      this.http.get<ActivityFeedEntry[]>(`${this.base}/friends/activity`, {
+        params: { limit: String(limit) },
+      }),
     );
   }
 
