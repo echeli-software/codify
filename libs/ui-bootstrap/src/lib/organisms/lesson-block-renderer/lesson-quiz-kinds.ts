@@ -40,7 +40,9 @@ let nextId = 0;
       @for (opt of q.options; track opt.id; let i = $index) {
         <li
           class="cdf-quiz__pair"
-          [class.cdf-quiz__option--answer]="!!correctFor(opt.id)"
+          [class.cdf-quiz__option--answer]="
+            !!correctFor(opt.id) && !isWrong(opt.id)
+          "
           [class.cdf-quiz__option--wrong]="isWrong(opt.id)"
         >
           <label class="cdf-quiz__pair-label" [for]="uid + '-' + opt.id">{{

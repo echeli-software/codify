@@ -225,6 +225,11 @@
   }
 }
 
+.cdf-quiz__pair .cdf-quiz__tag {
+  color: var(--cdf-color-text);
+  font-weight: var(--cdf-font-weight-semibold);
+}
+
 .cdf-quiz__pair-label {
   flex: 1 1 12rem;
   min-width: 0;

@@ -13,38 +13,38 @@
   color: var(--cdf-color-bg);
 
   --cdf-code-fg: var(--cdf-color-bg);
-  --cdf-code-muted: color-mix(in srgb, var(--cdf-code-fg) 55%, transparent);
+  --cdf-code-muted: color-mix(in srgb, var(--cdf-code-fg) 78%, transparent);
   --cdf-code-keyword: color-mix(
     in srgb,
-    var(--cdf-color-primary) 55%,
+    var(--cdf-color-primary) 38%,
     var(--cdf-code-fg)
   );
   --cdf-code-string: color-mix(
     in srgb,
-    var(--cdf-color-success) 60%,
+    var(--cdf-color-success) 38%,
     var(--cdf-code-fg)
   );
   --cdf-code-number: color-mix(
     in srgb,
-    var(--cdf-color-warning) 65%,
+    var(--cdf-color-warning) 38%,
     var(--cdf-code-fg)
   );
   --cdf-code-title: color-mix(
     in srgb,
-    var(--cdf-color-info) 60%,
+    var(--cdf-color-info) 38%,
     var(--cdf-code-fg)
   );
   --cdf-code-type: color-mix(
     in srgb,
-    var(--cdf-color-accent) 55%,
+    var(--cdf-color-accent) 38%,
     var(--cdf-code-fg)
   );
   --cdf-code-danger: color-mix(
     in srgb,
-    var(--cdf-color-danger) 60%,
+    var(--cdf-color-danger) 38%,
     var(--cdf-code-fg)
   );
-  --cdf-code-hl: color-mix(in srgb, var(--cdf-color-warning) 22%, transparent);
+  --cdf-code-hl: color-mix(in srgb, var(--cdf-code-fg) 10%, transparent);
 
   &__bar {
     display: flex;
