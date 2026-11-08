@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -34,7 +35,8 @@ export class CategoriesService {
         skip: opts.skip,
         take: opts.take,
         where: { deletedAt: null },
-        orderBy: { createdAt: 'desc' },
+        // docs/04 Categories: admin-defined order, newest first on ties.
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
       }),
       this.prisma.category.count({ where: { deletedAt: null } }),
     ]);
@@ -54,6 +56,12 @@ export class CategoriesService {
       where: { slug: input.slug },
     });
     if (existing) throw new ConflictException('Slug already in use');
+    // New categories go to the end unless a position is given.
+    const last = await this.prisma.category.findFirst({
+      where: { deletedAt: null },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
     const created = await this.prisma.category.create({
       data: {
         slug: input.slug,
@@ -61,6 +69,7 @@ export class CategoriesService {
         description: input.description ?? null,
         iconName: input.iconName ?? null,
         colorToken: input.colorToken ?? null,
+        sortOrder: input.sortOrder ?? (last ? last.sortOrder + 1 : 0),
       },
     });
     return toResponse(created);
@@ -105,6 +114,37 @@ export class CategoriesService {
     return toResponse(updated);
   }
 
+  /**
+   * Drag-to-reorder: `ids` (every live category, in the new order) get
+   * sortOrder 0..n-1. Returns the previous order for the audit diff.
+   */
+  async reorder(
+    ids: string[],
+  ): Promise<{ items: CategoryResponse[]; before: string[] }> {
+    const live = await this.prisma.category.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      select: { id: true },
+    });
+    const liveIds = new Set(live.map((c) => c.id));
+    if (
+      new Set(ids).size !== ids.length ||
+      ids.length !== liveIds.size ||
+      ids.some((id) => !liveIds.has(id))
+    )
+      throw new BadRequestException({
+        code: 'INVALID_CATEGORY_ORDER',
+        message: 'ids must list every category exactly once',
+      });
+    await this.prisma.$transaction(
+      ids.map((id, i) =>
+        this.prisma.category.update({ where: { id }, data: { sortOrder: i } }),
+      ),
+    );
+    const res = await this.list({ skip: 0, take: 200 });
+    return { items: res.items, before: live.map((c) => c.id) };
+  }
+
   async softDelete(id: string): Promise<void> {
     const target = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
@@ -125,6 +165,7 @@ function toResponse(c: Category): CategoryResponse {
     description: c.description,
     iconName: c.iconName,
     colorToken: c.colorToken,
+    sortOrder: c.sortOrder,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };

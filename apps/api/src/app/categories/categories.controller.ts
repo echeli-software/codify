@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import type { ApiUser } from '../auth/auth.types.js';
 import { CategoriesService } from './categories.service.js';
 import {
   CreateCategoryDto,
+  ReorderCategoriesDto,
   UpdateCategoryDto,
   type CategoryListResponse,
   type CategoryResponse,
@@ -44,6 +46,25 @@ export class CategoriesController {
     take: number,
   ): Promise<CategoryListResponse> {
     return this.categories.list({ skip, take });
+  }
+
+  /** Drag-to-reorder (docs/04 Categories). */
+  @Roles('ADMIN')
+  @Put('order')
+  async reorder(
+    @CurrentUser() actor: ApiUser,
+    @Body() body: ReorderCategoriesDto,
+    @Req() req: Request,
+  ): Promise<CategoryListResponse> {
+    const { items, before } = await this.categories.reorder(body.ids);
+    void this.audit.record(actor, {
+      action: 'category.reorder',
+      entity: 'Category',
+      diff: { before, after: body.ids },
+      ip: req.ip ?? null,
+      userAgent: (req.headers['user-agent'] as string) ?? null,
+    });
+    return { items, total: items.length };
   }
 
   @Get(':id')

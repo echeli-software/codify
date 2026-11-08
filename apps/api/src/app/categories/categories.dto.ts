@@ -1,5 +1,11 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsInt,
   IsOptional,
+  Max,
+  Min,
   IsString,
   Length,
   Matches,
@@ -34,6 +40,12 @@ export class CreateCategoryDto {
   @IsString()
   @Length(0, 40)
   colorToken?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  sortOrder?: number;
 }
 
 /** PATCH /api/categories/:id body. */
@@ -65,6 +77,12 @@ export class UpdateCategoryDto {
   @IsString()
   @Length(0, 40)
   colorToken?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  sortOrder?: number;
 }
 
 export interface CategoryResponse {
@@ -74,6 +92,8 @@ export interface CategoryResponse {
   description: string | null;
   iconName: string | null;
   colorToken: string | null;
+  /** Catalog order (ascending). */
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,4 +101,13 @@ export interface CategoryResponse {
 export interface CategoryListResponse {
   items: CategoryResponse[];
   total: number;
+}
+
+/** PUT /api/categories/order — every live category id, in the new order. */
+export class ReorderCategoriesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  ids!: string[];
 }
