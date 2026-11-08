@@ -34,6 +34,11 @@ const APPROVED = {
   // use it as a library, which FSL permits.
   sentry:
     'FSL-1.1-Apache-2.0 via @sentry/node — library use permitted (approved 2026-11)',
+  // Eclipse Public License 2.0 (file-level copyleft). Pulled in by the
+  // prisma CLI's Studio (@prisma/studio-core), a local dev tool that is not
+  // part of the API bundle; used unmodified.
+  elkjs:
+    'EPL-2.0 via prisma → @prisma/studio-core — dev tool, unmodified (approved 2026-11)',
 };
 
 /** "(MPL-2.0 OR Apache-2.0)" → OK if any alternative is allowed; "A AND B" → all. */
