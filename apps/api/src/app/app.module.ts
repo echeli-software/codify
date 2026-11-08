@@ -16,6 +16,7 @@ import { CertificatesModule } from './certificates/certificates.module.js';
 import { CoursesModule } from './courses/courses.module.js';
 import { ExercisesModule } from './exercises/exercises.module.js';
 import { BrowserExerciseModule } from './exercises/browser-exercise.module.js';
+import { SearchModule } from './search/search.module.js';
 import { GamificationModule } from './gamification/gamification.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ItemsModule } from './items/items.module.js';
@@ -66,6 +67,7 @@ import { PromoCodesModule } from './promo-codes/promo-codes.module.js';
     CoursesModule,
     ExercisesModule,
     BrowserExerciseModule,
+    SearchModule,
     ModulesModule,
     LessonsModule,
     NotificationsModule,

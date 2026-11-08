@@ -18,6 +18,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ItemsService } from './items.service.js';
 import { StarterPetService } from './starter-pet.service.js';
+import { validateClientTimestamp } from '../progress/progress.service.js';
 import {
   CreateItemCategoryDto,
   ClaimStarterPetDto,
@@ -109,7 +110,11 @@ export class ItemsController {
     @CurrentUser() actor: ApiUser,
     @Body() body: SaveAvatarConfigDto,
   ): Promise<AvatarResponse> {
-    return this.items.saveConfig(actor.userId, body.config);
+    return this.items.saveConfig(
+      actor.userId,
+      body.config,
+      validateClientTimestamp(body.clientTimestamp),
+    );
   }
 
   @Roles('STUDENT')
@@ -118,7 +123,12 @@ export class ItemsController {
     @CurrentUser() actor: ApiUser,
     @Body() body: EquipDto,
   ): Promise<AvatarResponse> {
-    return this.items.equip(actor.userId, body.slot, body.itemId ?? null);
+    return this.items.equip(
+      actor.userId,
+      body.slot,
+      body.itemId ?? null,
+      validateClientTimestamp(body.clientTimestamp),
+    );
   }
 
   /** "Random" in the dressing room: shuffle equipment from the owned set. */

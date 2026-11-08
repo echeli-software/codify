@@ -182,6 +182,12 @@ export class EquipDto {
   @IsOptional()
   @IsString()
   itemId?: string | null;
+
+  /** Offline edit time (docs/16 §8 last-write-wins); ISO-8601. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 40)
+  clientTimestamp?: string;
 }
 
 export class SaveAvatarConfigDto {
@@ -194,6 +200,12 @@ export class SaveAvatarConfigDto {
   @IsObject()
   @Type(() => Object)
   config!: Record<string, unknown>;
+
+  /** Offline edit time (docs/16 §8 last-write-wins); ISO-8601. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 40)
+  clientTimestamp?: string;
 }
 
 /** `POST /avatar/random` — shuffle equipment from the owned set. */
@@ -272,6 +284,8 @@ export interface AvatarResponse {
   equipped: Partial<Record<(typeof ITEM_SLOTS)[number], EquippedRef>>;
   /** The user's name for their pet (`User.petName`), if set. */
   petName?: string | null;
+  /** A `clientTimestamp` write lost to a newer change (LWW); nothing changed. */
+  stale?: boolean;
 }
 
 export interface StarterPetStatus {

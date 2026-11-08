@@ -21,6 +21,7 @@ import {
   validateAvatarConfig,
 } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { avatarWriteTime, isStaleWrite } from './avatar-lww.js';
 import { AccessService } from '../billing/access.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { GamificationService } from '../gamification/gamification.service.js';
@@ -523,9 +524,15 @@ export class ItemsService {
     config: Record<string, unknown>,
   ): Promise<AvatarResponse> {
     // AvatarConfig patch (docs/08 §5): known keys, curated values only.
+  /**
+   * Save the avatar config. Offline edits (docs/16 §8) pass the device
+   * `clientTimestamp`: last write wins against `User.avatarUpdatedAt`, so a
+   * change synced late never overwrites a newer one (`stale: true`).
+   */
     const valid = validateAvatarConfig(config);
     if (!valid.ok)
       throw new BadRequestException({
+    clientTimestamp?: string | null,
         code: 'avatar.config_invalid',
         message: 'Invalid avatar settings',
         errors: valid.errors,
@@ -535,18 +542,34 @@ export class ItemsService {
       select: { avatarConfig: true },
     });
     // The patch is merged over the stored (normalized) config.
+    const at = avatarWriteTime(clientTimestamp);
+    if (clientTimestamp) {
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { avatarUpdatedAt: true },
+      });
+      if (isStaleWrite(at, current?.avatarUpdatedAt))
+        return { ...(await this.getAvatar(userId)), stale: true };
+    }
     const merged = {
       ...normalizeAvatarConfig(stored.avatarConfig),
       ...valid.value,
     };
     await this.prisma.user.update({
       where: { id: userId },
-      data: { avatarConfig: merged as unknown as Prisma.InputJsonValue },
+      data: {
+        avatarConfig: merged as unknown as Prisma.InputJsonValue,
+        avatarUpdatedAt: at,
+      },
     });
     return this.getAvatar(userId);
   }
 
-  /** Equip an owned item into its slot, or unequip when itemId is null. */
+  /**
+   * Equip an owned item into its slot, or unequip when itemId is null.
+   * With a `clientTimestamp` (offline queue) the change is last-write-wins
+   * against the slot's `EquippedItem.updatedAt` (`stale: true` when older).
+   */
   async equip(
     userId: string,
     slot: ItemSlot,
@@ -556,7 +579,17 @@ export class ItemsService {
       await this.prisma.equippedItem.deleteMany({ where: { userId, slot } });
       return this.getAvatar(userId);
     }
+    clientTimestamp?: string | null,
     const owned = await this.prisma.userItem.findUnique({
+    const at = avatarWriteTime(clientTimestamp);
+    if (clientTimestamp) {
+      const row = await this.prisma.equippedItem.findUnique({
+        where: { userId_slot: { userId, slot } },
+        select: { updatedAt: true },
+      });
+      if (isStaleWrite(at, row?.updatedAt))
+        return { ...(await this.getAvatar(userId)), stale: true };
+    }
       where: { userId_itemId: { userId, itemId } },
       include: { item: true },
     });
@@ -567,8 +600,13 @@ export class ItemsService {
       );
     await this.prisma.equippedItem.upsert({
       where: { userId_slot: { userId, slot } },
-      create: { userId, slot, itemId },
-      update: { itemId },
+      create: {
+        userId,
+        slot,
+        itemId,
+        ...(clientTimestamp ? { updatedAt: at } : {}),
+      },
+      update: { itemId, ...(clientTimestamp ? { updatedAt: at } : {}) },
     });
     return this.getAvatar(userId);
   }
