@@ -6,7 +6,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
@@ -17,11 +16,9 @@ import {
 import {
   AppButton,
   AppCard,
-  AppInput,
   AppSkeleton,
   AvatarBuilder,
   AvatarRenderer,
-  FormField,
   Icon,
   Inventory,
   type AvatarSlot,
@@ -41,10 +38,10 @@ import {
 } from '@codify/ui-core';
 import {
   ItemsClient,
-  MeClient,
   type AvatarResponse,
   type ItemSlot,
   type InventoryItem,
+  type PetNameResponse,
   type ShopItem,
 } from '@codify/api-client';
 import { MotionAndSoundService } from '@codify/gamification-engine';
@@ -60,6 +57,7 @@ import {
   toUiItem,
 } from './shared/avatar.js';
 import { OfflineSyncService } from '../offline/offline-sync.service.js';
+import { PetNames } from '../components/pet-names.component.js';
 
 /** Look changes are saved 3 s after the last tap (docs/08 §9). */
 const LOOK_AUTOSAVE_MS = 3000;
@@ -76,7 +74,6 @@ const LOOK_AUTOSAVE_MS = 3000;
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -84,13 +81,12 @@ const LOOK_AUTOSAVE_MS = 3000;
     IonContent,
     AppButton,
     AppCard,
-    AppInput,
     AppSkeleton,
     AvatarBuilder,
     AvatarRenderer,
-    FormField,
     Icon,
     Inventory,
+    PetNames,
     TranslatePipe,
   ],
   template: `
@@ -299,36 +295,12 @@ const LOOK_AUTOSAVE_MS = 3000;
             </div>
           </section>
 
-          @if (hasPet()) {
-            <section aria-labelledby="av-pet" class="av__section">
-              <h2 id="av-pet">{{ 'student.avatar.petTitle' | translate }}</h2>
-              <form
-                class="av__pet"
-                (submit)="savePetName($event)"
-                data-testid="pet-name-form"
-              >
-                <cdf-form-field
-                  [label]="'student.avatar.petName' | translate"
-                  class="av__pet-field"
-                >
-                  <cdf-app-input
-                    name="petName"
-                    [(ngModel)]="petName"
-                    [maxLength]="30"
-                    data-testid="pet-name"
-                  />
-                </cdf-form-field>
-                <cdf-app-button
-                  kind="secondary"
-                  type="submit"
-                  [disabled]="!online()"
-                  [loading]="savingPet()"
-                >
-                  {{ 'common.save' | translate }}
-                </cdf-app-button>
-              </form>
-            </section>
-          }
+          <cdf-pet-names
+            class="av__section"
+            [inventory]="inventory()"
+            [disabled]="!online()"
+            (renamed)="onPetRenamed($event)"
+          />
 
           <section aria-labelledby="av-inventory" class="av__section">
             <div class="av__head">
@@ -451,15 +423,6 @@ const LOOK_AUTOSAVE_MS = 3000;
         opacity: 0.6;
         cursor: not-allowed;
       }
-      .av__pet {
-        display: flex;
-        gap: var(--cdf-space-2);
-        align-items: flex-end;
-        flex-wrap: wrap;
-      }
-      .av__pet-field {
-        flex: 1 1 220px;
-      }
     `,
   ],
 })
@@ -467,7 +430,6 @@ export class AvatarPage {
   private readonly items = inject(ItemsClient);
   /** Offline edits queue here and sync last-write-wins (docs/16 §3, §8). */
   private readonly offline = inject(OfflineSyncService);
-  private readonly me = inject(MeClient);
   private readonly downloads = inject(DownloadService);
   private readonly network = inject(NetworkStatusService);
   private readonly route = inject(ActivatedRoute);
@@ -494,8 +456,6 @@ export class AvatarPage {
   /** Unsaved look edits (auto-saved after 3 s). */
   private readonly lookDraft = signal<Partial<AvatarConfig>>({});
   protected readonly lookSaving = signal(false);
-  protected readonly savingPet = signal(false);
-  protected petName = '';
   private lookTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly owned = computed<UiShopItem[]>(() =>
@@ -515,9 +475,6 @@ export class AvatarPage {
   );
   protected readonly tryOnSprites = computed(() =>
     equippedSprites(this.avatar(), this.tryOn()),
-  );
-  protected readonly hasPet = computed(() =>
-    this.inventory().some((i) => i.item.slot === 'PET'),
   );
 
   constructor() {
@@ -577,7 +534,6 @@ export class AvatarPage {
 
   private setAvatar(av: AvatarResponse): void {
     this.avatar.set(av);
-    this.petName = av.petName ?? '';
   }
 
   private async load(): Promise<void> {
@@ -767,26 +723,14 @@ export class AvatarPage {
     }
   }
 
-  protected async savePetName(ev: Event): Promise<void> {
-    ev.preventDefault();
-    const name = this.petName.trim();
-    this.savingPet.set(true);
-    try {
-      const me = await this.me.update({ petName: name || null });
-      this.avatar.update((a) =>
-        a ? { ...a, petName: me.petName ?? null } : a,
-      );
-      this.petName = me.petName ?? '';
-      this.toast.show({
-        message: 'student.avatar.petSaved',
-        kind: 'success',
-        params: { name: me.petName ?? '' },
-      });
-    } catch (err) {
-      this.toast.error(err);
-    } finally {
-      this.savingPet.set(false);
-    }
+  /** A pet was (re)named: keep the avatar and the inventory row in step. */
+  protected onPetRenamed(res: PetNameResponse): void {
+    this.setAvatar(res.avatar);
+    this.inventory.update((list) =>
+      list.map((i) =>
+        i.item.id === res.itemId ? { ...i, nickname: res.nickname } : i,
+      ),
+    );
   }
 
   private async refreshInventory(): Promise<void> {

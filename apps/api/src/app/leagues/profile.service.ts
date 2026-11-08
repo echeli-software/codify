@@ -3,6 +3,7 @@ import { effectiveStreak, localDateKey } from '@codify/domain';
 import { levelFromXp, tierForLevel } from '@codify/ui-core';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { loadSpriteUrls, spriteUrlFor } from '../items/sprite-urls.js';
+import { loadEquippedPet, petNameAlias } from '../items/pet-names.js';
 import { ContentLocalizer } from '../translations/content-localizer.service.js';
 import { coursesCompleted } from './learner-stats.js';
 import { toStreakState } from '../gamification/gamification.service.js';
@@ -13,7 +14,7 @@ export interface PublicProfile {
   level: number;
   tier: string;
   totalXp: number;
-  /** The user's name for their pet (docs/08 §10). */
+  /** The equipped pet's name (docs/08 §10; see `petNameAlias`). */
   petName: string | null;
   avatar: {
     config: Record<string, unknown> | null;
@@ -24,6 +25,8 @@ export interface PublicProfile {
         name: string;
         spriteAssetId: string;
         spriteUrl: string | null;
+        /** The pet's name (PET slot only). */
+        nickname?: string | null;
       }
     >;
   };
@@ -74,6 +77,7 @@ export class ProfileService {
       friendsB,
       courses,
       itemsOwned,
+      pet,
     ] = await Promise.all([
       this.prisma.equippedItem.findMany({
         where: { userId },
@@ -92,6 +96,7 @@ export class ProfileService {
       this.prisma.userItem.count({
         where: { userId, item: { deletedAt: null } },
       }),
+      loadEquippedPet(this.prisma, userId),
     ]);
 
     const spriteUrls = await loadSpriteUrls(
@@ -131,6 +136,9 @@ export class ProfileService {
       if (ref && tr) ref.name = tr.text('ITEM', e.itemId, 'name', ref.name);
     }
 
+    const petName = petNameAlias(pet, user.petName);
+    if (equippedMap['PET']) equippedMap['PET'].nickname = petName;
+
     const level = levelFromXp(user.totalXp);
     const liveStreak = effectiveStreak(
       streak ? toStreakState(streak) : null,
@@ -142,7 +150,7 @@ export class ProfileService {
       level,
       tier: tierForLevel(level),
       totalXp: user.totalXp,
-      petName: user.petName ?? null,
+      petName,
       avatar: {
         config: (user.avatarConfig as Record<string, unknown> | null) ?? null,
         equipped: equippedMap,

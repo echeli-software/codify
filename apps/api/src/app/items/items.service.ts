@@ -44,6 +44,7 @@ import type {
   UpdateItemDto,
 } from './items.dto.js';
 import { ItemDropsService, renderDropCopy } from './item-drops.service.js';
+import { loadEquippedPet, petNameAlias } from './pet-names.js';
 import {
   isAssetSpriteRef,
   loadSpriteUrls,
@@ -498,13 +499,14 @@ export class ItemsService {
         equipped: equippedIds.has(r.itemId),
         acquiredAt: r.acquiredAt.toISOString(),
         source: r.source,
+        nickname: r.nickname ?? null,
       }));
     await this.localizeItems(out.map((o) => o.item));
     return out;
   }
 
   async getAvatar(userId: string): Promise<AvatarResponse> {
-    const [user, equipped] = await Promise.all([
+    const [user, equipped, pet] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: { avatarConfig: true, petName: true },
@@ -513,6 +515,7 @@ export class ItemsService {
         where: { userId },
         include: { item: true },
       }),
+      loadEquippedPet(this.prisma, userId),
     ]);
     const urls = await this.spriteUrls(equipped.map((e) => e.item));
     const map: AvatarResponse['equipped'] = {};
@@ -529,11 +532,13 @@ export class ItemsService {
       } satisfies EquippedRef;
     }
     await this.localizeEquipped(map);
+    const petName = petNameAlias(pet, user.petName);
+    if (map.PET) map.PET.nickname = petName;
     return {
       // The full AvatarConfig: stored values, defaults for missing ones.
       config: { ...normalizeAvatarConfig(user.avatarConfig) },
       equipped: map,
-      petName: user.petName ?? null,
+      petName,
     };
   }
 

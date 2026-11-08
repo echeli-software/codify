@@ -84,7 +84,7 @@ export interface PublicProfile {
   level: number;
   tier: string;
   totalXp: number;
-  /** The user's pet name (docs/08 §10). Optional for older APIs. */
+  /** The equipped pet's name (docs/08 §10). Optional for older APIs. */
   petName?: string | null;
   avatar: {
     config: Record<string, unknown> | null;
@@ -96,6 +96,8 @@ export interface PublicProfile {
         spriteAssetId: string;
         /** Resolved uploaded-sprite URL; null for `emoji:`/`color:` tokens. */
         spriteUrl?: string | null;
+        /** The pet's name (PET slot only). Optional for older APIs. */
+        nickname?: string | null;
       }
     >;
   };

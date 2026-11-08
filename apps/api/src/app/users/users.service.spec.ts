@@ -28,6 +28,10 @@ function setup() {
       findMany: jest.fn(async () => []),
       count: jest.fn(async () => 0),
     },
+    userItem: {
+      findFirst: jest.fn(async (): Promise<unknown> => null),
+      update: jest.fn(async () => ({})),
+    },
   };
   return {
     svc: new UsersService(prisma as unknown as PrismaService),
@@ -53,6 +57,44 @@ describe('UsersService.update', () => {
     const { svc, prisma } = setup();
     await svc.update('u1', { onboarded: false, locale: 'en-US' });
     expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsersService petName (docs/08 §10)', () => {
+  it('names the equipped pet; User.petName mirrors only the starter pet', async () => {
+    const { svc, prisma } = setup();
+    prisma.userItem.findFirst.mockResolvedValue({
+      itemId: 'dog',
+      nickname: 'Rex',
+      source: 'PURCHASE',
+    });
+    const me = await svc.update('u1', { petName: ' Rex ' });
+    expect(prisma.userItem.update).toHaveBeenCalledWith({
+      where: { userId_itemId: { userId: 'u1', itemId: 'dog' } },
+      data: { nickname: 'Rex' },
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: {} }),
+    );
+    expect(me.petName).toBe('Rex');
+  });
+
+  it('keeps writing User.petName for the starter pet or with no pet out', async () => {
+    const { svc, prisma } = setup();
+    prisma.userItem.findFirst.mockResolvedValueOnce({
+      itemId: 'kitten',
+      nickname: null,
+      source: 'ONBOARDING',
+    });
+    await svc.update('u1', { petName: 'Mimi' });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { petName: 'Mimi' } }),
+    );
+    await svc.update('u1', { petName: '' });
+    expect(prisma.user.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { petName: null } }),
+    );
+    expect(prisma.userItem.update).toHaveBeenCalledTimes(1);
   });
 });
 

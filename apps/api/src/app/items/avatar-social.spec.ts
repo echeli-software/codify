@@ -29,7 +29,10 @@ function itemsSetup(stored: unknown = { skinTone: 'deep' }) {
       findMany: jest.fn(async () => [] as unknown[]),
       upsert: jest.fn((args: unknown) => ({ upsert: args })),
     },
-    userItem: { findMany: jest.fn(async () => [] as unknown[]) },
+    userItem: {
+      findMany: jest.fn(async () => [] as unknown[]),
+      findFirst: jest.fn(async () => null),
+    },
     asset: { findMany: jest.fn(async () => []) },
     $transaction: jest.fn(async (ops: unknown[]) => ops),
   };
@@ -146,6 +149,7 @@ function starterSetup(opts: {
     deletedAt: null,
   };
   let claimed = opts.claimed ?? false;
+  let named: string | null = null;
   const tx = {
     userItem: {
       create: jest.fn(async () => {
@@ -163,12 +167,18 @@ function starterSetup(opts: {
   };
   const prisma = {
     userItem: {
-      findFirst: jest.fn(async () => (claimed ? { item: pet } : null)),
+      findFirst: jest.fn(async () =>
+        claimed ? { item: pet, nickname: named } : null,
+      ),
+      updateMany: jest.fn((args: unknown) => {
+        named = (args as { data: { nickname: string } }).data.nickname;
+        return { userItem: args };
+      }),
     },
     progress: { count: jest.fn(async () => opts.lessons ?? 1) },
     user: {
       findUniqueOrThrow: jest.fn(async () => ({ petName: null })),
-      update: jest.fn(async () => ({})),
+      update: jest.fn((args: unknown) => ({ user: args })),
     },
     item: {
       findUnique: jest.fn(async () =>
@@ -176,7 +186,9 @@ function starterSetup(opts: {
       ),
     },
     asset: { findMany: jest.fn(async () => []) },
-    $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+    $transaction: jest.fn(async (arg: unknown) =>
+      typeof arg === 'function' ? (arg as (t: typeof tx) => unknown)(tx) : arg,
+    ),
   };
   const items = {
     getAvatar: jest.fn(async () => ({ config: {}, equipped: {} })),
@@ -203,10 +215,16 @@ describe('StarterPetService (docs/10 §2 first reward)', () => {
     expect(tx.equippedItem.create).toHaveBeenCalledWith({
       data: { userId: 'u1', slot: 'PET', itemId: 'pet1' },
     });
+    // The gift's own name, mirrored to the legacy User.petName.
+    expect(prisma.userItem.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', source: 'ONBOARDING', item: { slot: 'PET' } },
+      data: { nickname: 'Bit Byte' },
+    });
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
       data: { petName: 'Bit Byte' },
     });
+    expect(res.petName).toBe('Bit Byte');
     expect(res.alreadyClaimed).toBe(false);
     expect(res.claimed).toBe(true);
     // Idempotent second call.
@@ -263,7 +281,8 @@ describe('Day2PetPushService (docs/10 §2 Day-2 push)', () => {
     reminderMinute: null,
     quietHoursStart: null,
     quietHoursEnd: null,
-    petName: 'Byte',
+    petName: 'Legacy',
+    items: [{ nickname: 'Byte' }],
     ...over,
   });
 
@@ -322,6 +341,15 @@ describe('Day2PetPushService (docs/10 §2 Day-2 push)', () => {
         ]).svc.run(now)
       ).skipped,
     ).toBe(1);
+  });
+
+  it('falls back to User.petName without a starter-pet nickname', async () => {
+    const { svc, notifications } = setup([user({ items: [] })]);
+    await svc.run(now);
+    const build = (notifications.notify.mock.calls[0] as unknown[])[1] as (u: {
+      locale: string;
+    }) => { title: string };
+    expect(build({ locale: 'en-US' }).title).toBe('🐾 Legacy is waiting!');
   });
 
   it('copy and dates', () => {

@@ -13,6 +13,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export const ITEM_SLOTS = [
@@ -231,6 +232,15 @@ export class ClaimStarterPetDto {
   petName?: string;
 }
 
+/** `PUT /avatar/pets/:itemId/name` — name an owned pet (docs/08 §10). */
+export class NamePetDto {
+  /** Max 30 chars (whitespace collapsed); null or "" clears the name. */
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  @Length(0, 30)
+  name!: string | null;
+}
+
 export interface ItemResponse {
   id: string;
   slug: string;
@@ -265,6 +275,8 @@ export interface InventoryItem {
   equipped: boolean;
   acquiredAt: string;
   source: string;
+  /** The user's name for this item (pets, docs/08 §10); null when unnamed. */
+  nickname: string | null;
 }
 
 export interface EquippedRef {
@@ -276,13 +288,18 @@ export interface EquippedRef {
   spriteAssetId: string;
   /** Resolved image URL for an uploaded sprite; null for `emoji:`/`color:` tokens. */
   spriteUrl: string | null;
+  /** The user's name for this pet (PET slot only; docs/08 §10). */
+  nickname?: string | null;
 }
 
 export interface AvatarResponse {
   /** The full AvatarConfig (stored values, defaults for missing ones). */
   config: Record<string, unknown> | null;
   equipped: Partial<Record<(typeof ITEM_SLOTS)[number], EquippedRef>>;
-  /** The user's name for their pet (`User.petName`), if set. */
+  /**
+   * The equipped pet's name (alias of `equipped.PET.nickname`, falling back
+   * to the legacy `User.petName`; see `petNameAlias`). Kept for old clients.
+   */
   petName?: string | null;
   /** A `clientTimestamp` write lost to a newer change (LWW); nothing changed. */
   stale?: boolean;
@@ -300,6 +317,13 @@ export interface StarterPetStatus {
 export interface ClaimStarterPetResponse extends StarterPetStatus {
   /** True when this call did nothing new (already claimed earlier). */
   alreadyClaimed: boolean;
+  avatar: AvatarResponse;
+}
+
+export interface PetNameResponse {
+  itemId: string;
+  /** The stored name; null when cleared. */
+  nickname: string | null;
   avatar: AvatarResponse;
 }
 

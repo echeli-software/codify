@@ -102,7 +102,10 @@ export class UpdateMeDto {
   @IsBoolean()
   onboarded?: boolean;
 
-  /** Name of the user's pet (docs/08 §10); null or "" clears it. */
+  /**
+   * Names the equipped pet (docs/08 §10); null or "" clears it. Legacy —
+   * new clients use PUT /avatar/pets/:itemId/name.
+   */
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
@@ -147,7 +150,10 @@ export interface MeResponse {
   /** Running gamification totals; cached on the student client. */
   totalXp: number;
   coins: number;
-  /** Name of the user's pet (docs/08 §10). */
+  /**
+   * The equipped pet's name (docs/08 §10; `UserItem.nickname`, falling back
+   * to the legacy `User.petName`). Each pet's own name: GET /inventory.
+   */
   petName: string | null;
   /** Friends may see this user's learning activity (docs/10 §5). */
   activityFeedOptIn: boolean;

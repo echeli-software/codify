@@ -445,3 +445,5 @@ export {
   type SiteSettingsAdmin,
   type UpdateSiteSettingsBody,
 } from './lib/admin-catalog.client.js';
+// Round 4 (SOC-2): per-pet names.
+export type { PetNameResponse } from './lib/items.client.js';

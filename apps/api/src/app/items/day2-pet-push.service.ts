@@ -28,7 +28,10 @@ export function nextDate(date: string): string {
     .slice(0, 10);
 }
 
-/** The Day-2 push copy (docs/10 §2: "[Pet name] is waiting."). */
+/**
+ * The Day-2 push copy (docs/10 §2: "[Pet name] is waiting."): the starter
+ * pet's nickname, else the legacy `User.petName`, else "Your pet".
+ */
 export function day2Copy(locale: string, petName: string | null) {
   const pt = locale.startsWith('pt');
   const pet = petName ?? (pt ? 'Seu pet' : 'Your pet');
@@ -84,6 +87,12 @@ export class Day2PetPushService {
         quietHoursStart: true,
         quietHoursEnd: true,
         petName: true,
+        // The starter pet's own name (docs/08 §10).
+        items: {
+          where: { source: 'ONBOARDING', item: { slot: 'PET' } },
+          select: { nickname: true },
+          take: 1,
+        },
       },
     });
     let candidates = 0;
@@ -115,7 +124,8 @@ export class Day2PetPushService {
       candidates += 1;
       const res = await this.notifications.notify(
         u.id,
-        ({ locale }) => day2Copy(locale, u.petName ?? null),
+        ({ locale }) =>
+          day2Copy(locale, u.items[0]?.nickname ?? u.petName ?? null),
         { now, respectQuietHours: true },
       );
       if (res.push.status === 'sent') sent += 1;

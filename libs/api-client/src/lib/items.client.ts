@@ -55,6 +55,8 @@ export interface InventoryItem {
   equipped: boolean;
   acquiredAt: string;
   source: string;
+  /** The user's name for this item (pets, docs/08 §10). Optional for older APIs. */
+  nickname?: string | null;
 }
 
 export interface EquippedRef {
@@ -69,6 +71,8 @@ export interface EquippedRef {
    * null for inline `emoji:` / `color:` tokens. Optional for older APIs.
    */
   spriteUrl?: string | null;
+  /** The pet's name (PET slot only, docs/08 §10). Optional for older APIs. */
+  nickname?: string | null;
 }
 
 export interface AvatarResponse {
@@ -76,8 +80,16 @@ export interface AvatarResponse {
   equipped: Partial<Record<ItemSlot, EquippedRef>>;
   /** A queued (clientTimestamp) write lost to a newer change — nothing changed (docs/16 §8). */
   stale?: boolean;
-  /** The user's pet name (`User.petName`). Optional for older APIs. */
+  /** The equipped pet's name (alias of `equipped.PET.nickname`). Optional for older APIs. */
   petName?: string | null;
+}
+
+/** `PUT /avatar/pets/:itemId/name` (docs/08 §10). */
+export interface PetNameResponse {
+  itemId: string;
+  /** The stored name; null when cleared. */
+  nickname: string | null;
+  avatar: AvatarResponse;
 }
 
 /** `GET /avatar/starter-pet` (docs/10 §2 first reward). */
@@ -246,6 +258,20 @@ export class ItemsClient {
       this.http.post<ClaimStarterPetResponse>(
         `${this.base}/avatar/starter-pet`,
         petName ? { petName } : {},
+        { context: withIdempotency() },
+      ),
+    );
+  }
+
+  /**
+   * Name an owned pet (max 30 chars; null or "" clears it). 404
+   * `pet.not_owned`, 400 `pet.not_a_pet`.
+   */
+  namePet(itemId: string, name: string | null): Promise<PetNameResponse> {
+    return firstValueFrom(
+      this.http.put<PetNameResponse>(
+        `${this.base}/avatar/pets/${encodeURIComponent(itemId)}/name`,
+        { name },
         { context: withIdempotency() },
       ),
     );

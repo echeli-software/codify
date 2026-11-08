@@ -54,6 +54,7 @@ function setup() {
     equippedItem: { findMany: jest.fn(async () => [] as unknown[]) },
     userItem: {
       findUnique: jest.fn(async () => null),
+      findFirst: jest.fn(async () => null),
       findMany: jest.fn(async () => [] as unknown[]),
     },
     idempotencyRecord: { create: jest.fn(async () => ({})) },

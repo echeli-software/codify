@@ -18,12 +18,14 @@ import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { ItemsService, itemAuditSnapshot } from './items.service.js';
 import { StarterPetService } from './starter-pet.service.js';
+import { PetNamesService } from './pet-names.service.js';
 import { validateClientTimestamp } from '../progress/progress.service.js';
 import {
   CreateItemCategoryDto,
   ClaimStarterPetDto,
   CreateItemDto,
   EquipDto,
+  NamePetDto,
   RandomizeAvatarDto,
   PurchaseDto,
   SaveAvatarConfigDto,
@@ -34,6 +36,7 @@ import {
   type StarterPetStatus,
   type InventoryItem,
   type ItemResponse,
+  type PetNameResponse,
   type PurchaseResponse,
   type ShopItem,
 } from './items.dto.js';
@@ -49,6 +52,7 @@ export class ItemsController {
     private readonly items: ItemsService,
     private readonly audit: AuditService,
     private readonly starterPets: StarterPetService,
+    private readonly petNames: PetNamesService,
   ) {}
 
   // ─── Student ───────────────────────────────────────────────────────────
@@ -161,6 +165,20 @@ export class ItemsController {
     @Body() body: ClaimStarterPetDto,
   ): Promise<ClaimStarterPetResponse> {
     return this.starterPets.claim(actor.userId, { petName: body?.petName });
+  }
+
+  /**
+   * Name an owned pet (docs/08 §10); null / "" clears the name. 404
+   * `pet.not_owned`, 400 `pet.not_a_pet`.
+   */
+  @Roles('STUDENT')
+  @Put('avatar/pets/:itemId/name')
+  namePet(
+    @CurrentUser() actor: ApiUser,
+    @Param('itemId') itemId: string,
+    @Body() body: NamePetDto,
+  ): Promise<PetNameResponse> {
+    return this.petNames.rename(actor.userId, itemId, body.name);
   }
 
   // ─── Admin ─────────────────────────────────────────────────────────────

@@ -122,7 +122,8 @@ _partial_ patch (`baseBodyId`, `skinTone`, `baseHairStyle`,
 `baseHairColor`, `eyeColor`, `pose`); unknown keys or off-palette values →
 400 `avatar.config_invalid` with one problem per field; the patch is merged
 over the stored config. `GET /avatar` always returns the full normalized
-config (defaults for missing fields) plus `petName`. `cdf-avatar-renderer`
+config (defaults for missing fields) plus `petName` (the equipped pet's
+name, §10). `cdf-avatar-renderer`
 draws one `<svg viewBox="0 0 256 256">`: a vector base body (no external
 art), uploaded sprites as `<image>`, `emoji:` tokens as glyphs and `color:`
 tokens tinting the vector part of their slot (shirt, trousers, shoes, cap,
@@ -207,9 +208,18 @@ the base look but keeps the skin tone.
 - Can be named (per pet, by user). Name appears in profile + pet sticker reactions.
 - Future: pets gain XP alongside owner, evolve into new forms (Pokemon-style). Out of scope for v1; data model accommodates by versioning the pet sprite.
 
-**As built.** One pet name per user (`User.petName`, set via `PATCH /me
-{ petName }`, max 30 chars, null/blank clears), shown in the dressing room,
-the public profile and the Day-2 push. The onboarding starter pet
+**As built.** Every owned pet has its own name (`UserItem.nickname`):
+`PUT /avatar/pets/:itemId/name { name }` (STUDENT; max 30 chars after
+collapsing whitespace, null/blank clears; 404 `pet.not_owned`, 400
+`pet.not_a_pet`) → `{ itemId, nickname, avatar }`. `GET /inventory` returns
+each item's `nickname`; `GET /avatar` and the public profile return it on
+`equipped.PET`. `petName` stays in `GET /avatar`, `GET|PATCH /me` and the
+profile as an alias for the **equipped** pet's name; the legacy
+`User.petName` is its fallback when no pet is out or the starter pet has no
+nickname, and is still written for the starter pet. `PATCH /me { petName }`
+(older clients) names the equipped pet. The dressing room lists a name field
+per owned pet; the own and public profiles show the equipped pet's name; the
+Day-2 push uses the starter pet's name. The onboarding starter pet
 (`starter-pet-kitten`, PET, COMMON, `emoji:🐱`, `isActive: false` so it is
 never sold) is seeded on first use and given once with
 `ItemAcquisitionSource.ONBOARDING`: `GET /avatar/starter-pet` →

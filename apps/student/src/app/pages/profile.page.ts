@@ -178,6 +178,11 @@ const STAT_TILES: {
               <div class="pf__copy">
                 <h1>{{ u.displayName }}</h1>
                 <p class="pf__muted">{{ u.email }}</p>
+                @if (avatar()?.petName; as pet) {
+                  <p class="pf__muted" data-testid="profile-pet">
+                    {{ 'student.publicProfile.pet' | translate: { name: pet } }}
+                  </p>
+                }
                 <cdf-level-badge [level]="xp.level()" size="sm" />
               </div>
             </header>

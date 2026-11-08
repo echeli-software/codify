@@ -746,6 +746,11 @@
       "petTitle": "Your pet",
       "petName": "Pet name",
       "petSaved": "Saved — say hi to {name}!",
+      "petsTitle": "Your pets",
+      "petsHint": "Every pet can have its own name.",
+      "petNameFor": "Name for {item}",
+      "petOut": "With you now",
+      "petCleared": "Name removed.",
       "bulkEquipped": "{count, plural, one {# item equipped.} other {# items equipped.}}",
       "savedOffline": "Saved on this device — it syncs when you're back online."
     },

@@ -12,6 +12,7 @@ import type {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { loadEquippedPet, petNameAlias } from '../items/pet-names.js';
 import type {
   AdminUserListItem,
   MeResponse,
@@ -52,7 +53,7 @@ export class UsersService {
       select: ME_FIELDS,
     });
     if (!user) throw new NotFoundException('User not found');
-    return toMeResponse(user);
+    return this.withPetName(toMeResponse(user));
   }
 
   async update(userId: string, patch: UpdateMeDto): Promise<MeResponse> {
@@ -73,15 +74,33 @@ export class UsersService {
         data: { onboardedAt: new Date() },
       });
     }
+    // Legacy `petName` names the equipped pet (docs/08 §10); User.petName
+    // stays the starter pet's mirror, so it is written only for that pet
+    // (or when no pet is out).
+    let legacyPetName: { petName?: string | null } = {};
+    if (petName !== undefined) {
+      const name = cleanPetName(petName);
+      const pet = await loadEquippedPet(this.prisma, userId);
+      if (pet)
+        await this.prisma.userItem.update({
+          where: { userId_itemId: { userId, itemId: pet.itemId } },
+          data: { nickname: name },
+        });
+      if (!pet || pet.source === 'ONBOARDING')
+        legacyPetName = { petName: name };
+    }
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        ...fields,
-        ...(petName !== undefined ? { petName: cleanPetName(petName) } : {}),
-      },
+      data: { ...fields, ...legacyPetName },
       select: ME_FIELDS,
     });
-    return toMeResponse(user);
+    return this.withPetName(toMeResponse(user));
+  }
+
+  /** `petName` = the equipped pet's name (see `petNameAlias`). */
+  private async withPetName(me: MeResponse): Promise<MeResponse> {
+    const pet = await loadEquippedPet(this.prisma, me.id);
+    return { ...me, petName: petNameAlias(pet, me.petName) };
   }
 
   async listForAdmin(opts: {
@@ -159,7 +178,7 @@ export class UsersService {
       select: ME_FIELDS,
     });
     if (!user) throw new NotFoundException('User not found');
-    return toMeResponse(user);
+    return this.withPetName(toMeResponse(user));
   }
 }
 

@@ -47,7 +47,8 @@ export function cleanPetName(name: string | null | undefined): string | null {
 /**
  * The free starter pet: given once per user (a `UserItem` with source
  * ONBOARDING), after the first completed lesson, equipped in the PET slot
- * when that slot is empty, and optionally named (`User.petName`). The item
+ * when that slot is empty, and optionally named (`UserItem.nickname`,
+ * mirrored to the legacy `User.petName`). The item
  * is seeded on first use when the catalog doesn't have one, so a fresh
  * environment works without admin setup.
  */
@@ -76,7 +77,8 @@ export class StarterPetService {
       claimed: !!claimed,
       eligible: !claimed && lessons > 0,
       item: item ? await this.respond(item) : null,
-      petName: user.petName ?? null,
+      // The gift's own name (docs/08 §10), else the legacy User.petName.
+      petName: claimed?.nickname ?? user.petName ?? null,
     };
   }
 
@@ -128,10 +130,17 @@ export class StarterPetService {
       });
     }
     if (petName)
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { petName },
-      });
+      await this.prisma.$transaction([
+        this.prisma.userItem.updateMany({
+          where: { userId, source: 'ONBOARDING', item: { slot: 'PET' } },
+          data: { nickname: petName },
+        }),
+        // Legacy mirror for clients that still read User.petName.
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { petName },
+        }),
+      ]);
     const after = await this.status(userId);
     return {
       ...after,
