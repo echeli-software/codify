@@ -17,7 +17,7 @@ describe('missing translation reporting (docs/11 §2)', () => {
 
   it('production: reports each key once per session, capped', () => {
     const reports: string[] = [];
-    setMissingTranslationReporter((key, locale) =>
+    setMissingTranslationReporter((key: string, locale: string) =>
       reports.push(`${locale}:${key}`),
     );
     noteMissingTranslation('a.b', 'pt-BR', false);

@@ -49,7 +49,9 @@ export class RetryAfterInterceptor implements NestInterceptor {
             String(
               Math.max(
                 1,
-                Math.ceil((err as { retryAfterSec: number }).retryAfterSec),
+                Math.ceil(
+                  (err as unknown as { retryAfterSec: number }).retryAfterSec,
+                ),
               ),
             ),
           );
