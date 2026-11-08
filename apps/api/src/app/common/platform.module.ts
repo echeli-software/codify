@@ -6,6 +6,7 @@ import { AppConfigService } from '../config/app-config.service.js';
 import { buildLoggerParams } from './logging.js';
 import { ProblemDetailsFilter } from './problem-details.filter.js';
 import { flushSentry } from './sentry.js';
+import { SecurityTxtController } from './security-txt.js';
 import { REDIS_CLIENT, RedisModule, type RedisClient } from './redis.module.js';
 import { RedisThrottlerStorage } from './throttling/redis-throttler.storage.js';
 import { THROTTLERS } from './throttling/throttler.config.js';
@@ -41,6 +42,8 @@ class SentryLifecycle implements OnApplicationShutdown {
       }),
     }),
   ],
+  // RFC 9116 /.well-known/security.txt (outside the /api prefix, main.ts).
+  controllers: [SecurityTxtController],
   providers: [
     SentryLifecycle,
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },

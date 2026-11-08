@@ -192,6 +192,7 @@ Purge job (`AccountPurgeService`, daily 03:17 UTC, behind `JOBS_ENABLED`): accou
 
 - **security@codify.app** mailbox monitored.
 - Public security policy at `/.well-known/security.txt`.
+  - As built: RFC 9116 file (Contact `mailto:security@codify.app`, Expires, Preferred-Languages, Canonical) served by the API at `https://api.codify.app/.well-known/security.txt` (outside the `/api` prefix; Canonical from `API_PUBLIC_URL`) and shipped as `apps/student|admin/public/.well-known/security.txt`. Marked as a draft like the legal pages: confirm the mailbox before launch. A unit test (`common/security-txt.spec.ts`) keeps the three in sync and fails 30 days before `Expires`, forcing a yearly renewal.
 - IR runbook in repo (`docs/runbooks/incident-response.md`, written when incident protocol matures).
 - Bug bounty: not at launch; consider after stable.
 

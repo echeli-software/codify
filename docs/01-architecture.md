@@ -220,9 +220,11 @@ Single inventory of all queues. Workers are separate Nest processes consuming fr
 | `reactivation.day-7/14/30` | Daily scan | `engagement` | Skip if user reactivated |
 | `coin-ledger.drift-check` | Cron nightly | `gamification` | Alert on mismatch |
 | `download.eviction-report` | Cron weekly | `analytics` | – |
-| `r2.orphan-asset-sweep` | Cron weekly | `assets` | – |
+| `r2.orphan-asset-sweep` | Cron daily 04:41 UTC (`@Cron`, `JOBS_ENABLED`) — as built: `AssetSweepService`; manual `POST /api/admin/assets/sweep?dryRun=` (ADMIN) | `assets` | Storage delete failure keeps the row for the next run; audited `asset.swept` |
 
 Failure handling: Redis-backed `bull-board` UI accessible to admins; PagerDuty alert on dead-letter queue depth > N.
+
+Orphan-asset sweep (as built, `apps/api/src/app/assets/asset-sweep.service.ts`): deletes (storage object, then row) **abandoned uploads** — `confirmed = false` older than `ASSET_SWEEP_UNCONFIRMED_HOURS` (24) — and **unreferenced assets** — confirmed, older than `ASSET_SWEEP_UNREFERENCED_DAYS` (30), whose id appears nowhere. "Referenced" is deliberately broad: `Course.coverAssetId`, `Badge.iconAssetId`, `Item.spriteAssetId` / `thumbnailAssetId` (soft-deleted / inactive rows included), and the id anywhere in the text of `Lesson.contentJson` (soft-deleted lessons too; asset URLs and keys embed the id), every `ContentTranslation.value`, `Scenario.graphJson`, AI-prompt texts and `GamificationConfig.value`. `ASSET_SWEEP_DRY_RUN` (default true outside production) only logs; at most `ASSET_SWEEP_MAX_DELETES` (500) per run.
 
 ## 11. Observability
 

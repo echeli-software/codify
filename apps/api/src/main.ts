@@ -12,7 +12,7 @@
 
 import 'reflect-metadata';
 import 'dotenv/config';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
@@ -48,7 +48,10 @@ async function bootstrap() {
   const config = app.get(AppConfigService);
 
   const globalPrefix = 'api';
-  app.setGlobalPrefix(globalPrefix);
+  // RFC 9116 security.txt lives at the host root (docs/14 §19).
+  app.setGlobalPrefix(globalPrefix, {
+    exclude: [{ path: '.well-known/security.txt', method: RequestMethod.GET }],
+  });
 
   // Cloudflare (and Coolify's proxy) sit in front: trust their
   // X-Forwarded-For so req.ip / rate-limit trackers see the real client.

@@ -1,0 +1,7 @@
+# Codify security policy (RFC 9116).
+# [Draft pending security/legal review: confirm the contact mailbox and
+# the Expires date before launch; renew Expires at least yearly.]
+Contact: mailto:security@codify.app
+Expires: 2027-10-31T23:59:59.000Z
+Preferred-Languages: en, pt
+Canonical: https://codify.app/.well-known/security.txt
