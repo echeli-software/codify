@@ -178,16 +178,22 @@ function fakePrisma(source: LessonDoc) {
           where: {
             entityType_entityId_locale_field: Parameters<typeof key>[0];
           };
-          create: (typeof translations)[number];
+          create: Omit<
+            (typeof translations)[number],
+            'outdated' | 'updatedAt'
+          > &
+            Partial<
+              Pick<(typeof translations)[number], 'outdated' | 'updatedAt'>
+            >;
           update: Partial<(typeof translations)[number]>;
         }) => {
           const hit = key(args.where.entityType_entityId_locale_field);
           if (hit) Object.assign(hit, args.update);
           else
             translations.push({
-              outdated: false,
-              updatedAt: new Date(),
               ...args.create,
+              outdated: args.create.outdated ?? false,
+              updatedAt: args.create.updatedAt ?? new Date(),
             });
           return 'op';
         },

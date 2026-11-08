@@ -1,10 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  afterNextRender,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   ContentTranslationService,
@@ -627,6 +630,9 @@ export class TranslationsPage implements HasUnsavedChanges {
   private readonly toast = inject(ToastService);
   private readonly errorsSvc = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly searchBar = viewChild(SearchBar);
 
   protected readonly statusVariant = STATUS_VARIANT;
   protected readonly entityTypesAll = [...ENTITY_TYPES, 'ALL'] as const;
@@ -719,6 +725,23 @@ export class TranslationsPage implements HasUnsavedChanges {
 
   constructor() {
     warnOnUnload(() => this.pendingCount() > 0);
+    // Deep links (e.g. the course Translations tab):
+    // ?entityType=LESSON&q=…&locale=en-US&status=missing
+    const qp = this.route.snapshot.queryParamMap;
+    const type = qp.get('entityType');
+    if (type && (ENTITY_TYPES as readonly string[]).includes(type))
+      this.entityType.set(type as TranslatableEntityType);
+    const loc = qp.get('locale');
+    if (loc && (LOCALES as readonly string[]).includes(loc))
+      this.locale.set(loc as ContentLocale);
+    const status = qp.get('status');
+    if (status === 'missing' || status === 'outdated' || status === 'done')
+      this.status.set(status);
+    const q = qp.get('q')?.trim();
+    if (q) {
+      this.q.set(q);
+      afterNextRender(() => this.searchBar()?.value.set(q));
+    }
     void this.load();
     void this.loadCompleteness();
   }
@@ -743,8 +766,23 @@ export class TranslationsPage implements HasUnsavedChanges {
     if (kind === 'type') this.entityType.set(v as TranslatableEntityType | '');
     if (kind === 'locale' && v) this.locale.set(v as ContentLocale);
     if (kind === 'status') this.status.set(v as TranslationStatus | '');
-    if (kind === 'q') this.q.set(v.trim());
+    if (kind === 'q') {
+      if (v.trim() === this.q()) return; // the search bar echoing a deep link
+      this.q.set(v.trim());
+    }
     this.page.set(1);
+    // Keep the filters in the URL (shareable, survives reload).
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        entityType: this.entityType() || null,
+        locale: this.locale(),
+        status: this.status() || null,
+        q: this.q() || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     void this.load();
   }
 

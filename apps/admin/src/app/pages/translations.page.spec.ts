@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import {
+  ActivatedRoute,
+  convertToParamMap,
+  provideRouter,
+} from '@angular/router';
 import { ContentTranslationService, provideI18n } from '@codify/i18n';
 import { ToastService } from '@codify/ui-bootstrap';
 import {
@@ -304,7 +308,9 @@ describe('TranslationsPage — import / export / mark complete (AUT-8)', () => {
     const { fixture, client } = await mount();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('Entity 50% translated');
-    el.querySelector<HTMLElement>('[data-testid="mark-complete"] button, [data-testid="mark-complete"]')!.click();
+    el.querySelector<HTMLElement>(
+      '[data-testid="mark-complete"] button, [data-testid="mark-complete"]',
+    )!.click();
     await new Promise((r) => setTimeout(r, 0));
     expect(client.markComplete).toHaveBeenCalledWith([
       { entityType: 'COURSE', entityId: 'c1', field: 'title', locale: 'en-US' },
@@ -326,11 +332,15 @@ describe('TranslationsPage — import / export / mark complete (AUT-8)', () => {
     await page.pickFile({ target: { files: [file] } });
     fixture.detectChanges();
     expect(client.importFile).toHaveBeenLastCalledWith(
-      expect.objectContaining({ entityType: 'COURSE', format: 'csv', dryRun: true }),
+      expect.objectContaining({
+        entityType: 'COURSE',
+        format: 'csv',
+        dryRun: true,
+      }),
     );
-    expect(el.querySelector('[data-testid="import-report"]')?.textContent).toContain(
-      '1 row ready to import',
-    );
+    expect(
+      el.querySelector('[data-testid="import-report"]')?.textContent,
+    ).toContain('1 row ready to import');
     client.importFile.mockResolvedValueOnce({
       dryRun: false,
       imported: 1,
@@ -343,5 +353,61 @@ describe('TranslationsPage — import / export / mark complete (AUT-8)', () => {
     expect(client.importFile).toHaveBeenLastCalledWith(
       expect.objectContaining({ dryRun: false }),
     );
+  });
+});
+
+describe('TranslationsPage — deep link filters', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('initialises entity type + search from the query string', async () => {
+    const client = {
+      list: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+      completeness: jest.fn().mockResolvedValue({ locales: {}, entities: [] }),
+    };
+    await TestBed.configureTestingModule({
+      imports: [TranslationsPage],
+      providers: [
+        provideRouter([]),
+        provideI18n(),
+        { provide: TranslationsClient, useValue: client },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({
+                entityType: 'LESSON',
+                q: 'signals',
+                status: 'missing',
+              }),
+            },
+          },
+        },
+        {
+          provide: ContentTranslationService,
+          useValue: { invalidate: jest.fn() },
+        },
+        {
+          provide: ToastService,
+          useValue: { success: jest.fn(), error: jest.fn() },
+        },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TranslationsPage);
+    fixture.detectChanges();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(client.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: 'LESSON',
+        q: 'signals',
+        status: 'missing',
+      }),
+    );
+    // The search bar echoing the deep-linked query doesn't refetch.
+    expect(client.list).toHaveBeenCalledTimes(1);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+        'input[type="search"]',
+      )?.value,
+    ).toBe('signals');
   });
 });
