@@ -555,6 +555,20 @@ describe('OfflineSyncService', () => {
         ['HAT', null, '2026-11-08T10:00:00.000Z'],
         ['PET', 'p1', '2026-11-08T10:05:00.000Z'],
       ]);
+      // A slot edited again later gets a new key, so the server's cache of
+      // an earlier (partially replayed) change can't answer for it.
+      expect(
+        items.equip.mock.calls.map(
+          (c) => (c[2] as { idempotencyKey: string }).idempotencyKey,
+        ),
+      ).toEqual([
+        expect.stringMatching(
+          new RegExp(`:HAT:${Date.UTC(2026, 10, 8, 10, 0)}$`),
+        ),
+        expect.stringMatching(
+          new RegExp(`:PET:${Date.UTC(2026, 10, 8, 10, 5)}$`),
+        ),
+      ]);
     });
 
     it('queues preference updates offline (merged) and sends them as PATCH /me', async () => {

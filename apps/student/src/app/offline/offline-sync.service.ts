@@ -956,7 +956,10 @@ export class OfflineSyncService {
               clientTimestamp && c.at !== undefined
                 ? new Date(c.at).toISOString()
                 : clientTimestamp,
-            idempotencyKey: `${ev.clientEventId}:${c.slot}`,
+            // The change time is part of the key: a slot edited again while
+            // this event was still queued (after a partial replay) must not
+            // be answered from the server's cache of the earlier change.
+            idempotencyKey: `${ev.clientEventId}:${c.slot}${c.at !== undefined ? `:${c.at}` : ''}`,
           });
           stale ||= !!last.stale;
         }
