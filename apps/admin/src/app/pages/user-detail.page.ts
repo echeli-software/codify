@@ -55,6 +55,7 @@ import {
 import { AdminErrors } from '../core/errors';
 import { localToIso } from '../core/catalog';
 import { CursorPager } from '../core/cursor-pager';
+import { countryName } from '../core/country';
 import { LoadError } from '../shared/load-error';
 import { UserAccountPanelComponent } from './user-account-panel.component';
 import { UserAuditTab } from './user-audit-tab.component';
@@ -185,6 +186,17 @@ export function daysUntil(
                   <dd>{{ u.locale }}</dd>
                   <dt>{{ 'admin.users.timezone' | translate }}</dt>
                   <dd>{{ u.timezone }}</dd>
+                  <dt>{{ 'admin.users.country' | translate }}</dt>
+                  <dd data-testid="user-country">
+                    @if (countryLabel(u.country); as name) {
+                      {{ name }} <span class="muted">({{ u.country }})</span>
+                    } @else {
+                      {{ 'admin.users.countryUnknown' | translate }}
+                    }
+                    <div class="muted small">
+                      {{ 'admin.users.countryHelp' | translate }}
+                    </div>
+                  </dd>
                   <dt>{{ 'admin.users.joined' | translate }}</dt>
                   <dd>{{ u.createdAt | locale: 'datetime' }}</dd>
                   <dt>{{ 'admin.users.lastSeen' | translate }}</dt>
@@ -1494,6 +1506,11 @@ export class UserDetailPage {
     return (
       !store && s.status !== 'CANCELED' && s.status !== 'INCOMPLETE_EXPIRED'
     );
+  }
+
+  /** IP-derived country (CF-IPCountry) in the admin's locale. */
+  protected countryLabel(code: string | null | undefined): string | null {
+    return countryName(code, this.i18n.currentLocale());
   }
 
   protected courseTitle(id: string): string {

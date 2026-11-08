@@ -32,6 +32,10 @@ import {
 import { AdminErrors } from '../core/errors';
 import { LoadError } from '../shared/load-error';
 import { BarChart, type BarPoint } from '../shared/bar-chart';
+import {
+  CountryReportCard,
+  MonthlyPixCard,
+} from './launch-report-cards.component';
 
 export interface AnalyticsPivot {
   days: string[];
@@ -83,7 +87,8 @@ type Tab = 'overview' | 'courses' | 'events';
  * Analytics (docs/04 "Analytics", docs/09 §13, docs/10 §14):
  *  - Overview (ADMIN): billing KPIs (MRR, trial → paid, ARPPU, refund
  *    rate), MRR per plan, new vs churned subscriptions, retention by signup
- *    cohort (D1/D7/D30), league participation and shop revenue (coins).
+ *    cohort (D1/D7/D30), learners by country, the monthly-BRL "card
+ *    only" checkout funnel, league participation and shop revenue (coins).
  *  - Courses (ADMIN all, TEACHER own): enrolled → started → completed and
  *    per-lesson drop-off.
  *  - Events (ADMIN): first-party event counts per day.
@@ -95,6 +100,8 @@ type Tab = 'overview' | 'courses' | 'events';
     FormsModule,
     BarChart,
     Button,
+    CountryReportCard,
+    MonthlyPixCard,
     DateRangePicker,
     EmptyState,
     LoadError,
@@ -395,6 +402,17 @@ type Tab = 'overview' | 'courses' | 'events';
                   </div>
                 }
               </section>
+
+              @if (o.countries || o.monthlyPix) {
+                <div class="grid-2">
+                  @if (o.countries; as c) {
+                    <cdf-country-report [report]="c" />
+                  }
+                  @if (o.monthlyPix; as f) {
+                    <cdf-monthly-pix-card [funnel]="f" />
+                  }
+                </div>
+              }
 
               <div class="grid-2">
                 <section class="admin-card" aria-labelledby="leagues-part">

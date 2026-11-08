@@ -1006,6 +1006,10 @@
       "lastSeen": "Last seen",
       "joined": "Joined",
       "never": "Never",
+      "country": "Country",
+      "allCountries": "All countries",
+      "countryUnknown": "Unknown",
+      "countryHelp": "From the IP address (Cloudflare); refreshed at most once a day.",
       "tabs": {
         "profile": "Profile",
         "subscriptions": "Subscriptions",
@@ -1659,7 +1663,33 @@
         "fullFunnels": "See full course funnels",
         "retentionD1": "Day 1",
         "retentionD7": "Day 7",
-        "retentionD30": "Day 30"
+        "retentionD30": "Day 30",
+        "countries": {
+          "title": "Learners by country",
+          "help": "Country comes from the IP address (Cloudflare) and is refreshed at most once a day. The 10 countries with the most learners, then the rest.",
+          "country": "Country",
+          "learners": "Learners",
+          "active7": "Active (7 days)",
+          "active30": "Active (30 days)",
+          "paid": "Paid",
+          "other": "Other ({count, plural, one {# country} other {# countries}})",
+          "unknown": "Unknown",
+          "total": "Total",
+          "empty": "No learners yet."
+        },
+        "monthlyPix": {
+          "title": "Monthly BRL checkouts: card only",
+          "help": "Subscription-page visits in the last {days} days where a BRL monthly plan offered card only (PIX and Boleto are annual-only), and what the student did next. Only students who allowed analytics are counted.",
+          "step": "Step",
+          "visits": "Visits",
+          "share": "Share",
+          "cardOnlySeen": "Saw “card only”",
+          "cardCheckout": "Started a monthly card checkout",
+          "switchedAnnual": "Switched to annual",
+          "switchedAnnualPrepay": "… paying with PIX or Boleto",
+          "left": "Left without a checkout",
+          "empty": "No BRL monthly checkouts in the last {days} days."
+        }
       },
       "exercises": {
         "title": "Exercise health",

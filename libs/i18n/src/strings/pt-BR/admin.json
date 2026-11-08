@@ -1006,6 +1006,10 @@
       "lastSeen": "Visto por último",
       "joined": "Entrou em",
       "never": "Nunca",
+      "country": "País",
+      "allCountries": "Todos os países",
+      "countryUnknown": "Desconhecido",
+      "countryHelp": "Pelo endereço IP (Cloudflare); atualizado no máximo uma vez por dia.",
       "tabs": {
         "profile": "Perfil",
         "subscriptions": "Assinaturas",
@@ -1659,7 +1663,33 @@
         "fullFunnels": "Ver os funis completos dos cursos",
         "retentionD1": "Dia 1",
         "retentionD7": "Dia 7",
-        "retentionD30": "Dia 30"
+        "retentionD30": "Dia 30",
+        "countries": {
+          "title": "Alunos por país",
+          "help": "O país vem do endereço IP (Cloudflare) e é atualizado no máximo uma vez por dia. Os 10 países com mais alunos e, depois, os demais.",
+          "country": "País",
+          "learners": "Alunos",
+          "active7": "Ativos (7 dias)",
+          "active30": "Ativos (30 dias)",
+          "paid": "Pagantes",
+          "other": "Outros ({count, plural, one {# país} other {# países}})",
+          "unknown": "Desconhecido",
+          "total": "Total",
+          "empty": "Ainda não há alunos."
+        },
+        "monthlyPix": {
+          "title": "Checkouts mensais em BRL: só cartão",
+          "help": "Visitas à página de assinatura nos últimos {days} dias em que um plano mensal em BRL aceitava só cartão (PIX e boleto são só no anual), e o que o aluno fez em seguida. Só contam alunos que permitiram a análise de uso.",
+          "step": "Etapa",
+          "visits": "Visitas",
+          "share": "Parcela",
+          "cardOnlySeen": "Viu “só cartão”",
+          "cardCheckout": "Iniciou checkout mensal com cartão",
+          "switchedAnnual": "Mudou para o anual",
+          "switchedAnnualPrepay": "… pagando com PIX ou boleto",
+          "left": "Saiu sem iniciar checkout",
+          "empty": "Nenhum checkout mensal em BRL nos últimos {days} dias."
+        }
       },
       "exercises": {
         "title": "Saúde dos exercícios",

@@ -23,10 +23,12 @@ import {
   UsersClient,
   type AdminUserListItem,
   type ApiUserRole,
+  type UserCountryCount,
   type UserListQuery,
   type UserSubscriptionFilter,
 } from '@codify/api-client';
 import { LoadError } from '../core/load-error';
+import { COUNTRY_UNKNOWN, countryName } from '../core/country';
 
 const PAGE_SIZE = 25;
 
@@ -149,6 +151,17 @@ export function lastSeenRange(
             (ngModelChange)="onFilter(subscription, $event ?? '')"
           />
         </cdf-form-field>
+        <cdf-form-field
+          [label]="'admin.users.country' | translate"
+          controlId="users-country"
+        >
+          <cdf-select
+            inputId="users-country"
+            [options]="countryOptions()"
+            [ngModel]="country()"
+            (ngModelChange)="onFilter(country, $event ?? '')"
+          />
+        </cdf-form-field>
       </div>
       <p class="muted small" aria-live="polite">
         @if (query() || filtered()) {
@@ -179,6 +192,7 @@ export function lastSeenRange(
                 <th scope="col">{{ 'admin.users.user' | translate }}</th>
                 <th scope="col">{{ 'admin.users.role' | translate }}</th>
                 <th scope="col">{{ 'admin.users.locale' | translate }}</th>
+                <th scope="col">{{ 'admin.users.country' | translate }}</th>
                 <th scope="col">{{ 'admin.users.lastSeen' | translate }}</th>
                 <th scope="col">{{ 'admin.users.joined' | translate }}</th>
               </tr>
@@ -203,6 +217,12 @@ export function lastSeenRange(
                     >
                   </td>
                   <td>{{ u.locale }}</td>
+                  <td [attr.title]="u.country ?? null">
+                    {{
+                      countryLabel(u.country) ??
+                        ('admin.users.countryUnknown' | translate)
+                    }}
+                  </td>
                   <td class="small">
                     {{
                       u.lastSeenAt
@@ -264,7 +284,30 @@ export class UsersPage {
   protected readonly locale = signal('');
   protected readonly lastSeen = signal<LastSeenPreset>('any');
   protected readonly subscription = signal<UserSubscriptionFilter | ''>('');
+  /** ISO code, COUNTRY_UNKNOWN or '' (any). */
+  protected readonly country = signal('');
+  private readonly countries = signal<UserCountryCount[]>([]);
   private seq = 0;
+
+  /** Countries present among users (by name), then "Unknown". */
+  protected readonly countryOptions = computed<SelectOption<string>[]>(() => {
+    const locale = this.i18n.currentLocale();
+    const known = this.countries()
+      .filter((c): c is { country: string; users: number } => !!c.country)
+      .map((c) => ({
+        value: c.country,
+        label: `${countryName(c.country, locale)} (${c.country})`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, locale));
+    return [
+      { value: '', label: this.i18n.t('admin.users.allCountries') },
+      ...known,
+      {
+        value: COUNTRY_UNKNOWN,
+        label: this.i18n.t('admin.users.countryUnknown'),
+      },
+    ];
+  });
 
   protected readonly localeOptions = computed<SelectOption<string>[]>(() => {
     this.i18n.currentLocale();
@@ -320,7 +363,8 @@ export class UsersPage {
       !!this.role() ||
       !!this.locale() ||
       this.lastSeen() !== 'any' ||
-      !!this.subscription(),
+      !!this.subscription() ||
+      !!this.country(),
   );
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
@@ -328,6 +372,20 @@ export class UsersPage {
 
   constructor() {
     void this.loadPage();
+    void this.loadCountries();
+  }
+
+  /** Country filter options; the filter still offers "Unknown" without them. */
+  private async loadCountries(): Promise<void> {
+    try {
+      this.countries.set((await this.users.countries()).items);
+    } catch {
+      this.countries.set([]);
+    }
+  }
+
+  protected countryLabel(code: string | null | undefined): string | null {
+    return countryName(code, this.i18n.currentLocale());
   }
 
   protected reload(): void {
@@ -349,6 +407,7 @@ export class UsersPage {
         ...(this.locale() ? { locale: this.locale() } : {}),
         ...lastSeenRange(this.lastSeen()),
         ...(sub ? { subscriptionStatus: sub } : {}),
+        ...(this.country() ? { country: this.country() } : {}),
       });
       if (seq !== this.seq) return;
       this.pageRows.set(res.items);
