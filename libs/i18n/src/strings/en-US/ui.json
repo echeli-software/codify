@@ -26,13 +26,26 @@
     },
     "avatar": {
       "label": "Avatar",
-      "wearing": "Avatar wearing {items}"
+      "wearing": "Avatar wearing {items}",
+      "customize": "Customize avatar"
     },
     "avatarBuilder": {
       "none": "None",
       "reset": "Reset",
       "slots": "Item slots",
-      "unsaved": "Unsaved changes"
+      "unsaved": "Unsaved changes",
+      "saving": "Saving…",
+      "autosavePending": "Unsaved changes — saving in a moment",
+      "pose": "Pose",
+      "poses": {
+        "idle": "Relaxed",
+        "wave": "Wave",
+        "cheer": "Cheer",
+        "study": "Study"
+      },
+      "emptySlot": "You don’t own anything for this slot yet.",
+      "browseShop": "Browse shop for {slot}",
+      "random": "Random"
     },
     "breadcrumb": {
       "label": "Breadcrumb"
@@ -106,7 +119,16 @@
     "inventory": {
       "empty": "You don’t own any items yet — visit the shop!",
       "equip": "Equip",
-      "equipped": "Equipped"
+      "equipped": "Equipped",
+      "search": "Search by name",
+      "rarity": "Rarity",
+      "anyRarity": "Any rarity",
+      "selectMany": "Select several",
+      "selected": "{count, plural, =0 {Pick one item per slot} one {# item selected} other {# items selected}}",
+      "equipSelected": "Equip selected",
+      "chosen": "Selected",
+      "choose": "Select",
+      "noMatch": "No items match these filters."
     },
     "item": {
       "cost": "{value, plural, one {# coin} other {# coins}}",

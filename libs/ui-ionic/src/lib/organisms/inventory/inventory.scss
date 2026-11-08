@@ -75,3 +75,93 @@
     color: var(--cdf-color-text-muted);
   }
 }
+
+.cdf-inv {
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--cdf-space-2);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 160px;
+    min-width: 0;
+
+    label {
+      font-size: var(--cdf-font-size-xs);
+      font-weight: var(--cdf-font-weight-semibold);
+      color: var(--cdf-color-text-muted);
+    }
+  }
+
+  &__input {
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 1px;
+    }
+  }
+
+  &__mode,
+  &__bulk-btn {
+    min-height: 40px;
+    padding: 6px 14px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-pill);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--cdf-color-primary);
+      border-color: var(--cdf-color-primary);
+      color: var(--cdf-color-primary-on);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-color-primary);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__bulk-btn {
+    background: var(--cdf-color-primary);
+    border-color: var(--cdf-color-primary);
+    color: var(--cdf-color-primary-on);
+  }
+
+  &__bulkbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-2) var(--cdf-space-3);
+    border-radius: var(--cdf-radius-lg);
+    background: var(--cdf-color-primary-subtle);
+  }
+
+  &__item[role='checkbox'][aria-checked='true'] {
+    border-color: var(--cdf-color-primary);
+    background: var(--cdf-color-primary-subtle);
+  }
+}

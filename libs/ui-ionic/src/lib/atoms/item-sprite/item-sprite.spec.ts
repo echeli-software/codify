@@ -103,8 +103,80 @@ describe('AvatarRenderer + SPRITE_URL_RESOLVER', () => {
     });
     fixture.detectChanges();
     const imgs = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('img'),
-    ).map((i) => i.getAttribute('src'));
+      (fixture.nativeElement as HTMLElement).querySelectorAll('svg image'),
+    ).map((i) => i.getAttribute('href'));
     expect(imgs).toEqual(['local:https://cdn.test/hat.png']);
+  });
+});
+
+describe('AvatarRenderer SVG composite (docs/08 §4)', () => {
+  function render(inputs: Record<string, unknown>) {
+    TestBed.configureTestingModule({ providers: [provideI18n()] });
+    const fixture = TestBed.createComponent(AvatarRenderer);
+    for (const [k, v] of Object.entries(inputs))
+      fixture.componentRef.setInput(k, v);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('draws the base body from the config (skin, eyes, hair)', () => {
+    const f = render({
+      config: {
+        skinTone: 'deep',
+        eyeColor: '#3d6a9e',
+        baseHairStyle: 'curly',
+        baseHairColor: '#b8432f',
+      },
+    });
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-part="head"]')?.getAttribute('fill')).toBe(
+      '#4a2c1c',
+    );
+    expect(el.querySelector('[data-part="iris"]')?.getAttribute('fill')).toBe(
+      '#3d6a9e',
+    );
+    expect(el.querySelector('g[data-part="hair"]')?.getAttribute('fill')).toBe(
+      '#b8432f',
+    );
+  });
+
+  it('tints clothes with color tokens and glows rare items', () => {
+    const f = render({
+      equipped: {
+        TOP: { spriteAssetId: 'color:#e4572e', name: 'Tee' },
+        HAT: { spriteAssetId: 'emoji:👑', name: 'Crown', rarity: 'LEGENDARY' },
+      },
+    });
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-part="torso"]')?.getAttribute('fill')).toBe(
+      '#e4572e',
+    );
+    const hat = el.querySelector('[data-slot="HAT"]');
+    expect(hat?.getAttribute('filter')).toMatch(
+      /^url\(#cdf-av-\d+-glow-LEGENDARY\)$/,
+    );
+    expect(el.querySelectorAll('filter')).toHaveLength(1);
+  });
+
+  it('poses and click output', () => {
+    const f = render({ pose: 'cheer', interactive: true });
+    const root = (f.nativeElement as HTMLElement).querySelector('.avatar')!;
+    expect(root.getAttribute('data-pose')).toBe('cheer');
+    expect(root.getAttribute('role')).toBe('button');
+    let clicks = 0;
+    f.componentInstance.avatarClick.subscribe(() => clicks++);
+    (root as HTMLElement).click();
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(clicks).toBe(2);
+  });
+
+  it('is a plain image when not interactive', () => {
+    const f = render({});
+    const root = (f.nativeElement as HTMLElement).querySelector('.avatar')!;
+    expect(root.getAttribute('role')).toBe('img');
+    let clicks = 0;
+    f.componentInstance.avatarClick.subscribe(() => clicks++);
+    (root as HTMLElement).click();
+    expect(clicks).toBe(0);
   });
 });

@@ -21,7 +21,11 @@ import { SPRITE_URL_RESOLVER } from './sprite-url-resolver.js';
 @Component({
   selector: 'cdf-item-sprite',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'cdf-item-sprite', 'aria-hidden': 'true' },
+  host: {
+    class: 'cdf-item-sprite',
+    'aria-hidden': 'true',
+    '[attr.data-rarity]': 'rarity()',
+  },
   template: `
     @if (imageUrl(); as src) {
       <img
@@ -63,6 +67,19 @@ import { SPRITE_URL_RESOLVER } from './sprite-url-resolver.js';
         display: block;
         border-radius: var(--cdf-radius-md, 8px);
       }
+      /* Rarity glow (docs/08 §3/§6): a filter, never baked into the art. */
+      :host([data-rarity='UNCOMMON']) > * {
+        filter: drop-shadow(0 0 2px #4ade80);
+      }
+      :host([data-rarity='RARE']) > * {
+        filter: drop-shadow(0 0 3px #60a5fa);
+      }
+      :host([data-rarity='EPIC']) > * {
+        filter: drop-shadow(0 0 4px #f5b301);
+      }
+      :host([data-rarity='LEGENDARY']) > * {
+        filter: drop-shadow(0 0 5px #e879f9);
+      }
     `,
   ],
 })
@@ -75,6 +92,8 @@ export class ItemSprite {
   readonly size = input(40);
   /** Emoji font size in px (defaults to `size`). */
   readonly glyphSize = input<number | null>(null);
+  /** Item rarity → glow for UNCOMMON and up; null = plain. */
+  readonly rarity = input<string | null | undefined>(null);
 
   private readonly resolver = inject(SPRITE_URL_RESOLVER, { optional: true });
 

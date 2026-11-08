@@ -102,6 +102,7 @@ import {
                 <cdf-item-sprite
                   [token]="item.spriteAssetId"
                   [url]="item.spriteUrl"
+                  [rarity]="item.rarity"
                   [size]="48"
                   [glyphSize]="40"
                 />

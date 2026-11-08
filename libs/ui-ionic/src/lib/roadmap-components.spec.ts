@@ -193,10 +193,46 @@ describe('AvatarBuilder', () => {
     await f.whenStable();
     expect(wizard.getAttribute('aria-checked')).toBe('true');
     expect(f.nativeElement.textContent).toContain('Unsaved changes');
-    (f.nativeElement.querySelectorAll('cdf-app-button')[1] as HTMLElement)
+    (
+      f.nativeElement.querySelector(
+        '[data-testid="avatar-save"]',
+      ) as HTMLElement
+    )
       .querySelector('ion-button')!
       .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(saved).toEqual({ HAT: 'i1' });
+  });
+
+  it('auto-saves 3 s after the last pick and offers every slot', async () => {
+    jest.useFakeTimers();
+    try {
+      const f = TestBed.createComponent(AvatarBuilder);
+      f.componentRef.setInput('items', SAMPLE_ITEMS);
+      f.componentRef.setInput('equipped', {});
+      const saved: unknown[] = [];
+      f.componentInstance.save.subscribe((m) => saved.push(m));
+      let shop: unknown = null;
+      f.componentInstance.browseShop.subscribe((s) => (shop = s));
+      f.detectChanges();
+      const tabs = f.nativeElement.querySelectorAll('[role="tab"]');
+      expect(tabs.length).toBe(11);
+      const radios = Array.from(
+        f.nativeElement.querySelectorAll('[role="radio"]'),
+      ) as HTMLButtonElement[];
+      radios.find((r) => r.textContent?.includes('Wizard hat'))!.click();
+      jest.advanceTimersByTime(2900);
+      expect(saved).toHaveLength(0);
+      jest.advanceTimersByTime(200);
+      expect(saved).toEqual([{ HAT: 'i1' }]);
+      (
+        f.nativeElement.querySelector(
+          '[data-testid="browse-slot-shop"]',
+        ) as HTMLButtonElement
+      ).click();
+      expect(shop).toBe('HAT');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

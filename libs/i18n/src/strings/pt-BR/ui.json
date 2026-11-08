@@ -26,13 +26,26 @@
     },
     "avatar": {
       "label": "Avatar",
-      "wearing": "Avatar usando {items}"
+      "wearing": "Avatar usando {items}",
+      "customize": "Personalizar avatar"
     },
     "avatarBuilder": {
       "none": "Nenhum",
       "reset": "Desfazer",
       "slots": "Partes do avatar",
-      "unsaved": "Alterações não salvas"
+      "unsaved": "Alterações não salvas",
+      "saving": "Salvando…",
+      "autosavePending": "Alterações não salvas — salvando em instantes",
+      "pose": "Pose",
+      "poses": {
+        "idle": "Relaxado",
+        "wave": "Acenar",
+        "cheer": "Comemorar",
+        "study": "Estudar"
+      },
+      "emptySlot": "Você ainda não tem nada para este espaço.",
+      "browseShop": "Ver na loja: {slot}",
+      "random": "Aleatório"
     },
     "breadcrumb": {
       "label": "Trilha de navegação"
@@ -106,7 +119,16 @@
     "inventory": {
       "empty": "Você ainda não tem itens — passe na loja!",
       "equip": "Equipar",
-      "equipped": "Equipado"
+      "equipped": "Equipado",
+      "search": "Buscar pelo nome",
+      "rarity": "Raridade",
+      "anyRarity": "Qualquer raridade",
+      "selectMany": "Selecionar vários",
+      "selected": "{count, plural, =0 {Escolha um item por espaço} one {# item selecionado} other {# itens selecionados}}",
+      "equipSelected": "Equipar selecionados",
+      "chosen": "Selecionado",
+      "choose": "Selecionar",
+      "noMatch": "Nenhum item corresponde a estes filtros."
     },
     "item": {
       "cost": "{value, plural, one {# moeda} other {# moedas}}",

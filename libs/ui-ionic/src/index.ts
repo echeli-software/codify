@@ -79,6 +79,8 @@ export {
   type AvatarSlot,
   type AvatarSprite,
   type AvatarConfigLike,
+  type AvatarLayer,
+  RARITY_GLOW,
 } from './lib/molecules/avatar-renderer/avatar-renderer.js';
 
 // ─── Organisms ───────────────────────────────────────────────────────────
@@ -158,9 +160,11 @@ export {
   Inventory,
   groupBySlot,
   type InventoryGroup,
+  filterInventory,
 } from './lib/organisms/inventory/inventory.js';
 export {
   AvatarBuilder,
+  AUTOSAVE_MS,
   type EquippedMap,
 } from './lib/organisms/avatar-builder/avatar-builder.js';
 export {
