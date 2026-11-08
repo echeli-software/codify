@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { jobsEnabled } from '../config/env.js';
 import type { Job } from 'bullmq';
 import {
   PUSH_DEFERRED_QUEUE,
@@ -13,7 +14,9 @@ import { PushService, type SendToUserResult } from './push.service.js';
  * dropped as `capped`) and a user who moved their quiet hours meanwhile is
  * deferred again rather than woken up.
  */
-@Processor(PUSH_DEFERRED_QUEUE, { concurrency: 4 })
+// Consumes only where jobs run (`JOBS_ENABLED`): the `worker` container,
+// not the HTTP-only `api` replicas (infra/coolify/README.md).
+@Processor(PUSH_DEFERRED_QUEUE, { concurrency: 4, autorun: jobsEnabled() })
 export class PushDeferredProcessor extends WorkerHost {
   private readonly log = new Logger('PushDeferredWorker');
   private lastErrorLog = 0;

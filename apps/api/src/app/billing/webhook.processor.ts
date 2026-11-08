@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { jobsEnabled } from '../config/env.js';
 import type { Job } from 'bullmq';
 import {
   BILLING_WEBHOOK_QUEUE,
@@ -14,7 +15,9 @@ import type { WebhookResult } from './webhook-idempotency.js';
  * in-transaction claim + process; a throw makes BullMQ retry with
  * exponential backoff, and the final failure is reported to Sentry.
  */
-@Processor(BILLING_WEBHOOK_QUEUE, { concurrency: 2 })
+// Consumes only where jobs run (`JOBS_ENABLED`): the `worker` container,
+// not the HTTP-only `api` replicas (infra/coolify/README.md).
+@Processor(BILLING_WEBHOOK_QUEUE, { concurrency: 2, autorun: jobsEnabled() })
 export class WebhookProcessor extends WorkerHost {
   private readonly log = new Logger('BillingWebhookWorker');
   private lastErrorLog = 0;

@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { jobsEnabled } from '../config/env.js';
 import type { Job } from 'bullmq';
 import {
   SUBMISSION_QUEUE,
@@ -13,7 +14,9 @@ const concurrency = Math.max(
 );
 
 /** BullMQ worker for `submission.run` jobs (docs/12 §6 step 5). */
-@Processor(SUBMISSION_QUEUE, { concurrency })
+// Consumes only where jobs run (`JOBS_ENABLED`): the `worker` container,
+// not the HTTP-only `api` replicas (infra/coolify/README.md).
+@Processor(SUBMISSION_QUEUE, { concurrency, autorun: jobsEnabled() })
 export class SubmissionProcessor extends WorkerHost {
   private readonly log = new Logger('SubmissionWorker');
   private lastErrorLog = 0;
