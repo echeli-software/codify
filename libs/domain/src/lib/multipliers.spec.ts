@@ -231,3 +231,52 @@ describe('resolveMultiplier uncapped', () => {
     expect(r.xp.uncapped).toBe(50);
   });
 });
+
+describe('SURPRISE_BOOST (per-user)', () => {
+  const boost = rule({
+    kind: 'SURPRISE_BOOST',
+    value: 2,
+    target: 'XP',
+    userId: 'u1',
+    startsAt: new Date(NOW.getTime() - 60_000),
+    endsAt: new Date(NOW.getTime() + 14 * 60_000),
+  });
+
+  it('applies to its user only, on top of the other categories', () => {
+    const r = resolveMultiplier({
+      multipliers: [boost, rule({ kind: 'CAMPAIGN', value: 2 })],
+      isPremium: false,
+      userId: 'u1',
+      now: NOW,
+    });
+    expect(r.xp.effective).toBe(4);
+    expect(r.coins.effective).toBe(2); // XP-only boost
+    expect(r.xp.components.map((c) => c.kind)).toEqual([
+      'CAMPAIGN',
+      'SURPRISE_BOOST',
+    ]);
+    const other = resolveMultiplier({
+      multipliers: [boost],
+      isPremium: false,
+      userId: 'u2',
+      now: NOW,
+    });
+    expect(other.xp.effective).toBe(1);
+    const anonymous = resolveMultiplier({
+      multipliers: [boost],
+      isPremium: false,
+      now: NOW,
+    });
+    expect(anonymous.xp.effective).toBe(1);
+  });
+
+  it('expires with its window', () => {
+    const r = resolveMultiplier({
+      multipliers: [boost],
+      isPremium: false,
+      userId: 'u1',
+      now: new Date(NOW.getTime() + 20 * 60_000),
+    });
+    expect(r.xp.effective).toBe(1);
+  });
+});

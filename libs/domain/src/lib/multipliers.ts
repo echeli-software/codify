@@ -10,6 +10,7 @@
  *   2. STREAK_TIER     (highest qualifying tier)
  *   3. COURSE_PROMO ⊕ LESSON_PROMO (more specific wins; never both)
  *   4. CAMPAIGN        (one active)
+ *   5. SURPRISE_BOOST  (the user's own short boost, docs/10 §6)
  * The effective multiplier is capped (default 30x) to avoid surprise payouts.
  */
 
@@ -36,6 +37,8 @@ export interface MultiplierRule {
   courseId?: string | null;
   lessonId?: string | null;
   streakDaysMin?: number | null;
+  /** Per-user rules (SURPRISE_BOOST) only apply to this user. */
+  userId?: string | null;
   description?: string | null;
 }
 
@@ -46,6 +49,8 @@ export interface ResolveMultiplierInput {
   courseId?: string | null;
   lessonId?: string | null;
   streakDays?: number;
+  /** The rewarded user — selects their SURPRISE_BOOST rows. */
+  userId?: string | null;
   now?: Date;
   cap?: number;
 }
@@ -110,7 +115,12 @@ export function resolveMultiplier(
   const now = (input.now ?? new Date()).getTime();
   const cap = input.cap ?? DEFAULT_MULTIPLIER_CAP;
   const streakDays = input.streakDays ?? 0;
-  const active = input.multipliers.filter((m) => isActive(m, now));
+  // A per-user row never applies to anyone else, whatever its kind.
+  const active = input.multipliers.filter(
+    (m) =>
+      isActive(m, now) &&
+      (!m.userId || (!!input.userId && m.userId === input.userId)),
+  );
 
   // Each "category slot" picks at most one rule.
   const chosen: MultiplierRule[] = [];
@@ -152,6 +162,16 @@ export function resolveMultiplier(
   // 4. CAMPAIGN — one active (highest value).
   const campaign = pickMaxValue(active.filter((m) => m.kind === 'CAMPAIGN'));
   if (campaign) chosen.push(campaign);
+
+  // 5. SURPRISE_BOOST — the user's own boost (highest, if several overlap).
+  const boost = input.userId
+    ? pickMaxValue(
+        active.filter(
+          (m) => m.kind === 'SURPRISE_BOOST' && m.userId === input.userId,
+        ),
+      )
+    : null;
+  if (boost) chosen.push(boost);
 
   return {
     xp: build(chosen, 'XP', cap),

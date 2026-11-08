@@ -1,5 +1,6 @@
 import {
   reachableNodeIds,
+  scenarioEndingKey,
   scenarioMaxDepth,
   validateScenario,
   walkScenario,
@@ -252,5 +253,20 @@ describe('validateScenario — hardening', () => {
     );
     expect(errors).toContain('node "bad" is not an object');
     expect(errors).toContain('node "worse" choices must be a list');
+  });
+});
+
+describe('scenarioEndingKey', () => {
+  it('identifies the ending reached; different endings differ', () => {
+    const x = scenarioEndingKey(graph, ['a', 'x']);
+    const y = scenarioEndingKey(graph, ['a', 'y']);
+    const b = scenarioEndingKey(graph, ['b']);
+    expect(x).toBeTruthy();
+    expect(new Set([x, y, b]).size).toBe(3);
+    expect(scenarioEndingKey(graph, ['a', 'x'])).toBe(x);
+  });
+  it('is null for an unfinished or invalid walk', () => {
+    expect(scenarioEndingKey(graph, ['a'])).toBeNull();
+    expect(scenarioEndingKey(graph, ['zzz'])).toBeNull();
   });
 });

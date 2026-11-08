@@ -5,6 +5,8 @@ import {
   nextTierAfter,
   promoteZoneSize,
   previousWeekStart,
+  validateLeagueZones,
+  DEFAULT_LEAGUE_ZONES,
   tierDown,
   tierUp,
   type RollMember,
@@ -158,5 +160,69 @@ describe('zone sizes (docs/07 §9 ratios scaled to cohort size)', () => {
   it('tier ends', () => {
     expect(promoteZoneSize(30, 'DIAMOND')).toBe(0);
     expect(demoteZoneSize(30, 'BRONZE')).toBe(0);
+  });
+});
+
+describe('configurable zones (league.zones)', () => {
+  const zones = {
+    cohortSize: 20,
+    promote: 5,
+    demote: 3,
+    minCohortForDemotion: 4,
+  };
+  it('defaults equal the documented constants', () => {
+    for (let n = 1; n <= 40; n++) {
+      expect(promoteZoneSize(n, 'GOLD', DEFAULT_LEAGUE_ZONES)).toBe(
+        promoteZoneSize(n, 'GOLD'),
+      );
+      expect(demoteZoneSize(n, 'GOLD', DEFAULT_LEAGUE_ZONES)).toBe(
+        demoteZoneSize(n, 'GOLD'),
+      );
+    }
+  });
+  it('a full cohort of the configured size gets exactly the configured zones', () => {
+    expect(promoteZoneSize(20, 'GOLD', zones)).toBe(5);
+    expect(demoteZoneSize(20, 'GOLD', zones)).toBe(3);
+    expect(demoteZoneSize(3, 'GOLD', zones)).toBe(0);
+    expect(demoteZoneSize(4, 'GOLD', zones)).toBe(1);
+  });
+  it('computeRollover uses them', () => {
+    const members = Array.from({ length: 20 }, (_, i) => ({
+      userId: `u${String(i).padStart(2, '0')}`,
+      weeklyXp: 100 - i,
+    }));
+    const res = computeRollover(members, 'GOLD', undefined, zones);
+    expect(res.filter((r) => r.promoted)).toHaveLength(5);
+    expect(res.filter((r) => r.demoted)).toHaveLength(3);
+  });
+  it('a zero zone turns promotion/demotion off', () => {
+    const off = { ...zones, promote: 0, demote: 0 };
+    expect(promoteZoneSize(20, 'GOLD', off)).toBe(0);
+    expect(demoteZoneSize(20, 'GOLD', off)).toBe(0);
+  });
+  it('validation lists every problem', () => {
+    expect(validateLeagueZones(DEFAULT_LEAGUE_ZONES)).toEqual([]);
+    expect(
+      validateLeagueZones({
+        cohortSize: 10,
+        promote: 6,
+        demote: 4,
+        minCohortForDemotion: 5,
+      }),
+    ).toEqual(['promote + demote must be smaller than cohortSize']);
+    expect(
+      validateLeagueZones({
+        cohortSize: 1,
+        promote: -1,
+        demote: 2,
+        minCohortForDemotion: 5,
+        x: 1,
+      }),
+    ).toEqual([
+      'unknown field "x"',
+      'cohortSize must be an integer between 2 and 200',
+      'promote must be an integer between 0 and 100',
+    ]);
+    expect(validateLeagueZones(null)).toHaveLength(1);
   });
 });

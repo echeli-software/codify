@@ -239,3 +239,19 @@ export function scenarioMaxDepth(graph: ScenarioGraph): number {
   };
   return dfs(graph.startId, new Set([graph.startId]));
 }
+
+/**
+ * Stable identity of the ending a play-through reached, for the "new
+ * ending" reward (docs/07 §2 "Scenario complete (per branch)"): the final
+ * node plus the ending choice that got there (two ending choices on the
+ * same node are different endings). Null when the walk didn't complete.
+ */
+export function scenarioEndingKey(
+  graph: ScenarioGraph,
+  choiceIds: readonly string[],
+): string | null {
+  const walk = walkScenario(graph, [...choiceIds]);
+  if (!walk.valid || !walk.completed) return null;
+  const node = walk.path[walk.path.length - 1] ?? graph.startId;
+  return `${node}/${choiceIds[choiceIds.length - 1] ?? ''}`;
+}

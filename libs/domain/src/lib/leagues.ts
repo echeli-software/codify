@@ -84,6 +84,55 @@ export interface RollResult {
 export const MIN_COHORT_FOR_DEMOTION = 5;
 
 /**
+ * Zone sizing knobs (admin-editable as `league.zones`, docs/07 §9 /
+ * docs/04 Leagues). Defaults are the constants above.
+ */
+export interface LeagueZoneConfig {
+  /** Reference ("full") cohort size the promote/demote counts are for. */
+  cohortSize: number;
+  /** Members promoted from a full cohort. */
+  promote: number;
+  /** Members demoted from a full cohort. */
+  demote: number;
+  /** Smallest cohort in which anyone is demoted. */
+  minCohortForDemotion: number;
+}
+
+export const DEFAULT_LEAGUE_ZONES: LeagueZoneConfig = {
+  cohortSize: COHORT_CAPACITY,
+  promote: PROMOTE_COUNT,
+  demote: DEMOTE_COUNT,
+  minCohortForDemotion: 5,
+};
+
+/** Problems with a zone config; empty = valid. */
+export function validateLeagueZones(z: unknown): string[] {
+  if (!z || typeof z !== 'object' || Array.isArray(z))
+    return ['must be { cohortSize, promote, demote, minCohortForDemotion }'];
+  const o = z as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowed = ['cohortSize', 'promote', 'demote', 'minCohortForDemotion'];
+  for (const k of Object.keys(o))
+    if (!allowed.includes(k)) errors.push(`unknown field "${k}"`);
+  const int = (k: string, min: number, max: number) => {
+    const v = o[k];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
+      errors.push(`${k} must be an integer between ${min} and ${max}`);
+  };
+  int('cohortSize', 2, 200);
+  int('promote', 0, 100);
+  int('demote', 0, 100);
+  int('minCohortForDemotion', 2, 200);
+  if (errors.length) return errors;
+  if (
+    (o['promote'] as number) + (o['demote'] as number) >=
+    (o['cohortSize'] as number)
+  )
+    errors.push('promote + demote must be smaller than cohortSize');
+  return errors;
+}
+
+/**
  * How many members promote from a cohort of `n` (docs/07 §9).
  *
  * The spec's "top 7 of ~30" is a ratio (≈23%) designed for full cohorts;
@@ -96,10 +145,14 @@ export const MIN_COHORT_FOR_DEMOTION = 5;
 export function promoteZoneSize(
   n: number,
   tier: LeagueTier = 'BRONZE',
+  zones: LeagueZoneConfig = DEFAULT_LEAGUE_ZONES,
 ): number {
-  if (tier === 'DIAMOND' || n <= 1) return 0;
-  const scaled = Math.max(1, Math.round((n * PROMOTE_COUNT) / COHORT_CAPACITY));
-  return Math.min(PROMOTE_COUNT, scaled, n - 1);
+  if (tier === 'DIAMOND' || n <= 1 || zones.promote <= 0) return 0;
+  const scaled = Math.max(
+    1,
+    Math.round((n * zones.promote) / zones.cohortSize),
+  );
+  return Math.min(zones.promote, scaled, n - 1);
 }
 
 /**
@@ -109,10 +162,18 @@ export function promoteZoneSize(
  * last of three people is noise, not competition) and never overlapping the
  * promotion zone. Bronze never demotes. A full cohort gets exactly 5.
  */
-export function demoteZoneSize(n: number, tier: LeagueTier = 'GOLD'): number {
-  if (tier === 'BRONZE' || n < MIN_COHORT_FOR_DEMOTION) return 0;
-  const scaled = Math.max(1, Math.round((n * DEMOTE_COUNT) / COHORT_CAPACITY));
-  return Math.min(DEMOTE_COUNT, scaled, n - promoteZoneSize(n, tier));
+export function demoteZoneSize(
+  n: number,
+  tier: LeagueTier = 'GOLD',
+  zones: LeagueZoneConfig = DEFAULT_LEAGUE_ZONES,
+): number {
+  if (tier === 'BRONZE' || n < zones.minCohortForDemotion || zones.demote <= 0)
+    return 0;
+  const scaled = Math.max(1, Math.round((n * zones.demote) / zones.cohortSize));
+  return Math.max(
+    0,
+    Math.min(zones.demote, scaled, n - promoteZoneSize(n, tier, zones)),
+  );
 }
 
 export interface RolloverRewards {
@@ -136,6 +197,7 @@ export function computeRollover(
     promotion: PROMOTION_REWARD,
     rank1: RANK1_REWARD,
   },
+  zones: LeagueZoneConfig = DEFAULT_LEAGUE_ZONES,
 ): RollResult[] {
   const sorted = [...members].sort(
     (a, b) =>
@@ -143,8 +205,8 @@ export function computeRollover(
       (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
   );
   const n = sorted.length;
-  const promoteN = promoteZoneSize(n, tier);
-  const demoteN = demoteZoneSize(n, tier);
+  const promoteN = promoteZoneSize(n, tier, zones);
+  const demoteN = demoteZoneSize(n, tier, zones);
   return sorted.map((m, idx) => {
     const rank = idx + 1;
     const active = m.weeklyXp > 0;
