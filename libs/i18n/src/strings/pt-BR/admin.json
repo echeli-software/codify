@@ -1032,6 +1032,11 @@
         "cancel": "Cancelar…",
         "cancelMode": "Quando cancelar",
         "confirmCancel": "Cancelar assinatura",
+        "cancelTitle": "Cancelar {plan} de {name}?",
+        "cancelMessage": {
+          "period_end": "A assinatura deixa de renovar e termina no fim do período atual.",
+          "immediate": "A assinatura termina agora e o usuário perde o acesso imediatamente."
+        },
         "modes": {
           "period_end": "No fim do período",
           "immediate": "Imediatamente (o acesso termina agora)"

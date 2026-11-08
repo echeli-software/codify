@@ -1032,6 +1032,11 @@
         "cancel": "Cancel…",
         "cancelMode": "When to cancel",
         "confirmCancel": "Cancel subscription",
+        "cancelTitle": "Cancel {plan} for {name}?",
+        "cancelMessage": {
+          "period_end": "The subscription stops renewing and ends at the end of the current period.",
+          "immediate": "The subscription ends now and the user loses its access immediately."
+        },
         "modes": {
           "period_end": "At the end of the period",
           "immediate": "Immediately (access ends now)"

@@ -91,7 +91,9 @@ export function daysUntil(
  * User detail (docs/04 "Users"): profile, subscriptions (grant a plan for N
  * days — SUPPORT capped at 31 with the API's message shown — and cancel now
  * or at period end) and course enrollments (grant PROMO / ADMIN_GRANT with
- * an access end, revoke). Every mutation carries an audit reason.
+ * an access end, revoke), inventory, ledger and account. Every mutation
+ * carries an audit reason; cancelling, revoking, role changes and grants
+ * ask for the user's email typed back (SEC-8).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1035,9 +1037,7 @@ export class UserDetailPage {
   protected readonly isSelf = computed(() => {
     const me = this.auth.user();
     const u = this.user();
-    return (
-      !!me && (me.id === this.userId() || (!!u && me.email === u.email))
-    );
+    return !!me && (me.id === this.userId() || (!!u && me.email === u.email));
   });
   protected roleDraft: ApiUserRole = 'STUDENT';
   protected roleReason = '';
@@ -1525,19 +1525,25 @@ export class UserDetailPage {
   }
 
   protected async cancel(s: AdminSubscriptionView): Promise<void> {
+    const mode = this.cancelMode;
+    const ok = await this.typedConfirm(
+      'admin.users.subs.cancelTitle',
+      `admin.users.subs.cancelMessage.${mode}`,
+      'admin.users.subs.confirmCancel',
+      { plan: s.planName, name: this.user()?.displayName ?? '' },
+    );
+    if (!ok) return;
     this.busy.set('cancel');
     try {
       const updated = await this.billing.adminCancel(s.id, {
-        mode: this.cancelMode,
+        mode,
         reason: this.cancelReason.trim() || undefined,
       });
       this.subs.update((list) =>
         (list ?? []).map((x) => (x.id === updated.id ? updated : x)),
       );
       this.cancelFor.set(null);
-      this.toast.success(
-        this.i18n.t(`admin.users.subs.canceled.${this.cancelMode}`),
-      );
+      this.toast.success(this.i18n.t(`admin.users.subs.canceled.${mode}`));
     } catch (err) {
       this.errorsSvc.toast(err, 'admin.errors.actionFailed');
     } finally {
@@ -1593,14 +1599,12 @@ export class UserDetailPage {
   }
 
   protected async revoke(e: EnrollmentView): Promise<void> {
-    const ok = await this.confirm.open({
-      title: this.i18n.t('admin.users.enr.revokeTitle', {
-        course: this.courseTitle(e.courseId),
-      }),
-      message: this.i18n.t('admin.users.enr.revokeMessage'),
-      confirmLabel: this.i18n.t('admin.users.enr.revoke'),
-      confirmKind: 'danger',
-    });
+    const ok = await this.typedConfirm(
+      'admin.users.enr.revokeTitle',
+      'admin.users.enr.revokeMessage',
+      'admin.users.enr.revoke',
+      { course: this.courseTitle(e.courseId) },
+    );
     if (!ok) return;
     try {
       await this.enrollmentsClient.revoke(e.id);
