@@ -9,6 +9,7 @@ Estimates assume 2 senior full-stack engineers + 1 designer + 1 PM-ish role (the
 **Goal**: a reproducible, deployable skeleton.
 
 Deliverables:
+
 - Nx monorepo created with empty `apps/admin`, `apps/student`, `apps/api`, all libs scaffolded as listed in [03-shared-libraries.md](./03-shared-libraries.md).
 - Both apps boot to "Hello world", deploy to Cloudflare Pages preview on every PR.
 - API boots, returns `/health`, deploys to staging via Coolify on `main`.
@@ -22,6 +23,7 @@ Deliverables:
 - Cloudflare DNS, TLS, WAF basics live.
 
 **Acceptance**:
+
 - ✅ A PR opened by a contributor produces a preview URL for both apps.
 - ✅ Pushing to `main` deploys to staging and runs migrations.
 - ✅ Tagging `v0.0.1` deploys to prod with a manual approval gate.
@@ -31,6 +33,7 @@ Deliverables:
 **Goal**: design system + i18n foundations.
 
 Deliverables:
+
 - `libs/ui-tokens` complete (color, spacing, type, shadow, motion, breakpoints).
 - Bootstrap variable map and Ionic CSS-var map in place.
 - Light + dark themes verified on both apps with a demo page.
@@ -39,6 +42,7 @@ Deliverables:
 - Locale switcher in both apps; persisted on `User.locale`.
 
 **Acceptance**:
+
 - ✅ Theme switcher live on both apps.
 - ✅ Locale switcher live; chrome strings flip immediately; `<html lang/dir>` updates.
 - ✅ Storybook page documents tokens.
@@ -49,12 +53,14 @@ Deliverables:
 **Goal**: complete Bootstrap component catalog before any admin feature.
 
 Deliverables:
+
 - All atoms, molecules, organisms listed in [03-shared-libraries.md](./03-shared-libraries.md) for `ui-bootstrap`.
 - Storybook with every variant.
 - A11y check (axe) passes on every component.
 - A demo "Course list" page and demo "Lesson editor" shell page in `apps/admin`, built using only `ui-bootstrap` + tokens.
 
 **Acceptance**:
+
 - ✅ Storybook URL deployed and reviewed by design.
 - ✅ Two demo pages signed off.
 - ✅ Component ownership matrix written (who owns each component for evolution).
@@ -64,6 +70,7 @@ Deliverables:
 **Goal**: student component catalog + reward orchestration before features.
 
 Deliverables (in parallel):
+
 - All atoms, molecules, organisms listed in [03-shared-libraries.md](./03-shared-libraries.md) for `ui-ionic`.
 - `AvatarRenderer` shared component + sample base bodies + a few items.
 - `libs/gamification-engine`: `RewardOrchestrator`, `XpService`, `CoinService`, `StreakService`, animation primitives (coin-fly, confetti, level-up, badge unlock), sound + haptic wrappers.
@@ -73,6 +80,7 @@ Deliverables (in parallel):
 - Responsive verification at xs/sm/md/lg/xl breakpoints (catalog-style and lesson-style demo pages).
 
 **Acceptance**:
+
 - ✅ Storybook URL deployed.
 - ✅ Two demo pages signed off; mobile + desktop layouts both reviewed.
 - ✅ "RewardOrchestrator demo" page plays each reward kind with deterministic seed.
@@ -83,6 +91,7 @@ Deliverables (in parallel):
 **Goal**: real auth + role guards + lesson schema usable.
 
 Deliverables:
+
 - `libs/auth` complete: signals, guards, role directive.
 - AppShell organisms wired in both apps with sidebar/tabs adapting per breakpoint (student) and persistent sidebar (admin).
 - Profile basics in both apps (display name, locale, theme).
@@ -90,6 +99,7 @@ Deliverables:
 - API: User module (CRUD limited), AuditLog wiring, auth middleware, JWT verification.
 
 **Acceptance**:
+
 - ✅ Sign in → land in app → sign out works on both.
 - ✅ Role-protected route blocks unauthorized users.
 - ✅ A v1 `LessonDoc` round-trips through schema validator and migrator.
@@ -99,6 +109,7 @@ Deliverables:
 **Goal**: teacher creates content; student consumes.
 
 Deliverables:
+
 - API: Course / Module / Lesson CRUD, Category CRUD, draft/publish flow, `Progress` tracking, `Enrollment` model, free-flag enforcement.
 - Admin: Catalog screens (Courses list, detail, curriculum), `LessonBlockEditor` with Tiptap + custom blocks (paragraph, heading, code, callout, image, embed, divider, table, quiz, ai-prompt placeholder, exerciseRef placeholder), Categories screen.
 - Student: Catalog browse + filter, Course detail with curriculum, Lesson player rendering reading + quiz blocks, basic Progress recording.
@@ -106,6 +117,7 @@ Deliverables:
 - Asset upload pipeline (R2 + CDN).
 
 **Acceptance**:
+
 - ✅ Non-developer creates a 3-lesson course in < 20 minutes.
 - ✅ Student sees the course, completes a free lesson, sees "subscribe to continue" paywall on a non-free lesson.
 - ✅ Translation completeness % shown per locale per entity.
@@ -115,6 +127,7 @@ Deliverables:
 **Goal**: student app survives disconnection without losing progress. See [16-offline.md](./16-offline.md).
 
 Deliverables:
+
 - Service worker (PWA) + IndexedDB plumbing in `apps/student`.
 - Cached identity bundle on sign-in (user, locale, level, XP, coin balance, owned items, active subscription, avatar config).
 - `OfflineEventQueue` (IndexedDB) with FIFO flush + idempotency-key generation per event.
@@ -126,6 +139,7 @@ Deliverables:
 - Offline indicator chip in header + "Sync now" affordance.
 
 **Acceptance**:
+
 - ✅ Airplane-mode test: sign in online → enable airplane mode → complete 3 cached lessons → re-enable network → all 3 sync, XP/coins/streak credited once.
 - ✅ Two-device test: same lesson completed offline on Device A and Device B; first to sync wins, second gets `409` and reconciles cleanly.
 - ✅ Token-revoked test: revoke session server-side, return to online, re-sign-in same user → queue flushes; sign in different user → queue discarded.
@@ -136,6 +150,7 @@ Deliverables:
 **Goal**: monetization end-to-end.
 
 Deliverables:
+
 - `Plan`, `PlanPrice`, `PlanCategory` admin screens.
 - "Sync to Stripe" creates Stripe Product + Prices.
 - API: `BillingProvider` abstraction + Stripe implementation.
@@ -147,6 +162,7 @@ Deliverables:
 - "Plans including this course" rendered on course detail.
 
 **Acceptance**:
+
 - ✅ Student subscribes via card with installments in < 90 seconds (mobile).
 - ✅ Student subscribes via PIX, sees QR, pays in test, gets access within 30s of webhook.
 - ✅ Admin can change a plan's category set and access updates immediately for affected users.
@@ -157,6 +173,7 @@ Deliverables:
 **Goal**: XP, coins, multipliers, streaks, badges, daily quests, level-ups all live.
 
 Deliverables:
+
 - API: `XpEvent` + `CoinTransaction` + `Streak` + `Multiplier` + `Badge` + `UserBadge` + `QuestTemplate` + `QuestAssignment`.
 - `libs/domain/multipliers.resolveMultiplier` complete; admin `MultiplierEditor` and `Promotions` screens.
 - Server-authoritative grant pipeline: `GamificationService.grantReward(...)`.
@@ -167,6 +184,7 @@ Deliverables:
 - Admin: gamification defaults panel, badge editor, quest template editor.
 
 **Acceptance**:
+
 - ✅ Lesson complete → server returns canonical reward → client plays animation in < 50ms after response.
 - ✅ Multiplier breakdown UI shows correct math for premium × course-promo × streak.
 - ✅ Drift check passes nightly (coin balance == sum of transactions).
@@ -177,6 +195,7 @@ Deliverables:
 **Goal**: cosmetic loop live; first batch of items shipped.
 
 Deliverables:
+
 - API: `Item`, `UserItem`, `EquippedItem`, item purchase endpoint with idempotency.
 - Admin: Items + Item Categories screens; sprite upload + preview; limited-drop scheduler.
 - Student: Avatar dressing room, Shop, Inventory, premium-only badge, limited-drop section + countdown, push notifications for drops.
@@ -184,6 +203,7 @@ Deliverables:
 - Avatar visible in profile, leaderboard placeholder, Today header.
 
 **Acceptance**:
+
 - ✅ User can preview any item on dressing room without buying ("Try on").
 - ✅ Buying debits coin balance, adds to inventory, optionally equips. Atomic.
 - ✅ Reduced-motion mode disables equip animations but UX still works.
@@ -193,6 +213,7 @@ Deliverables:
 **Goal**: explicit download UX + complete offline asset story. See [16-offline.md](./16-offline.md).
 
 Deliverables:
+
 - "Download" button on course / module / lesson surfaces with progress + pause/resume/cancel.
 - Settings → Downloads screen: per-course size, total used vs budget, last-updated, "Update" / "Remove" / "Sync now".
 - Storage budget cap (default 1 GB, configurable) with LRU eviction by `lastReadAt`.
@@ -205,6 +226,7 @@ Deliverables:
 - Telemetry: download/sync events, storage/eviction metrics.
 
 **Acceptance**:
+
 - ✅ Download a 12-lesson course → go offline → all 12 readable; quiz lessons playable; exercise lessons surface "Connect to run code" inline.
 - ✅ Avatar (config + equipped items) renders offline even after course downloads are evicted.
 - ✅ Wi-Fi-only mode pauses an in-progress cellular download; resumes on Wi-Fi reconnect.
@@ -216,12 +238,14 @@ Deliverables:
 **Goal**: weekly cohort competition + minimal friends.
 
 Deliverables:
+
 - API: League rollover job (Sunday 23:59 UTC), `LeagueMembership` weekly XP accumulation.
 - Student: League screen, current rank, time-to-reset, virtualized leaderboard, promotion/demotion summary at week roll, weekly result push.
 - Friends MVP: add by email + share link, friend requests inbox, nudge button (rate-limited).
 - Profile pages with avatar, badges, level, stats.
 
 **Acceptance**:
+
 - ✅ Cohort sharding produces ~30-person groups; verified at 1k synthetic users.
 - ✅ Promotion event awards expected XP/coins/freeze atomically.
 - ✅ Nudge sends a single push, respects rate limit.
@@ -231,6 +255,7 @@ Deliverables:
 **Goal**: real coding lessons with auto-graded feedback.
 
 Deliverables:
+
 - Judge0 self-hosted on dedicated VPS (per [12-code-execution.md](./12-code-execution.md)).
 - API: `Exercise`, `Submission`, submission worker, language whitelist (JS/TS/Python initially).
 - Admin: Exercise editor (Monaco), test harness fields, "verify reference solution" tool.
@@ -238,6 +263,7 @@ Deliverables:
 - Reward path: first-time pass → full XP/coins via `RewardOrchestrator`.
 
 **Acceptance**:
+
 - ✅ p95 submission turnaround < 4s under realistic load.
 - ✅ Visible vs hidden test separation works as specified.
 - ✅ Sandbox enforces limits; intentionally hostile submissions caught (fork bomb, infinite loop, network attempt).
@@ -248,6 +274,7 @@ Deliverables:
 **Goal**: store presence + native billing.
 
 Deliverables:
+
 - iOS + Android builds via Capacitor, signed in CI.
 - TestFlight + Play Internal Testing live.
 - RevenueCat integration: products mirror Stripe plans; entitlement webhook syncs to `Subscription`.
@@ -257,6 +284,7 @@ Deliverables:
 - App submission to App Store + Play.
 
 **Acceptance**:
+
 - ✅ Subscribe via App Store IAP → entitlement created in our DB → access granted.
 - ✅ Push notification arrives on a real device for streak reminder.
 - ✅ Apps approved.
@@ -266,12 +294,14 @@ Deliverables:
 **Goal**: differentiator content types live.
 
 Deliverables:
+
 - API: `ai-grading` module with deterministic + LLM-judged rubric scoring; per-user rate limits; caching.
 - Admin: AI prompt block editor with rubric builder.
 - Student: `AiPromptPlayground` with rubric checklist that lights up.
 - API + admin + student: scenario block + `ScenarioRunner` (branching dialogue).
 
 **Acceptance**:
+
 - ✅ AI prompt lesson grades within 3s p95.
 - ✅ Scenario lesson supports 2+ branch depth and replay.
 - ✅ A soft-skill course (4 scenarios) shipped as dogfood.
@@ -281,10 +311,80 @@ Deliverables:
 **Goal**: top-of-funnel + social proof.
 
 Deliverables:
+
 - Public marketing site (`codify.app` root pages).
 - "Capstone project" lesson type (a curated multi-lesson capstone with shareable result).
 - Certificate of completion: branded image + verifiable URL on user profile.
 - Referral / share links.
+
+## Phase 14 — Launch decisions (November 2026)
+
+**Goal**: build what the product owner decided on 8 November 2026 after the
+release-readiness review (recorded in the Codify Release Report). Schema is
+in migration `20261108170000_launch_decisions`.
+
+| Decision                  | Outcome                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| Gold mastery              | Gold needs spaced-repetition reviews for everyone; no grandfathering (already built, docs/10 §7). |
+| Minimum age               | **12+**. Teenagers (12–17) may sign up with safer defaults.                                       |
+| Promotional notifications | Push **and** email, both opt-in; ask once.                                                        |
+| Web push                  | Build for launch.                                                                                 |
+| User country              | Detect automatically from Cloudflare.                                                             |
+| Monthly PIX               | Launch annual-only; revisit Pix Automático after launch; measure the drop-off.                    |
+| Dev test data             | Leave it.                                                                                         |
+
+Deliverables:
+
+- **Age (12+)** — `User.birthDate`.
+  - Student: a date-of-birth step at the start of onboarding; existing users
+    without one get a one-time blocking prompt. The date is set once by the
+    user (staff can correct it in admin).
+  - Under 12: sign-up can't continue; the account and its data are deleted
+    at once (no restore window) and the student sees why.
+  - 12–17 ("minor") defaults: public profile visible to friends only; not
+    discoverable in user search or friend suggestions; the friends activity
+    feed stays off; no promotional push or email; no marketing-email opt-in.
+  - Paid plans for minors: web checkout first records a parent / guardian
+    confirmation (`GuardianConsent`: name, email, "I am 18+ and the account
+    holder's parent or guardian"); the guardian gets an email notice. Store
+    purchases rely on the stores' family controls.
+  - Admin: age group (under 18 / adult / not given) on the user page and as
+    a Users filter; staff can correct the date (audited).
+  - Legal: the draft privacy policy and terms state 12+ and describe the
+    minor defaults; legal review confirms (release checklist §8).
+- **Promotional notifications**
+  - A one-time "Get alerts about bonus events?" prompt after the first
+    completed lesson (adults only; `User.promoPromptedAt`). Accepting turns
+    on PROMO push and, with its own tick box, marketing email.
+  - Campaign email at campaign start to adults with `marketingEmailOptIn`
+    (and PROMO email not switched off), pt-BR + en-US, with the existing
+    one-click unsubscribe; same idempotency and caps as the push.
+- **Web push** — standard Web Push (VAPID) through Angular's service worker
+  (`SwPush`), which already runs the PWA; the API sends with `web-push`.
+  `WebPushSubscription` rows; delivery goes through the existing
+  notification pipeline (preferences, quiet hours, daily caps, deep link on
+  tap). The browser permission prompt is shown at a meaningful moment (after
+  the first streak day), never on first load. New env: `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. iPhone: works once the web app is
+  added to the home screen (iOS 16.4+).
+- **Country** — `User.country` from `CF-IPCountry` at sign-up and refreshed
+  at most daily (Tor/unknown codes ignored); admin Users filter and column;
+  country breakdown in the admin reports. The privacy policy names IP-derived
+  country.
+- **Monthly PIX** — analytics events for the subscription page that show
+  how often a BRL user wanting a monthly plan meets "card only", and whether
+  they leave or switch to annual / card.
+
+**Acceptance**:
+
+- ⬜ An 11-year-old date of birth stops onboarding and removes the account.
+- ⬜ A 15-year-old's profile is hidden from non-friends and absent from
+  search; their web checkout requires the guardian step.
+- ⬜ An adult who accepts the prompt receives a campaign push and email; one
+  who declines receives neither.
+- ⬜ A desktop Chrome user who allowed notifications gets the streak
+  reminder as a web push, respecting quiet hours.
+- ⬜ Admin can filter users by country and age group.
 
 ## Future (post-launch backlog)
 
@@ -296,29 +396,30 @@ Deliverables:
 - Advanced search (Meilisearch).
 - Apple Watch / Wear OS minimal companions.
 - Feature-flag service migration to GrowthBook/Unleash if needed.
+- Recurring monthly PIX (Pix Automático) once the payment provider supports it; decide using the Phase 14 checkout drop-off data.
 
 ## Cross-cutting workstreams (always on)
 
-| Workstream | Owner | Cadence |
-|---|---|---|
-| Engagement instrumentation | PM + FE | Each phase |
-| A/B test review | PM | Bi-weekly |
-| Cost monitoring | Ops | Monthly |
-| Dependency upgrades | Renovate + 1 dev | Weekly |
-| Security drill | Ops | Quarterly |
-| Backup restore drill | Ops | Quarterly |
-| Translation catch-up | Content + agency | Monthly per locale |
-| Asset production for shop | Designer | Continuous |
+| Workstream                 | Owner            | Cadence            |
+| -------------------------- | ---------------- | ------------------ |
+| Engagement instrumentation | PM + FE          | Each phase         |
+| A/B test review            | PM               | Bi-weekly          |
+| Cost monitoring            | Ops              | Monthly            |
+| Dependency upgrades        | Renovate + 1 dev | Weekly             |
+| Security drill             | Ops              | Quarterly          |
+| Backup restore drill       | Ops              | Quarterly          |
+| Translation catch-up       | Content + agency | Monthly per locale |
+| Asset production for shop  | Designer         | Continuous         |
 
 ## Risk & dependency map
 
-| Risk | Mitigation phase |
-|---|---|
-| Engagement loop fails | Phase 7 + Phase 9 land before paid push; instrument retention from Phase 5 |
-| Stripe BR PIX-recurring limitations | Phase 6 ships card-first + PIX one-shot; revisit recurring PIX with Pagar.me later |
-| Judge0 compromise | Phase 10 isolates VPS, locks egress, adds drift monitor |
-| App Store rejection | Phase 11 adheres to IAP rules from day 1 (no external payment links from inside app for digital subs) |
-| Over-engineering shared libs | Atomic phases (2, 3) gated on demo-page sign-off, not on "every conceivable component" — ship Phase 5 with 90% of components, add the remaining 10% on demand |
+| Risk                                | Mitigation phase                                                                                                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engagement loop fails               | Phase 7 + Phase 9 land before paid push; instrument retention from Phase 5                                                                                           |
+| Stripe BR PIX-recurring limitations | Phase 6 ships card-first + PIX one-shot (annual prepay); decided 2026-11 to launch annual-only and revisit Pix Automático after launch with Phase 14's drop-off data |
+| Judge0 compromise                   | Phase 10 isolates VPS, locks egress, adds drift monitor                                                                                                              |
+| App Store rejection                 | Phase 11 adheres to IAP rules from day 1 (no external payment links from inside app for digital subs)                                                                |
+| Over-engineering shared libs        | Atomic phases (2, 3) gated on demo-page sign-off, not on "every conceivable component" — ship Phase 5 with 90% of components, add the remaining 10% on demand        |
 
 ## Definition of done (every phase)
 

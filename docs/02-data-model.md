@@ -941,6 +941,19 @@ Postgres is authoritative; Redis is a hot-path cache. On a write: Postgres uniqu
 
 Every catalog entity (`Course.coverAssetId`, lesson images via `LessonDoc`, `Item.spriteAssetId`/`thumbnailAssetId`, `Badge.iconAssetId`) references asset IDs. Centralizing them in `Asset` lets us enforce existence on save, dedupe by `sha256`, run R2 cleanup on delete, and store SVG-sanitization metadata in one place.
 
+### Launch-decision columns (Phase 14, migration `20261108170000_launch_decisions`)
+
+- `User.birthDate` (date only) — minimum age 12; 12–17 get the minor
+  defaults (docs/15 Phase 14). Set once by the user; staff can correct it.
+  Under-12 accounts are deleted at once, so no such row is kept.
+- `User.country` + `countryUpdatedAt` — ISO 3166-1 alpha-2 from Cloudflare's
+  `CF-IPCountry`, refreshed at most daily; indexed for the admin filter.
+- `User.promoPromptedAt` — the one-time promotional-alerts prompt was shown.
+- `WebPushSubscription` — browser push endpoint + keys (VAPID), one row per
+  browser; native devices stay in `DeviceToken`.
+- `GuardianConsent` — a parent / guardian's confirmation before a minor's
+  web checkout (name, email, purpose, plan price, IP, user agent).
+
 ## Indexing strategy
 
 Beyond the indexes declared inline:

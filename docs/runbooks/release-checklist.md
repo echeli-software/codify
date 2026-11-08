@@ -61,6 +61,9 @@ Follow `infra/README.md` §0–5.
       `MFA_REQUIRED` (docs/14 §1; `STAFF_MFA_ROLES`,
       `STAFF_SESSION_MAX_HOURS`). Set the instance's session maximum
       lifetime too.
+- [ ] Web push keys: generate a VAPID key pair once per environment
+      (`npx web-push generate-vapid-keys`) and set `VAPID_PUBLIC_KEY`,
+      `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (a `mailto:` or site URL).
 - [ ] Stripe win-back coupon (and promotion code) created;
       `STRIPE_WINBACK_COUPON` / `STRIPE_WINBACK_PROMOTION_CODE` set and
       `WINBACK_PERCENT_OFF` equal to the coupon's percentage (the app shows
@@ -155,8 +158,13 @@ from the public footer, the sign-in screen and Settings.
 - [ ] Data processing agreements in place with every processor the policy
       lists (Clerk, Stripe, RevenueCat, Anthropic, Resend, Firebase,
       DigitalOcean, Cloudflare, Sentry).
-- [ ] Minimum-age decision; if under-18 users are allowed, the parental
-      consent flow (LGPD art. 14) is a product task before launch.
+- [ ] Minimum age is **12** (decided 2026-11). Legal confirms the duties for
+      12–17 users (LGPD art. 14 best interest and the newer Brazilian rules
+      for online services used by minors) and the minor defaults in docs/15
+      Phase 14, including the guardian confirmation before a minor's paid
+      plan.
+- [ ] The privacy policy also covers the date of birth, the IP-derived
+      country, web push and promotional email (all added in Phase 14).
 - [ ] App Store privacy labels and Google Play data-safety form match the
       policy.
 

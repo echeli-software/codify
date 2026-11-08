@@ -76,6 +76,15 @@ model User {
   /// Onboarding goal (docs/10 §2): career | newTech | ai | softSkills.
   /// Drives "Recommended next" on every device.
   onboardingGoal    String?
+  /// Date of birth (launch decision 2026-11: 12+). Set once by the user,
+  /// corrected only by staff. Drives the minor (12–17) defaults.
+  birthDate         DateTime? @db.Date
+  /// ISO 3166-1 alpha-2 country from Cloudflare's CF-IPCountry header,
+  /// refreshed at most daily on visits (launch decision 2026-11).
+  country           String?
+  countryUpdatedAt  DateTime?
+  /// When the one-time "bonus event alerts?" prompt was shown (docs/10 §3).
+  promoPromptedAt   DateTime?
 
   /// Running gamification totals — single-row updates from Progress
   /// completions inside the same transaction that writes Progress, so
@@ -99,6 +108,8 @@ model User {
   questAssignments     QuestAssignment[]
   items                UserItem[]
   avatarSlotTombstones AvatarSlotTombstone[]
+  webPushSubscriptions WebPushSubscription[]
+  guardianConsents     GuardianConsent[]
   reviewCards          ReviewCard[]
   equipped             EquippedItem[]
   leagueMemberships    LeagueMembership[]
@@ -127,6 +138,7 @@ model User {
 
   @@index([role])
   @@index([lastSeenAt])
+  @@index([country])
   @@index([referredById])
   @@index([deletedAt])
 }
@@ -1433,4 +1445,37 @@ model ReviewCard {
 
   @@unique([userId, lessonId])
   @@index([userId, dueAt])
+}
+
+/// A browser Web Push subscription (VAPID) for the PWA (docs/10 §3). Native
+/// apps use DeviceToken (FCM/APNs) instead.
+model WebPushSubscription {
+  id         String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// A parent / guardian's confirmation for a minor's (12–17) paid plan
+/// (launch decision 2026-11). Recorded before web checkout.
+model GuardianConsent {
+  id            String   @id @default(dbgenerated("uuid_generate_v7()"))
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardianName  String
+  guardianEmail String
+  purpose       String
+  planPriceId   String?
+  ip            String?
+  userAgent     String?
+  confirmedAt   DateTime @default(now())
+
+  @@index([userId, confirmedAt])
 }
