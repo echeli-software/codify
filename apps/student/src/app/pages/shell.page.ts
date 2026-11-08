@@ -28,6 +28,7 @@ import {
   XpTarget,
 } from '@codify/gamification-engine';
 import { RewardOverlays } from '../reward-overlays.component.js';
+import { EngagementPrompts } from '../components/engagement-prompts.component.js';
 import { NotificationBell } from '../components/notification-bell.component.js';
 import { IdentityCacheService } from '../offline/identity-cache.service.js';
 import { OfflineIndicator } from '../offline/offline-indicator.component.js';
@@ -144,6 +145,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     LocalePipe,
     TranslatePipe,
     RewardOverlays,
+    EngagementPrompts,
     OfflineIndicator,
     NotificationBell,
     StoragePrompt,
@@ -308,6 +310,8 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     </cdf-bottom-sheet>
 
     <cdf-reward-overlays />
+    <!-- docs/10 §3: promo alerts / browser notifications, after a lesson. -->
+    <cdf-engagement-prompts />
     <cdf-storage-prompt />
     <cdf-sign-out-confirm />
     <!-- docs/14 "Minors": one-time date-of-birth prompt before the app. -->
