@@ -101,6 +101,7 @@ import {
 } from './lesson/lesson-nav.js';
 import type { ConfirmsExit } from './lesson/lesson-exit.guard.js';
 import { ShellBreadcrumbs } from '../components/shell-breadcrumbs.service.js';
+import { PromoBadge } from '../components/promotions/promo-badge.component.js';
 
 interface Completion {
   xp: number;
@@ -130,6 +131,7 @@ interface Neighbour {
   // docs/16 §8: downloaded lesson images render from the device on native.
   providers: [provideNativeLessonImages()],
   imports: [
+    PromoBadge,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -295,6 +297,7 @@ interface Neighbour {
                       </p>
                     }
                     <h1>{{ l.title }}</h1>
+                    <cdf-promo-badge [courseId]="l.courseId" [lessonId]="l.id" />
                     <p class="lp__meta">
                       @if (l.estimatedMinutes) {
                         <span
@@ -606,7 +609,7 @@ interface Neighbour {
           overflow: auto;
           padding-right: 4px;
         }
-        .lp__tool--outline {
+        .lp__tool.lp__tool--outline {
           display: none;
         }
       }

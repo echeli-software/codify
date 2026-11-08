@@ -42,6 +42,7 @@ import { NetworkStatusService } from '../offline/network-status.service.js';
 import { withResponseCache } from '../offline/response-cache.js';
 import { CachedDataChip } from '../offline/cached-data-chip.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { PromoBadge } from '../components/promotions/promo-badge.component.js';
 
 interface CourseCardVM {
   id: string;
@@ -151,6 +152,7 @@ export function plansForCourse(
     SearchBar,
     TranslatePipe,
     ContentTranslatePipe,
+    PromoBadge,
   ],
   template: `
     <ion-header>
@@ -330,6 +332,9 @@ export function plansForCourse(
                     [routerLink]="['/courses', c.slug]"
                     [attr.data-course-slug]="c.slug"
                   >
+                    <span class="catalog__promo"
+                      ><cdf-promo-badge [courseId]="c.id"
+                    /></span>
                     <cdf-course-card
                       [title]="c.id | tContent: 'COURSE' : 'title' : c.title"
                       [author]="c.author"
@@ -494,6 +499,15 @@ export function plansForCourse(
         text-decoration: none;
         color: inherit;
         border-radius: var(--cdf-radius-lg, 12px);
+      }
+      .catalog__card {
+        position: relative;
+      }
+      .catalog__promo {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 1;
       }
       .catalog__plans {
         font-size: var(--cdf-font-size-xs);

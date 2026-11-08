@@ -85,8 +85,10 @@ let seq = 0;
               [id]="optionId(i)"
               [attr.aria-selected]="i === active()"
               [attr.data-kind]="o.kind"
+              tabindex="-1"
               (mousedown)="$event.preventDefault()"
               (click)="choose(o)"
+              (keydown.enter)="choose(o)"
             >
               <cdf-icon
                 [name]="o.kind === 'course' ? 'school' : 'play'"

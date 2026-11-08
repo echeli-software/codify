@@ -11,6 +11,7 @@ import {
 import { signal } from '@angular/core';
 import { AuthService } from '@codify/auth';
 import { TelemetryService } from '../telemetry/telemetry.service';
+import { PromotionsService } from '../components/promotions/promotions.service';
 import {
   CatalogPage,
   DEFAULT_FILTERS,
@@ -49,6 +50,13 @@ describe('CatalogPage', () => {
         provideI18n(),
         { provide: AuthService, useValue: { user: signal({ id: 'u1' }) } },
         { provide: TelemetryService, useValue: { track: jest.fn() } },
+        {
+          provide: PromotionsService,
+          useValue: {
+            promoFor: () => null,
+            ensureLoaded: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: CoursesClient, useValue: { list } },
         {
           provide: CategoriesClient,

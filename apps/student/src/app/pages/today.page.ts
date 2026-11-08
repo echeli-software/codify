@@ -83,6 +83,7 @@ import { GrowthLinksService } from './shared/growth-links.service.js';
 import { DownloadService } from '../offline/download.service.js';
 import { formatCountdown } from './shared/countdown.js';
 import { FeatureFlagsService } from '../platform/feature-flags.service.js';
+import { PromoBanner } from '../components/promotions/promo-banner.component.js';
 
 const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
   LESSON_COUNT: 'lesson-count',
@@ -218,6 +219,7 @@ export function needsOnboarding(opts: {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PromoBanner,
     RouterLink,
     IonHeader,
     IonToolbar,
