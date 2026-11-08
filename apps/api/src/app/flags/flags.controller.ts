@@ -24,6 +24,7 @@ import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import {
   FeatureFlagService,
+  type ExperimentPolicyView,
   type FeatureFlagView,
 } from './feature-flag.service.js';
 import type { FlagEvaluation } from './flag-evaluation.js';
@@ -95,8 +96,15 @@ export class AdminFlagsController {
 
   @Roles('ADMIN')
   @Get()
-  async list(): Promise<{ items: FeatureFlagView[] }> {
-    return { items: await this.flags.list() };
+  async list(): Promise<{
+    items: FeatureFlagView[];
+    policy: ExperimentPolicyView;
+  }> {
+    const [items, policy] = await Promise.all([
+      this.flags.list(),
+      this.flags.policy(),
+    ]);
+    return { items, policy };
   }
 
   @Roles('ADMIN')

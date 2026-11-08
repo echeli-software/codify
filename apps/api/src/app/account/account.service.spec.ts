@@ -91,12 +91,20 @@ function setup(users: Partial<UserRow>[]) {
   const clerk = {
     setBanned: jest.fn(async () => ({ status: 'synced' as const })),
   };
+  const notifications = {
+    notify: jest.fn(async (userId: string) => ({
+      status: 'ok',
+      // Tokens still exist when the SYSTEM notice goes out.
+      tokensAtSend: deviceTokens.filter((t) => t.userId === userId).length,
+    })),
+  };
   const svc = new AccountService(
     prisma as never,
     billing as never,
     clerk as never,
+    notifications as never,
   );
-  return { svc, rows, prisma, billing, deviceTokens, clerk };
+  return { svc, rows, prisma, billing, deviceTokens, clerk, notifications };
 }
 
 const actor = (userId: string, role: ApiUser['role'] = 'STUDENT'): ApiUser => ({
@@ -213,6 +221,32 @@ describe('AccountService', () => {
     expect(un.before.suspendedReason).toBe('abuse');
     expect(un.after).toMatchObject({ status: 'active', suspendedReason: null });
     expect(rows[0].suspendedAt).toBeNull();
+  });
+
+  it('sends one SYSTEM notice on suspension, before device tokens are dropped', async () => {
+    const { svc, notifications, deviceTokens } = setup([
+      { role: 'STUDENT' },
+      { role: 'ADMIN' },
+    ]);
+    const hadTokens = deviceTokens.some((t) => t.userId === 'u1');
+    await svc.suspend(actor('u2', 'ADMIN'), 'u1', 'spam', now);
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+    const [userId, content] = notifications.notify.mock.calls[0] as unknown as [
+      string,
+      (u: { locale: string }) => { kind: string; title: string; body: string },
+    ];
+    expect(userId).toBe('u1');
+    const en = content({ locale: 'en-US' });
+    expect(en.kind).toBe('SYSTEM');
+    expect(en.body).not.toContain('spam');
+    expect(content({ locale: 'pt-BR' }).title).toBe('Sua conta foi suspensa');
+    if (hadTokens)
+      await expect(
+        notifications.notify.mock.results[0].value,
+      ).resolves.toMatchObject({ tokensAtSend: 1 });
+    // A reason edit on an already-suspended account is not re-announced.
+    await svc.suspend(actor('u2', 'ADMIN'), 'u1', 'abuse', now);
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
   });
 
   it('mirrors suspend / unsuspend as a Clerk ban / unban', async () => {

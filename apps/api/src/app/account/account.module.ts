@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AccountExportService } from './account-export.service.js';
 import { AccountPurgeService } from './account-purge.service.js';
 import {
@@ -16,7 +17,8 @@ import { AccountService } from './account.service.js';
  */
 @Module({
   // ClerkService: suspensions are mirrored as Clerk bans.
-  imports: [AuthModule],
+  // NotificationsModule: SYSTEM notice on suspension (docs/10 §3).
+  imports: [AuthModule, NotificationsModule],
   controllers: [AccountController, AdminAccountController],
   providers: [AccountService, AccountExportService, AccountPurgeService],
   exports: [AccountService],

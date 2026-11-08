@@ -139,6 +139,15 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
   ≥ 7 days exist — else 20:00; never inside quiet hours; once per local day); weekly recap hourly, sent Monday
   09:00–12:00 user-local to users with XP or lessons last week (inbox + email, respects `emailEnabled`); the
   reactivation sweep daily at 13:40 UTC (§13). ADMIN triggers: `POST /api/admin/engagement/{daily-quest-reminders|weekly-recap|reactivation}/run`.
+- **SYSTEM** (inbox + push + email; bypasses quiet hours and every cap; cannot be turned off): sent when an
+  account is **suspended** (`AccountService.suspend`, on the transition only, before the device tokens are
+  dropped; the staff-only reason is never included; deep link `/account/suspended`) and for a **terms update**:
+  `POST /api/admin/system-notices/terms-update { version, effectiveDate?, confirm: "NOTIFY ALL USERS" }` (ADMIN,
+  202, audited `system.terms_update_announced`) notifies every active account (not deleted / suspended /
+  purged) in batches of 200 in the background, claiming each recipient first
+  (`IdempotencyRecord system_terms_notice:<version>:<userId>`) so a rerun only reaches who is left;
+  `GET /api/admin/system-notices/terms-update/:version` → `{ version, audience, notified, running }`
+  (`409 ANNOUNCEMENT_RUNNING` while a run of that version is going on the instance). Deep link `/terms`.
 - **WELCOME**: sent once (inbox + email) when the auth middleware provisions a user, or on the first request of a
   user the Clerk webhook created (`lastSeenAt` still null).
 - **Student app**: bell with unread count (desktop shell header / mobile Today header) → `/notifications`
@@ -249,7 +258,18 @@ We deliberately **do not** use:
 - `bucket(seed)` = first 4 bytes of `sha256(seed)` as an unsigned big-endian int, mod 10 000. Rollout/holdout use `bucket("<key>:<userId>")`; the variant uses `bucket("<key>:<userId>:variant")`.
 - Order: inactive or `enabled: false` → `{ enabled: false, variant: null }`; `b < holdoutPct·100` → `{ enabled: false, variant: "holdout" }`; the remaining buckets are the rollout population (raising `rolloutPct` only adds users; the holdout never moves); enabled users get a weighted variant (keys sorted by code point, zero weights skipped) or `null` without variants. Signed-out callers are never held out, see a flag only at 100 % rollout and get the first variant.
 - `GET /flags` → `{ flags: { [key]: { enabled, variant } } }` — every flag for a signed-in caller, only `surface: "public"` flags otherwise. Admin CRUD: `GET/POST /admin/feature-flags`, `PATCH/DELETE /admin/feature-flags/:key` (ADMIN, audited `feature_flag.create|update|delete`). Rows are cached in memory for 30 s; writes through the API invalidate the cache on that instance.
-- Built-in flags `leagues.enabled`, `friends.enabled`, `shop.enabled` are inserted on boot when missing (never overwritten) and can be turned off but not deleted. When off, `/league/current|last-week`, `/friends/*` and `/shop`, `/shop/:id/purchase` answer `404 { code: "FEATURE_DISABLED", feature }`, and the student app hides those tabs and route-guards them.
+- **Experiment policy**: a flag with at least one positive-weight variant is an _engagement experiment_.
+  - **Global hold-out**: built-in flag `experiments.global_holdout` (`{ enabled: true, holdoutPct: 5 }`); users in
+    its hold-out bucket (`bucket("experiments.global_holdout:<userId>") < holdoutPct·100`) get
+    `{ enabled: false, variant: "holdout" }` for **every** experiment. Disable it or set 0 % to turn it off. Plain
+    feature flags and signed-out callers are never affected.
+  - **One experiment per user per surface** (`surface`, default `default`): the surface's experiments are ranked
+    oldest `createdAt` first (then key); the first one that takes the user — rolled out to them, or its own
+    hold-out (control) — owns the surface for that user, and later ones answer `{ enabled: false, variant: null }`.
+    Deterministic, and a new experiment never reshuffles users of an older one.
+  - `GET /admin/feature-flags` adds `experiment` per item and `policy { globalHoldoutKey, globalHoldoutPct,
+surfaces[{ surface, experiments[] }] }` (priority order); the admin Settings flags section shows it.
+- Built-in flags `leagues.enabled`, `friends.enabled`, `shop.enabled` (and `experiments.global_holdout`) are inserted on boot when missing (never overwritten) and can be turned off but not deleted. When off, `/league/current|last-week`, `/friends/*` and `/shop`, `/shop/:id/purchase` answer `404 { code: "FEATURE_DISABLED", feature }`, and the student app hides those tabs and route-guards them.
 
 ## 10. KPI dashboards
 
@@ -308,7 +328,9 @@ replicas never repeat a stage; a user first seen 40 days lapsed gets only the da
   first use, 150 coins + 50 XP, admin-editable, never drawn by the daily picker) for their local today, after the
   regular daily quests, so it pays through the normal quest pipeline.
 - **30** → one win-back offer (inbox + push + email) deep-linking to `/subscription?offer=winback`; skipped for
-  users with an active subscription (stage still advances).
+  users with an active subscription (stage still advances). The discount itself (annual plan, once per user,
+  open `WINBACK_OFFER_DAYS` after the message) is applied at checkout — see docs/09 "Win-back offer at checkout";
+  the subscription page shows the offer banner and the discounted annual price.
 - **90** → `dormantAt` set; only `BILLING` email/push reaches them.
 
 Any activity (the auth middleware's `lastSeenAt` refresh) resets the stage to 0 and clears `dormantAt`.

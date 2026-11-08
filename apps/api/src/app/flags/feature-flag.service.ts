@@ -10,7 +10,10 @@ import type { FeatureFlag, Prisma } from '@prisma/client';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
-  evaluateFlag,
+  GLOBAL_HOLDOUT_KEY,
+  evaluateWithPolicy,
+  experimentSurfaces,
+  isExperiment,
   parseFlagValue,
   type FlagEvaluation,
   type FlagRow,
@@ -38,10 +41,25 @@ export const DEFAULT_FLAGS: ReadonlyArray<{
     value: { enabled: true, surface: 'student' },
     description: 'Avatar shop (docs/08): Shop tab and /shop API.',
   },
+  {
+    key: GLOBAL_HOLDOUT_KEY,
+    value: { enabled: true, holdoutPct: 5, surface: 'system' },
+    description:
+      'Global experiment hold-out (docs/10 §9): holdoutPct % of users are left out of every experiment. Disable or set 0 to turn it off.',
+  },
 ];
 
 export const FLAG_CACHE_TTL_MS = 30_000;
 export const PUBLIC_SURFACE = 'public';
+
+/** GET /admin/feature-flags → `policy` (docs/10 §9). */
+export interface ExperimentPolicyView {
+  globalHoldoutKey: string;
+  /** Effective global hold-out % (0 when the flag is off / inactive). */
+  globalHoldoutPct: number;
+  /** Experiments (flags with variants) per surface, highest priority first. */
+  surfaces: { surface: string; experiments: string[] }[];
+}
 
 export interface FeatureFlagView {
   key: string;
@@ -50,6 +68,8 @@ export interface FeatureFlagView {
   isActive: boolean;
   /** Built-in flags cannot be deleted (disable them instead). */
   builtIn: boolean;
+  /** Has variants → subject to the experiment policy. */
+  experiment: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,7 +131,7 @@ export class FeatureFlagService implements OnModuleInit {
 
   async evaluate(key: string, userId?: string | null): Promise<FlagEvaluation> {
     const rows = await this.rows();
-    return evaluateFlag(rows.get(key) ?? defaultRow(key), userId);
+    return evaluateWithPolicy(rows, rows.get(key) ?? defaultRow(key), userId);
   }
 
   async isEnabled(key: string, userId?: string | null): Promise<boolean> {
@@ -133,7 +153,7 @@ export class FeatureFlagService implements OnModuleInit {
       a.key.localeCompare(b.key),
     )) {
       if (!userId && row.value.surface !== PUBLIC_SURFACE) continue;
-      out[row.key] = evaluateFlag(row, userId);
+      out[row.key] = evaluateWithPolicy(rows, row, userId);
     }
     return out;
   }
@@ -145,6 +165,19 @@ export class FeatureFlagService implements OnModuleInit {
       orderBy: { key: 'asc' },
     });
     return rows.map(toView);
+  }
+
+  /** The experiment policy as it applies right now (admin Settings). */
+  async policy(): Promise<ExperimentPolicyView> {
+    const rows = await this.rows();
+    const holdout =
+      rows.get(GLOBAL_HOLDOUT_KEY) ?? defaultRow(GLOBAL_HOLDOUT_KEY);
+    const on = !!holdout && holdout.isActive && holdout.value.enabled;
+    return {
+      globalHoldoutKey: GLOBAL_HOLDOUT_KEY,
+      globalHoldoutPct: on ? (holdout.value.holdoutPct ?? 0) : 0,
+      surfaces: experimentSurfaces(rows.values()),
+    };
   }
 
   async create(key: string, input: FlagInput): Promise<FeatureFlagView> {
@@ -233,7 +266,7 @@ export class FeatureFlagService implements OnModuleInit {
 
   private async load(): Promise<Map<string, FlagRow>> {
     const rows = await this.prisma.featureFlag.findMany({
-      select: { key: true, value: true, isActive: true },
+      select: { key: true, value: true, isActive: true, createdAt: true },
     });
     const map = new Map<string, FlagRow>();
     for (const r of rows) {
@@ -246,10 +279,16 @@ export class FeatureFlagService implements OnModuleInit {
           key: r.key,
           value: { enabled: false },
           isActive: false,
+          createdAt: r.createdAt,
         });
         continue;
       }
-      map.set(r.key, { key: r.key, value: parsed.value, isActive: r.isActive });
+      map.set(r.key, {
+        key: r.key,
+        value: parsed.value,
+        isActive: r.isActive,
+        createdAt: r.createdAt,
+      });
     }
     return map;
   }
@@ -286,12 +325,14 @@ function flagNotFound(key: string): NotFoundException {
 
 function toView(row: FeatureFlag): FeatureFlagView {
   const parsed = parseFlagValue(row.value);
+  const value = parsed.ok ? parsed.value : { enabled: false };
   return {
     key: row.key,
-    value: parsed.ok ? parsed.value : { enabled: false },
+    value,
     description: row.description,
     isActive: row.isActive,
     builtIn: isBuiltIn(row.key),
+    experiment: isExperiment({ key: row.key, value, isActive: row.isActive }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

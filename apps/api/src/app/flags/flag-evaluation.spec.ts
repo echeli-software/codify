@@ -1,7 +1,12 @@
 import {
   BUCKETS,
+  GLOBAL_HOLDOUT_KEY,
   bucket,
   evaluateFlag,
+  evaluateWithPolicy,
+  experimentSurfaces,
+  inGlobalHoldout,
+  isExperiment,
   parseFlagValue,
   pickVariant,
   type FlagRow,
@@ -154,5 +159,118 @@ describe('parseFlagValue', () => {
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.errors).toHaveLength(6);
     expect(parseFlagValue([]).ok).toBe(false);
+  });
+});
+
+describe('experiment policy (docs/10 §9)', () => {
+  const exp = (
+    key: string,
+    over: Partial<FlagRow['value']> = {},
+    createdAt = new Date('2026-01-01'),
+  ): FlagRow => ({
+    key,
+    isActive: true,
+    createdAt,
+    value: {
+      enabled: true,
+      variants: { a: 1, b: 1 },
+      surface: 'today',
+      ...over,
+    },
+  });
+  const holdout = (pct: number): FlagRow => ({
+    key: GLOBAL_HOLDOUT_KEY,
+    isActive: true,
+    value: { enabled: true, holdoutPct: pct, surface: 'system' },
+  });
+  const map = (...rows: FlagRow[]) => new Map(rows.map((r) => [r.key, r]));
+
+  it('only flags with weighted variants are experiments', () => {
+    expect(isExperiment(exp('x'))).toBe(true);
+    expect(isExperiment(exp('x', { variants: { a: 0 } }))).toBe(false);
+    expect(isExperiment(row({ enabled: true }))).toBe(false);
+    expect(isExperiment(holdout(5))).toBe(false);
+  });
+
+  it('a user is in at most one experiment per surface; the older one wins', () => {
+    const older = exp('exp.older', {}, new Date('2026-01-01'));
+    const newer = exp('exp.newer', {}, new Date('2026-02-01'));
+    const other = exp('exp.other', { surface: 'shop' });
+    const rows = map(older, newer, other);
+    for (const u of users.slice(0, 500)) {
+      const a = evaluateWithPolicy(rows, older, u);
+      const b = evaluateWithPolicy(rows, newer, u);
+      // Everyone is rolled into the older one (100 %) → never the newer one.
+      expect(a.enabled).toBe(true);
+      expect(b).toEqual({ enabled: false, variant: null });
+      // Other surfaces are independent.
+      expect(evaluateWithPolicy(rows, other, u).enabled).toBe(true);
+    }
+  });
+
+  it('the newer experiment gets exactly the users the older one leaves', () => {
+    const older = exp('exp.older', { rolloutPct: 30 });
+    const newer = exp('exp.newer', {}, new Date('2026-03-01'));
+    const rows = map(older, newer);
+    let both = 0;
+    let newerCount = 0;
+    for (const u of users) {
+      const a = evaluateWithPolicy(rows, older, u);
+      const b = evaluateWithPolicy(rows, newer, u);
+      if (a.enabled && b.enabled) both += 1;
+      if (b.enabled) newerCount += 1;
+      // The older experiment is unaffected by the newer one.
+      expect(a).toEqual(evaluateFlag(older, u));
+    }
+    expect(both).toBe(0);
+    expect(newerCount / users.length).toBeGreaterThan(0.6);
+    expect(newerCount / users.length).toBeLessThan(0.8);
+  });
+
+  it("an experiment's own hold-out (control) also takes the surface", () => {
+    const older = exp('exp.older', { holdoutPct: 50 });
+    const newer = exp('exp.newer', {}, new Date('2026-03-01'));
+    const rows = map(older, newer);
+    for (const u of users.slice(0, 300))
+      expect(evaluateWithPolicy(rows, newer, u).enabled).toBe(false);
+  });
+
+  it('the global hold-out leaves ~pct % of users out of every experiment', () => {
+    const e1 = exp('exp.one');
+    const e2 = exp('exp.two', { surface: 'shop' });
+    const rows = map(holdout(10), e1, e2);
+    const held = users.filter((u) => inGlobalHoldout(rows, u));
+    expect(held.length / users.length).toBeGreaterThan(0.07);
+    expect(held.length / users.length).toBeLessThan(0.13);
+    for (const u of held) {
+      expect(evaluateWithPolicy(rows, e1, u)).toEqual({
+        enabled: false,
+        variant: 'holdout',
+      });
+      expect(evaluateWithPolicy(rows, e2, u).variant).toBe('holdout');
+    }
+    // Plain feature flags ignore the hold-out; signed-out callers are never held out.
+    const feature = row({ enabled: true });
+    expect(
+      held.every((u) => evaluateWithPolicy(rows, feature, u).enabled),
+    ).toBe(true);
+    expect(inGlobalHoldout(rows, null)).toBe(false);
+    // Off → nobody is held out.
+    const off = map({ ...holdout(10), value: { enabled: false } }, e1);
+    expect(users.some((u) => inGlobalHoldout(off, u))).toBe(false);
+  });
+
+  it('lists experiments per surface in priority order', () => {
+    expect(
+      experimentSurfaces([
+        exp('b', {}, new Date('2026-02-01')),
+        exp('a', {}, new Date('2026-03-01')),
+        exp('c', { surface: undefined }),
+        row({ enabled: true }),
+      ]),
+    ).toEqual([
+      { surface: 'default', experiments: ['c'] },
+      { surface: 'today', experiments: ['b', 'a'] },
+    ]);
   });
 });

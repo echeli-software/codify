@@ -9,6 +9,7 @@ import {
 import type { ApiUser } from '../auth/auth.types.js';
 import { ClerkService, type ClerkBanResult } from '../auth/clerk.service.js';
 import { BillingService } from '../billing/billing.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   accountStatus,
@@ -79,6 +80,7 @@ export class AccountService {
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
     private readonly clerk: ClerkService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async status(userId: string, now = new Date()): Promise<AccountStatusView> {
@@ -195,6 +197,16 @@ export class AccountService {
         suspendedReason: reason,
       },
     });
+    // docs/10 §3: SYSTEM notice (inbox + push + email, no caps / quiet
+    // hours) on the transition only — a reason edit is not news. Sent
+    // before the device tokens go; the staff-only reason is never included.
+    if (!before.suspendedAt) {
+      await this.notifications.notify(
+        userId,
+        ({ locale }) => ({ kind: 'SYSTEM', ...suspendedCopy(locale) }),
+        { now },
+      );
+    }
     // Suspended accounts get no pushes.
     await this.prisma.deviceToken.deleteMany({ where: { userId } });
     const after = await this.adminStatus(userId, now);
@@ -286,6 +298,24 @@ export class AccountService {
     if (!row) throw new NotFoundException('User not found');
     return row;
   }
+}
+
+/** SYSTEM notice copy (pt-* → pt-BR, else en-US), like the other server copy. */
+export function suspendedCopy(locale: string): {
+  title: string;
+  body: string;
+  deepLink: string;
+  action: null;
+} {
+  const pt = (locale || 'pt-BR').toLowerCase().startsWith('pt');
+  return {
+    title: pt ? 'Sua conta foi suspensa' : 'Your account has been suspended',
+    body: pt
+      ? 'Sua conta Codify foi suspensa pela nossa equipe e não pode ser usada no momento. Se acha que foi um engano, responda a este e-mail ou fale com o suporte.'
+      : 'Your Codify account has been suspended by our team and cannot be used right now. If you think this is a mistake, reply to this email or contact support.',
+    deepLink: '/account/suspended',
+    action: null,
+  };
 }
 
 function toStatus(row: LifecycleRow, now: Date): AccountStatusView {
