@@ -125,6 +125,20 @@ checkout; an unpaid prepay simply ends at period end (no `PAST_DUE`).
 Monthly PIX with a QR per renewal and the "first month by PIX, then card"
 flow are not built (roadmap risk table: revisit recurring PIX later).
 
+**Measuring the monthly-PIX drop-off (Phase 14).** Launch is annual-only for
+PIX; Pix Automático is revisited with this data. The student subscription
+page tags each visit with a `visitId` and sends
+`checkout_method_unavailable { period: MONTHLY, currency: BRL, method: pix }`
+when a BRL monthly checkout sheet shows card only, `visitId` + `currency` on
+`checkout_start`, and `subscription_page_exit` when the visit ends without a
+checkout (docs/10 §14). The admin Analytics overview's "Monthly BRL
+checkouts: card only" card (`monthlyPix` in
+`GET /api/admin/reports/overview`) classifies the last 30 days' card-only
+visits by the first checkout started afterwards: monthly card checkout,
+switched to annual (and how many of those paid by PIX / Boleto), or left.
+Web events are sent only after analytics consent, so the counts are a
+lower bound.
+
 ### Boleto
 
 - Available as one-shot for full-year prepayment. Slow confirmation (1–3 business days). Not used for recurring.

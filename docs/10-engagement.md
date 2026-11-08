@@ -348,6 +348,12 @@ All on Grafana. Key panels:
 - Reward-orchestration latency (animation start delay after API).
 - Multiplier P50 / P95.
 
+**As built.** The admin Analytics overview (`GET /api/admin/reports/overview`,
+docs/04) carries the first-party reports used before Grafana exists, among
+them learners by country (`User.country` from `CF-IPCountry`: learners,
+active 7 / 30 days, paid; top 10, Other, Unknown) and the monthly-BRL
+"card only" checkout funnel (docs/09 §4) from the §14 events below.
+
 Alerts (page on-call):
 
 - Push failure rate > 5%.
@@ -486,14 +492,19 @@ Common props on every event (added by the client SDK): `platform`
 
 **Billing**
 
-| Event                                   | When                                   | Props                               |
-| --------------------------------------- | -------------------------------------- | ----------------------------------- | ---------- | ----------- |
-| `plans_view`                            | Pricing/plans screen                   | `source` (`paywall                  | settings   | marketing`) |
-| `checkout_start`                        | Checkout session created               | `planId`, `period`, `method` (`card | pix        | store`)     |
-| `checkout_complete` / `checkout_cancel` | Return from checkout                   | `planId`, `period`, `method`        |
-| `subscription_status_changed`           | Webhook moved the status (server-side) | `from`, `to`, `source` (`stripe     | revenuecat | admin`)     |
-| `payment_failed`                        | Invoice/payment failed (server-side)   | `method`, `attempt`                 |
-| `restore_purchases`                     | Store restore tapped                   | `found`                             |
+| Event                                   | When                                                                                          | Props                                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `plans_view`                            | Pricing/plans screen                                                                          | `source` (`paywall` / `settings` / `marketing`)                                           |
+| `checkout_start`                        | Checkout started (web: session requested; native: store purchase)                             | `planId`, `period`, `method` (`card` / `pix` / `boleto` / `store`), `currency`, `visitId` |
+| `checkout_method_unavailable`           | A BRL monthly checkout sheet shows "card only" (PIX / Boleto are BRL-annual only, docs/09 §4) | `visitId`, `planId`, `period`, `currency`, `method` (`pix`)                               |
+| `subscription_page_exit`                | Subscription page left (route change or tab closed) without starting a checkout               | `visitId`, `lastPeriod`, `lastMethodSeen`, `cardOnlySeen`                                 |
+| `checkout_complete` / `checkout_cancel` | Return from checkout                                                                          | `planId`, `period`, `method`                                                              |
+| `subscription_status_changed`           | Webhook moved the status (server-side)                                                        | `from`, `to`, `source` (`stripe` / `revenuecat` / `admin`)                                |
+| `payment_failed`                        | Invoice/payment failed (server-side)                                                          | `method`, `attempt`                                                                       |
+| `restore_purchases`                     | Store restore tapped                                                                          | `found`                                                                                   |
+
+`visitId` is a random id per subscription-page visit, so the monthly-PIX
+funnel (docs/09 §4) can follow one visit from "card only" to its outcome.
 
 **Social / growth**
 
