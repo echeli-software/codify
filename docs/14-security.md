@@ -113,6 +113,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
   - Stripe configuration sync.
 - Includes actor, IP, user-agent, before/after diff (where applicable).
   - IP and user agent are stamped automatically on every `AuditService.record` call from the request context (`RequestContextMiddleware`, AsyncLocalStorage; UA truncated to 512 chars) — controllers don't pass them; jobs (no request) record none. `record(actor, { before, after })` stores them as `diff.before` / `diff.after`.
+  - Item, multiplier and plan (and plan price) update / delete rows carry the row as loaded before the change in `diff.before` (updates also `diff.after`; creates `diff.after`), the stored columns only (no derived URLs, timestamps or `activeNow`).
   - The account purge (§13.1) nulls `ip` / `userAgent` on the purged user's own audit rows (`actorId` = user); staff rows about the user keep the staff member's IP.
 - Read-only in admin UI; export to S3 for long-term retention.
 

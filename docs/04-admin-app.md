@@ -157,7 +157,8 @@ Tabs per role: ADMIN / TEACHER (own courses) see all; SUPPORT sees Overview, Cur
   - **Coin / XP ledger**: paged transactions with delta + balance after.
   - **Manual grant**: form (amount, source = `ADMIN_GRANT`, reason). Rate-limited per admin/day.
   - **Suspend / unsuspend**: sets `User.suspendedAt` + a staff-only reason (the API then refuses the account with `ACCOUNT_SUSPENDED`); ADMIN and SUPPORT, SUPPORT only for student/teacher accounts; audited. Shown with the account's deletion / purge state and its payments in `<cdf-user-account-panel>` (see docs/14 §13.1). When Clerk is configured (`CLERK_SECRET_KEY`) the user is also banned / unbanned at Clerk (Backend API `POST /v1/users/{id}/ban` / `/unban`; users without a Clerk id — dev tokens — are skipped). A Clerk failure keeps the local change, is audited as `user.idp_sync_failed` and shows a warning toast.
-  - **Audit**: actions performed on this user.
+  - **Audit**: actions performed on this user. As built: `GET /admin/audit?entityType=User&entityId=<id>` ("About this user"); staff users add "Actions by this user" (`?actorId=<id>`). Keyset-paged, before/after diff per row, link to the audit log with the same filter.
+  - Cancelling a subscription and revoking an enrollment ask for the user's email typed back, like suspend, role change, refunds and grants (docs/14 §18).
 
 ### Translations
 
