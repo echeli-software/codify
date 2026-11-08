@@ -1,12 +1,15 @@
 import {
   ApplicationConfig,
+  inject,
   isDevMode,
+  provideAppInitializer,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
 import {
+  I18nService,
   LOCALE_PERSISTENCE,
   SHARED_NAMESPACES,
   provideI18n,
@@ -16,7 +19,12 @@ import {
   STUDENT_STRINGS,
 } from '@codify/i18n/student';
 import { authInterceptor, provideAuth } from '@codify/auth';
-import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
+import {
+  SiteConfigClient,
+  apiClientInterceptors,
+  provideApiClient,
+} from '@codify/api-client';
+import { applyBrandingVars } from '@codify/ui-core/color';
 import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
 import { appRoutes } from './app.routes';
 import { provideLazyContentTranslationSource } from './platform/lazy-providers';
@@ -69,6 +77,23 @@ export const appConfig: ApplicationConfig = {
     },
     // docs/14 §13: analytics only after web consent (native: store disclosure).
     { provide: TELEMETRY_CONSENT, useValue: () => consentAllows('analytics') },
+    // docs/04 Settings: environment branding colours + enabled locales.
+    // Non-blocking: a failed fetch keeps the built-in tokens and locales.
+    provideAppInitializer(() => {
+      const site = inject(SiteConfigClient);
+      const i18n = inject(I18nService);
+      void site
+        .get()
+        .then((c) => {
+          if (typeof document !== 'undefined')
+            applyBrandingVars(
+              document.documentElement.style,
+              c.branding.tokens,
+            );
+          return i18n.restrictLocales(c.locales.enabled);
+        })
+        .catch(() => undefined);
+    }),
     // docs/11 §6: persist the chosen locale on the user (PATCH /me).
     { provide: LOCALE_PERSISTENCE, useExisting: StudentLocalePersistence },
     // docs/11 §3: content translations — API online, downloads offline.
