@@ -247,6 +247,15 @@ Everything routes through `RewardOrchestrator`. The canonical event → visual /
 
 Web fallbacks: every Capacitor call wrapped in `libs/ui-ionic/platform.ts` so calls no-op or fall back gracefully on web.
 
+**As built (student `native/`).** `NativeShellService`: Local Notifications
+schedule a repeating daily reminder (id 7001) at `reminderMinute` (default
+20:00) whenever remote push is not granted — synced after sign-in and from
+the onboarding schedule step, cancelled on sign-out; Browser opens the Stripe
+Customer Portal in the in-app browser (a new tab on the web); the status bar
+follows the `<html>` theme classes (dark/light/system); the splash hides
+once the app boots (`launchAutoHide` 3 s is the safety net). All of it is a
+no-op on the web.
+
 ## 8. In-app purchases (later)
 
 Apple and Google require their billing for digital subscriptions inside their apps. We will integrate **RevenueCat** to unify Stripe (web) + StoreKit + Play Billing under one entitlement, mirrored to our `Subscription` table via webhook. Architectural prep: `Subscription.source` enum (deferred to phase 11) so our access logic remains payment-provider-agnostic.

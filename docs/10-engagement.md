@@ -40,6 +40,18 @@ Streak milestones at 30/100/365 days → exclusive cosmetics + flair.
 
 **60-second rule**: from app open to first reward, ≤ 60s of UI time excluding lesson reading. Test continuously.
 
+**As built.** Schedule step: a time picker pre-filled 20:00 saves
+`reminderMinute` (`PUT /me/notification-preferences`) and mirrors it to the
+native local reminder; picking a course then launches its first free lesson
+(else its first lesson). The first reward is a sheet on Today once the first
+lesson is done (starter pet + name, docs/08 §10). Day-2 push: an hourly job
+(minute 40 UTC, `Day2PetPushService`) sends "🐾 [pet] is waiting!" as a
+`STREAK_REMINDER` the day after `onboardedAt` (user-local), inside the hour
+after the learner's `reminderMinute` (default 20:00), once per user
+(`IdempotencyRecord day2_pet_push:<userId>`), skipped when they already
+completed a lesson that day, in quiet hours, or with STREAK_REMINDER push
+off; caps / dormancy apply through NotificationService.
+
 ## 3. Notifications
 
 ### Channels
@@ -210,6 +222,16 @@ starts, only to users who turned PROMO push on (docs/07 §15).
 - Mutual nudge respected.
 - No public global feed (avoid moderation cost).
 
+**As built.** `GET /friends/activity?limit=` (≤ 50) lists the last 14 days of
+lesson completions and (non-hidden) badge unlocks of friends who opted in
+(`User.activityFeedOptIn`, `PATCH /me { activityFeedOptIn }`; friends who
+did not opt in never appear). `GET /friends/:id/compare` returns
+`{ me, friend }` stats (level, total / weekly XP, current / longest streak,
+lessons, courses completed, badges) — 403 `FRIEND_REQUIRED` for non-friends.
+`GET /league/history?limit=` (≤ 52) lists finished weeks
+(`weekStart, tier, newTier, finalRank, cohortSize, weeklyXp, promoted,
+demoted`).
+
 ### Cohort challenges (later)
 
 - "This week's React cohort" — opt-in group challenge with shared progress bar and a final reward.
@@ -236,6 +258,16 @@ We deliberately **do not** use:
 - **Mastery levels per topic**: Bronze/Silver/Gold via spaced-repetition checks.
 - **Capstone projects**: produce something the user can show.
 - **Certificate of completion** (issued by us; not externally accredited): branded image + verifiable URL on profile.
+
+**As built (skill tree).** `GET /me/mastery` → `{ topics, totals }`: one topic
+per category (plus one for uncategorized courses) with lessons done / total,
+`scorePct` (average best quiz / scored-exercise score) and `mastery`:
+GOLD = every lesson and ≥ 90 %, SILVER = ≥ 50 % of lessons and ≥ 70 %,
+BRONZE = ≥ 1 lesson (no graded attempt counts as meeting the score bar);
+each course carries module nodes `COMPLETED | IN_PROGRESS | AVAILABLE |
+LOCKED` (locked behind the previous unfinished module — shown, not
+enforced). Spaced-repetition checks are not built yet. Student page:
+`/skills` (linked from Profile).
 
 ## 8. Anti-pattern checklist (review before any feature ships)
 
@@ -402,6 +434,10 @@ Common props on every event (added by the client SDK): `platform`
 | `league_viewed`                                          | League screen opened                         | `tier`, `rank`, `cohortSize`                                                                 |
 | `league_result_viewed`                                   | Last-week result card seen                   | `tier`, `newTier`, `promoted`, `demoted`, `finalRank`                                        |
 | `shop_view` / `item_purchase` / `item_equip`             | Shop browsed / bought / equipped             | `itemId`, `rarity`, `costCoins`, `equipOnPurchase`                                           |
+| `avatar_randomize` / `starter_pet_offered` / `starter_pet_claimed` | Dressing-room Random / gift sheet shown / gift opened | `itemId?`, `named?` |
+| `friend_compare_viewed` / `activity_feed_opt_in`         | Compare sheet opened / sharing toggled       | `optIn?`                                                                                     |
+| `skill_tree_viewed`                                      | Skill tree opened                            | `topics`, `gold`                                                                             |
+| `local_reminder_scheduled`                               | Native backup reminder scheduled             | `minute`                                                                                     |
 | `promo_banner_view`                                      | Campaign/promo banner shown                  | `multiplierId`, `kind`, `value`                                                              |
 
 **Download / sync (offline, docs/16)**

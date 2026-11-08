@@ -110,6 +110,22 @@ type AvatarConfig = {
 
 Stored as JSON on `User.avatarConfig`. Customizable in the dressing room without unlocking anything (free).
 
+**As built (AvatarConfig + renderer).** The palettes live in
+`@codify/ui-core` (`SKIN_TONES` — all 8 —, `HAIR_STYLES`, `HAIR_COLORS`,
+`EYE_COLORS`, `BASE_BODIES` = `classic | broad | slim`, `AVATAR_POSES` =
+`idle | wave | cheer | study`). `PUT /avatar/config { config }` takes a
+_partial_ patch (`baseBodyId`, `skinTone`, `baseHairStyle`,
+`baseHairColor`, `eyeColor`, `pose`); unknown keys or off-palette values →
+400 `avatar.config_invalid` with one problem per field; the patch is merged
+over the stored config. `GET /avatar` always returns the full normalized
+config (defaults for missing fields) plus `petName`. `cdf-avatar-renderer`
+draws one `<svg viewBox="0 0 256 256">`: a vector base body (no external
+art), uploaded sprites as `<image>`, `emoji:` tokens as glyphs and `color:`
+tokens tinting the vector part of their slot (shirt, trousers, shoes, cap,
+glasses frames, necklace); a per-rarity glow `<filter>` (UNCOMMON+);
+`pose`, `animate` (breathing / cheer bounce, off under
+`prefers-reduced-motion`) and `interactive` (`avatarClick`) inputs.
+
 ## 6. Item taxonomy
 
 `ItemCategory` is a catalog grouping (e.g. "Animals", "Sci-fi", "Dev culture", "Brazilian flair", "Seasonal — June Festas Juninas"). Each item belongs to one category and one slot.
@@ -160,6 +176,12 @@ See [05-student-app.md §3 → Shop](./05-student-app.md). Highlights:
 - Equip / unequip per item.
 - "Save outfit" creates a named preset (later) — equip-all in one tap.
 
+**As built.** The shop page filters by slot (incl. EMOTE; `?slot=` preselects
+it from the dressing room), category, rarity, "can afford" and premium-only
+through `GET /shop` params, and "limited drops" client-side. `cdf-inventory`
+has a rarity filter, name search and (with `bulk`) a multi-select mode that
+equips one chosen item per slot.
+
 ## 9. Dressing room
 
 - Live-rendered avatar, can drag to rotate (later). Pose picker (subtle).
@@ -168,11 +190,30 @@ See [05-student-app.md §3 → Shop](./05-student-app.md). Highlights:
 - "Random" button — shuffles equipped items from owned set; surprisingly fun.
 - "Save" persists `EquippedItem`. Auto-saves after 3s of no changes; explicit save button always present.
 
+**As built.** Every slot is a tab (empty slots link to the shop); picks
+auto-save 3 s after the last change (`autosaveMs`), the free base look
+(skin tone, body, hair style + colour, eye colour, pose) is auto-saved the
+same way. "Random" = `POST /avatar/random { slots?, look? }`: a random owned
+item per slot (EMOTE skipped unless listed); `look: true` also randomizes
+the base look but keeps the skin tone.
+
 ## 10. Pets
 
 - Pets sit beside the avatar (rendered to the side, not stacked).
 - Can be named (per pet, by user). Name appears in profile + pet sticker reactions.
 - Future: pets gain XP alongside owner, evolve into new forms (Pokemon-style). Out of scope for v1; data model accommodates by versioning the pet sprite.
+
+**As built.** One pet name per user (`User.petName`, set via `PATCH /me
+{ petName }`, max 30 chars, null/blank clears), shown in the dressing room,
+the public profile and the Day-2 push. The onboarding starter pet
+(`starter-pet-kitten`, PET, COMMON, `emoji:🐱`, `isActive: false` so it is
+never sold) is seeded on first use and given once with
+`ItemAcquisitionSource.ONBOARDING`: `GET /avatar/starter-pet` →
+`{ claimed, eligible, item, petName }` (eligible = not claimed and ≥ 1
+completed lesson); `POST /avatar/starter-pet { petName? }` is idempotent
+(`alreadyClaimed`), 409 `starter_pet.locked` before the first lesson, 404
+`starter_pet.unavailable` when an admin deleted the item; it equips the pet
+when the PET slot is empty.
 
 ## 11. Backgrounds & frames
 
