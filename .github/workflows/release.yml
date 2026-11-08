@@ -193,6 +193,10 @@ jobs:
         env:
           # Public key; unset = dev role-picker login.
           CLERK_PUBLISHABLE_KEY: ${{ vars.PROD_CLERK_PUBLISHABLE_KEY }}
+          # Frontend Sentry (public DSNs; unset = no Sentry) + release name.
+          SENTRY_DSN_STUDENT: ${{ vars.SENTRY_DSN_STUDENT }}
+          SENTRY_DSN_ADMIN: ${{ vars.SENTRY_DSN_ADMIN }}
+          APP_VERSION: ${{ github.ref_name }}
         run: |
           bash infra/web/build-frontend.sh student "$API_URL" pages
           bash infra/web/build-frontend.sh admin "$API_URL" pages

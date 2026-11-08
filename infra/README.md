@@ -132,21 +132,22 @@ droplets, Sentry projects, uptime monitors, Grafana alerts.
 
 **Variables** (repository level unless noted):
 
-| Variable                                                        | Default when unset                                | Purpose                                                |
-| --------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| `CLOUDFLARE_ACCOUNT_ID`                                         | — (required for Pages)                            | wrangler                                               |
-| `STAGING_API_URL`                                               | `https://api.staging.codify.app/api`              | staging smoke + staging/preview frontend builds        |
-| `PREVIEW_API_URL`                                               | `https://api.staging.codify.app/api`              | PR preview builds                                      |
-| `PROD_API_URL`                                                  | `https://api.codify.app/api`                      | release smoke, prod + mobile frontend builds           |
-| `STAGING_CLERK_PUBLISHABLE_KEY`                                 | `pk_test_…` (public)                              | staging + preview frontend builds; unset = dev login   |
-| `PROD_CLERK_PUBLISHABLE_KEY`                                    | `pk_live_…` (public)                              | prod + mobile frontend builds (Clerk sign-in)          |
-| `PAGES_PROJECT_STUDENT` / `PAGES_PROJECT_ADMIN`                 | `codify-student` / `codify-admin`                 | prod Pages projects                                    |
-| `PAGES_PROJECT_STUDENT_STAGING` / `PAGES_PROJECT_ADMIN_STAGING` | `codify-student-staging` / `codify-admin-staging` | staging + PR previews                                  |
-| `PAGES_PRODUCTION_BRANCH`                                       | `main`                                            | branch name that makes a Pages deployment "production" |
-| `STAGING_SSH_USER` / `PROD_SSH_USER`                            | `deploy`                                          | SSH user for migrations                                |
-| `SENTRY_ORG`                                                    | —                                                 | source-map upload                                      |
-| `APPLE_TEAM_ID`                                                 | — (required for iOS)                              | fastlane                                               |
-| `APP_IDENTIFIER` / `ANDROID_PACKAGE_NAME`                       | `app.codify.student`                              | fastlane                                               |
+| Variable                                                        | Default when unset                                | Purpose                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                                         | — (required for Pages)                            | wrangler                                                                                                          |
+| `STAGING_API_URL`                                               | `https://api.staging.codify.app/api`              | staging smoke + staging/preview frontend builds                                                                   |
+| `PREVIEW_API_URL`                                               | `https://api.staging.codify.app/api`              | PR preview builds                                                                                                 |
+| `PROD_API_URL`                                                  | `https://api.codify.app/api`                      | release smoke, prod + mobile frontend builds                                                                      |
+| `STAGING_CLERK_PUBLISHABLE_KEY`                                 | `pk_test_…` (public)                              | staging + preview frontend builds; unset = dev login                                                              |
+| `PROD_CLERK_PUBLISHABLE_KEY`                                    | `pk_live_…` (public)                              | prod + mobile frontend builds (Clerk sign-in)                                                                     |
+| `PAGES_PROJECT_STUDENT` / `PAGES_PROJECT_ADMIN`                 | `codify-student` / `codify-admin`                 | prod Pages projects                                                                                               |
+| `PAGES_PROJECT_STUDENT_STAGING` / `PAGES_PROJECT_ADMIN_STAGING` | `codify-student-staging` / `codify-admin-staging` | staging + PR previews                                                                                             |
+| `PAGES_PRODUCTION_BRANCH`                                       | `main`                                            | branch name that makes a Pages deployment "production"                                                            |
+| `SENTRY_DSN_STUDENT` / `SENTRY_DSN_ADMIN`                       | unset = no browser error reporting                | public Sentry DSNs baked into the student / admin builds (preview, staging, release; mobile uses the student one) |
+| `STAGING_SSH_USER` / `PROD_SSH_USER`                            | `deploy`                                          | SSH user for migrations                                                                                           |
+| `SENTRY_ORG`                                                    | —                                                 | source-map upload                                                                                                 |
+| `APPLE_TEAM_ID`                                                 | — (required for iOS)                              | fastlane                                                                                                          |
+| `APP_IDENTIFIER` / `ANDROID_PACKAGE_NAME`                       | `app.codify.student`                              | fastlane                                                                                                          |
 
 **Branch protection** on the default branch: require `CI / ci` and
 `CI / images (api)`, 1 review, linear history.

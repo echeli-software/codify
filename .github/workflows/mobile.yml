@@ -60,6 +60,9 @@ jobs:
       - name: Build student (production API)
         env:
           CLERK_PUBLISHABLE_KEY: ${{ vars.PROD_CLERK_PUBLISHABLE_KEY }}
+          # Frontend Sentry (public DSNs; unset = no Sentry) + release name.
+          SENTRY_DSN_STUDENT: ${{ vars.SENTRY_DSN_STUDENT }}
+          APP_VERSION: mobile+${{ github.sha }}
         run: bash infra/web/build-frontend.sh student "${{ vars.PROD_API_URL || 'https://api.codify.app/api' }}" none
 
       - uses: actions/upload-artifact@v4
