@@ -163,7 +163,14 @@ export class ItemsService {
     return toItemResponse(created, await this.spriteUrls([created]));
   }
 
-  async updateItem(id: string, patch: UpdateItemDto): Promise<ItemResponse> {
+  /**
+   * Patch an item. Returns the row as it was before the patch and as it is
+   * after, so the controller can audit both (docs/14 §12).
+   */
+  async updateItem(
+    id: string,
+    patch: UpdateItemDto,
+  ): Promise<{ before: ItemResponse; after: ItemResponse }> {
     const target = await this.prisma.item.findFirst({
       where: { id, deletedAt: null },
     });
@@ -232,10 +239,15 @@ export class ItemsService {
       id,
       changedFields(target, patch, ['name', 'description']),
     );
-    return toItemResponse(updated, await this.spriteUrls([updated]));
+    const urls = await this.spriteUrls([target, updated]);
+    return {
+      before: toItemResponse(target, urls),
+      after: toItemResponse(updated, urls),
+    };
   }
 
-  async deleteItem(id: string): Promise<void> {
+  /** Soft-delete an item; returns the row as it was (for the audit). */
+  async deleteItem(id: string): Promise<ItemResponse> {
     const target = await this.prisma.item.findFirst({
       where: { id, deletedAt: null },
     });
@@ -244,6 +256,7 @@ export class ItemsService {
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
+    return toItemResponse(target, await this.spriteUrls([target]));
   }
 
   // ─── Shop (student) ─────────────────────────────────────────────────────
@@ -841,6 +854,16 @@ function purchaseError(reason: string) {
     default:
       return new BadRequestException('Cannot purchase this item');
   }
+}
+
+/**
+ * The audited fields of an item (`diff.before` / `diff.after`): the stored
+ * columns, without the derived sprite URL.
+ */
+export function itemAuditSnapshot(i: ItemResponse): Record<string, unknown> {
+  const stored: Record<string, unknown> = { ...i };
+  delete stored['spriteUrl'];
+  return stored;
 }
 
 export function toItemResponse(i: Item, urls: SpriteUrlMap): ItemResponse {

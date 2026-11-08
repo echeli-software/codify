@@ -16,7 +16,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
-import { ItemsService } from './items.service.js';
+import { ItemsService, itemAuditSnapshot } from './items.service.js';
 import { StarterPetService } from './starter-pet.service.js';
 import { validateClientTimestamp } from '../progress/progress.service.js';
 import {
@@ -194,7 +194,7 @@ export class ItemsController {
       action: 'item.create',
       entity: 'Item',
       entityId: created.id,
-      diff: { ...body },
+      after: itemAuditSnapshot(created),
     });
     return created;
   }
@@ -206,14 +206,15 @@ export class ItemsController {
     @Param('id') id: string,
     @Body() body: UpdateItemDto,
   ): Promise<ItemResponse> {
-    const updated = await this.items.updateItem(id, body);
+    const { before, after } = await this.items.updateItem(id, body);
     void this.audit.record(actor, {
       action: 'item.update',
       entity: 'Item',
       entityId: id,
-      diff: { ...body },
+      before: itemAuditSnapshot(before),
+      after: itemAuditSnapshot(after),
     });
-    return updated;
+    return after;
   }
 
   @Roles('ADMIN')
@@ -223,11 +224,12 @@ export class ItemsController {
     @CurrentUser() actor: ApiUser,
     @Param('id') id: string,
   ): Promise<void> {
-    await this.items.deleteItem(id);
+    const removed = await this.items.deleteItem(id);
     void this.audit.record(actor, {
       action: 'item.delete',
       entity: 'Item',
       entityId: id,
+      before: itemAuditSnapshot(removed),
     });
   }
 
