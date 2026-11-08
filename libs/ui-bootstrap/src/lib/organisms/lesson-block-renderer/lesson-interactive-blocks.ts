@@ -54,9 +54,10 @@ let nextId = 0;
           }
           @default {
             {{
-              q.kind === 'single'
-                ? 'Choose one answer.'
-                : 'Choose all that apply.'
+              (q.kind === 'single'
+                ? 'ui.lesson.quiz.singleHint'
+                : 'ui.lesson.quiz.multiHint'
+              ) | translate
             }}
           }
         }
@@ -87,11 +88,13 @@ let nextId = 0;
                 />
                 <span class="cdf-quiz__text">{{ opt.text }}</span>
                 @if (isAnswer(opt.id)) {
-                  <span class="cdf-quiz__tag">Correct answer</span>
+                  <span class="cdf-quiz__tag">{{
+                    'ui.lesson.quiz.correctAnswer' | translate
+                  }}</span>
                 } @else if (!!r && isSelected(opt.id)) {
-                  <span class="cdf-quiz__tag cdf-quiz__tag--wrong"
-                    >Your answer</span
-                  >
+                  <span class="cdf-quiz__tag cdf-quiz__tag--wrong">{{
+                    'ui.lesson.quiz.yourAnswer' | translate
+                  }}</span>
                 }
               </label>
             </li>
@@ -100,7 +103,10 @@ let nextId = 0;
       }
       @if (r) {
         <div class="cdf-quiz__feedback" role="status" [id]="uid + '-feedback'">
-          <strong>{{ r.correct ? 'Correct!' : 'Not quite.' }}</strong>
+          <strong>{{
+            (r.correct ? 'ui.lesson.quiz.correct' : 'ui.lesson.quiz.notQuite')
+              | translate
+          }}</strong>
           @if (r.explanation) {
             <p>{{ r.explanation }}</p>
           }

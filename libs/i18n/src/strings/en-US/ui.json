@@ -188,13 +188,27 @@
         "moveUp": "Move “{item}” up",
         "moveDown": "Move “{item}” down",
         "moved": "“{item}” is now {position} of {total}",
-        "orderConfirm": "This order is my answer"
+        "orderConfirm": "This order is my answer",
+        "correct": "Correct!",
+        "notQuite": "Not quite.",
+        "correctAnswer": "Correct answer",
+        "yourAnswer": "Your answer",
+        "singleHint": "Choose one answer.",
+        "multiHint": "Choose all that apply."
       },
       "embed": {
         "by": "by {author}"
       },
       "video": {
         "comingSoon": "Video coming soon"
+      },
+      "callout": {
+        "info": "Info",
+        "tip": "Tip",
+        "warn": "Warning",
+        "danger": "Danger",
+        "success": "Success",
+        "note": "Note"
       }
     },
     "level": {

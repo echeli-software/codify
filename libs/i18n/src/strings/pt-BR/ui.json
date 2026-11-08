@@ -188,13 +188,27 @@
         "moveUp": "Mover “{item}” para cima",
         "moveDown": "Mover “{item}” para baixo",
         "moved": "“{item}” agora está na posição {position} de {total}",
-        "orderConfirm": "Esta ordem é minha resposta"
+        "orderConfirm": "Esta ordem é minha resposta",
+        "correct": "Correto!",
+        "notQuite": "Quase lá.",
+        "correctAnswer": "Resposta certa",
+        "yourAnswer": "Sua resposta",
+        "singleHint": "Escolha uma resposta.",
+        "multiHint": "Escolha todas as que se aplicam."
       },
       "embed": {
         "by": "por {author}"
       },
       "video": {
         "comingSoon": "Vídeo em breve"
+      },
+      "callout": {
+        "info": "Informação",
+        "tip": "Dica",
+        "warn": "Atenção",
+        "danger": "Perigo",
+        "success": "Sucesso",
+        "note": "Nota"
       }
     },
     "level": {

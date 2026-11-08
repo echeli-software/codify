@@ -1,4 +1,5 @@
 import { NgComponentOutlet } from '@angular/common';
+import { I18nService } from '@codify/i18n';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -41,13 +42,13 @@ import {
   LessonRenderContext,
 } from './lesson-render-context.js';
 
-const CALLOUT_LABELS: Record<CalloutKind, string> = {
-  info: 'Info',
-  tip: 'Tip',
-  warn: 'Warning',
-  danger: 'Danger',
-  success: 'Success',
-};
+const CALLOUT_KINDS: readonly CalloutKind[] = [
+  'info',
+  'tip',
+  'warn',
+  'danger',
+  'success',
+];
 
 /** Slug for heading anchors (`#section` links). */
 export function headingSlug(
@@ -90,6 +91,7 @@ export class LessonBlocks {
   readonly blocks = input<readonly AnyBlockNode[] | null | undefined>([]);
 
   private readonly ctx = inject(LessonRenderContext);
+  private readonly i18n = inject(I18nService);
   private readonly imageResolver = inject(LESSON_IMAGE_RESOLVER, {
     optional: true,
   });
@@ -141,7 +143,10 @@ export class LessonBlocks {
   }
 
   protected calloutLabel(b: AnyBlockNode): string {
-    return CALLOUT_LABELS[this.callout(b).attrs?.kind] ?? 'Note';
+    const kind = this.callout(b).attrs?.kind;
+    return this.i18n.t(
+      `ui.lesson.callout.${kind && CALLOUT_KINDS.includes(kind) ? kind : 'note'}`,
+    );
   }
 
   protected imageSrc(b: AnyBlockNode): string | null {
