@@ -220,13 +220,18 @@ Outputs feed the next steps: `database_url_prod` / `database_url_staging` (→ C
 
 ### Runtime (Coolify, per environment)
 
-`NODE_ENV`, `PORT`, `DATABASE_URL`, `REDIS_PASSWORD` (→ `REDIS_URL`), `JOBS_ENABLED`, `CORS_ORIGINS`, `STUDENT_APP_URL`, `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, `CLERK_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_AUTH`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `JUDGE0_URL`, `JUDGE0_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `FCM_SERVICE_ACCOUNT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `LOG_LEVEL`; `ALLOW_DEV_AUTH` unset. Table with sources: [`infra/coolify/README.md`](../infra/coolify/README.md). `.env.example` is the authority for names.
+Required in production (the API refuses to boot without them): `NODE_ENV`, `DATABASE_URL`, `REDIS_PASSWORD` (→ `REDIS_URL`), `CORS_ORIGINS`, `CLERK_SECRET_KEY`, `CLERK_AUTHORIZED_PARTIES`, `CLERK_WEBHOOK_SIGNING_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_AUTH`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `JUDGE0_URL` (+ `JUDGE0_AUTH_TOKEN`, enforced by the Judge0 host), `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_UNSUBSCRIBE_SECRET`.
+
+Recommended / optional: `PORT`, `JOBS_ENABLED`, `STUDENT_APP_URL`, `API_PUBLIC_URL`, `CLERK_JWT_KEY`, `CLERK_PUBLISHABLE_KEY`, `TRUST_PROXY`, `TRUST_CLOUDFLARE`, `CLOUDFLARE_IP_RANGES`, `STAFF_MFA_ROLES`, `STAFF_SESSION_MAX_HOURS`, `JUDGE0_LANGUAGE_IDS`, `JUDGE0_MAX_CPU_TIME_LIMIT`, `JUDGE0_MAX_MEMORY_LIMIT`, `JUDGE0_MAX_WALL_TIME_LIMIT`, `CODE_QUEUE_MAX_BACKLOG`, `AI_GRADER_MODEL`, `AI_GRADER_TIMEOUT_MS`, `ASSET_SWEEP_UNCONFIRMED_HOURS`, `ASSET_SWEEP_UNREFERENCED_DAYS`, `ASSET_SWEEP_DRY_RUN`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `LOG_LEVEL`; `ALLOW_DEV_AUTH` unset. Table with sources: [`infra/coolify/README.md`](../infra/coolify/README.md). The code is the authority for names (`apps/api/src/app/config/env.schema.ts` + each integration's factory); `apps/api/src/app/config/env-docs.spec.ts` fails CI when this list, the Coolify table or `.env.example` name a variable the API doesn't read, or omit a production-required one.
 
 ### Build time (frontends)
 
-| Define           | Set by                                                           | Default                                                        |
-| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| `CODIFY_API_URL` | `infra/web/build-frontend.sh <app> <api-url>` (Angular `define`) | `http://localhost:3000/api` (`apps/*/src/app/api-base-url.ts`) |
+| Define                         | Set by                                                                                   | Default                                                         |
+| ------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `CODIFY_API_URL`               | `infra/web/build-frontend.sh <app> <api-url>` (Angular `define`)                         | `http://localhost:3000/api` (`apps/*/src/app/api-base-url.ts`)  |
+| `CODIFY_CLERK_PUBLISHABLE_KEY` | env `CLERK_PUBLISHABLE_KEY` of `build-frontend.sh`                                       | unset → dev role-picker login                                   |
+| `CODIFY_SENTRY_DSN`            | env `SENTRY_DSN_STUDENT` / `SENTRY_DSN_ADMIN` (else `SENTRY_DSN`) of `build-frontend.sh` | unset → Sentry SDK never loaded                                 |
+| `CODIFY_APP_VERSION`           | env `APP_VERSION` of `build-frontend.sh`                                                 | `<package.json version>+<short sha>` (`dev` outside the script) |
 
 CSP `connect-src` is derived from the same API URL; `CDN_ORIGIN` / `CLERK_ORIGIN` (env of `build-frontend.sh`) extend it for the CDN and a Clerk production custom domain.
 
