@@ -173,6 +173,12 @@ export {
   type ConfettiPiece,
 } from './lib/organisms/celebration-overlay/celebration-overlay.js';
 export {
+  CodeEditor,
+  loadMonaco,
+  monacoLanguage,
+  preferMonaco,
+} from './lib/molecules/code-editor/code-editor.js';
+export {
   ExerciseRunner,
   type ExerciseAction,
   type ExerciseTestView,

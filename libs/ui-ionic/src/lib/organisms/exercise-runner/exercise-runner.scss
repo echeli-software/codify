@@ -22,24 +22,13 @@
     font-weight: var(--cdf-font-weight-semibold);
   }
 
-  &__editor {
-    width: 100%;
-    box-sizing: border-box;
-    padding: var(--cdf-space-3);
-    font-family: var(--cdf-font-family-mono);
+  &__offline {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-1);
+    margin: 0;
     font-size: var(--cdf-font-size-sm);
-    line-height: 1.5;
-    tab-size: 2;
-    color: #e6e6f0;
-    background: #1e1e2e;
-    border: 1px solid var(--cdf-color-border);
-    border-radius: var(--cdf-radius-md);
-    resize: vertical;
-
-    &:focus-visible {
-      outline: 2px solid var(--cdf-color-primary);
-      outline-offset: 2px;
-    }
+    color: var(--cdf-color-warning-text, var(--cdf-color-text-muted));
   }
 
   &__actions {

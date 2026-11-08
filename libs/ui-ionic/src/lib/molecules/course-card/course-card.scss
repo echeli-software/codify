@@ -3,6 +3,17 @@
 }
 
 .cdf-course-card {
+  &__cover {
+    display: block;
+    width: calc(100% + 2 * var(--cdf-space-4));
+    margin: calc(-1 * var(--cdf-space-4)) calc(-1 * var(--cdf-space-4))
+      var(--cdf-space-2);
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--cdf-radius-lg, 12px) var(--cdf-radius-lg, 12px) 0 0;
+    background: var(--cdf-color-surface-2, #f3f4f6);
+  }
+
   &__head {
     display: flex;
     align-items: flex-start;

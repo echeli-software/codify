@@ -15,6 +15,7 @@ const meta: Meta<CourseCard> = {
     difficulty: { control: 'text' },
     hasFreePreview: { control: 'boolean' },
     premiumOnly: { control: 'boolean' },
+    coverUrl: { control: 'text' },
   },
   render: (args) => ({
     props: args,
@@ -28,6 +29,7 @@ const meta: Meta<CourseCard> = {
         [categories]="categories"
         [hasFreePreview]="hasFreePreview"
         [premiumOnly]="premiumOnly"
+        [coverUrl]="coverUrl"
       />
     `,
   }),
@@ -57,5 +59,20 @@ export const Premium: Story = {
     categories: AI,
     hasFreePreview: false,
     premiumOnly: true,
+  },
+};
+
+/** With a cover image (docs/05 §3 course cards). */
+export const WithCover: Story = {
+  args: {
+    title: 'React Fundamentals',
+    author: 'Maria S.',
+    lessonCount: 12,
+    estimatedMinutes: 180,
+    difficulty: 'Iniciante',
+    categories: FRONTEND,
+    hasFreePreview: true,
+    coverUrl:
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect width="16" height="9" fill="%236366f1"/></svg>',
   },
 };

@@ -11,6 +11,7 @@ import { AppBadge } from '../../atoms/app-badge/app-badge.js';
 import { AppButton } from '../../atoms/app-button/app-button.js';
 import { AppSkeleton } from '../../atoms/app-skeleton/app-skeleton.js';
 import { Icon } from '../../atoms/icon/icon.js';
+import { CodeEditor } from '../../molecules/code-editor/code-editor.js';
 
 /** Structural mirror of api-client `StudentExercise` (presentation subset). */
 export interface ExerciseView {
@@ -51,7 +52,7 @@ let runnerSeq = 0;
 @Component({
   selector: 'cdf-exercise-runner',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AppBadge, AppButton, AppSkeleton, Icon, TranslatePipe],
+  imports: [AppBadge, AppButton, AppSkeleton, CodeEditor, Icon, TranslatePipe],
   template: `
     @if (loading() || !exercise()) {
       <cdf-app-skeleton shape="rect" [height]="180" />
@@ -69,25 +70,36 @@ let runnerSeq = 0;
         <label class="cdf-runner__label" [for]="editorId">{{
           'ui.exercise.editor' | translate
         }}</label>
-        <textarea
+        <cdf-code-editor
           class="cdf-runner__editor"
-          spellcheck="false"
-          autocapitalize="off"
-          autocomplete="off"
-          rows="10"
-          [id]="editorId"
+          [inputId]="editorId"
           [value]="code()"
-          [readonly]="submitting()"
-          (input)="code.set($any($event.target).value)"
-          (keydown)="onEditorKey($event)"
-        ></textarea>
+          (valueChange)="code.set($event)"
+          [language]="ex.language"
+          [readonly]="submitting() || offline()"
+          [plain]="plainEditor()"
+          [height]="editorHeight()"
+        />
+
+        <ng-content select="[cdfRunnerPreview]" />
+
+        @if (offline()) {
+          <p
+            class="cdf-runner__offline"
+            role="status"
+            data-testid="runner-offline"
+          >
+            <cdf-icon name="cloud-offline" size="sm" />
+            {{ 'ui.exercise.connectToRun' | translate }}
+          </p>
+        }
 
         <div class="cdf-runner__actions">
           <cdf-app-button
             kind="secondary"
             size="sm"
             [loading]="running()"
-            [disabled]="submitting()"
+            [disabled]="submitting() || offline()"
             (buttonClick)="emitRun($event)"
           >
             <cdf-icon name="play" size="sm" />
@@ -97,7 +109,7 @@ let runnerSeq = 0;
             kind="primary"
             size="sm"
             [loading]="submitting()"
-            [disabled]="running()"
+            [disabled]="running() || offline()"
             (buttonClick)="emitSubmit($event)"
           >
             {{ 'ui.exercise.submit' | translate }}
@@ -105,7 +117,7 @@ let runnerSeq = 0;
           <cdf-app-button
             kind="ghost"
             size="sm"
-            [disabled]="code() === ex.starterCode"
+            [disabled]="code() === ex.starterCode || offline()"
             (buttonClick)="code.set(ex.starterCode)"
           >
             {{ 'ui.exercise.reset' | translate }}
@@ -184,6 +196,11 @@ export class ExerciseRunner {
   readonly scorePct = input(0);
   readonly error = input<string | null>(null);
   readonly passed = input(false);
+  /** Offline: code is shown read-only with "Connect to run code" (docs/16 §3). */
+  readonly offline = input(false);
+  /** Force the plain textarea instead of Monaco. */
+  readonly plainEditor = input(false);
+  readonly editorHeight = input(280);
 
   readonly run = output<ExerciseAction>();
   readonly submitted = output<ExerciseAction>();
@@ -205,25 +222,6 @@ export class ExerciseRunner {
       code: this.code(),
       sourceEl: (ev?.currentTarget as HTMLElement) ?? null,
     });
-  }
-
-  /** Tab inserts two spaces; Esc then Tab leaves the editor (no keyboard trap). */
-  protected onEditorKey(ev: KeyboardEvent): void {
-    const el = ev.target as HTMLTextAreaElement;
-    if (ev.key === 'Escape') {
-      el.dataset['escaped'] = '1';
-      return;
-    }
-    if (ev.key !== 'Tab' || ev.shiftKey || el.dataset['escaped'] === '1') {
-      delete el.dataset['escaped'];
-      return;
-    }
-    ev.preventDefault();
-    const { selectionStart: s, selectionEnd: e, value } = el;
-    const next = `${value.slice(0, s)}  ${value.slice(e)}`;
-    el.value = next;
-    el.selectionStart = el.selectionEnd = s + 2;
-    this.code.set(next);
   }
 
   protected fmt(v: unknown): string {

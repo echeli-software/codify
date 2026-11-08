@@ -53,3 +53,18 @@ export const Solved: Story = {
 export const RateLimited: Story = {
   args: { error: 'Slow down — one submission every few seconds.' },
 };
+/** Offline: code read-only, Run / Submit disabled, "Connect to run code". */
+export const Offline: Story = { args: { offline: true } };
+/** Touch / plain mode: the native textarea instead of Monaco. */
+export const PlainEditor: Story = { args: { plainEditor: true } };
+/** Browser-graded HTML/CSS/JS exercise (docs/12 §4). */
+export const WebExercise: Story = {
+  args: {
+    exercise: {
+      language: 'web',
+      entryFunction: '',
+      starterCode: '<h1>Hello</h1>\n<style>\n  h1 { color: red; }\n</style>\n',
+    },
+    code: '<h1>Hello</h1>\n<style>\n  h1 { color: red; }\n</style>\n',
+  },
+};

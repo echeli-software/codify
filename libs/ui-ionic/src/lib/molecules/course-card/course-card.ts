@@ -43,7 +43,11 @@ export interface CourseCategoryRef {
  *     [categories]="[{id:'frontend', label:'Frontend'}]"
  *     [hasFreePreview]="true"
  *     difficulty="Intermediário"
+ *     coverUrl="https://cdn…/cover.webp"
  *   />
+ *
+ * The cover is decorative (`alt=""`) — the title names the course — and
+ * lazy-loaded; the service worker keeps the last 50 covers for offline.
  */
 @Component({
   selector: 'cdf-course-card',
@@ -51,6 +55,16 @@ export interface CourseCategoryRef {
   imports: [AppCard, AppChip, AppBadge, Icon, TranslatePipe],
   template: `
     <cdf-app-card padding="normal">
+      @if (coverUrl(); as src) {
+        <img
+          class="cdf-course-card__cover"
+          [src]="src"
+          alt=""
+          loading="lazy"
+          decoding="async"
+          data-testid="course-card-cover"
+        />
+      }
       <header class="cdf-course-card__head">
         <div>
           <h3 class="cdf-course-card__title">{{ title() }}</h3>
@@ -115,6 +129,8 @@ export class CourseCard {
   readonly categories = input<CourseCategoryRef[]>([]);
   readonly hasFreePreview = input(false);
   readonly premiumOnly = input(false);
+  /** Course cover image (docs/05 §3); hidden when null. */
+  readonly coverUrl = input<string | null>(null);
 
   private readonly i18n = inject(I18nService);
 

@@ -114,7 +114,8 @@
       "solved": "Solved! All tests pass.",
       "submit": "Submit",
       "testsSummary": "{passed} of {total} tests passing",
-      "verdict": "{verdict} · {score}%"
+      "verdict": "{verdict} · {score}%",
+      "connectToRun": "Connect to run code. You can read the exercise offline."
     },
     "inventory": {
       "empty": "You don’t own any items yet — visit the shop!",
@@ -591,6 +592,9 @@
         "moveUp": "Move item {n} up",
         "moveDown": "Move item {n} down"
       }
+    },
+    "codeEditor": {
+      "escHint": "Tip: press Ctrl+M (⌃⇧M on Mac) to let Tab move focus out of the editor."
     }
   }
 }
