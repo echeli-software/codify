@@ -39,8 +39,30 @@ function fakePrisma() {
         return r;
       }),
       findUnique: jest.fn(
-        async ({ where }: { where: { id: string } }) =>
-          rows.get(where.id) ?? null,
+        async ({ where }: { where: { id?: string; sha256?: string } }) =>
+          where.sha256
+            ? ([...rows.values()].find((r) => r['sha256'] === where.sha256) ??
+              null)
+            : (rows.get(where.id as string) ?? null),
+      ),
+      findFirst: jest.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            sha256: string;
+            kind: string;
+            confirmed: boolean;
+            id: { not: string };
+          };
+        }) =>
+          [...rows.values()].find(
+            (r) =>
+              r['sha256'] === where.sha256 &&
+              r['kind'] === where.kind &&
+              r['confirmed'] === where.confirmed &&
+              r['id'] !== where.id.not,
+          ) ?? null,
       ),
       update: jest.fn(
         async ({
@@ -108,6 +130,36 @@ describe('AssetsService (dev disk storage)', () => {
     await expect(svc.devServe(p.assetId)).resolves.toMatchObject({
       mimeType: 'image/png',
     });
+  });
+
+  it('records sha256 + dimensions and returns the existing asset for a duplicate upload', async () => {
+    // 1×1 PNG header (IHDR width/height at bytes 16/20).
+    const png = Buffer.alloc(33);
+    PNG.copy(png, 0, 0, 8);
+    png.write('IHDR', 12, 'latin1');
+    png.writeUInt32BE(640, 16);
+    png.writeUInt32BE(360, 20);
+    const upload = async () => {
+      const p = await svc.presign(teacher, {
+        kind: 'COVER',
+        mimeType: 'image/png',
+        sizeBytes: png.length,
+        filename: 'c.png',
+      });
+      const token = new URL(p.uploadUrl).searchParams.get('token') ?? undefined;
+      await svc.devUpload(p.assetId, token, png);
+      return { id: p.assetId, view: await svc.confirm(teacher, p.assetId) };
+    };
+    const first = await upload();
+    expect(first.view).toMatchObject({ width: 640, height: 360 });
+    expect(first.view.deduplicated).toBeUndefined();
+    expect(prisma.rows.get(first.id)?.['sha256']).toMatch(/^[0-9a-f]{64}$/);
+
+    const second = await upload();
+    expect(second.view).toMatchObject({ id: first.id, deduplicated: true });
+    // The duplicate row is gone; only the original remains.
+    expect(prisma.rows.has(second.id)).toBe(false);
+    expect(prisma.rows.size).toBe(1);
   });
 
   it('rejects SVG, disallowed types per kind, and oversized files at presign', async () => {

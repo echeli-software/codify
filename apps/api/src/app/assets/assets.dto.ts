@@ -41,4 +41,12 @@ export interface AssetView {
   confirmed: boolean;
   uploadedById: string | null;
   createdAt: string;
+  /** Pixel size recorded on confirm (images only), else null. */
+  width: number | null;
+  height: number | null;
+  /**
+   * True when confirm found identical bytes already uploaded (same kind):
+   * this is the existing asset and the new upload was discarded.
+   */
+  deduplicated?: boolean;
 }

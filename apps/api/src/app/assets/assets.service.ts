@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import type { Asset, AssetKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isUniqueViolation } from '../prisma/prisma-errors.js';
+import { imageDimensions, sha256Hex } from './image-meta.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
   ASSET_RULES,
@@ -131,11 +133,63 @@ export class AssetsService {
             : 'File contents do not match the declared type',
       });
     }
-    const updated = await this.prisma.asset.update({
-      where: { id },
-      data: { confirmed: true },
+    // docs/02 Asset: content hash (dedupe) + image dimensions.
+    const data = await this.storage.readPrefix(asset.key, asset.sizeBytes);
+    const sha256 = sha256Hex(data);
+    const dims = asset.mimeType.startsWith('image/')
+      ? imageDimensions(data)
+      : null;
+    const dupe = await this.findDuplicate(sha256, asset);
+    if (dupe) return this.discardAsDuplicate(asset, dupe);
+    try {
+      const updated = await this.prisma.asset.update({
+        where: { id },
+        data: {
+          confirmed: true,
+          // sha256 is unique: an identical file of another kind keeps its
+          // own row without a hash rather than being merged across kinds.
+          sha256: (await this.hashTaken(sha256)) ? null : sha256,
+          width: dims?.width ?? null,
+          height: dims?.height ?? null,
+        },
+      });
+      return toView(updated);
+    } catch (err) {
+      // A concurrent confirm of the same bytes won the unique hash.
+      if (!isUniqueViolation(err)) throw err;
+      const winner = await this.findDuplicate(sha256, asset);
+      if (winner) return this.discardAsDuplicate(asset, winner);
+      throw err;
+    }
+  }
+
+  /** A confirmed asset of the same kind with identical bytes, if any. */
+  private findDuplicate(sha256: string, asset: Asset): Promise<Asset | null> {
+    return this.prisma.asset.findFirst({
+      where: {
+        sha256,
+        confirmed: true,
+        kind: asset.kind,
+        id: { not: asset.id },
+      },
     });
-    return toView(updated);
+  }
+
+  private async hashTaken(sha256: string): Promise<boolean> {
+    return !!(await this.prisma.asset.findUnique({
+      where: { sha256 },
+      select: { id: true },
+    }));
+  }
+
+  /** Drop the fresh upload and hand back the existing asset (dedupe). */
+  private async discardAsDuplicate(
+    fresh: Asset,
+    existing: Asset,
+  ): Promise<AssetView> {
+    await this.storage.delete(fresh.key);
+    await this.prisma.asset.delete({ where: { id: fresh.id } });
+    return { ...toView(existing), deduplicated: true };
   }
 
   async list(opts: {
@@ -233,5 +287,7 @@ function toView(a: Asset): AssetView {
     confirmed: a.confirmed,
     uploadedById: a.uploadedById,
     createdAt: a.createdAt.toISOString(),
+    width: a.width ?? null,
+    height: a.height ?? null,
   };
 }
