@@ -25,8 +25,8 @@ import { RewardThrottle } from '../common/throttling/throttle.decorators.js';
  *
  *   POST /api/lessons/:id/complete  — record completion (STUDENT only).
  *     Body (optional): { clientTimestamp?: ISO-8601 } — offline queue time;
- *       400 (code CLIENT_TIMESTAMP_IN_FUTURE / _TOO_OLD) when > 5 min ahead
- *       or > 72 h old.
+ *       a time in the future or older than 24 h is clamped to now and
+ *       logged; an unparseable one is 400 INVALID_CLIENT_TIMESTAMP.
  *     - 201 on first completion
  *     - 409 code LESSON_ALREADY_COMPLETED on replay (original progress + totals)
  *     - 409 code LESSON_COMPLETES_VIA_OWN_FLOW for EXERCISE / AI_PROMPT /
