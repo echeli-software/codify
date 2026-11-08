@@ -409,6 +409,9 @@ export {
   type BillingReport,
   type CourseFunnel,
   type LessonFunnel,
+  type CountryReport,
+  type CountryReportRow,
+  type MonthlyPixFunnel,
 } from './lib/reports.client.js';
 export {
   SearchClient,

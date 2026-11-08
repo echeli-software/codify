@@ -8,6 +8,14 @@ import type { ApiUser } from '../auth/auth.types.js';
 import { computeMrr } from '../admin-ops/dashboard.service.js';
 import { resolveTitles } from '../admin-ops/admin-ops.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  CHECKOUT_EVENTS,
+  PIX_FUNNEL_DAYS,
+  monthlyPixFunnel,
+  rollupCountries,
+  type CountryReport,
+  type MonthlyPixFunnel,
+} from './launch-reports.js';
 
 const DAY_MS = 86_400_000;
 /** Weeks of history in the weekly series. */
@@ -105,6 +113,10 @@ export interface OverviewReport {
   leagues: LeagueWeek[];
   shop: ShopWeek[];
   billing: BillingReport;
+  /** Learners / active (7, 30 d) / paid per country (docs/15 Phase 14). */
+  countries: CountryReport;
+  /** BRL monthly checkouts that met "card only" (last 30 days). */
+  monthlyPix: MonthlyPixFunnel;
 }
 
 export interface CourseFunnelRow {
@@ -157,18 +169,23 @@ export class ReportsService {
   async overview(now = new Date(), fresh = false): Promise<OverviewReport> {
     if (!fresh && this.cache && now.getTime() - this.cache.at < REPORT_CACHE_MS)
       return this.cache.value;
-    const [retention, leagues, shop, billing] = await Promise.all([
-      this.retention(now),
-      this.leagueWeeks(now),
-      this.shopWeeks(now),
-      this.billing(now),
-    ]);
+    const [retention, leagues, shop, billing, countries, monthlyPix] =
+      await Promise.all([
+        this.retention(now),
+        this.leagueWeeks(now),
+        this.shopWeeks(now),
+        this.billing(now),
+        this.countries(now),
+        this.monthlyPix(now),
+      ]);
     const value = {
       generatedAt: now.toISOString(),
       retention,
       leagues,
       shop,
       billing,
+      countries,
+      monthlyPix,
     };
     this.cache = { at: now.getTime(), value };
     return value;
@@ -457,6 +474,88 @@ export class ReportsService {
         };
       }),
     };
+  }
+
+  // ─── Launch decisions (docs/15 Phase 14) ─────────────────────────────
+
+  /**
+   * Learners (students, not deleted) per `User.country`: active = seen in
+   * the last 7 / 30 days (`lastSeenAt`), paid = an ACTIVE / PAST_DUE
+   * subscription from a paid source. Top 10, "Other", "Unknown".
+   */
+  async countries(now: Date): Promise<CountryReport> {
+    const since7 = new Date(now.getTime() - 7 * DAY_MS);
+    const since30 = new Date(now.getTime() - 30 * DAY_MS);
+    const rows = await this.prisma.$queryRaw<
+      {
+        country: string | null;
+        learners: bigint;
+        a7: bigint;
+        a30: bigint;
+        paid: bigint;
+      }[]
+    >`
+      SELECT u.country, COUNT(*) AS learners,
+        COUNT(*) FILTER (WHERE u."lastSeenAt" >= ${since7}) AS a7,
+        COUNT(*) FILTER (WHERE u."lastSeenAt" >= ${since30}) AS a30,
+        COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM "Subscription" s WHERE s."userId" = u.id
+            AND s.source::text IN ('STRIPE_WEB', 'APPLE_IAP', 'GOOGLE_PLAY')
+            AND s.status::text IN ('ACTIVE', 'PAST_DUE'))) AS paid
+      FROM "User" u
+      WHERE u.role::text = 'STUDENT' AND u."deletedAt" IS NULL
+      GROUP BY u.country`;
+    return rollupCountries(
+      rows.map((r) => ({
+        country: r.country,
+        learners: Number(r.learners),
+        active7: Number(r.a7),
+        active30: Number(r.a30),
+        paid: Number(r.paid),
+      })),
+    );
+  }
+
+  /**
+   * Monthly-PIX drop-off (docs/09 §4): subscription-page visits (props
+   * `visitId`) of the last 30 days that showed "card only" on a BRL
+   * monthly price, by what happened next.
+   */
+  async monthlyPix(now: Date): Promise<MonthlyPixFunnel> {
+    const since = new Date(now.getTime() - PIX_FUNNEL_DAYS * DAY_MS);
+    const rows = await this.prisma.$queryRaw<
+      {
+        name: string;
+        visit: string;
+        period: string | null;
+        method: string | null;
+        currency: string | null;
+        at: Date;
+      }[]
+    >`
+      SELECT e.name, e.props->>'visitId' AS visit, e.props->>'period' AS period,
+        e.props->>'method' AS method, e.props->>'currency' AS currency,
+        e."occurredAt" AS at
+      FROM "AnalyticsEvent" e
+      WHERE e.name IN (${CHECKOUT_EVENTS.unavailable}, ${CHECKOUT_EVENTS.start})
+        AND e."occurredAt" >= ${since} AND e."occurredAt" <= ${now}
+        AND e.props->>'visitId' IN (
+          SELECT u.props->>'visitId' FROM "AnalyticsEvent" u
+          WHERE u.name = ${CHECKOUT_EVENTS.unavailable}
+            AND u."occurredAt" >= ${since} AND u."occurredAt" <= ${now}
+            AND u.props->>'visitId' IS NOT NULL)
+      ORDER BY e."occurredAt" ASC
+      LIMIT 50000`;
+    return monthlyPixFunnel(
+      rows.map((r) => ({
+        name: r.name,
+        visitId: r.visit,
+        period: r.period,
+        method: r.method,
+        currency: r.currency,
+        at: new Date(r.at),
+      })),
+    );
   }
 
   // ─── Course funnels (ADMIN all, TEACHER own) ─────────────────────────

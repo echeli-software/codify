@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -54,6 +56,7 @@ import { OfflineGate } from '../platform/offline-gate.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { activePrices, annualSavings } from './shared/plan-view.js';
 import { BillingHistoryComponent } from './billing/billing-history.component.js';
+import { CheckoutVisit } from './billing/checkout-visit.js';
 import {
   currentSubscription,
   discountedCents,
@@ -942,9 +945,23 @@ export class SubscriptionPage {
       .filter((o): o is NonNullable<typeof o> => o !== null);
   });
 
+  /** Monthly-PIX drop-off funnel for this visit (docs/09 §4). */
+  private readonly visit = new CheckoutVisit((name, props) =>
+    this.telemetry.track(name, props),
+  );
+
   constructor() {
     void this.load().then(() => this.applyQuery());
     this.telemetry.track('plans_view', { source: 'settings' });
+    effect(() => this.visit.periodShown(this.period()));
+    effect(() => this.visit.methodPicked(this.method()));
+    const end = () => this.visit.end();
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', end);
+    inject(DestroyRef).onDestroy(() => {
+      if (typeof window !== 'undefined')
+        window.removeEventListener('pagehide', end);
+      end();
+    });
   }
 
   private async load(): Promise<void> {
@@ -1074,6 +1091,7 @@ export class SubscriptionPage {
     this.selected.set({ plan, price });
     this.method.set('card');
     this.checkoutOpen.set(true);
+    this.visit.checkoutShown(plan.id, price, this.isNative);
   }
 
   protected priceLabel(p: PlanPrice, noInstallments: boolean): string {
@@ -1108,6 +1126,8 @@ export class SubscriptionPage {
       planId: sel.plan.id,
       period: sel.price.period,
       method,
+      currency: sel.price.currency.toUpperCase(),
+      ...this.visit.checkoutStarted(),
     });
 
     // Native: digital subscriptions must go through the store (App Store /

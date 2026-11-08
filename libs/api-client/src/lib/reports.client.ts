@@ -71,6 +71,42 @@ export interface OverviewReport {
   leagues: LeagueWeekReport[];
   shop: ShopWeekReport[];
   billing: BillingReport;
+  /** Learners per country (docs/15 Phase 14); older APIs omit it. */
+  countries?: CountryReport;
+  /** BRL monthly "card only" checkout funnel, last 30 days. */
+  monthlyPix?: MonthlyPixFunnel;
+}
+
+export interface CountryCounts {
+  /** ISO 3166-1 alpha-2; null for the Other / Unknown rows and totals. */
+  country: string | null;
+  learners: number;
+  active7: number;
+  active30: number;
+  paid: number;
+}
+
+export interface CountryReportRow extends CountryCounts {
+  kind: 'country' | 'other' | 'unknown';
+  /** Countries folded into the Other row. */
+  countries: number;
+}
+
+/** Top 10 countries by learners, then Other, then Unknown. */
+export interface CountryReport {
+  rows: CountryReportRow[];
+  total: CountryCounts;
+}
+
+/** Subscription-page visits that met "card only" on a BRL monthly price. */
+export interface MonthlyPixFunnel {
+  days: number;
+  cardOnlySeen: number;
+  cardCheckout: number;
+  switchedAnnual: number;
+  /** Switched to annual and paid with PIX or Boleto. */
+  switchedAnnualPrepay: number;
+  left: number;
 }
 
 export interface CourseFunnel {
