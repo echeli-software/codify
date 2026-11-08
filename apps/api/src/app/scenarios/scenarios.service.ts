@@ -32,6 +32,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from '../billing/access.service.js';
 import type { RewardResult } from '../gamification/gamification.types.js';
+import { scenarioEndingInfo } from '../progress/scenario-branch.js';
 
 export interface StudentScenarioView {
   id: string;
@@ -243,8 +244,16 @@ export class ScenariosService {
     };
 
     // Replayable: every completion goes through recordCompletion, which only
-    // rewards the first one (idempotent per user + lesson).
+    // rewards the first one (idempotent per user + lesson) — plus a smaller
+    // SCENARIO_BRANCH reward when a later run reaches a new ending.
     if (walk.completed) {
+      const scenarioEnding = await scenarioEndingInfo(this.prisma, {
+        userId,
+        scenarioId,
+        graph,
+        choiceIds,
+        runId: run.id,
+      });
       const done = await this.progress.recordCompletion({
         userId,
         lessonId: lesson.id,
@@ -254,8 +263,9 @@ export class ScenariosService {
         refId: scenarioId,
         questEvent: 'scenario_complete',
         ...(clientTimestamp ? { clientTimestamp } : {}),
+        ...(scenarioEnding ? { scenario: scenarioEnding } : {}),
       });
-      if (!done.alreadyCompleted) {
+      if (!done.alreadyCompleted || done.retake) {
         result.reward = done.reward;
         result.questsCompleted = done.questsCompleted;
         result.badgesUnlocked = done.badgesUnlocked;

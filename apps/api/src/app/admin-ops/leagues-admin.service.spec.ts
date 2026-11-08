@@ -2,11 +2,19 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { GamificationConfigService } from '../gamification/gamification-config.service.js';
 import { LeaguesAdminService, percentile } from './leagues-admin.service.js';
 
+const zones = {
+  cohortSize: 30,
+  promote: 7,
+  demote: 5,
+  minCohortForDemotion: 5,
+};
 const config = {
   getMany: jest.fn(async () => ({
     'league.promotionReward': { xp: 50, coins: 100, freeze: 1 },
     'league.rank1Reward': { xp: 25, coins: 50 },
+    'league.zones': zones,
   })),
+  get: jest.fn(async () => zones),
 } as unknown as GamificationConfigService;
 
 describe('percentile', () => {

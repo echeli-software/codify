@@ -1,9 +1,22 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { QuestsService, type QuestView } from './quests.service.js';
-import { CreateQuestTemplateDto, UpdateQuestTemplateDto } from './quests.dto.js';
+import {
+  CreateQuestTemplateDto,
+  UpdateQuestTemplateDto,
+} from './quests.dto.js';
 
 /**
  * Daily quests for students + quest-template management for admins.

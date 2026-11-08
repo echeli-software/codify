@@ -61,6 +61,7 @@ export class CreateQuestTemplateDto {
   @Max(100000)
   xpReward?: number;
 
+  /** Default 20 on create (docs/07 §2 "Daily quest complete: 20 coins"). */
   @IsOptional()
   @IsInt()
   @Min(0)

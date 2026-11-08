@@ -276,3 +276,265 @@ describe('GamificationService streak milestones', () => {
     expect(r.streakMilestone).toEqual({ days: 3, xp: 5, coins: 7 });
   });
 });
+
+const dayKeyAgo = (n: number) => {
+  const d = new Date();
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - n),
+  );
+};
+
+describe('GamificationService streak settlement on grant (FIX-7)', () => {
+  it('a gap covered by a freeze keeps the streak and reports the freeze', async () => {
+    const { svc, streaks } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    streaks.set('u1', {
+      userId: 'u1',
+      currentDays: 4,
+      longestDays: 4,
+      freezesAvailable: 1,
+      lastActivityDate: dayKeyAgo(2),
+    });
+    const r = await svc.grantReward(
+      lesson({ idempotencyKey: 'l1', countsForStreak: true }),
+    );
+    expect(r.streak).toMatchObject({
+      currentDays: 5,
+      freezesAvailable: 0,
+      freezesUsed: 1,
+      extended: true,
+      restartedAfterLoss: false,
+    });
+  });
+
+  it('a lost streak restarts at 1 (restartedAfterLoss)', async () => {
+    const { svc, streaks } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    streaks.set('u1', {
+      userId: 'u1',
+      currentDays: 9,
+      longestDays: 9,
+      freezesAvailable: 0,
+      lastActivityDate: dayKeyAgo(3),
+    });
+    const r = await svc.grantReward(
+      lesson({ idempotencyKey: 'l1', countsForStreak: true }),
+    );
+    expect(r.streak).toMatchObject({
+      currentDays: 1,
+      longestDays: 9,
+      restartedAfterLoss: true,
+    });
+  });
+
+  it('getSummary shows the effective streak, not the stale row', async () => {
+    const { svc, streaks, db } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    Object.assign(db, {
+      coinBonusPool: { findUnique: async () => ({ coins: 30 }) },
+    });
+    streaks.set('u1', {
+      userId: 'u1',
+      currentDays: 12,
+      longestDays: 12,
+      freezesAvailable: 0,
+      lastActivityDate: dayKeyAgo(2),
+    });
+    const s = await svc.getSummary('u1');
+    expect(s.streak).toMatchObject({ currentDays: 0, longestDays: 12 });
+    expect(s.weeklyBonusPool.coins).toBe(30);
+  });
+});
+
+describe('GamificationService daily coin caps + weekly pool (ECO-2)', () => {
+  it('caps LESSON_COMPLETE at 200/day; the excess goes to the pool; reports it', async () => {
+    const { svc, users, pools } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    for (let i = 0; i < 3; i++)
+      await svc.grantReward(
+        lesson({ baseCoins: 60, idempotencyKey: `a${i}`, flat: true }),
+      );
+    const r = await svc.grantReward(
+      lesson({ baseCoins: 60, idempotencyKey: 'a3', flat: true }),
+    );
+    expect(r.coins).toBe(20);
+    expect(r.coinCap).toEqual({ requested: 60, pooled: 40, dropped: 0 });
+    expect(r.breakdown).toContainEqual({
+      source: 'DAILY_CAP',
+      coins: -40,
+      pooled: 40,
+    });
+    expect(users.get('u1')!.coins).toBe(200);
+    expect([...pools.values()]).toEqual([40]);
+  });
+
+  it('a full pool drops the rest; uncapped / unlisted sources are never capped', async () => {
+    const { svc, pools } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      config: {
+        'coins.dailyCaps': { LESSON_COMPLETE: 10 },
+        'coins.weeklyPoolCap': 15,
+      },
+    });
+    const r = await svc.grantReward(
+      lesson({ baseCoins: 40, idempotencyKey: 'x', flat: true }),
+    );
+    expect(r).toMatchObject({
+      coins: 10,
+      coinCap: { pooled: 15, dropped: 15 },
+    });
+    expect([...pools.values()]).toEqual([15]);
+    const free = await svc.grantReward(
+      lesson({
+        baseCoins: 40,
+        idempotencyKey: 'y',
+        flat: true,
+        coinSource: 'DAILY_QUEST',
+      }),
+    );
+    expect(free.coins).toBe(40);
+    const bypass = await svc.grantReward(
+      lesson({
+        baseCoins: 40,
+        idempotencyKey: 'z',
+        flat: true,
+        uncapped: true,
+      }),
+    );
+    expect(bypass.coins).toBe(40);
+  });
+});
+
+describe('GamificationService analytics + breakdown (ECO-5, ECO-13)', () => {
+  it('writes reward_granted with the effective multiplier', async () => {
+    const { svc, analytics } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      multipliers: [{ kind: 'CAMPAIGN', value: 2, target: 'BOTH' }],
+    });
+    await svc.grantReward(lesson({ idempotencyKey: 'k', lessonId: 'L1' }));
+    expect(analytics[0]).toMatchObject({
+      name: 'reward_granted',
+      userId: 'u1',
+      props: expect.objectContaining({
+        source: 'LESSON_COMPLETE',
+        xp: 20,
+        coins: 10,
+        multiplierEffective: 2,
+        multiplierCapped: false,
+        lessonId: 'L1',
+      }),
+    });
+  });
+
+  it('lists coin-only factors with appliesTo so the toast can show them', async () => {
+    const { svc } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      multipliers: [
+        { kind: 'CAMPAIGN', value: 2, target: 'XP' },
+        { kind: 'COURSE_PROMO', value: 4, target: 'COINS', courseId: 'C1' },
+      ],
+    });
+    const r = await svc.grantReward(
+      lesson({ idempotencyKey: 'k', courseId: 'C1' }),
+    );
+    expect(r).toMatchObject({ xp: 20, coins: 20, coinMultiplier: 4 });
+    expect(r.breakdown).toEqual([
+      { source: 'base', xp: 10, coins: 5 },
+      { source: 'CAMPAIGN', multiplier: 2, appliesTo: 'xp' },
+      { source: 'COURSE_PROMO', multiplier: 4, appliesTo: 'coins' },
+    ]);
+  });
+
+  it("never applies another user's surprise boost", async () => {
+    const now = Date.now();
+    const { svc } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      multipliers: [
+        {
+          kind: 'SURPRISE_BOOST',
+          value: 2,
+          target: 'XP',
+          userId: 'u2',
+          startsAt: new Date(now - 60_000),
+          endsAt: new Date(now + 600_000),
+        },
+      ],
+    });
+    const r = await svc.grantReward(lesson({ idempotencyKey: 'k' }));
+    expect(r.xp).toBe(10);
+  });
+});
+
+describe('GamificationService surprise boosts (ECO-9)', () => {
+  it('starts a 15-min 2x XP boost on a lucky roll, at most 2 per week', async () => {
+    const { svc, db, multipliers } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    svc.random = () => 0; // always lucky
+    const t0 = new Date('2026-11-07T10:00:00Z');
+    const b1 = await svc.maybeStartSurpriseBoost(db as never, 'u1', t0);
+    expect(b1).toMatchObject({ value: 2, target: 'XP' });
+    expect(Date.parse(b1!.endsAt) - t0.getTime()).toBe(15 * 60_000);
+    // While one runs, no second one.
+    expect(
+      await svc.maybeStartSurpriseBoost(
+        db as never,
+        'u1',
+        new Date(t0.getTime() + 60_000),
+      ),
+    ).toBeNull();
+    const later = new Date(t0.getTime() + 60 * 60_000);
+    // createdAt of the fake rows is "now" (real clock); keep them in-window.
+    for (const m of multipliers) m.createdAt = t0;
+    expect(
+      await svc.maybeStartSurpriseBoost(db as never, 'u1', later),
+    ).not.toBeNull();
+    for (const m of multipliers) m.createdAt = t0;
+    expect(
+      await svc.maybeStartSurpriseBoost(
+        db as never,
+        'u1',
+        new Date(later.getTime() + 60 * 60_000),
+      ),
+    ).toBeNull();
+  });
+
+  it('an unlucky roll starts nothing', async () => {
+    const { svc, db } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+    });
+    svc.random = () => 0.99;
+    expect(await svc.maybeStartSurpriseBoost(db as never, 'u1')).toBeNull();
+  });
+});
+
+describe('GamificationService exclusive milestone cosmetics (ECO-8)', () => {
+  it('grants the 30-day item once with the milestone', async () => {
+    const { svc, streaks, userItems } = setup({
+      users: [{ id: 'u1', coins: 0, totalXp: 0, timezone: 'UTC' }],
+      items: [{ id: 'i30', slug: 'streak-30-flame-frame', name: 'Flame' }],
+    });
+    streaks.set('u1', {
+      userId: 'u1',
+      currentDays: 29,
+      longestDays: 29,
+      freezesAvailable: 0,
+      lastActivityDate: dayKeyAgo(1),
+    });
+    const r = await svc.grantReward(
+      lesson({ idempotencyKey: 'l1', countsForStreak: true }),
+    );
+    expect(r.streakMilestone).toMatchObject({
+      days: 30,
+      coins: 200,
+      item: { id: 'i30', slug: 'streak-30-flame-frame' },
+    });
+    expect(userItems).toEqual([
+      { userId: 'u1', itemId: 'i30', source: 'PROMO' },
+    ]);
+  });
+});

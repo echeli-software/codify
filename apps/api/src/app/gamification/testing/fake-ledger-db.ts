@@ -21,6 +21,23 @@ export interface FakeCoinTx {
   source: string;
   idempotencyKey: string | null;
   refType: string | null;
+  createdAt?: Date;
+}
+
+export interface FakeMultiplier {
+  id: string;
+  kind: string;
+  target: 'XP' | 'COINS' | 'BOTH';
+  value: number;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  courseId: string | null;
+  lessonId: string | null;
+  streakDaysMin: number | null;
+  userId: string | null;
+  description: string | null;
+  isActive: boolean;
+  createdAt: Date;
 }
 
 export interface FakeXpEvent {
@@ -45,6 +62,8 @@ export function makeFakeLedgerDb(opts: {
   config?: Record<string, unknown>;
   /** When false, `FOR UPDATE` is a no-op (to show the second guard). */
   locking?: boolean;
+  multipliers?: Partial<FakeMultiplier>[];
+  items?: { id: string; slug: string; name: string }[];
 }) {
   const locking = opts.locking ?? true;
   const users = new Map(opts.users.map((u) => [u.id, { ...u }]));
@@ -53,7 +72,31 @@ export function makeFakeLedgerDb(opts: {
   const streaks = new Map<string, FakeStreak>();
   const config = new Map(Object.entries(opts.config ?? {}));
   const locks = new Map<string, Promise<void>>();
+  const analytics: { name: string; userId: string; props: unknown }[] = [];
+  const pools = new Map<string, number>();
+  const userItems: { userId: string; itemId: string; source: string }[] = [];
+  const items = opts.items ?? [];
   let seq = 0;
+  const multipliers: FakeMultiplier[] = (opts.multipliers ?? []).map(
+    (m, i) => ({
+      id: `m${i}`,
+      kind: 'CAMPAIGN',
+      target: 'BOTH',
+      value: 2,
+      startsAt: null,
+      endsAt: null,
+      courseId: null,
+      lessonId: null,
+      streakDaysMin: null,
+      userId: null,
+      description: null,
+      isActive: true,
+      createdAt: new Date(),
+      ...m,
+    }),
+  );
+  const poolKey = (w: { userId: string; weekStart: Date }) =>
+    `${w.userId}|${w.weekStart.toISOString()}`;
   const id = () => `id-${++seq}`;
 
   function unique(
@@ -145,9 +188,90 @@ export function makeFakeLedgerDb(opts: {
             id: id(),
             idempotencyKey: data.idempotencyKey ?? null,
             refType: data.refType ?? null,
+            createdAt: new Date(),
           };
           coinTx.push(row);
           return row;
+        },
+        aggregate: async ({
+          where,
+        }: {
+          where: { userId: string; source: string; createdAt: { gte: Date } };
+        }) => {
+          await tick();
+          const sum = coinTx
+            .filter(
+              (c) =>
+                c.userId === where.userId &&
+                c.source === where.source &&
+                c.delta > 0 &&
+                (c.createdAt ?? new Date()) >= where.createdAt.gte,
+            )
+            .reduce((a, c) => a + c.delta, 0);
+          return { _sum: { delta: sum || null } };
+        },
+      },
+      coinBonusPool: {
+        findUnique: async ({
+          where,
+        }: {
+          where: { userId_weekStart: { userId: string; weekStart: Date } };
+        }) => {
+          const v = pools.get(poolKey(where.userId_weekStart));
+          return v === undefined ? null : { coins: v };
+        },
+        upsert: async ({
+          where,
+          create,
+          update,
+        }: {
+          where: { userId_weekStart: { userId: string; weekStart: Date } };
+          create: { coins: number };
+          update: { coins: { increment: number } };
+        }) => {
+          const k = poolKey(where.userId_weekStart);
+          const cur = pools.get(k);
+          pools.set(
+            k,
+            cur === undefined ? create.coins : cur + update.coins.increment,
+          );
+          return { coins: pools.get(k) };
+        },
+      },
+      analyticsEvent: {
+        create: async ({
+          data,
+        }: {
+          data: { name: string; userId: string; props: unknown };
+        }) => {
+          analytics.push(data);
+          return data;
+        },
+      },
+      item: {
+        findUnique: async ({ where }: { where: { slug: string } }) => {
+          const it = items.find((i) => i.slug === where.slug);
+          return it ? { ...it, deletedAt: null } : null;
+        },
+      },
+      userItem: {
+        createMany: async ({
+          data,
+        }: {
+          data: { userId: string; itemId: string; source: string }[];
+        }) => {
+          let count = 0;
+          for (const d of data) {
+            if (
+              userItems.some(
+                (u) => u.userId === d.userId && u.itemId === d.itemId,
+              )
+            )
+              continue;
+            userItems.push(d);
+            count += 1;
+          }
+          return { count };
         },
       },
       xpEvent: {
@@ -198,7 +322,73 @@ export function makeFakeLedgerDb(opts: {
           return { ...s };
         },
       },
-      multiplier: { findMany: async () => [] },
+      multiplier: {
+        findMany: async ({
+          where,
+        }: {
+          where: { OR?: { userId: string | null }[] };
+        }) => {
+          const ids = where.OR?.map((o) => o.userId) ?? [null];
+          return multipliers
+            .filter((m) => m.isActive && ids.includes(m.userId))
+            .map((m) => ({ ...m }));
+        },
+        findFirst: async ({
+          where,
+        }: {
+          where: {
+            userId: string;
+            kind: string;
+            startsAt: { lte: Date };
+            endsAt: { gt: Date };
+          };
+        }) =>
+          multipliers.find(
+            (m) =>
+              m.userId === where.userId &&
+              m.kind === where.kind &&
+              m.isActive &&
+              m.startsAt !== null &&
+              m.startsAt <= where.startsAt.lte &&
+              m.endsAt !== null &&
+              m.endsAt > where.endsAt.gt,
+          ) ?? null,
+        count: async ({
+          where,
+        }: {
+          where: { userId: string; kind: string; createdAt: { gte: Date } };
+        }) =>
+          multipliers.filter(
+            (m) =>
+              m.userId === where.userId &&
+              m.kind === where.kind &&
+              m.createdAt >= where.createdAt.gte,
+          ).length,
+        create: async ({
+          data,
+        }: {
+          data: Partial<FakeMultiplier> & { value: unknown };
+        }) => {
+          const row: FakeMultiplier = {
+            id: id(),
+            kind: 'SURPRISE_BOOST',
+            target: 'XP',
+            startsAt: null,
+            endsAt: null,
+            courseId: null,
+            lessonId: null,
+            streakDaysMin: null,
+            userId: null,
+            description: null,
+            isActive: true,
+            createdAt: new Date(),
+            ...data,
+            value: Number(data.value),
+          };
+          multipliers.push(row);
+          return { ...row };
+        },
+      },
       subscription: { findMany: async () => [] },
       gamificationConfig: {
         findUnique: async ({ where }: { where: { key: string } }) =>
@@ -231,5 +421,16 @@ export function makeFakeLedgerDb(opts: {
     },
   };
 
-  return { db: root, users, coinTx, xpEvents, streaks, config };
+  return {
+    db: root,
+    users,
+    coinTx,
+    xpEvents,
+    streaks,
+    config,
+    analytics,
+    pools,
+    userItems,
+    multipliers,
+  };
 }

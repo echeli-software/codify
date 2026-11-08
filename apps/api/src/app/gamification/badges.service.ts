@@ -5,7 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GamificationService } from './gamification.service.js';
 import {
@@ -55,8 +55,18 @@ interface NumericPredicate {
   lt?: number;
   eq?: number;
 }
+/**
+ * Event filters (docs/07 §7): `scorePct` (numeric predicate) on
+ * ai_prompt_pass / quiz_pass / exercise_pass; `afterStreakLost: true` on
+ * any lesson event ("completed a lesson after losing a streak").
+ */
+export interface EventWhere {
+  scorePct?: NumericPredicate;
+  afterStreakLost?: boolean;
+}
 interface EventClause {
   event: string;
+  where?: EventWhere;
   count?: NumericPredicate;
 }
 interface MetricClause {
@@ -76,7 +86,33 @@ export interface BadgeRule {
 export interface UserMetrics {
   events: Record<string, number>;
   metrics: Record<string, number>;
+  /** Counts for filtered event clauses, keyed by {@link whereKey}. */
+  filtered?: Record<string, number>;
 }
+
+/** The event that triggered an evaluation (feeds `where` filters). */
+export interface BadgeEventContext {
+  type: string;
+  lessonId?: string | null;
+  scorePct?: number | null;
+  /** This completion restarted a streak that had been lost. */
+  afterStreakLost?: boolean;
+}
+
+/** Stable key of a filtered clause (event + where). */
+export function whereKey(event: string, where: EventWhere): string {
+  const w: Record<string, unknown> = {};
+  for (const k of Object.keys(where).sort())
+    w[k] = (where as Record<string, unknown>)[k];
+  return `${event}|${JSON.stringify(w)}`;
+}
+
+/** Events a `scorePct` filter can apply to. */
+export const SCORED_BADGE_EVENTS = [
+  'ai_prompt_pass',
+  'quiz_pass',
+  'exercise_pass',
+] as const;
 
 function assertRule(rule: unknown): void {
   const errors = validateBadgeRule(rule);
@@ -210,7 +246,11 @@ export class BadgesService {
    * Award any active badges the user newly qualifies for. Runs in the event
    * transaction; returns the badges unlocked so the client can celebrate.
    */
-  async evaluate(tx: Tx, userId: string): Promise<UnlockedBadge[]> {
+  async evaluate(
+    tx: Tx,
+    userId: string,
+    ctx: BadgeEventContext | null = null,
+  ): Promise<UnlockedBadge[]> {
     const [badges, owned] = await Promise.all([
       tx.badge.findMany({ where: { isActive: true } }),
       tx.userBadge.findMany({ where: { userId }, select: { badgeId: true } }),
@@ -220,6 +260,13 @@ export class BadgesService {
     if (candidates.length === 0) return [];
 
     const metrics = await this.computeMetrics(tx, userId);
+    metrics.filtered = await this.computeFiltered(
+      tx,
+      userId,
+      candidates.map((b) => b.rule as unknown as BadgeRule),
+      metrics,
+      ctx,
+    );
     const unlocked: UnlockedBadge[] = [];
 
     for (const badge of candidates) {
@@ -251,6 +298,80 @@ export class BadgesService {
       });
     }
     return unlocked;
+  }
+
+  /**
+   * Counts for every filtered event clause in `rules` (computed only when a
+   * candidate badge uses one):
+   *   - `scorePct` — distinct items passed with a matching score, from
+   *     AiSubmission / QuizAttempt / scored Submission rows;
+   *   - `afterStreakLost` — 1 when this event restarted a lost streak, or
+   *     the stored streak shows a loss followed by activity (longest >
+   *     current ≥ 1); otherwise 0. It answers "happened at least once", so
+   *     validation only allows it with `count` ≤ 1.
+   */
+  async computeFiltered(
+    tx: Tx,
+    userId: string,
+    rules: BadgeRule[],
+    metrics: UserMetrics,
+    ctx: BadgeEventContext | null,
+  ): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const rule of rules) {
+      for (const c of [...(rule.all ?? []), ...(rule.any ?? [])]) {
+        if (!('event' in c) || !c.where) continue;
+        const key = whereKey(c.event, c.where);
+        if (key in out) continue;
+        out[key] = await this.countFiltered(
+          tx,
+          userId,
+          c.event,
+          c.where,
+          metrics,
+          ctx,
+        );
+      }
+    }
+    return out;
+  }
+
+  private async countFiltered(
+    tx: Tx,
+    userId: string,
+    event: string,
+    where: EventWhere,
+    metrics: UserMetrics,
+    ctx: BadgeEventContext | null,
+  ): Promise<number> {
+    let count = metrics.events[event] ?? 0;
+    if (where.afterStreakLost) {
+      const restarted =
+        (ctx?.afterStreakLost ?? false) ||
+        ((metrics.metrics['streak.longest_days'] ?? 0) >
+          (metrics.metrics['streak.current_days'] ?? 0) &&
+          (metrics.metrics['streak.current_days'] ?? 0) >= 1);
+      count = restarted && count > 0 ? 1 : 0;
+    }
+    if (where.scorePct && count > 0) {
+      const pred = predicateSql('"scorePct"', where.scorePct);
+      let rows: { count: bigint }[] = [];
+      if (event === 'ai_prompt_pass') {
+        rows = await tx.$queryRaw<{ count: bigint }[]>`
+          SELECT COUNT(DISTINCT "aiPromptId") AS count FROM "AiSubmission"
+          WHERE "userId" = ${userId} AND passed ${pred}`;
+      } else if (event === 'quiz_pass') {
+        rows = await tx.$queryRaw<{ count: bigint }[]>`
+          SELECT COUNT(DISTINCT "lessonId") AS count FROM "QuizAttempt"
+          WHERE "userId" = ${userId} AND passed ${pred}`;
+      } else if (event === 'exercise_pass') {
+        rows = await tx.$queryRaw<{ count: bigint }[]>`
+          SELECT COUNT(DISTINCT "exerciseId") AS count FROM "Submission"
+          WHERE "userId" = ${userId} AND scored AND verdict = 'PASS' ${pred}`;
+      }
+      count = Math.min(count, Number(rows[0]?.count ?? 0));
+    }
+    return count;
   }
 
   /**
@@ -379,18 +500,26 @@ export function validateBadgeRule(rule: unknown): string[] {
     if (!c || typeof c !== 'object')
       return errors.push(`${where} must be an object`);
     const clause = c as Record<string, unknown>;
-    if ('where' in clause) {
-      errors.push(`${where}.where: event filters are not supported yet`);
+    if ('where' in clause && !('event' in clause)) {
+      errors.push(`${where}.where is only allowed on "event" clauses`);
     }
     if ('event' in clause) {
-      if (
-        !(BADGE_EVENTS as readonly string[]).includes(clause['event'] as string)
-      )
+      const event = clause['event'] as string;
+      if (!(BADGE_EVENTS as readonly string[]).includes(event))
         errors.push(`${where}.event must be one of ${BADGE_EVENTS.join(', ')}`);
       const count = clause['count'] ?? { gte: 1 };
       if (!count || typeof count !== 'object')
         errors.push(`${where}.count must be an object`);
       else checkPred(count as Record<string, unknown>, `${where}.count`);
+      if ('where' in clause)
+        validateWhere(
+          clause['where'],
+          event,
+          count,
+          `${where}.where`,
+          errors,
+          checkPred,
+        );
     } else if ('metric' in clause) {
       if (
         !(BADGE_METRICS as readonly string[]).includes(
@@ -409,6 +538,69 @@ export function validateBadgeRule(rule: unknown): string[] {
   return errors;
 }
 
+function validateWhere(
+  w: unknown,
+  event: string,
+  count: unknown,
+  path: string,
+  errors: string[],
+  checkPred: (p: Record<string, unknown>, where: string) => void,
+): void {
+  if (!w || typeof w !== 'object' || Array.isArray(w)) {
+    errors.push(`${path} must be an object`);
+    return;
+  }
+  const o = w as Record<string, unknown>;
+  const keys = Object.keys(o);
+  if (keys.length === 0) errors.push(`${path} needs at least one filter`);
+  for (const k of keys) {
+    if (k === 'scorePct') {
+      if (!(SCORED_BADGE_EVENTS as readonly string[]).includes(event))
+        errors.push(
+          `${path}.scorePct only applies to ${SCORED_BADGE_EVENTS.join(', ')}`,
+        );
+      const p = o[k];
+      if (!p || typeof p !== 'object' || Array.isArray(p))
+        errors.push(`${path}.scorePct must be a predicate object`);
+      else checkPred(p as Record<string, unknown>, `${path}.scorePct`);
+    } else if (k === 'afterStreakLost') {
+      if (o[k] !== true) errors.push(`${path}.afterStreakLost must be true`);
+      const c = (count ?? {}) as Record<string, unknown>;
+      const needsMore =
+        (typeof c['gte'] === 'number' && c['gte'] > 1) ||
+        (typeof c['gt'] === 'number' && c['gt'] >= 1) ||
+        (typeof c['eq'] === 'number' && c['eq'] > 1);
+      if (needsMore)
+        errors.push(
+          `${path}.afterStreakLost can only be counted once (count ≤ 1)`,
+        );
+    } else {
+      errors.push(
+        `${path}.${k} is not a supported filter (scorePct, afterStreakLost)`,
+      );
+    }
+  }
+}
+
+const SQL_OPS: Record<string, string> = {
+  gte: '>=',
+  lte: '<=',
+  gt: '>',
+  lt: '<',
+  eq: '=',
+};
+
+/** `AND col >= $n …` for a validated numeric predicate (values bound). */
+function predicateSql(column: string, p: NumericPredicate): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  for (const [op, sym] of Object.entries(SQL_OPS)) {
+    const v = (p as Record<string, unknown>)[op];
+    if (typeof v === 'number' && Number.isFinite(v))
+      parts.push(Prisma.sql`AND ${Prisma.raw(column)} ${Prisma.raw(sym)} ${v}`);
+  }
+  return parts.length ? Prisma.join(parts, ' ') : Prisma.empty;
+}
+
 // ─── Pure rule evaluation ────────────────────────────────────────────────
 
 function evalRule(rule: BadgeRule, m: UserMetrics): boolean {
@@ -419,7 +611,9 @@ function evalRule(rule: BadgeRule, m: UserMetrics): boolean {
 
 function evalClause(clause: Clause, m: UserMetrics): boolean {
   if ('event' in clause) {
-    const value = m.events[clause.event] ?? 0;
+    const value = clause.where
+      ? (m.filtered?.[whereKey(clause.event, clause.where)] ?? 0)
+      : (m.events[clause.event] ?? 0);
     // No count → "happened at least once" (docs/07 §7 "Comeback" example).
     return cmp(value, clause.count ?? { gte: 1 });
   }

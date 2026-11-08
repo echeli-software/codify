@@ -150,11 +150,14 @@ describe('QuizzesService.submit', () => {
       expect.objectContaining({
         userId: 'u1',
         lessonId: 'l1',
-        xpSource: 'QUIZ_PERFECT',
-        coinSource: 'QUIZ_PERFECT',
+        // Base as LESSON_COMPLETE; the perfect bonus is ProgressService's
+        // own QUIZ_PERFECT ledger row, driven by `quiz`.
+        xpSource: 'LESSON_COMPLETE',
+        coinSource: 'LESSON_COMPLETE',
         refType: 'quiz',
         refId: 'att-1',
         questEvent: 'quiz_pass',
+        quiz: { scorePct: 100, correctCount: 2, totalCount: 2 },
       }),
     );
     expect(res.completion?.alreadyCompleted).toBe(false);
@@ -238,11 +241,18 @@ describe('QuizzesService.submit', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rejects a clientTimestamp in the future', async () => {
+  it('clamps a future clientTimestamp to now instead of rejecting (docs/16 §8)', async () => {
     const { svc } = setup();
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await expect(
       svc.submit(actor, 'l1', { answers: {}, clientTimestamp: future }),
+    ).resolves.toMatchObject({ passed: false });
+  });
+
+  it('still rejects an unparseable clientTimestamp', async () => {
+    const { svc } = setup();
+    await expect(
+      svc.submit(actor, 'l1', { answers: {}, clientTimestamp: 'soon' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

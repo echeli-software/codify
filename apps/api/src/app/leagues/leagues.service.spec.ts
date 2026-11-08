@@ -3,6 +3,7 @@ import { GAMIFICATION_CONFIG_DEFAULTS } from '../gamification/gamification-confi
 import {
   LeaguesService,
   leagueResultCopy,
+  leagueResultDue,
   weeklyBadgeSlug,
 } from './leagues.service.js';
 import { LeagueAccumulatorService } from './league-accumulator.service.js';
@@ -77,14 +78,14 @@ function setupRollover(memberCount: number) {
 }
 
 describe('LeaguesService.runRollover', () => {
-  it('rewards, awards the weekly badge, pushes every member, and is idempotent', async () => {
+  it('rewards, awards the weekly badge, and is idempotent (results are pushed Monday 09:00 local)', async () => {
     const { svc, tx, gamification, push, prisma } = setupRollover(10);
     const res = await svc.runRollover('2026-09-28T00:00:00.000Z');
     // 10 × 7/30 ≈ 2.3 → 2 promote.
     expect(res.promotions).toBe(2);
     expect(res.membersRewarded).toBe(10);
     expect(res.badgesAwarded).toBe(1);
-    expect(res.pushesSent).toBe(10);
+    expect(res.pushesSent).toBe(0);
     expect(gamification.grantReward).toHaveBeenCalledTimes(2);
     expect(gamification.grantReward.mock.calls[0]).toEqual([
       expect.objectContaining({
@@ -108,7 +109,8 @@ describe('LeaguesService.runRollover', () => {
         }),
       }),
     );
-    expect(push.sendToUser).toHaveBeenCalledTimes(10);
+    // LEAGUE_RESULT is not sent at rollover (Sunday night in the Americas).
+    expect(push.sendToUser).not.toHaveBeenCalled();
 
     const again = await svc.runRollover('2026-09-28T00:00:00.000Z');
     expect(again.membersRewarded).toBe(0);
@@ -208,5 +210,125 @@ describe('LeagueAccumulatorService.ensureMembership', () => {
     expect(res).toEqual({ leagueId: 'L9' });
     expect(calls).toEqual(['check', 'prevTier', 'lock', 'recheck']);
     expect(tx.leagueMembership.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('LEAGUE_RESULT at Monday 09:00 user-local (ECO-10)', () => {
+  // The week 2026-09-28 … ended at UTC Monday 2026-10-05 00:00.
+  const monday = '2026-10-05';
+  it('leagueResultDue follows the user zone', () => {
+    // 2026-10-05T11:30Z = 08:30 São Paulo → not yet; 12:00Z = 09:00 → due.
+    expect(
+      leagueResultDue(
+        new Date('2026-10-05T11:30:00Z'),
+        'America/Sao_Paulo',
+        monday,
+      ),
+    ).toBe(false);
+    expect(
+      leagueResultDue(
+        new Date('2026-10-05T12:00:00Z'),
+        'America/Sao_Paulo',
+        monday,
+      ),
+    ).toBe(true);
+    // Rollover time (00:05Z) is still Sunday evening in São Paulo.
+    expect(
+      leagueResultDue(
+        new Date('2026-10-05T00:05:00Z'),
+        'America/Sao_Paulo',
+        monday,
+      ),
+    ).toBe(false);
+    // Tokyo reaches Monday 09:00 at 00:00Z.
+    expect(
+      leagueResultDue(new Date('2026-10-05T00:05:00Z'), 'Asia/Tokyo', monday),
+    ).toBe(true);
+    // Later in the week it is still due (a missed hour catches up).
+    expect(
+      leagueResultDue(
+        new Date('2026-10-07T03:00:00Z'),
+        'America/Sao_Paulo',
+        monday,
+      ),
+    ).toBe(true);
+  });
+
+  it('sendLeagueResults notifies due members once', async () => {
+    const claimed = new Set<string>();
+    const prisma = {
+      leagueMembership: {
+        findMany: jest.fn(async () => [
+          {
+            leagueId: 'L1',
+            userId: 'sp',
+            finalRank: 1,
+            promoted: true,
+            demoted: false,
+            league: { tier: 'SILVER' },
+            user: { timezone: 'America/Sao_Paulo' },
+          },
+          {
+            leagueId: 'L1',
+            userId: 'la',
+            finalRank: 5,
+            promoted: false,
+            demoted: false,
+            league: { tier: 'SILVER' },
+            user: { timezone: 'America/Los_Angeles' },
+          },
+        ]),
+      },
+      idempotencyRecord: {
+        create: jest.fn(async ({ data }: { data: { key: string } }) => {
+          if (claimed.has(data.key)) {
+            const { Prisma } = await import('@prisma/client');
+            throw new Prisma.PrismaClientKnownRequestError('dup', {
+              code: 'P2002',
+              clientVersion: '7',
+            });
+          }
+          claimed.add(data.key);
+          return data;
+        }),
+      },
+    };
+    const push = { sendToUser: jest.fn(async () => ({ sent: 1 })) };
+    const svc = new LeaguesService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      config as never,
+      push as never,
+    );
+    // 13:00Z Monday: 10:00 São Paulo (due), 06:00 Los Angeles (not yet).
+    const at = new Date('2026-10-05T13:00:00Z');
+    expect(await svc.sendLeagueResults(at)).toEqual({
+      due: 1,
+      sent: 1,
+      pushed: 1,
+    });
+    expect(push.sendToUser).toHaveBeenCalledWith(
+      'sp',
+      expect.any(Function),
+      at,
+    );
+    const built = (
+      push.sendToUser.mock.calls[0] as unknown as [
+        string,
+        (u: { locale: string }) => { kind: string; title: string },
+      ]
+    )[1]({ locale: 'en-US' });
+    expect(built).toMatchObject({ kind: 'LEAGUE_RESULT' });
+    expect(built.title).toMatch(/Gold/);
+    // Re-run: already claimed → nothing new.
+    expect((await svc.sendLeagueResults(at)).sent).toBe(0);
+    expect(prisma.leagueMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          league: { weekStart: new Date('2026-09-28T00:00:00Z') },
+        }),
+      }),
+    );
   });
 });

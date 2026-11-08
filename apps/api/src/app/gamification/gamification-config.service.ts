@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import {
+  DEFAULT_EARNING_BY_TYPE,
+  DEFAULT_LEAGUE_ZONES,
+  validateLeagueZones,
+  type LeagueZoneConfig,
+} from '@codify/domain';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 type Tx = Prisma.TransactionClient;
@@ -36,6 +42,36 @@ export interface GamificationConfigValues {
   'referral.reward': RewardAmount;
   /** Days after signup during which a referral code may be claimed. */
   'referral.claimWindowDays': number;
+  /**
+   * First-completion reward per lesson type (docs/07 §2). Applies when the
+   * lesson's own baseXp / baseCoins are still at the column default
+   * (10 / 5) — see `lessonBaseReward` in @codify/domain.
+   */
+  'earning.byLessonType': Record<string, RewardAmount>;
+  /** Extra reward for a 100 % quiz, journaled as its own QUIZ_PERFECT rows. */
+  'earning.quizPerfectBonus': RewardAmount;
+  /** Extra reward per correctly answered quiz question (0 = off). */
+  'earning.quizPerQuestionBonus': RewardAmount;
+  /** Exercise / AI-prompt pass after the first: once per lesson per local day (RETAKE). */
+  'earning.retake': RewardAmount;
+  /** A newly reached scenario ending (SCENARIO_BRANCH), at most `dailyCap` per scenario per day. */
+  'earning.scenarioBranch': RewardAmount & { dailyCap: number };
+  /**
+   * Daily coin cap per CoinSource, user-local day (docs/07 §5, §12). Sources
+   * not listed are uncapped. The excess goes to the weekly bonus pool.
+   */
+  'coins.dailyCaps': Record<string, number>;
+  /** Max coins held in a user's weekly bonus pool (paid at week close, WEEKLY_BONUS). */
+  'coins.weeklyPoolCap': number;
+  /** League promotion / relegation zone sizes (docs/07 §9). */
+  'league.zones': LeagueZoneConfig;
+  /** Surprise XP boosts (docs/10 §6): chance per completion, length, weekly limit. */
+  'boost.surprise': {
+    chancePct: number;
+    value: number;
+    minutes: number;
+    maxPerWeek: number;
+  };
 }
 
 export type GamificationConfigKey = keyof GamificationConfigValues;
@@ -58,7 +94,40 @@ export const GAMIFICATION_CONFIG_DEFAULTS: GamificationConfigValues = {
   'quest.dailyCount': 3,
   'referral.reward': { xp: 50, coins: 200 },
   'referral.claimWindowDays': 14,
+  'earning.byLessonType': { ...DEFAULT_EARNING_BY_TYPE },
+  'earning.quizPerfectBonus': { xp: 10, coins: 5 },
+  'earning.quizPerQuestionBonus': { xp: 0, coins: 0 },
+  'earning.retake': { xp: 5, coins: 2 },
+  'earning.scenarioBranch': { xp: 10, coins: 5, dailyCap: 3 },
+  'coins.dailyCaps': { LESSON_COMPLETE: 200 },
+  'coins.weeklyPoolCap': 500,
+  'league.zones': { ...DEFAULT_LEAGUE_ZONES },
+  'boost.surprise': { chancePct: 10, value: 2, minutes: 15, maxPerWeek: 2 },
 };
+
+/** CoinSources a daily cap may name (earn sources; spends are never capped). */
+export const CAPPABLE_COIN_SOURCES = [
+  'LESSON_COMPLETE',
+  'QUIZ_PERFECT',
+  'EXERCISE_PASS',
+  'AI_PROMPT_PASS',
+  'SCENARIO_COMPLETE',
+  'CAPSTONE_PASS',
+  'RETAKE',
+  'SCENARIO_BRANCH',
+  'DAILY_QUEST',
+  'BADGE_UNLOCK',
+  'STREAK_MILESTONE',
+] as const;
+
+const LESSON_TYPES = [
+  'READING',
+  'QUIZ',
+  'EXERCISE',
+  'AI_PROMPT',
+  'SCENARIO',
+  'CAPSTONE',
+];
 
 export const GAMIFICATION_CONFIG_KEYS = Object.keys(
   GAMIFICATION_CONFIG_DEFAULTS,
@@ -142,9 +211,72 @@ export function validateConfigValue(
         : 'must be { xp, coins, freeze } with non-negative integers (freeze ≤ 10)';
     case 'league.rank1Reward':
     case 'referral.reward':
+    case 'earning.quizPerfectBonus':
+    case 'earning.quizPerQuestionBonus':
+    case 'earning.retake':
       return isReward(value)
         ? null
         : 'must be { xp, coins } with non-negative integers';
+    case 'earning.scenarioBranch':
+      return isReward(value, ['dailyCap'])
+        ? null
+        : 'must be { xp, coins, dailyCap } with non-negative integers (dailyCap ≤ 10)';
+    case 'earning.byLessonType': {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return 'must be an object of { "<LESSON_TYPE>": { xp, coins } }';
+      for (const [type, reward] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        if (!LESSON_TYPES.includes(type))
+          return `"${type}" must be one of ${LESSON_TYPES.join(', ')}`;
+        if (!isReward(reward))
+          return `${type} must be { xp, coins } with non-negative integers`;
+      }
+      return null;
+    }
+    case 'coins.dailyCaps': {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return 'must be an object of { "<COIN_SOURCE>": cap }';
+      for (const [source, cap] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        if (!(CAPPABLE_COIN_SOURCES as readonly string[]).includes(source))
+          return `"${source}" must be one of ${CAPPABLE_COIN_SOURCES.join(', ')}`;
+        if (!isInt(cap, 0, MAX_REWARD))
+          return `${source} cap must be an integer between 0 and ${MAX_REWARD}`;
+      }
+      return null;
+    }
+    case 'coins.weeklyPoolCap':
+      return isInt(value, 0, MAX_REWARD)
+        ? null
+        : `must be an integer between 0 and ${MAX_REWARD}`;
+    case 'league.zones': {
+      const errs = validateLeagueZones(value);
+      return errs.length ? errs.join('; ') : null;
+    }
+    case 'boost.surprise': {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return 'must be { chancePct, value, minutes, maxPerWeek }';
+      const o = value as Record<string, unknown>;
+      const allowed = ['chancePct', 'value', 'minutes', 'maxPerWeek'];
+      if (Object.keys(o).some((k) => !allowed.includes(k)))
+        return `only ${allowed.join(', ')} are allowed`;
+      if (!isInt(o['chancePct'], 0, 100))
+        return 'chancePct must be an integer between 0 and 100';
+      if (
+        typeof o['value'] !== 'number' ||
+        !Number.isFinite(o['value']) ||
+        o['value'] < 1 ||
+        o['value'] > 5
+      )
+        return 'value must be a number between 1 and 5';
+      if (!isInt(o['minutes'], 1, 120))
+        return 'minutes must be an integer between 1 and 120';
+      if (!isInt(o['maxPerWeek'], 0, 7))
+        return 'maxPerWeek must be an integer between 0 and 7';
+      return null;
+    }
     default:
       return 'unknown key';
   }

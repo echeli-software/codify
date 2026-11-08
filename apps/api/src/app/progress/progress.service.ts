@@ -4,10 +4,14 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { levelFromXp } from '@codify/ui-core';
+import { lessonBaseReward, localDateKey, localDayStart } from '@codify/domain';
+import { GamificationConfigService } from '../gamification/gamification-config.service.js';
+import type { RewardResult } from '../gamification/gamification.types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { AccessService } from '../billing/access.service.js';
@@ -38,12 +42,30 @@ export interface RecordCompletionParams {
   questEvent?: QuestEventContext['type'];
   /** Offline-queue client time, so streak credit lands on the right local day. */
   clientTimestamp?: string | null;
+  /** Graded quiz pass: drives the perfect-score and per-question bonuses. */
+  quiz?: { scorePct: number; correctCount: number; totalCount: number };
+  /**
+   * Scenario play-through that reached an ending: on a replay of an
+   * already-completed lesson, a *new* ending pays SCENARIO_BRANCH.
+   */
+  scenario?: { scenarioId: string; endingKey: string; isNewEnding: boolean };
 }
 
 export type RecordCompletionResult = CompleteLessonResponse & {
-  /** True when the lesson was already complete; nothing was granted. */
+  /**
+   * True when the lesson was already complete; the first-completion reward
+   * was not paid again. A retake / new scenario ending may still carry a
+   * (smaller) `reward` — then `retake` is true.
+   */
   alreadyCompleted: boolean;
+  /** True when this replay paid a RETAKE / SCENARIO_BRANCH reward. */
+  retake?: boolean;
 };
+
+/** Sources whose re-pass pays the once-a-day RETAKE reward (docs/07 §2). */
+const RETAKE_SOURCES = new Set(['EXERCISE_PASS', 'AI_PROMPT_PASS']);
+
+const DEFAULT_TZ = 'America/Sao_Paulo';
 
 /**
  * Service backing the Progress feature.
@@ -65,12 +87,15 @@ export type RecordCompletionResult = CompleteLessonResponse & {
  */
 @Injectable()
 export class ProgressService {
+  private readonly logger = new Logger(ProgressService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly gamification: GamificationService,
     private readonly quests: QuestsService,
     private readonly badges: BadgesService,
+    private readonly config: GamificationConfigService,
     @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
@@ -124,7 +149,12 @@ export class ProgressService {
     if (actor.role !== 'STUDENT') {
       throw new ForbiddenException('Only students can complete lessons');
     }
-    const clientTimestamp = validateClientTimestamp(opts.clientTimestamp);
+    const clientTimestamp = validateClientTimestamp(
+      opts.clientTimestamp,
+      Date.now(),
+      (msg) =>
+        this.logger.warn(`${msg} (user=${actor.userId}, lesson=${lessonId})`),
+    );
 
     // Phase 6: server-authoritative access. The same @codify/domain rule the
     // client uses for UI gating decides here, so they never drift. A paywall
@@ -226,18 +256,35 @@ export class ProgressService {
       throw new NotFoundException('Lesson not found');
     }
 
+    // Course categories — needed for category-scoped quests.
+    const courseId = lesson.module.course.id;
+    const categoryIds = async () =>
+      (
+        await this.prisma.courseCategory.findMany({
+          where: { courseId },
+          select: { categoryId: true },
+        })
+      ).map((c) => c.categoryId);
+
     const existing = await this.prisma.progress.findUnique({
       where: { userId_lessonId: { userId, lessonId } },
     });
-    if (existing) return this.replay(userId, existing);
+    if (existing) {
+      return this.replayWithRepeatReward(params, existing, {
+        courseId,
+        categoryIds,
+      });
+    }
 
-    // Course categories — needed for category-scoped quests.
-    const courseId = lesson.module.course.id;
-    const courseCats = await this.prisma.courseCategory.findMany({
-      where: { courseId },
-      select: { categoryId: true },
-    });
-    const categoryIds = courseCats.map((c) => c.categoryId);
+    const cfg = await this.config.getMany([
+      'earning.byLessonType',
+      'earning.quizPerfectBonus',
+      'earning.quizPerQuestionBonus',
+    ]);
+    // Per-type defaults unless the author changed the lesson's own values
+    // (docs/07 §2; rule in @codify/domain lessonBaseReward).
+    const base = lessonBaseReward(lesson, cfg['earning.byLessonType']);
+    const cats = await categoryIds();
 
     try {
       const out = await this.prisma.$transaction(async (tx) => {
@@ -253,8 +300,8 @@ export class ProgressService {
         const granted = await this.gamification.grantReward(
           {
             userId,
-            baseXp: lesson.baseXp,
-            baseCoins: lesson.baseCoins,
+            baseXp: base.xp,
+            baseCoins: base.coins,
             xpSource: params.xpSource,
             coinSource: params.coinSource,
             refType: params.refType,
@@ -268,16 +315,78 @@ export class ProgressService {
           tx,
         );
 
+        // Quiz bonuses (docs/07 §2): their own ledger rows (QUIZ_PERFECT /
+        // per-question), multiplied like the completion, folded into the
+        // one reward the client celebrates.
+        if (params.quiz) {
+          const q = params.quiz;
+          const perQ = cfg['earning.quizPerQuestionBonus'];
+          if (q.correctCount > 0 && (perQ.xp > 0 || perQ.coins > 0)) {
+            mergeBonus(
+              granted,
+              'QUIZ_QUESTIONS',
+              await this.gamification.grantReward(
+                {
+                  userId,
+                  baseXp: perQ.xp * q.correctCount,
+                  baseCoins: perQ.coins * q.correctCount,
+                  xpSource: params.xpSource,
+                  coinSource: params.coinSource,
+                  refType: 'quiz_questions',
+                  refId: params.refId,
+                  idempotencyKey: `quiz_questions:${userId}:${lessonId}`,
+                  courseId,
+                  lessonId,
+                },
+                tx,
+              ),
+            );
+          }
+          const perfect = cfg['earning.quizPerfectBonus'];
+          if (q.scorePct >= 100 && (perfect.xp > 0 || perfect.coins > 0)) {
+            mergeBonus(
+              granted,
+              'QUIZ_PERFECT',
+              await this.gamification.grantReward(
+                {
+                  userId,
+                  baseXp: perfect.xp,
+                  baseCoins: perfect.coins,
+                  xpSource: 'QUIZ_PERFECT',
+                  coinSource: 'QUIZ_PERFECT',
+                  refType: 'quiz_perfect',
+                  refId: params.refId,
+                  idempotencyKey: `quiz_perfect:${userId}:${lessonId}`,
+                  courseId,
+                  lessonId,
+                },
+                tx,
+              ),
+            );
+          }
+        }
+
         // Advance daily quests + evaluate badges in the same transaction so
         // their (flat) rewards land atomically with the completion.
         const questsCompleted = await this.quests.onEvent(tx, userId, {
           type: params.questEvent ?? 'lesson_complete',
           courseId,
-          categoryIds,
+          categoryIds: cats,
           xpEarned: granted.xp,
-          streakAdvanced: granted.streak !== null,
+          streakAdvanced: granted.streak?.extended ?? granted.streak !== null,
         });
-        const badgesUnlocked = await this.badges.evaluate(tx, userId);
+        const badgesUnlocked = await this.badges.evaluate(tx, userId, {
+          type: params.questEvent ?? 'lesson_complete',
+          lessonId,
+          scorePct: params.quiz?.scorePct ?? null,
+          afterStreakLost: granted.streak?.restartedAfterLoss ?? false,
+        });
+
+        // docs/10 §6: a rare surprise boost for the rest of the session.
+        granted.surpriseBoost = await this.gamification.maybeStartSurpriseBoost(
+          tx,
+          userId,
+        );
 
         // Re-read final totals (quest/badge bonuses may have added more).
         const finalUser = await tx.user.findUniqueOrThrow({
@@ -321,6 +430,152 @@ export class ProgressService {
         });
         if (raced) return this.replay(userId, raced);
       }
+      throw err;
+    }
+  }
+
+  /**
+   * A completion flow ran again for a lesson that is already complete.
+   * Exercise / AI-prompt re-passes pay RETAKE once per lesson per user-local
+   * day, and a scenario play-through that reached a new ending pays
+   * SCENARIO_BRANCH (at most `earning.scenarioBranch.dailyCap` per scenario
+   * per day, the first completion counting when it was today). Both count
+   * for the streak and for quests/badges (not for lesson-count quests).
+   * Anything else is a plain replay.
+   */
+  private async replayWithRepeatReward(
+    params: RecordCompletionParams,
+    existing: {
+      lessonId: string;
+      completedAt: Date;
+      xpAwarded: number;
+      coinsAwarded: number;
+    },
+    ctx: { courseId: string; categoryIds: () => Promise<string[]> },
+  ): Promise<RecordCompletionResult> {
+    const { userId, lessonId } = params;
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { timezone: true },
+    });
+    const tz = user.timezone || DEFAULT_TZ;
+    const now = new Date();
+    const today = localDateKey(now, tz);
+
+    let reward: {
+      key: string;
+      xp: number;
+      coins: number;
+      xpSource: 'RETAKE' | 'SCENARIO_BRANCH';
+      refType: string;
+      refId: string;
+    } | null = null;
+
+    if (RETAKE_SOURCES.has(params.xpSource)) {
+      const r = await this.config.get('earning.retake');
+      reward = {
+        key: `retake:${userId}:${lessonId}:${today}`,
+        xp: r.xp,
+        coins: r.coins,
+        xpSource: 'RETAKE',
+        refType: `${params.refType}_retake`,
+        refId: params.refId,
+      };
+    } else if (params.scenario?.isNewEnding) {
+      const b = await this.config.get('earning.scenarioBranch');
+      const { scenarioId, endingKey } = params.scenario;
+      const dayStart = localDayStart(now, tz);
+      const branchesToday = await this.prisma.idempotencyRecord.count({
+        where: {
+          userId,
+          scope: 'scenario_branch',
+          key: { startsWith: `scenario_branch:${userId}:${scenarioId}:` },
+          createdAt: { gte: dayStart },
+        },
+      });
+      const firstToday = existing.completedAt >= dayStart ? 1 : 0;
+      if (branchesToday + firstToday < b.dailyCap) {
+        reward = {
+          key: `scenario_branch:${userId}:${scenarioId}:${endingKey}`,
+          xp: b.xp,
+          coins: b.coins,
+          xpSource: 'SCENARIO_BRANCH',
+          refType: 'scenario_branch',
+          refId: scenarioId,
+        };
+      }
+    }
+    if (!reward || (reward.xp <= 0 && reward.coins <= 0))
+      return this.replay(userId, existing);
+
+    const r = reward;
+    const cats = await ctx.categoryIds();
+    try {
+      const out = await this.prisma.$transaction(async (tx) => {
+        // The record is the once-per-key guard (and the scenario-branch
+        // daily counter); a racing duplicate fails here and rolls back.
+        await tx.idempotencyRecord.create({
+          data: {
+            key: r.key,
+            scope: r.xpSource === 'RETAKE' ? 'retake' : 'scenario_branch',
+            userId,
+          },
+        });
+        const granted = await this.gamification.grantReward(
+          {
+            userId,
+            baseXp: r.xp,
+            baseCoins: r.coins,
+            xpSource: r.xpSource,
+            coinSource: r.xpSource,
+            refType: r.refType,
+            refId: r.refId,
+            idempotencyKey: r.key,
+            courseId: ctx.courseId,
+            lessonId,
+            countsForStreak: true,
+            clientTimestamp: params.clientTimestamp ?? null,
+          },
+          tx,
+        );
+        const questsCompleted = await this.quests.onEvent(tx, userId, {
+          type: params.questEvent ?? 'lesson_complete',
+          courseId: ctx.courseId,
+          categoryIds: cats,
+          xpEarned: granted.xp,
+          streakAdvanced: granted.streak?.extended ?? false,
+          repeat: true,
+        });
+        const badgesUnlocked = await this.badges.evaluate(tx, userId, {
+          type: params.questEvent ?? 'lesson_complete',
+          lessonId,
+          scorePct: null,
+          afterStreakLost: granted.streak?.restartedAfterLoss ?? false,
+        });
+        const finalUser = await tx.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: { totalXp: true, coins: true },
+        });
+        granted.totals = {
+          totalXp: finalUser.totalXp,
+          coins: finalUser.coins,
+          level: levelFromXp(finalUser.totalXp),
+        };
+        return { granted, questsCompleted, badgesUnlocked };
+      });
+      await this.localizeRewards(out.questsCompleted, out.badgesUnlocked);
+      return {
+        alreadyCompleted: true,
+        retake: true,
+        progress: toItem(existing),
+        totals: out.granted.totals,
+        reward: out.granted,
+        questsCompleted: out.questsCompleted,
+        badgesUnlocked: out.badgesUnlocked,
+      };
+    } catch (err) {
+      // Already paid today / this ending (or a concurrent request won).
+      if (isUniqueViolation(err)) return this.replay(userId, existing);
       throw err;
     }
   }
@@ -392,18 +647,21 @@ export const SELF_GRADED_TYPES: ReadonlySet<LessonType> = new Set<LessonType>([
   'CAPSTONE',
 ]);
 
-/** Offline completions may be at most this old / this far in the future. */
-export const CLIENT_TIMESTAMP_MAX_AGE_MS = 72 * 60 * 60 * 1000;
-export const CLIENT_TIMESTAMP_MAX_SKEW_MS = 5 * 60 * 1000;
+/** Offline event times older than this are clamped to "now" (docs/16 §8). */
+export const CLIENT_TIMESTAMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Validate an offline-queue `clientTimestamp` (docs/16 §8 "Streak
- * attribution"). Rejects (400) times more than 5 min in the future or older
- * than 72 h; returns the normalised ISO string, or null when absent.
+ * Normalise an offline-queue `clientTimestamp` (docs/16 §8 "Streak
+ * attribution"). A time more than 24 h in the past or any time in the
+ * future is **clamped to now** and logged as a warning (a sanity rail
+ * against fake clocks, not a security boundary) — the event itself is
+ * still accepted. Only an unparseable value is a 400
+ * (`INVALID_CLIENT_TIMESTAMP`). Returns the ISO string, or null when absent.
  */
 export function validateClientTimestamp(
   value: string | null | undefined,
   now = Date.now(),
+  warn: (message: string) => void = (m) => clampLogger.warn(m),
 ): string | null {
   if (value === undefined || value === null || value === '') return null;
   const t = Date.parse(value);
@@ -414,21 +672,40 @@ export function validateClientTimestamp(
       message: 'clientTimestamp must be an ISO-8601 date-time',
     });
   }
-  if (t - now > CLIENT_TIMESTAMP_MAX_SKEW_MS) {
-    throw new BadRequestException({
-      statusCode: 400,
-      code: 'CLIENT_TIMESTAMP_IN_FUTURE',
-      message: 'clientTimestamp is in the future',
-    });
+  if (t > now) {
+    warn(`clientTimestamp ${value} is in the future; clamped to now`);
+    return new Date(now).toISOString();
   }
   if (now - t > CLIENT_TIMESTAMP_MAX_AGE_MS) {
-    throw new BadRequestException({
-      statusCode: 400,
-      code: 'CLIENT_TIMESTAMP_TOO_OLD',
-      message: 'clientTimestamp is older than 72 hours',
-    });
+    warn(`clientTimestamp ${value} is older than 24 h; clamped to now`);
+    return new Date(now).toISOString();
   }
   return new Date(t).toISOString();
+}
+
+const clampLogger = new Logger('ClientTimestamp');
+
+/** Fold a bonus grant (quiz perfect / per-question) into the completion's reward. */
+function mergeBonus(
+  into: RewardResult,
+  source: string,
+  bonus: RewardResult,
+): void {
+  if (bonus.xp <= 0 && bonus.coins <= 0) return;
+  into.xp += bonus.xp;
+  into.coins += bonus.coins;
+  into.breakdown.push({ source, xp: bonus.xp, coins: bonus.coins });
+  into.totals = bonus.totals;
+  if (bonus.levelUp) into.levelUp = bonus.levelUp;
+  if (bonus.coinCap) {
+    into.coinCap = {
+      requested:
+        (into.coinCap?.requested ?? into.coins - bonus.coins) +
+        bonus.coinCap.requested,
+      pooled: (into.coinCap?.pooled ?? 0) + bonus.coinCap.pooled,
+      dropped: (into.coinCap?.dropped ?? 0) + bonus.coinCap.dropped,
+    };
+  }
 }
 
 /** True when a Tiptap doc contains a graded `quiz` block anywhere. */

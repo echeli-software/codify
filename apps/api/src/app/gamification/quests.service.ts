@@ -81,7 +81,16 @@ export interface QuestEventContext {
   categoryIds?: string[];
   xpEarned?: number;
   streakAdvanced?: boolean;
+  /**
+   * A repeat of an already-completed lesson (exercise / AI-prompt retake,
+   * new scenario ending): counts for XP, streak and kind-specific quests,
+   * not for lesson-count quests.
+   */
+  repeat?: boolean;
 }
+
+/** docs/07 §2 "Daily quest complete: 20 coins" — the default for new templates. */
+export const DEFAULT_QUEST_COIN_REWARD = 20;
 
 /**
  * Daily quests (docs/07 §8). `quest.dailyCount` (default 3) quests per local
@@ -128,7 +137,7 @@ export class QuestsService {
           | Prisma.InputJsonValue
           | undefined,
         xpReward: input.xpReward ?? 0,
-        coinReward: input.coinReward ?? 0,
+        coinReward: input.coinReward ?? DEFAULT_QUEST_COIN_REWARD,
         isActive: input.isActive ?? true,
       },
     });
@@ -417,8 +426,9 @@ export class QuestsService {
   ): number {
     switch (kind) {
       case 'LESSON_COUNT':
-        return 1;
+        return ctx.repeat ? 0 : 1;
       case 'CATEGORY_LESSON_COUNT': {
+        if (ctx.repeat) return 0;
         const params = (template.paramsJson ?? {}) as { categoryId?: string };
         if (!params.categoryId) return 1; // un-scoped → any lesson counts
         return ctx.categoryIds?.includes(params.categoryId) ? 1 : 0;

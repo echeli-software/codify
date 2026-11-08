@@ -314,7 +314,8 @@ export class SubmissionsService {
           refId: ex.id,
           questEvent: 'exercise_pass',
         });
-        if (!done.alreadyCompleted) {
+        // A re-pass of a completed exercise may pay the daily RETAKE reward.
+        if (!done.alreadyCompleted || done.retake) {
           outcome.reward = done.reward;
           outcome.questsCompleted = done.questsCompleted;
           outcome.badgesUnlocked = done.badgesUnlocked;

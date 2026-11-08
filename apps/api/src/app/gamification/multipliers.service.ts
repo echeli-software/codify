@@ -96,7 +96,8 @@ export class MultipliersService {
     opts: { active?: 'now'; kind?: MultiplierKind } = {},
   ): Promise<MultiplierResponse[]> {
     const now = new Date();
-    const where: Prisma.MultiplierWhereInput = {};
+    // Per-user rows (SURPRISE_BOOST) are private: never listed here.
+    const where: Prisma.MultiplierWhereInput = { userId: null };
     if (opts.kind) where.kind = opts.kind;
     if (opts.active === 'now') {
       where.isActive = true;

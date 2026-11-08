@@ -4,6 +4,13 @@
  * per docs/08-avatar-and-shop.md §16. Idempotent-ish: skips slugs that 409.
  * Sprites are placeholder tokens (emoji:/color:) until the SVG/R2 pipeline.
  *
+ * Not here on purpose: the exclusive streak cosmetics (category
+ * `streak-rewards`, items `streak-30-flame-frame`, `streak-100-blaze-hat`,
+ * `streak-365-phoenix-pet`), the default multipliers (PREMIUM_DEFAULT,
+ * STREAK_TIER), starter quest templates and starter badges — those come
+ * from the `20261108120000_gamification_defaults` migration, so every
+ * database (dev, CI, prod) has them without running this script.
+ *
  *   node tools/scripts/seed-shop.mjs
  */
 

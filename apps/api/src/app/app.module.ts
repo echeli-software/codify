@@ -44,6 +44,7 @@ import { OpsModule } from './ops/ops.module.js';
 import { AdminOpsModule } from './admin-ops/admin-ops.module.js';
 import { AccountModule } from './account/account.module.js';
 import { FlagsModule } from './flags/flags.module.js';
+import { PromoCodesModule } from './promo-codes/promo-codes.module.js';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { FlagsModule } from './flags/flags.module.js';
     AccountModule,
     FlagsModule,
     MasteryModule,
+    PromoCodesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

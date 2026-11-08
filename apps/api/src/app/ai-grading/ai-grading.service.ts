@@ -377,7 +377,8 @@ export class AiGradingService {
         refId: aiPromptId,
         questEvent: capstone ? 'capstone_pass' : 'ai_prompt_pass',
       });
-      if (!done.alreadyCompleted) {
+      // A re-pass of a completed AI prompt may pay the daily RETAKE reward.
+      if (!done.alreadyCompleted || done.retake) {
         result.reward = done.reward;
         result.questsCompleted = done.questsCompleted;
         result.badgesUnlocked = done.badgesUnlocked;

@@ -10,6 +10,8 @@ import { GamificationController } from './gamification.controller.js';
 import { GamificationConfigController } from './gamification-config.controller.js';
 import { MultipliersController } from './multipliers.controller.js';
 import { UserPushService } from './user-push.service.js';
+import { EconomyJobsService } from './economy-jobs.service.js';
+import { EconomyAdminController } from './economy-admin.controller.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 
 /**
@@ -28,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     GamificationController,
     GamificationConfigController,
     MultipliersController,
+    EconomyAdminController,
   ],
   providers: [
     GamificationService,
@@ -36,6 +39,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     BadgesService,
     MultipliersService,
     UserPushService,
+    EconomyJobsService,
   ],
   exports: [
     GamificationService,
@@ -43,6 +47,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     QuestsService,
     BadgesService,
     UserPushService,
+    EconomyJobsService,
   ],
 })
 export class GamificationModule {}

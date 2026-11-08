@@ -24,4 +24,12 @@ export const ENGAGEMENT_CRONS = {
   referralRewards: '30 * * * *',
   /** Every 15 minutes: announce limited drops that just went live. */
   dropAnnouncements: '*/15 * * * *',
+  /** Hourly: apply freezes / reset lost streaks after local midnight (docs/07 §6). */
+  streakSettle: '10 * * * *',
+  /** Hourly: pay closed weeks' coin bonus pools (docs/07 §5). */
+  weeklyBonusPayout: '20 * * * *',
+  /** Every 15 minutes: PROMO push for campaigns that just started (docs/10 §3). */
+  promoAnnouncements: '7,22,37,52 * * * *',
+  /** Hourly: LEAGUE_RESULT once it is Monday 09:00 user-local (docs/10 §3). */
+  leagueResults: '3 * * * *',
 } as const;

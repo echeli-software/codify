@@ -2,6 +2,7 @@ import {
   BadRequestException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -39,6 +40,8 @@ export const QUIZ_ATTEMPT_COOLDOWN_MS = 3000;
  */
 @Injectable()
 export class QuizzesService {
+  private readonly logger = new Logger(QuizzesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
@@ -51,7 +54,13 @@ export class QuizzesService {
     body: SubmitQuizAttemptDto,
     idempotencyKey?: string,
   ): Promise<QuizAttemptResponse> {
-    const clientTimestamp = validateClientTimestamp(body.clientTimestamp);
+    // Too old / future times are clamped to now and logged (docs/16 §8).
+    const clientTimestamp = validateClientTimestamp(
+      body.clientTimestamp,
+      Date.now(),
+      (msg) =>
+        this.logger.warn(`${msg} (user=${actor.userId}, lesson=${lessonId})`),
+    );
     const doc = await this.loadGradableDoc(actor, lessonId);
 
     // A replayed key (offline-queue retry, flaky network) returns the
@@ -202,16 +211,23 @@ export class QuizzesService {
     };
 
     if (grade.passed) {
-      const perfect = grade.scorePct === 100;
+      // The completion pays the QUIZ base as LESSON_COMPLETE; a perfect
+      // score (+10/+5) and the per-question bonus are their own ledger rows
+      // (QUIZ_PERFECT / quiz_questions), see ProgressService.
       response.completion = await this.progress.recordCompletion({
         userId: actor.userId,
         lessonId,
-        xpSource: perfect ? 'QUIZ_PERFECT' : 'LESSON_COMPLETE',
-        coinSource: perfect ? 'QUIZ_PERFECT' : 'LESSON_COMPLETE',
+        xpSource: 'LESSON_COMPLETE',
+        coinSource: 'LESSON_COMPLETE',
         refType: 'quiz',
         refId: attemptId,
         questEvent: 'quiz_pass',
         clientTimestamp,
+        quiz: {
+          scorePct: grade.scorePct,
+          correctCount: grade.correctCount,
+          totalCount: grade.totalCount,
+        },
       });
     }
     return response;

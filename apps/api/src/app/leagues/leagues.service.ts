@@ -196,14 +196,15 @@ export class LeaguesService {
     }));
     const me = members.find((m) => m.isMe);
     const tier = membership.league.tier;
+    const zones = await this.config.get('league.zones');
 
     return {
       tier,
       weekStart: weekStart.toISOString(),
       resetAt: new Date(weekStart.getTime() + WEEK_MS).toISOString(),
       // Zones scale with the cohort (see @codify/domain promoteZoneSize).
-      promoteCount: promoteZoneSize(members.length, tier),
-      demoteCount: demoteZoneSize(members.length, tier),
+      promoteCount: promoteZoneSize(members.length, tier, zones),
+      demoteCount: demoteZoneSize(members.length, tier, zones),
       cohortSize: members.length,
       myRank: me?.rank ?? 0,
       myWeeklyXp: me?.weeklyXp ?? 0,
@@ -338,6 +339,7 @@ export class LeaguesService {
       'league.promotionReward',
       'league.rank1Reward',
       'streak.freezeCap',
+      'league.zones',
     ]);
     const badgeId =
       leagues.length > 0 ? await this.ensureWeeklyBadge(weekStart) : null;
@@ -345,7 +347,9 @@ export class LeaguesService {
     let rewarded = 0;
     let promotions = 0;
     let badgesAwarded = 0;
-    let pushesSent = 0;
+    // LEAGUE_RESULT goes out Monday 09:00 user-local (sendLeagueResults),
+    // not at rollover time (Sunday night in the Americas).
+    const pushesSent = 0;
 
     for (const league of leagues) {
       const results = computeRollover(
@@ -355,8 +359,8 @@ export class LeaguesService {
           promotion: rewards['league.promotionReward'],
           rank1: rewards['league.rank1Reward'],
         },
+        rewards['league.zones'],
       );
-      const processed: RollResult[] = [];
       await this.prisma.$transaction(async (tx) => {
         for (const r of results) {
           // Conditional stamp: only the run that flips rewardedAt from null
@@ -406,17 +410,8 @@ export class LeaguesService {
           }
           if (r.promoted) promotions += 1;
           rewarded += 1;
-          processed.push(r);
         }
       });
-
-      // Pushes after commit — a push failure never rolls back rewards.
-      for (const r of processed) {
-        const res = await this.push.sendToUser(r.userId, ({ locale }) =>
-          leagueResultCopy(locale, league.tier, r),
-        );
-        pushesSent += res.sent;
-      }
     }
 
     return {
@@ -427,6 +422,95 @@ export class LeaguesService {
       badgesAwarded,
       pushesSent,
     };
+  }
+
+  /**
+   * LEAGUE_RESULT notifications (docs/10 §3: "Monday 09:00 user-local").
+   * Runs hourly: for last week's rolled-over memberships, a member is due
+   * once their local clock passed 09:00 on the Monday the week ended
+   * (the UTC week end's calendar date, in their zone). One per membership,
+   * claimed on an IdempotencyRecord; delivery (inbox + push, quiet hours,
+   * caps) goes through UserPushService → NotificationService.
+   */
+  async sendLeagueResults(
+    now: Date = new Date(),
+  ): Promise<{ due: number; sent: number; pushed: number }> {
+    const weekStart = previousWeekStart(now);
+    const mondayKey = new Date(weekStart.getTime() + WEEK_MS)
+      .toISOString()
+      .slice(0, 10);
+    const rows = await this.prisma.leagueMembership.findMany({
+      where: {
+        rewardedAt: { not: null },
+        league: { weekStart },
+        user: ACTIVE_USER,
+      },
+      include: {
+        league: { select: { tier: true } },
+        user: { select: { timezone: true } },
+      },
+    });
+    let due = 0;
+    let sent = 0;
+    let pushed = 0;
+    for (const m of rows) {
+      if (!leagueResultDue(now, m.user.timezone, mondayKey)) continue;
+      due += 1;
+      if (!(await this.claimResult(m.leagueId, m.userId))) continue;
+      const promoted = m.promoted ?? false;
+      const demoted = m.demoted ?? false;
+      const res = await this.push.sendToUser(
+        m.userId,
+        ({ locale }) =>
+          leagueResultCopy(locale, m.league.tier, {
+            rank: m.finalRank ?? 0,
+            promoted,
+            demoted,
+            newTier: nextTierAfter(m.league.tier, promoted, demoted),
+          }),
+        now,
+      );
+      sent += 1;
+      pushed += res.sent;
+    }
+    return { due, sent, pushed };
+  }
+
+  @Cron(ENGAGEMENT_CRONS.leagueResults, {
+    name: 'runScheduledLeagueResults',
+    timeZone: 'UTC',
+  })
+  async runScheduledLeagueResults(): Promise<{
+    due: number;
+    sent: number;
+    pushed: number;
+  } | null> {
+    if (!jobsEnabled()) return null;
+    try {
+      const res = await this.sendLeagueResults();
+      if (res.sent > 0)
+        this.logger.log(`league results: ${res.sent} sent (${res.pushed} pushed)`);
+      return res;
+    } catch (err) {
+      this.logger.error(`league results failed: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  private async claimResult(leagueId: string, userId: string): Promise<boolean> {
+    try {
+      await this.prisma.idempotencyRecord.create({
+        data: {
+          key: `league_result:${leagueId}:${userId}`,
+          scope: 'league_result',
+          userId,
+        },
+      });
+      return true;
+    } catch (err) {
+      if (isUniqueViolation(err)) return false;
+      throw err;
+    }
   }
 
   /**
@@ -499,6 +583,41 @@ export class LeaguesService {
       });
     }
   }
+}
+
+/** Local 09:00, LEAGUE_RESULT delivery time (docs/10 §3). */
+export const LEAGUE_RESULT_LOCAL_MINUTE = 9 * 60;
+
+/**
+ * True once `now` is at/after 09:00 on `mondayKey` (YYYY-MM-DD) in the
+ * user's zone.
+ */
+export function leagueResultDue(
+  now: Date,
+  timezone: string | null | undefined,
+  mondayKey: string,
+): boolean {
+  let date: string;
+  let minutes: number;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+    date = `${get('year')}-${get('month')}-${get('day')}`;
+    minutes = Number(get('hour')) * 60 + Number(get('minute'));
+  } catch {
+    date = now.toISOString().slice(0, 10);
+    minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  }
+  if (date > mondayKey) return true;
+  return date === mondayKey && minutes >= LEAGUE_RESULT_LOCAL_MINUTE;
 }
 
 const TIER_NAMES: Record<LeagueTier, { pt: string; en: string }> = {

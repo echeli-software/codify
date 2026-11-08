@@ -4,6 +4,8 @@ import { StreakReminderService } from './streak-reminder.service.js';
 
 interface StreakRow {
   currentDays: number;
+  longestDays: number;
+  freezesAvailable: number;
   lastActivityDate: Date;
   user: {
     id: string;
@@ -20,9 +22,12 @@ function streak(
   lastLocalDate: string,
   over: Partial<StreakRow['user']> = {},
   days = 5,
+  freezes = 0,
 ): StreakRow {
   return {
     currentDays: days,
+    longestDays: days,
+    freezesAvailable: freezes,
     // Stored as the user-local date at UTC midnight (GamificationService).
     lastActivityDate: new Date(`${lastLocalDate}T00:00:00Z`),
     user: {
@@ -80,7 +85,7 @@ const NOON = new Date('2026-10-07T15:00:00Z');
 describe('StreakReminderService', () => {
   it('manual mode reminds every at-risk user regardless of the time', async () => {
     const { svc, notifications } = setup([
-      streak('risk', '2026-10-05'),
+      streak('risk', '2026-10-06'),
       streak('ok', '2026-10-07'),
     ]);
     const res = await svc.run({ mode: 'manual', now: NOON });
@@ -115,16 +120,16 @@ describe('StreakReminderService', () => {
   });
 
   it('scheduled mode only reaches users in their local evening slot', async () => {
-    const tokyo = streak('tokyo', '2026-10-05', {
+    const tokyo = streak('tokyo', '2026-10-06', {
       timezone: 'Asia/Tokyo',
       locale: 'en',
     }); // 08:30 local
-    const { svc } = setup([streak('sp', '2026-10-05'), tokyo]);
+    const { svc } = setup([streak('sp', '2026-10-06'), tokyo]);
     const res = await svc.run({ mode: 'scheduled', now: EVENING });
     expect(res).toMatchObject({ candidates: 1, pushed: 1 });
     expect(
       (
-        await setup([streak('sp', '2026-10-05')]).svc.run({
+        await setup([streak('sp', '2026-10-06')]).svc.run({
           mode: 'scheduled',
           now: NOON,
         })
@@ -134,7 +139,7 @@ describe('StreakReminderService', () => {
 
   it('scheduled mode skips users whose quiet hours cover the slot', async () => {
     const { svc } = setup([
-      streak('early-sleeper', '2026-10-05', {
+      streak('early-sleeper', '2026-10-06', {
         quietHoursStart: 20 * 60,
         quietHoursEnd: 7 * 60,
       }),
@@ -144,7 +149,7 @@ describe('StreakReminderService', () => {
   });
 
   it('scheduled mode is idempotent per user per local day', async () => {
-    const { svc, prisma, claimed } = setup([streak('sp', '2026-10-05')]);
+    const { svc, prisma, claimed } = setup([streak('sp', '2026-10-06')]);
     await svc.run({ mode: 'scheduled', now: EVENING });
     const second = await svc.run({
       mode: 'scheduled',
@@ -156,13 +161,44 @@ describe('StreakReminderService', () => {
   });
 
   it('counts users whose push was capped (the inbox row is still written)', async () => {
-    const { svc, notifications } = setup([streak('sp', '2026-10-05')]);
+    const { svc, notifications } = setup([streak('sp', '2026-10-06')]);
     notifications.notify.mockResolvedValueOnce({
       push: { status: 'capped', reason: 'daily' },
     });
     const res = await svc.run({ mode: 'scheduled', now: EVENING });
     expect(res).toMatchObject({ candidates: 1, capped: 1, pushed: 0 });
     expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips streaks that are already lost (FIX-7), keeps ones freezes cover', async () => {
+    // Now = Oct 7 in São Paulo. Last activity Oct 5 → Oct 6 was missed.
+    const { svc, notifications } = setup([
+      streak('lost', '2026-10-05', {}, 12, 0),
+      streak('frozen', '2026-10-05', {}, 12, 1),
+    ]);
+    const res = await svc.run({ mode: 'manual', now: NOON });
+    expect(res.candidates).toBe(1);
+    expect(
+      (notifications.notify.mock.calls as unknown as [string][]).map(
+        (c) => c[0],
+      ),
+    ).toEqual(['frozen']);
+  });
+
+  it('time zones: the same instant is "yesterday" in one zone and a missed day in another', async () => {
+    // 2026-10-07T01:00Z: São Paulo is still Oct 6 (last Oct 5 = yesterday,
+    // live), Tokyo is Oct 7 (Oct 6 missed, lost).
+    const at = new Date('2026-10-07T01:00:00Z');
+    const { svc, notifications } = setup([
+      streak('sp', '2026-10-05'),
+      streak('tokyo', '2026-10-05', { timezone: 'Asia/Tokyo' }),
+    ]);
+    await svc.run({ mode: 'manual', now: at });
+    expect(
+      (notifications.notify.mock.calls as unknown as [string][]).map(
+        (c) => c[0],
+      ),
+    ).toEqual(['sp']);
   });
 
   it('only queries users who did not turn STREAK_REMINDER push off', async () => {

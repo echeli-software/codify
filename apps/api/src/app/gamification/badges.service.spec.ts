@@ -3,10 +3,28 @@ import {
   BadgesService,
   evalRule,
   validateBadgeRule,
+  whereKey,
 } from './badges.service.js';
 
 describe('validateBadgeRule', () => {
-  it('accepts the docs examples (minus unsupported where filters)', () => {
+  it('accepts the docs examples, including where filters', () => {
+    // docs/07 §7 "Prompt Pro" and "Comeback".
+    expect(
+      validateBadgeRule({
+        all: [
+          {
+            event: 'ai_prompt_pass',
+            where: { scorePct: { gte: 80 } },
+            count: { gte: 10 },
+          },
+        ],
+      }),
+    ).toEqual([]);
+    expect(
+      validateBadgeRule({
+        all: [{ event: 'lesson_complete', where: { afterStreakLost: true } }],
+      }),
+    ).toEqual([]);
     expect(
       validateBadgeRule({
         all: [{ event: 'lesson_complete', count: { gte: 1 } }],
@@ -38,17 +56,110 @@ describe('validateBadgeRule', () => {
     expect(validateBadgeRule({ all: [] })).toHaveLength(1);
     expect(validateBadgeRule({ all: [], any: [] })).toHaveLength(1);
     expect(validateBadgeRule([])).toHaveLength(1);
+  });
+  it('lists every where-filter problem', () => {
+    const errs = (where: unknown, event = 'ai_prompt_pass', count?: unknown) =>
+      validateBadgeRule({
+        all: [{ event, where, ...(count ? { count } : {}) }],
+      });
+    expect(errs({ scorePct: { gte: 'x' } })).toEqual([
+      'all[0].where.scorePct.gte must be a number',
+    ]);
+    expect(errs({ scorePct: {} })).toEqual([
+      'all[0].where.scorePct: needs a predicate (gte/lte/gt/lt/eq)',
+    ]);
+    expect(errs({ scorePct: { gte: 80 } }, 'lesson_complete')).toEqual([
+      'all[0].where.scorePct only applies to ai_prompt_pass, quiz_pass, exercise_pass',
+    ]);
+    expect(errs({ afterStreakLost: 'yes' }, 'lesson_complete')).toEqual([
+      'all[0].where.afterStreakLost must be true',
+    ]);
+    expect(
+      errs({ afterStreakLost: true }, 'lesson_complete', { gte: 3 }),
+    ).toEqual([
+      'all[0].where.afterStreakLost can only be counted once (count ≤ 1)',
+    ]);
+    expect(errs({ color: 'red' })).toEqual([
+      'all[0].where.color is not a supported filter (scorePct, afterStreakLost)',
+    ]);
+    expect(errs({})).toEqual(['all[0].where needs at least one filter']);
+    expect(errs([])).toEqual(['all[0].where must be an object']);
     expect(
       validateBadgeRule({
-        all: [
-          {
-            event: 'ai_prompt_pass',
-            where: { scorePct: { gte: 80 } },
-            count: { gte: 1 },
-          },
-        ],
+        all: [{ metric: 'streak.current_days', gte: 1, where: {} }],
       }),
-    ).toHaveLength(1);
+    ).toEqual(['all[0].where is only allowed on "event" clauses']);
+  });
+});
+
+describe('where filters', () => {
+  const promptPro = {
+    all: [
+      {
+        event: 'ai_prompt_pass',
+        where: { scorePct: { gte: 80 } },
+        count: { gte: 10 },
+      },
+    ],
+  };
+  it('evalRule reads the filtered count, not the raw event count', () => {
+    const key = whereKey('ai_prompt_pass', { scorePct: { gte: 80 } });
+    const base = { events: { ai_prompt_pass: 12 }, metrics: {} };
+    expect(evalRule(promptPro, { ...base, filtered: { [key]: 9 } })).toBe(
+      false,
+    );
+    expect(evalRule(promptPro, { ...base, filtered: { [key]: 10 } })).toBe(
+      true,
+    );
+  });
+
+  it('computeFiltered counts scorePct passes in SQL and afterStreakLost from the event / streak', async () => {
+    const tx = {
+      $queryRaw: jest.fn(async () => [{ count: 4n }]),
+    };
+    const svc = new BadgesService({} as never, {} as never);
+    const comeback = {
+      all: [{ event: 'lesson_complete', where: { afterStreakLost: true } }],
+    };
+    const metrics = {
+      events: { ai_prompt_pass: 7, lesson_complete: 20 },
+      metrics: { 'streak.current_days': 3, 'streak.longest_days': 3 },
+    };
+    const out = await svc.computeFiltered(
+      tx as never,
+      'u1',
+      [promptPro as never, comeback as never],
+      metrics,
+      null,
+    );
+    expect(out[whereKey('ai_prompt_pass', { scorePct: { gte: 80 } })]).toBe(4);
+    expect(out[whereKey('lesson_complete', { afterStreakLost: true })]).toBe(0);
+    // The SQL binds the predicate value.
+    const sql = (tx.$queryRaw.mock.calls[0] as unknown[]).flat();
+    expect(JSON.stringify(sql)).toMatch(/scorePct/);
+    // This completion restarted a lost streak → Comeback.
+    const now = await svc.computeFiltered(
+      tx as never,
+      'u1',
+      [comeback as never],
+      metrics,
+      { type: 'lesson_complete', afterStreakLost: true },
+    );
+    expect(now[whereKey('lesson_complete', { afterStreakLost: true })]).toBe(1);
+    // Or the stored streak shows a loss followed by activity.
+    const durable = await svc.computeFiltered(
+      tx as never,
+      'u1',
+      [comeback as never],
+      {
+        ...metrics,
+        metrics: { 'streak.current_days': 2, 'streak.longest_days': 9 },
+      },
+      null,
+    );
+    expect(
+      durable[whereKey('lesson_complete', { afterStreakLost: true })],
+    ).toBe(1);
   });
 });
 

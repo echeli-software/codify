@@ -1,9 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  COHORT_CAPACITY,
-  DEMOTE_COUNT,
-  MIN_COHORT_FOR_DEMOTION,
-  PROMOTE_COUNT,
   TIER_ORDER,
   computeRollover,
   currentWeekStart,
@@ -28,9 +24,9 @@ export function percentile(sortedAsc: number[], p: number): number {
 
 /**
  * Leagues admin (docs/04 "Gamification → Leagues"): this week's snapshot
- * per tier and a drill-in per league. Promotion/relegation zone sizes are
- * the @codify/domain constants the rollover uses; the reward amounts are
- * the `league.*` GamificationConfig keys (edited on the Gamification page).
+ * per tier and a drill-in per league. Promotion/relegation zone sizes and
+ * the reward amounts are the `league.zones` / `league.*` GamificationConfig
+ * keys the rollover uses (edited on the Leagues / Gamification pages).
  */
 @Injectable()
 export class LeaguesAdminService {
@@ -52,7 +48,11 @@ export class LeaguesAdminService {
         },
         orderBy: [{ tier: 'asc' }, { cohortKey: 'asc' }],
       }),
-      this.config.getMany(['league.promotionReward', 'league.rank1Reward']),
+      this.config.getMany([
+        'league.promotionReward',
+        'league.rank1Reward',
+        'league.zones',
+      ]),
     ]);
     const tiers: LeagueTierSnapshot[] = TIER_ORDER.map((tier) => {
       const inTier = leagues.filter((l) => l.tier === tier);
@@ -85,10 +85,10 @@ export class LeaguesAdminService {
             a.cohortKey.localeCompare(b.cohortKey),
         ),
       rules: {
-        cohortCapacity: COHORT_CAPACITY,
-        promoteCount: PROMOTE_COUNT,
-        demoteCount: DEMOTE_COUNT,
-        minCohortForDemotion: MIN_COHORT_FOR_DEMOTION,
+        cohortCapacity: rewards['league.zones'].cohortSize,
+        promoteCount: rewards['league.zones'].promote,
+        demoteCount: rewards['league.zones'].demote,
+        minCohortForDemotion: rewards['league.zones'].minCohortForDemotion,
         promotionReward: rewards['league.promotionReward'],
         rank1Reward: rewards['league.rank1Reward'],
       },
@@ -121,9 +121,12 @@ export class LeaguesAdminService {
       },
     });
     if (!league) throw new NotFoundException('League not found');
+    const zones = await this.config.get('league.zones');
     const projected = computeRollover(
       league.members.map((m) => ({ userId: m.userId, weeklyXp: m.weeklyXp })),
       league.tier,
+      undefined,
+      zones,
     );
     const byUser = new Map(league.members.map((m) => [m.userId, m]));
     const n = league.members.length;
@@ -132,8 +135,8 @@ export class LeaguesAdminService {
       tier: league.tier,
       weekStart: league.weekStart.toISOString(),
       cohortKey: league.cohortKey,
-      promoteZone: promoteZoneSize(n, league.tier),
-      demoteZone: demoteZoneSize(n, league.tier),
+      promoteZone: promoteZoneSize(n, league.tier, zones),
+      demoteZone: demoteZoneSize(n, league.tier, zones),
       members: projected.map((r) => {
         const m = byUser.get(r.userId);
         return {

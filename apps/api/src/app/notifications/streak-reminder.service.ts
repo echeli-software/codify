@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { effectiveStreak } from '@codify/domain';
 import { streakReminderCopy } from '../email/copy.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -99,7 +100,20 @@ export class StreakReminderService {
       // lastActivityDate stores the user-local date as UTC midnight (see
       // GamificationService.advanceStreak), so read its UTC calendar date —
       // converting it to the user's zone would shift it a day back west of UTC.
-      if (s.lastActivityDate.toISOString().slice(0, 10) >= today.date) continue;
+      const lastKey = s.lastActivityDate.toISOString().slice(0, 10);
+      if (lastKey >= today.date) continue;
+      // Only a live streak can be "broken" (docs/07 §6): a row whose gap the
+      // banked freezes can't cover is already lost — no "N-day streak" nag.
+      const live = effectiveStreak(
+        {
+          currentDays: s.currentDays,
+          longestDays: s.longestDays,
+          freezesAvailable: s.freezesAvailable,
+          lastActivityKey: lastKey,
+        },
+        today.date,
+      );
+      if (live.currentDays <= 0) continue;
       if (s.user.deviceTokens.length === 0) continue;
 
       if (scheduled) {
@@ -120,7 +134,7 @@ export class StreakReminderService {
       }
 
       candidates += 1;
-      const days = s.currentDays;
+      const days = live.currentDays;
       const res = await this.notifications.notify(
         s.user.id,
         ({ locale }) => ({
