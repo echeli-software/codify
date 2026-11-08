@@ -5,9 +5,7 @@
       "package": "body-parser",
       "severity": "high",
       "fixedIn": ">=2.4.0",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -15,9 +13,7 @@
       "package": "shell-quote",
       "severity": "high",
       "fixedIn": ">=1.9.0",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -25,9 +21,7 @@
       "package": "@angular/common",
       "severity": "high",
       "fixedIn": ">=21.2.17",
-      "via": [
-        "@angular/common"
-      ],
+      "via": ["@angular/common"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -35,9 +29,7 @@
       "package": "mysql2",
       "severity": "high",
       "fixedIn": ">=3.22.0",
-      "via": [
-        "prisma"
-      ],
+      "via": ["prisma"],
       "reason": "Prisma CLI tooling dependency (studio/dev server), not loaded by the API at runtime; upgrade prisma",
       "expires": "2027-01-31"
     },
@@ -45,9 +37,7 @@
       "package": "brace-expansion",
       "severity": "high",
       "fixedIn": ">=5.0.7",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -55,9 +45,7 @@
       "package": "@angular/common",
       "severity": "high",
       "fixedIn": ">=21.2.17",
-      "via": [
-        "@angular/common"
-      ],
+      "via": ["@angular/common"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -65,9 +53,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.3",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -75,9 +61,7 @@
       "package": "multer",
       "severity": "high",
       "fixedIn": ">=2.3.0",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -85,9 +69,7 @@
       "package": "@angular/router",
       "severity": "high",
       "fixedIn": ">=21.2.25",
-      "via": [
-        "@angular/router"
-      ],
+      "via": ["@angular/router"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -95,9 +77,7 @@
       "package": "launch-editor",
       "severity": "high",
       "fixedIn": ">=2.14.2",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -105,9 +85,7 @@
       "package": "@angular/router",
       "severity": "high",
       "fixedIn": ">=21.2.25",
-      "via": [
-        "@angular/router"
-      ],
+      "via": ["@angular/router"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -115,9 +93,7 @@
       "package": "brace-expansion",
       "severity": "high",
       "fixedIn": ">=5.0.10",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -125,9 +101,7 @@
       "package": "multer",
       "severity": "high",
       "fixedIn": ">=2.2.0",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -135,9 +109,7 @@
       "package": "browserslist",
       "severity": "high",
       "fixedIn": ">=4.28.7",
-      "via": [
-        "@ng-bootstrap/ng-bootstrap"
-      ],
+      "via": ["@ng-bootstrap/ng-bootstrap"],
       "reason": "browserslist via @ng-bootstrap (build-time); upgrade",
       "expires": "2027-01-31"
     },
@@ -145,9 +117,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.5",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -155,9 +125,7 @@
       "package": "hono",
       "severity": "high",
       "fixedIn": ">=4.12.25",
-      "via": [
-        "prisma"
-      ],
+      "via": ["prisma"],
       "reason": "Prisma CLI tooling dependency (studio/dev server), not loaded by the API at runtime; upgrade prisma",
       "expires": "2027-01-31"
     },
@@ -165,9 +133,7 @@
       "package": "follow-redirects",
       "severity": "high",
       "fixedIn": ">=1.16.1",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -175,9 +141,7 @@
       "package": "ws",
       "severity": "high",
       "fixedIn": ">=8.21.0",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -185,9 +149,7 @@
       "package": "browserslist",
       "severity": "high",
       "fixedIn": ">=4.28.7",
-      "via": [
-        "@ng-bootstrap/ng-bootstrap"
-      ],
+      "via": ["@ng-bootstrap/ng-bootstrap"],
       "reason": "browserslist via @ng-bootstrap (build-time); upgrade",
       "expires": "2027-01-31"
     },
@@ -195,9 +157,7 @@
       "package": "prosemirror-view",
       "severity": "high",
       "fixedIn": ">=1.42.3",
-      "via": [
-        "@tiptap/pm"
-      ],
+      "via": ["@tiptap/pm"],
       "reason": "Lesson editor (admin, staff-only) — upgrade @tiptap/*",
       "expires": "2027-01-31"
     },
@@ -205,9 +165,7 @@
       "package": "dompurify",
       "severity": "critical",
       "fixedIn": ">=3.4.17",
-      "via": [
-        "monaco-editor"
-      ],
+      "via": ["monaco-editor"],
       "reason": "monaco-editor bundled DOMPurify (admin code editor, staff-only); upgrade monaco-editor",
       "expires": "2027-01-31"
     },
@@ -215,9 +173,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.6",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -225,9 +181,7 @@
       "package": "@angular/router",
       "severity": "high",
       "fixedIn": ">=21.2.24",
-      "via": [
-        "@angular/router"
-      ],
+      "via": ["@angular/router"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -235,9 +189,7 @@
       "package": "deepmerge-ts",
       "severity": "high",
       "fixedIn": ">=8.0.0",
-      "via": [
-        "prisma"
-      ],
+      "via": ["prisma"],
       "reason": "Prisma CLI tooling dependency (studio/dev server), not loaded by the API at runtime; upgrade prisma",
       "expires": "2027-01-31"
     },
@@ -245,9 +197,7 @@
       "package": "@tiptap/core",
       "severity": "high",
       "fixedIn": ">=3.30.5",
-      "via": [
-        "@tiptap/core"
-      ],
+      "via": ["@tiptap/core"],
       "reason": "Lesson editor (admin, staff-only) — upgrade @tiptap/*",
       "expires": "2027-01-31"
     },
@@ -255,9 +205,7 @@
       "package": "@angular/common",
       "severity": "high",
       "fixedIn": ">=21.2.19",
-      "via": [
-        "@angular/common"
-      ],
+      "via": ["@angular/common"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -265,9 +213,7 @@
       "package": "@angular/compiler",
       "severity": "high",
       "fixedIn": ">=21.2.19",
-      "via": [
-        "@angular/compiler"
-      ],
+      "via": ["@angular/compiler"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -275,9 +221,7 @@
       "package": "proxy-addr",
       "severity": "critical",
       "fixedIn": ">=2.0.8",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -285,9 +229,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.6",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -295,9 +237,7 @@
       "package": "brace-expansion",
       "severity": "high",
       "fixedIn": ">=5.0.8",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -305,9 +245,7 @@
       "package": "zod",
       "severity": "high",
       "fixedIn": ">=4.6.6",
-      "via": [
-        "zod"
-      ],
+      "via": ["zod"],
       "reason": "zod direct dependency — patch upgrade pending (root package.json is lead-owned)",
       "expires": "2027-01-31"
     },
@@ -315,9 +253,7 @@
       "package": "dompurify",
       "severity": "high",
       "fixedIn": ">=3.4.17",
-      "via": [
-        "monaco-editor"
-      ],
+      "via": ["monaco-editor"],
       "reason": "monaco-editor bundled DOMPurify (admin code editor, staff-only); upgrade monaco-editor",
       "expires": "2027-01-31"
     },
@@ -325,9 +261,7 @@
       "package": "follow-redirects",
       "severity": "high",
       "fixedIn": ">=1.16.2",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -335,9 +269,7 @@
       "package": "@angular/common",
       "severity": "high",
       "fixedIn": ">=21.2.15",
-      "via": [
-        "@angular/common"
-      ],
+      "via": ["@angular/common"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -345,9 +277,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.1",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -355,9 +285,7 @@
       "package": "follow-redirects",
       "severity": "high",
       "fixedIn": ">=1.16.1",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -365,9 +293,7 @@
       "package": "@angular/common",
       "severity": "high",
       "fixedIn": ">=21.2.15",
-      "via": [
-        "@angular/common"
-      ],
+      "via": ["@angular/common"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -375,9 +301,7 @@
       "package": "multer",
       "severity": "high",
       "fixedIn": ">=2.5.0",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -385,9 +309,7 @@
       "package": "brace-expansion",
       "severity": "high",
       "fixedIn": ">=5.0.11",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -395,9 +317,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.7",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -405,9 +325,7 @@
       "package": "@angular/service-worker",
       "severity": "high",
       "fixedIn": ">=21.2.17",
-      "via": [
-        "@angular/service-worker"
-      ],
+      "via": ["@angular/service-worker"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -415,9 +333,7 @@
       "package": "@angular/core",
       "severity": "high",
       "fixedIn": ">=21.2.17",
-      "via": [
-        "@angular/core"
-      ],
+      "via": ["@angular/core"],
       "reason": "Angular 21.2 patch upgrade pending (root package.json is lead-owned); admin/student framework",
       "expires": "2027-01-31"
     },
@@ -425,9 +341,7 @@
       "package": "brace-expansion",
       "severity": "high",
       "fixedIn": ">=2.1.4",
-      "via": [
-        "firebase-admin"
-      ],
+      "via": ["firebase-admin"],
       "reason": "transitive; upgrade parent",
       "expires": "2027-01-31"
     },
@@ -435,9 +349,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.4",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -445,9 +357,7 @@
       "package": "fast-uri",
       "severity": "high",
       "fixedIn": ">=3.1.2",
-      "via": [
-        "@ng-icons/core"
-      ],
+      "via": ["@ng-icons/core"],
       "reason": "fast-uri via @ng-icons/core (build-time schema validation); upgrade",
       "expires": "2027-01-31"
     },
@@ -455,9 +365,7 @@
       "package": "compression",
       "severity": "high",
       "fixedIn": ">=1.8.2",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -465,9 +373,7 @@
       "package": "shell-quote",
       "severity": "critical",
       "fixedIn": ">=1.8.4",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     },
@@ -475,9 +381,7 @@
       "package": "multer",
       "severity": "high",
       "fixedIn": ">=2.3.0",
-      "via": [
-        "@nestjs/platform-express"
-      ],
+      "via": ["@nestjs/platform-express"],
       "reason": "Express stack via @nestjs/platform-express — upgrade @nestjs/platform-express/express (PRIORITY: request handling, proxy-addr feeds client IP)",
       "expires": "2027-01-31"
     },
@@ -485,9 +389,7 @@
       "package": "websocket-driver",
       "severity": "critical",
       "fixedIn": ">=0.7.5",
-      "via": [
-        "@sentry/node"
-      ],
+      "via": ["@sentry/node"],
       "reason": "@sentry/node -> @sentry/bundler-plugins build tooling (webpack-dev-server chain), not executed at runtime; upgrade @sentry/node",
       "expires": "2027-01-31"
     }

@@ -43,7 +43,10 @@ for (const adv of Object.values(report.advisories ?? {})) {
   if (!entry) failures.push(line);
   else if (entry.expires < today)
     failures.push(`${line}\n    allow-list entry expired ${entry.expires}`);
-  else accepted.push(`${line}\n    accepted until ${entry.expires}: ${entry.reason}`);
+  else
+    accepted.push(
+      `${line}\n    accepted until ${entry.expires}: ${entry.reason}`,
+    );
 }
 const stale = Object.keys(allow).filter(
   (id) =>

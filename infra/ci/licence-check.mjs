@@ -32,7 +32,8 @@ const APPROVED = {
   // Functional Source License (source-available, converts to Apache-2.0
   // after two years). Pulled in by @sentry/node's bundler plugin; we only
   // use it as a library, which FSL permits.
-  sentry: 'FSL-1.1-Apache-2.0 via @sentry/node — library use permitted (approved 2026-11)',
+  sentry:
+    'FSL-1.1-Apache-2.0 via @sentry/node — library use permitted (approved 2026-11)',
 };
 
 /** "(MPL-2.0 OR Apache-2.0)" → OK if any alternative is allowed; "A AND B" → all. */
