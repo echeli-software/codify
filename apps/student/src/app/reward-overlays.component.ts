@@ -537,7 +537,7 @@ export class RewardOverlays {
       ].filter(Boolean);
       return {
         eyebrow: 'gamification.reward.milestoneEyebrow',
-        icon: 'flame',
+        icon: 'flame' as const,
         league: false,
         title: t('gamification.reward.streakMilestone', { days: m.days }),
         body: gains.join(' · '),
@@ -553,7 +553,7 @@ export class RewardOverlays {
       ].filter(Boolean);
       return {
         eyebrow: 'gamification.reward.leagueEyebrow',
-        icon: 'trophy',
+        icon: 'trophy' as const,
         league: true,
         title: t('gamification.reward.leaguePromoted', {
           tier: t(`ui.tier.${o.promotion.newTier}`),

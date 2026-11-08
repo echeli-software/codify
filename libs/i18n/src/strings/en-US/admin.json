@@ -27,7 +27,8 @@
       "audit": "Audit log",
       "leagues": "Leagues",
       "itemCategories": "Item categories",
-      "exerciseHealth": "Exercise health"
+      "exerciseHealth": "Exercise health",
+      "promoCodes": "Promo codes"
     },
     "roles": {
       "ADMIN": "Admin",
@@ -697,7 +698,16 @@
         "league_rank1Reward": "League 1st place reward",
         "quest_dailyCount": "Daily quests per student",
         "referral_reward": "Referral reward",
-        "referral_claimWindowDays": "Referral claim window (days)"
+        "referral_claimWindowDays": "Referral claim window (days)",
+        "earning_byLessonType": "First-completion reward per lesson type",
+        "earning_quizPerfectBonus": "Perfect quiz bonus",
+        "earning_quizPerQuestionBonus": "Bonus per correct quiz answer",
+        "earning_retake": "Retake reward (once per lesson per day)",
+        "earning_scenarioBranch": "New scenario ending reward",
+        "coins_dailyCaps": "Daily coin caps per source",
+        "coins_weeklyPoolCap": "Weekly bonus pool cap",
+        "league_zones": "League zone sizes",
+        "boost_surprise": "Surprise XP boosts"
       },
       "rewardFields": {
         "xp": "XP",
@@ -1185,7 +1195,7 @@
       "promotionReward": "Promotion reward",
       "rank1Reward": "First-place bonus",
       "rewardFreeze": "{xp} XP · {coins} coins · {freeze} streak freeze",
-      "rulesHelp": "Zone sizes are fixed in code; reward amounts are gamification settings.",
+      "rulesHelp": "Zone sizes are edited below; reward amounts are gamification settings.",
       "editRewards": "Edit rewards",
       "detailTitle": "{tier} · {cohort}",
       "detailLoading": "League",
@@ -1208,7 +1218,17 @@
         "GOLD": "Gold",
         "PLATINUM": "Platinum",
         "DIAMOND": "Diamond"
-      }
+      },
+      "zonesTitle": "Zone sizes",
+      "zoneFields": {
+        "cohortSize": "Full cohort size",
+        "promote": "Promoted (full cohort)",
+        "demote": "Relegated (full cohort)",
+        "minCohortForDemotion": "Min. members for relegation"
+      },
+      "zonesReset": "Reset to defaults",
+      "zonesSaved": "Zone sizes saved — the next rollover uses them.",
+      "zonesInvalid": "Check the zone sizes:"
     },
     "itemCategories": {
       "title": "Item categories",
@@ -1484,6 +1504,41 @@
         "running": "Sending {version}: {notified} of {audience} notified…",
         "done": "{version}: {notified} of {audience} active accounts notified."
       }
+    },
+    "promoCodes": {
+      "title": "Promo codes",
+      "subtitle": "Coin codes learners redeem once each, inside an optional window and limit.",
+      "new": "New code",
+      "editTitle": "Edit {code}",
+      "code": "Code",
+      "codeHelp": "3–32 letters, digits, - or _. Stored in capitals; redeemed case-insensitively.",
+      "codeFixed": "Codes can't be renamed.",
+      "coins": "Coins",
+      "maxRedemptions": "Redemption limit",
+      "maxHelp": "Empty = unlimited.",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "description": "Internal note",
+      "active": "Active",
+      "redemptions": "Redeemed",
+      "window": "Window",
+      "status": "Status",
+      "always": "Always",
+      "redeemable": "Redeemable",
+      "notRedeemable": "Not redeemable now",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "deleteAria": "Delete or deactivate {code}",
+      "deleteMessage": "The code is deleted. Nobody has redeemed it yet.",
+      "deactivateMessage": "This code was already redeemed, so it is deactivated instead of deleted.",
+      "saved": "Promo code {code} saved.",
+      "deleted": "Promo code {code} deleted.",
+      "deactivated": "Promo code {code} deactivated.",
+      "emptyTitle": "No promo codes yet",
+      "emptyDescription": "Create a code to give learners coins for a campaign or event.",
+      "invalidCode": "Use 3–32 letters, digits, - or _.",
+      "invalidCoins": "Between 1 and 10 000 coins.",
+      "invalidWindow": "The end must be after the start."
     }
   }
 }

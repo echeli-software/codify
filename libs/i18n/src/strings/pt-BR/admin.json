@@ -27,7 +27,8 @@
       "audit": "Auditoria",
       "leagues": "Ligas",
       "itemCategories": "Categorias de itens",
-      "exerciseHealth": "Saúde dos exercícios"
+      "exerciseHealth": "Saúde dos exercícios",
+      "promoCodes": "Códigos promocionais"
     },
     "roles": {
       "ADMIN": "Admin",
@@ -697,7 +698,16 @@
         "league_rank1Reward": "Recompensa do 1º lugar da liga",
         "quest_dailyCount": "Missões diárias por aluno",
         "referral_reward": "Recompensa por indicação",
-        "referral_claimWindowDays": "Prazo para resgatar indicação (dias)"
+        "referral_claimWindowDays": "Prazo para resgatar indicação (dias)",
+        "earning_byLessonType": "Recompensa da primeira conclusão por tipo de lição",
+        "earning_quizPerfectBonus": "Bônus de quiz perfeito",
+        "earning_quizPerQuestionBonus": "Bônus por resposta certa no quiz",
+        "earning_retake": "Recompensa de refazer (1x por lição por dia)",
+        "earning_scenarioBranch": "Recompensa por novo final de cenário",
+        "coins_dailyCaps": "Limites diários de moedas por origem",
+        "coins_weeklyPoolCap": "Limite do bônus semanal",
+        "league_zones": "Tamanho das zonas da liga",
+        "boost_surprise": "Turbos surpresa de XP"
       },
       "rewardFields": {
         "xp": "XP",
@@ -1185,7 +1195,7 @@
       "promotionReward": "Recompensa de promoção",
       "rank1Reward": "Bônus do 1º lugar",
       "rewardFreeze": "{xp} XP · {coins} moedas · {freeze} congelamento de sequência",
-      "rulesHelp": "O tamanho das zonas é fixo no código; as recompensas são configurações de gamificação.",
+      "rulesHelp": "O tamanho das zonas é editado abaixo; as recompensas ficam nas configurações de gamificação.",
       "editRewards": "Editar recompensas",
       "detailTitle": "{tier} · {cohort}",
       "detailLoading": "Liga",
@@ -1208,7 +1218,17 @@
         "GOLD": "Ouro",
         "PLATINUM": "Platina",
         "DIAMOND": "Diamante"
-      }
+      },
+      "zonesTitle": "Tamanho das zonas",
+      "zoneFields": {
+        "cohortSize": "Tamanho do grupo cheio",
+        "promote": "Promovidos (grupo cheio)",
+        "demote": "Rebaixados (grupo cheio)",
+        "minCohortForDemotion": "Mín. de membros para rebaixar"
+      },
+      "zonesReset": "Restaurar padrão",
+      "zonesSaved": "Zonas salvas — a próxima virada de semana usa estes valores.",
+      "zonesInvalid": "Confira o tamanho das zonas:"
     },
     "itemCategories": {
       "title": "Categorias de itens",
@@ -1484,6 +1504,41 @@
         "running": "Enviando {version}: {notified} de {audience} avisados…",
         "done": "{version}: {notified} de {audience} contas ativas avisadas."
       }
+    },
+    "promoCodes": {
+      "title": "Códigos promocionais",
+      "subtitle": "Códigos de moedas que cada aluno resgata uma vez, com janela e limite opcionais.",
+      "new": "Novo código",
+      "editTitle": "Editar {code}",
+      "code": "Código",
+      "codeHelp": "3–32 letras, dígitos, - ou _. Salvo em maiúsculas; resgate sem diferenciar maiúsculas.",
+      "codeFixed": "Códigos não podem ser renomeados.",
+      "coins": "Moedas",
+      "maxRedemptions": "Limite de resgates",
+      "maxHelp": "Vazio = ilimitado.",
+      "startsAt": "Início",
+      "endsAt": "Fim",
+      "description": "Nota interna",
+      "active": "Ativo",
+      "redemptions": "Resgatados",
+      "window": "Janela",
+      "status": "Status",
+      "always": "Sempre",
+      "redeemable": "Resgatável",
+      "notRedeemable": "Não resgatável agora",
+      "inactive": "Inativo",
+      "deactivate": "Desativar",
+      "deleteAria": "Excluir ou desativar {code}",
+      "deleteMessage": "O código será excluído. Ninguém o resgatou ainda.",
+      "deactivateMessage": "Este código já foi resgatado, então ele será desativado em vez de excluído.",
+      "saved": "Código {code} salvo.",
+      "deleted": "Código {code} excluído.",
+      "deactivated": "Código {code} desativado.",
+      "emptyTitle": "Nenhum código promocional",
+      "emptyDescription": "Crie um código para dar moedas aos alunos em campanhas ou eventos.",
+      "invalidCode": "Use 3–32 letras, dígitos, - ou _.",
+      "invalidCoins": "Entre 1 e 10 000 moedas.",
+      "invalidWindow": "O fim precisa ser depois do início."
     }
   }
 }

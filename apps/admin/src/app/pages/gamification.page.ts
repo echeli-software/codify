@@ -1375,7 +1375,8 @@ function emptyQuest(): QuestForm {
     target: 1,
     categorySlug: '',
     xpReward: 10,
-    coinReward: 5,
+    // docs/07 §2: "Daily quest complete: 20 coins".
+    coinReward: 20,
     isActive: true,
   };
 }

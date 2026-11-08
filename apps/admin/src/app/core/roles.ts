@@ -22,6 +22,7 @@ export type AdminSection =
   | 'audit'
   | 'leagues'
   | 'itemCategories'
+  | 'promoCodes'
   | 'settings';
 
 /**
@@ -51,6 +52,8 @@ export const SECTION_ROLES: Record<AdminSection, readonly UserRole[]> = {
   audit: ['ADMIN', 'TEACHER', 'SUPPORT'],
   leagues: ['ADMIN'],
   itemCategories: ['ADMIN'],
+  // docs/08 §12: coin promo codes (audited).
+  promoCodes: ['ADMIN'],
   // docs/04 Settings: feature flags + Stripe status.
   settings: ['ADMIN'],
 };
@@ -172,6 +175,12 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         labelKey: 'admin.nav.leagues',
         icon: 'star',
         link: '/leagues',
+      },
+      {
+        section: 'promoCodes',
+        labelKey: 'admin.nav.promoCodes',
+        icon: 'coins',
+        link: '/promo-codes',
       },
       {
         section: 'users',

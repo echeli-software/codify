@@ -173,6 +173,13 @@ export const SHELL_ROUTES: Route[] = [
           import('./pages/leagues.page').then((m) => m.LeaguesPage),
       },
       {
+        path: 'promo-codes',
+        canActivate: [sectionGuard('promoCodes')],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () =>
+          import('./pages/promo-codes.page').then((m) => m.PromoCodesPage),
+      },
+      {
         path: 'item-categories',
         canActivate: [sectionGuard('itemCategories')],
         loadComponent: () =>

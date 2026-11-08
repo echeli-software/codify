@@ -6,18 +6,25 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
+import { validateLeagueZones, type LeagueZoneConfig } from '@codify/domain';
 import {
   Badge,
   type BadgeVariant,
   Button,
   Drawer,
   EmptyState,
+  FormField,
   Icon,
+  Input,
   Skeleton,
+  ToastService,
 } from '@codify/ui-bootstrap';
 import {
   AdminOpsClient,
+  GamificationClient,
+  type LeagueZones,
   type AdminLeagueTier,
   type LeagueDetail,
   type LeagueSnapshot,
@@ -64,13 +71,17 @@ export function weekAfterMove(
  * Gamification → Leagues (docs/04): the week's snapshot per tier (league
  * count, members, p50/p95 weekly XP), every cohort, and a drill-in with
  * members, ranks and projected promotion/relegation zones. Zone sizes are
- * code constants; rewards are the `league.*` keys edited under
+ * the `league.zones` setting, edited here (validated server-side, audited,
+ * used by the next rollover); rewards are the `league.*` keys edited under
  * Gamification → Defaults.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    FormsModule,
+    FormField,
+    Input,
     Badge,
     Button,
     Drawer,
@@ -268,6 +279,50 @@ export function weekAfterMove(
                 'admin.leagues.editRewards' | translate
               }}</a>
             </p>
+            <form
+              class="zones"
+              data-testid="league-zones-form"
+              aria-labelledby="zones-title"
+              (submit)="saveZones($event)"
+            >
+              <h3 id="zones-title" class="h6">
+                {{ 'admin.leagues.zonesTitle' | translate }}
+              </h3>
+              <div class="zones__grid">
+                @for (f of zoneFields; track f) {
+                  <cdf-form-field
+                    [label]="'admin.leagues.zoneFields.' + f | translate"
+                    [controlId]="'zone-' + f"
+                  >
+                    <cdf-input
+                      [inputId]="'zone-' + f"
+                      [name]="f"
+                      type="number"
+                      [(ngModel)]="zones[f]"
+                    />
+                  </cdf-form-field>
+                }
+              </div>
+              @if (zoneErrors().length) {
+                <ul class="form-error" role="alert">
+                  @for (e of zoneErrors(); track e) {
+                    <li>{{ e }}</li>
+                  }
+                </ul>
+              }
+              <div class="form-actions">
+                <cdf-button
+                  kind="primary"
+                  type="submit"
+                  [loading]="savingZones()"
+                >
+                  {{ 'admin.common.save' | translate }}
+                </cdf-button>
+                <cdf-button kind="ghost" (click)="resetZones()">
+                  {{ 'admin.leagues.zonesReset' | translate }}
+                </cdf-button>
+              </div>
+            </form>
           </section>
         </div>
       }
@@ -360,13 +415,41 @@ export function weekAfterMove(
       .kv dd {
         margin: 0;
       }
+      .zones {
+        margin-top: var(--cdf-space-3, 12px);
+        border-top: 1px solid var(--cdf-color-border, #e5e7eb);
+        padding-top: var(--cdf-space-3, 12px);
+      }
+      .zones__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px 12px;
+      }
     `,
   ],
 })
 export class LeaguesPage {
   private readonly client = inject(AdminOpsClient);
+  private readonly gamification = inject(GamificationClient);
+  private readonly toast = inject(ToastService);
   private readonly errors = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
+
+  /** `league.zones` editor (ECO-14). */
+  protected readonly zoneFields: readonly (keyof LeagueZones)[] = [
+    'cohortSize',
+    'promote',
+    'demote',
+    'minCohortForDemotion',
+  ];
+  protected zones: Record<keyof LeagueZones, number | string> = {
+    cohortSize: 30,
+    promote: 7,
+    demote: 5,
+    minCohortForDemotion: 5,
+  };
+  protected readonly zoneErrors = signal<string[]>([]);
+  protected readonly savingZones = signal(false);
 
   protected readonly snapshot = signal<LeagueSnapshot | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -380,6 +463,55 @@ export class LeaguesPage {
 
   constructor() {
     void this.load();
+    void this.loadZones();
+  }
+
+  private async loadZones(): Promise<void> {
+    try {
+      const entry = (await this.gamification.getConfig()).find(
+        (e) => e.key === 'league.zones',
+      );
+      if (entry) this.zones = { ...(entry.value as LeagueZones) };
+    } catch {
+      // The snapshot's rules still show the effective values.
+    }
+  }
+
+  protected async saveZones(ev: Event): Promise<void> {
+    ev.preventDefault();
+    const value = Object.fromEntries(
+      this.zoneFields.map((f) => [f, Number(this.zones[f])]),
+    ) as unknown as LeagueZoneConfig;
+    const errs = validateLeagueZones(value);
+    this.zoneErrors.set(
+      errs.length ? [this.i18n.t('admin.leagues.zonesInvalid'), ...errs] : [],
+    );
+    if (errs.length) return;
+    await this.putZones(value);
+  }
+
+  protected async resetZones(): Promise<void> {
+    await this.putZones(null);
+  }
+
+  private async putZones(value: LeagueZoneConfig | null): Promise<void> {
+    this.savingZones.set(true);
+    try {
+      const entries = await this.gamification.updateConfig({
+        'league.zones': value,
+      });
+      const entry = entries.find((e) => e.key === 'league.zones');
+      if (entry) this.zones = { ...(entry.value as LeagueZones) };
+      this.zoneErrors.set([]);
+      this.toast.success(this.i18n.t('admin.leagues.zonesSaved'));
+      void this.load();
+    } catch (err) {
+      this.zoneErrors.set([
+        this.errors.message(err, 'admin.errors.saveFailed'),
+      ]);
+    } finally {
+      this.savingZones.set(false);
+    }
   }
 
   protected tierLabel(tier: AdminLeagueTier): string {
