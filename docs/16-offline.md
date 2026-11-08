@@ -301,6 +301,10 @@ sign-out and untouched by "Remove all downloads". `cdf-item-sprite` and
 
 - **IndexedDB**: same structured data.
 - **Cache Storage API** (via service worker): app shell + image/asset responses.
+- **Web push** (Phase 14): the same Angular service worker (`ngsw-worker.js`, wrapped by `codify-sw.js`) receives
+  VAPID web pushes and shows them; a tap opens / focuses the app at the deep link (`navigateLastFocusedOrOpen`).
+  Nothing about it is cached or queued offline: subscribing needs the network, and a push that arrives while the
+  device is offline is held by the browser's push service (TTL 24 h). See docs/10 §3.
 - **localStorage**: tiny prefs only.
 - **OPFS** (Origin Private File System): considered for large asset bundles in the future; v1 sticks with Cache Storage.
 

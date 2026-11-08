@@ -57,6 +57,9 @@ off; caps / dormancy apply through NotificationService.
 ### Channels
 
 - **Push** (FCM/APNs via Capacitor; web push for PWA users).
+  - As built (Phase 14): the PWA uses standard Web Push with VAPID through Angular's service worker (`SwPush`); the
+    API sends with `web-push`. Browser subscriptions get the same message and rules as the native tokens (see
+    Implementation below).
 - **Email** (transactional via Postmark/Resend).
 - **In-app inbox** (always; persisted on `Notification`).
 
@@ -82,7 +85,7 @@ off; caps / dormancy apply through NotificationService.
 | `FRIEND_NUDGE`    | Push (rate-limited 1/friend/day) | When a friend nudges                                                                          | Respect quiet hours         |
 | `LEAGUE_RESULT`   | Push                             | Monday 09:00 user-local                                                                       | Respect quiet hours         |
 | `ITEM_DROP`       | Push                             | At drop start (subject to opt-in)                                                             | Respect quiet hours         |
-| `PROMO`           | Push                             | Campaign start (subject to opt-in, default off)                                               | Respect quiet hours         |
+| `PROMO`           | Push + Email (both opt-in)       | Campaign start (subject to opt-in, default off; adults only)                                  | Respect (email anytime)     |
 | `BILLING`         | Push + Email                     | On payment failure / before renewal (PIX)                                                     | Respect (email anytime)     |
 | `SYSTEM`          | Push                             | Critical (account suspended, terms update)                                                    | No quiet-hours override     |
 
@@ -116,8 +119,9 @@ starts, only to users who turned PROMO push on (docs/07 §15).
   item drops, streak reminders and billing notices all go through it. Push payloads carry `data.url` (deep link),
   `data.kind` and `data.notificationId`. Tapping a native push marks that inbox entry read
   (`POST /notifications/:id/read`, fire-and-forget) and re-syncs the bell's unread count
-  (`NativePushService` → `NotificationsStore.markReadFromPush`). The PWA has no web push (no VAPID / `SwPush`
-  subscription), so there is no service-worker click path.
+  (`NativePushService` → `NotificationsStore.markReadFromPush`). Web push taps work the same way: the payload's
+  `notification.data.onActionClick.default` (`navigateLastFocusedOrOpen`, the deep link) opens or focuses the app,
+  and with the app open `SwPush.notificationClicks` routes in place and marks the entry read (`WebPushService`).
 - **Channels per kind**: push — every kind except `WELCOME` / `WEEKLY_RECAP`; email — `WELCOME`, `BILLING`,
   `WEEKLY_RECAP`, `REACTIVATION`, `SYSTEM`. Dormant (§13) and suspended users only get `BILLING` (+ `SYSTEM`)
   push/email; the inbox row is still written.
@@ -169,6 +173,50 @@ starts, only to users who turned PROMO push on (docs/07 §15).
 - **Student app**: bell with unread count (desktop shell header / mobile Today header) → `/notifications`
   (grouped by day, quick actions, "fewer like this", offline: the last inbox cached on the device) and
   `/settings/notifications`.
+
+- **Web push (PWA, Phase 14)** — `WebPushSubscription` rows (one per browser, upserted by `endpoint`, re-owned to
+  whoever registers it). `PushService` delivers to them next to the FCM tokens with the same title/body/data,
+  preference, quiet-hour/deferral and cap rules (one cap slot per push); a browser-only user counts as reachable
+  for the reminder jobs. Payload (Angular SW format): `{ notification: { title, body, icon, badge, tag:
+notificationId, data: { …data, url, onActionClick: { default: { operation: 'navigateLastFocusedOrOpen', url } } } } }`,
+  TTL 24 h. A 404 / 410 from the push service deletes the subscription; other errors are logged at most once a
+  minute (never the endpoint). Deleting / suspending an account drops its browser subscriptions with the tokens.
+  Env `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: unset in dev → web push off; required in
+  production.
+
+  | Method | Path                          | Auth          | Body                                                | Response                                                                                 |
+  | ------ | ----------------------------- | ------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+  | GET    | `/api/push/web/config`        | public        | —                                                   | `{ publicKey }`; 404 `WEB_PUSH_DISABLED` without VAPID keys                              |
+  | POST   | `/api/push/web/subscriptions` | any signed-in | `{ endpoint, keys: { p256dh, auth } }` (`toJSON()`) | `{ id }`; 400 `WEB_PUSH_ENDPOINT_NOT_ALLOWED` (not https on FCM / Mozilla / Apple / WNS) |
+  | DELETE | `/api/push/web/subscriptions` | any signed-in | `{ endpoint }`                                      | `{ removed }` (own rows only)                                                            |
+
+  Student app: the browser permission prompt is never shown on load. After a meaningful moment (a completed lesson /
+  the first streak day, once the reward toast and any celebration are gone) a small non-modal card explains it and
+  only its "Turn on" tap calls `SwPush.requestSubscription`; "Not now" is remembered on the device. Settings →
+  Notifications has a "Browser notifications" toggle (off = DELETE + unsubscribe); iPhone / iPad outside a
+  home-screen web app (iOS 16.4+) and browsers that blocked notifications get a short hint instead; the native
+  shell uses FCM and shows neither. Sign-out removes the browser subscription; sign-in re-binds an existing one.
+
+- **Promotional notifications (Phase 14)** — marketing reaches **known adults only** (date of birth 18+ years
+  ago; no date → nothing, fail closed): `NotificationService` writes nothing at all (not even the inbox row) for a
+  PROMO to anyone else.
+  - **One-time prompt** "Get alerts about bonus events?": `GET /api/me/promo-prompt` → `{ show, promptedAt }` (show
+    for an adult with ≥ 1 completed lesson never asked); `POST /api/me/promo-prompt { push, email }` stamps
+    `User.promoPromptedAt` whatever the answer (409 `PROMO_PROMPT_ANSWERED` afterwards; 403
+    `PROMO_PROMPT_NOT_ALLOWED` for minors / no date of birth), sets PROMO push to `push` and PROMO email to
+    `email`; only the separate "also by email" tick box sets `marketingEmailOptIn = true` (audited
+    `user.promo_prompt_answered`). The student app shows it as the same non-modal card after a completed lesson;
+    accepting on the web is followed by the browser notifications card.
+  - **Campaign email**: the 15-minute promo job also emails, at campaign start, adults with `marketingEmailOptIn`
+    whose PROMO email is not off (default on, so consent is the explicit switch; the one-click unsubscribe turns
+    PROMO email off). Template: bonus, course and end time in the user's zone, pt-BR / en-US, the shared layout
+    with `List-Unsubscribe` + one-click POST and the reason "you chose to get bonus-event alerts by email".
+    Claimed per (promotion, user) on its own key `promo_email:<multiplierId>:<userId>` (push keeps
+    `promo_announce:`); a failed send releases the claim for the next run. Caps (from the EMAIL log): ≤ 2 PROMO
+    emails per 7 days and ≥ 24 h apart (or the PROMO "fewer like this" window).
+  - **Settings**: for adults PROMO shows push + email toggles (email on only with consent; turning it on records
+    the consent); for minors / unknown age the PROMO row is hidden and `PUT` turning it on is 403
+    `MARKETING_NOT_ALLOWED`.
 
 ## 4. Animations & feedback
 
@@ -527,6 +575,10 @@ funnel (docs/09 §4) can follow one visit from "card only" to its outcome.
 | `push_skipped`                  | Push suppressed (server-side)                | `kind`, `reason` (`quiet_hours` / `no_devices` / `cap` / `disabled` / `fewer`) |
 | `push_open`                     | App opened from a push                       | `kind`                                                                         |
 | `notification_settings_changed` | Quiet hours / opt-outs edited                | `kind?`, `channel?`, `enabled?`, `fields?`                                     |
+| `promo_prompt_shown`            | "Get alerts about bonus events?" card shown  | —                                                                              |
+| `promo_prompt_answered`         | Promo alerts prompt answered                 | `push`, `email`                                                                |
+| `web_push_prompt_shown`         | "Turn on browser notifications?" card shown  | —                                                                              |
+| `web_push_prompt_dismissed`     | That card's "Not now"                        | —                                                                              |
 | `notifications_inbox_opened`    | Inbox screen opened                          | `unread`, `count`, `fromCache`                                                 |
 | `notification_opened`           | Inbox entry or its quick action tapped       | `kind`, `via` (`item` / `action`), `action?`                                   |
 | `notification_fewer`            | "Fewer like this" tapped                     | `kind`, `level`                                                                |
