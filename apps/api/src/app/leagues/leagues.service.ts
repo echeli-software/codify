@@ -489,7 +489,9 @@ export class LeaguesService {
     try {
       const res = await this.sendLeagueResults();
       if (res.sent > 0)
-        this.logger.log(`league results: ${res.sent} sent (${res.pushed} pushed)`);
+        this.logger.log(
+          `league results: ${res.sent} sent (${res.pushed} pushed)`,
+        );
       return res;
     } catch (err) {
       this.logger.error(`league results failed: ${(err as Error).message}`);
@@ -497,7 +499,10 @@ export class LeaguesService {
     }
   }
 
-  private async claimResult(leagueId: string, userId: string): Promise<boolean> {
+  private async claimResult(
+    leagueId: string,
+    userId: string,
+  ): Promise<boolean> {
     try {
       await this.prisma.idempotencyRecord.create({
         data: {

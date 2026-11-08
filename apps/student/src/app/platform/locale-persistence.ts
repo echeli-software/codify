@@ -18,10 +18,11 @@ export class StudentLocalePersistence implements LocalePersistence {
       // `preference_update` — the sync service is a lazy chunk.
       if (toProblemDetails(err).status !== 0) return;
       try {
-        const { OfflineSyncService } = await import(
-          '../offline/offline-sync.service'
-        );
-        await this.injector.get(OfflineSyncService).updatePreferences({ locale });
+        const { OfflineSyncService } =
+          await import('../offline/offline-sync.service');
+        await this.injector
+          .get(OfflineSyncService)
+          .updatePreferences({ locale });
       } catch {
         /* best-effort */
       }

@@ -47,11 +47,11 @@ A scenario is a directed graph of dialogue nodes; each choice either advances
 - `validateScenario` — author-time checks (start exists, every target
   resolves, at least one ending).
 - `walkScenario` — replay a student's choice path → `valid / path / depth /
-  completed / outcome`.
+completed / outcome`.
 - `scenarioMaxDepth` — longest reachable branch (cycle-safe).
 
 The API validates author graphs and replays student paths with the **same**
-functions, so authoring and runtime never drift. The graph *is* the content —
+functions, so authoring and runtime never drift. The graph _is_ the content —
 `GET /lessons/:id/scenario` returns it; the `ScenarioRunner` walks it
 client-side and `POST /scenarios/:id/complete` records each play-through. The
 **first** completion grants `SCENARIO_COMPLETE`; scenarios are replayable
