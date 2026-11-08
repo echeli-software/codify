@@ -1,0 +1,114 @@
+:host {
+  display: block;
+}
+
+.cdf-props {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdf-space-2);
+  padding: var(--cdf-space-3);
+  font-size: var(--cdf-font-size-sm);
+
+  &__title {
+    margin: 0;
+    font-size: var(--cdf-font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__type {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--cdf-space-2);
+    margin: 0;
+  }
+
+  &__muted {
+    margin: 0;
+    color: var(--cdf-color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  &__help {
+    margin: 0;
+    color: var(--cdf-color-text-muted);
+
+    &--error {
+      color: var(--cdf-color-danger);
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    > span {
+      font-weight: var(--cdf-font-weight-semibold);
+    }
+
+    input,
+    select {
+      min-height: 36px;
+      padding: 4px 8px;
+      border: 1px solid var(--cdf-color-border);
+      border-radius: var(--cdf-radius-sm);
+      background: var(--cdf-color-surface);
+      color: var(--cdf-color-text);
+      font: inherit;
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: var(--cdf-shadow-focus-ring);
+      }
+
+      &[aria-invalid='true'] {
+        border-color: var(--cdf-color-danger);
+      }
+    }
+  }
+
+  &__check {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cdf-space-1);
+    padding-top: var(--cdf-space-2);
+    border-top: 1px dashed var(--cdf-color-border);
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 2px 8px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-sm);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+
+    &--danger {
+      color: var(--cdf-color-danger);
+    }
+  }
+}

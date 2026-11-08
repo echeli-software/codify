@@ -171,6 +171,29 @@
         "in-progress": "Em andamento",
         "completed": "Concluída",
         "locked": "Bloqueada"
+      },
+      "code": {
+        "label": "Código · {language}",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "copyFailed": "Não foi possível copiar",
+        "copiedAnnounce": "Código copiado para a área de transferência"
+      },
+      "quiz": {
+        "matchHint": "Associe cada item à resposta certa.",
+        "matchChoose": "Escolha uma resposta…",
+        "correctMatch": "Resposta certa: {answer}",
+        "orderHint": "Coloque os itens na ordem certa com os botões de seta.",
+        "moveUp": "Mover “{item}” para cima",
+        "moveDown": "Mover “{item}” para baixo",
+        "moved": "“{item}” agora está na posição {position} de {total}",
+        "orderConfirm": "Esta ordem é minha resposta"
+      },
+      "embed": {
+        "by": "por {author}"
+      },
+      "video": {
+        "comingSoon": "Vídeo em breve"
       }
     },
     "level": {
@@ -428,15 +451,23 @@
           "url": "O envio retornou uma URL não suportada.",
           "failedWith": "Falha no envio: {message}",
           "failed": "Falha no envio."
+        },
+        "align": "Alinhamento",
+        "aligns": {
+          "left": "Esquerda",
+          "center": "Centro",
+          "right": "Direita"
         }
       },
       "embed": {
         "title": "Incorporar",
         "urlPlaceholder": "https://www.youtube.com/watch?v=…",
         "detected": "{provider} detectado.",
-        "help": "Somente links do YouTube, Vimeo, CodePen, CodeSandbox ou Loom.",
+        "help": "Somente links do YouTube, Vimeo, CodePen, CodeSandbox, Loom, StackBlitz ou Figma.",
         "titleLabel": "Título (lido por leitores de tela)",
-        "insert": "Incorporar"
+        "insert": "Incorporar",
+        "aspectRatio": "Proporção",
+        "invalidProvider": "Use um link do YouTube, Vimeo, CodePen, CodeSandbox, Loom, StackBlitz ou Figma."
       },
       "placeholder": "Comece a escrever a lição…",
       "contentLabel": "Conteúdo da lição",
@@ -445,7 +476,120 @@
         "quizInserted": "Bloco de quiz inserido.",
         "blockInserted": "Bloco inserido.",
         "imageInserted": "Imagem inserida.",
-        "embedInserted": "Incorporação inserida."
+        "embedInserted": "Incorporação inserida.",
+        "blockMoved": "Bloco movido para a posição {n}.",
+        "blockDeleted": "Bloco excluído.",
+        "blockSelected": "Bloco selecionado. Alt+Shift+setas o movem.",
+        "videoInserted": "Bloco de vídeo inserido.",
+        "locked": "Modo tradução: a estrutura dos blocos não pode mudar."
+      },
+      "views": {
+        "label": "Painéis do editor",
+        "outline": "Estrutura",
+        "properties": "Propriedades"
+      },
+      "outline": {
+        "title": "Estrutura",
+        "empty": "Adicione títulos ou blocos interativos para vê-los aqui.",
+        "untitled": "(sem título)"
+      },
+      "handle": {
+        "label": "Arraste para mover este bloco ou pressione para selecioná-lo (Alt+Shift+↑/↓ move)"
+      },
+      "bubble": {
+        "label": "Formatação do texto",
+        "bold": "Negrito",
+        "italic": "Itálico",
+        "strike": "Tachado",
+        "code": "Código em linha",
+        "highlight": "Marca-texto",
+        "link": "Link"
+      },
+      "props": {
+        "title": "Propriedades do bloco",
+        "none": "Coloque o cursor em um bloco para ver suas propriedades.",
+        "noFields": "Este bloco não tem propriedades extras.",
+        "position": "Bloco {n} de {total}",
+        "moveUp": "Mover bloco para cima",
+        "moveDown": "Mover bloco para baixo",
+        "delete": "Excluir bloco",
+        "level": "Nível do título",
+        "levels": {
+          "2": "Título 2",
+          "3": "Título 3"
+        },
+        "calloutKind": "Tipo de destaque",
+        "calloutKinds": {
+          "info": "Informação",
+          "tip": "Dica",
+          "warn": "Atenção",
+          "danger": "Perigo",
+          "success": "Sucesso"
+        },
+        "language": "Linguagem",
+        "lineNumbers": "Mostrar números de linha",
+        "highlightLines": "Destacar linhas",
+        "highlightHelp": "Números e intervalos de linha, ex.: 3,7-9",
+        "highlightInvalid": "Use números e intervalos como 3,7-9.",
+        "copyable": "Mostrar botão de copiar",
+        "quizHint": "Edite a pergunta e as respostas no próprio bloco.",
+        "quizKind": "Tipo de resposta",
+        "refId": "Id vinculado",
+        "notSet": "não definido",
+        "embedProvider": "Serviço",
+        "embedMeta": "Título obtido: {title}",
+        "tableSize": "{rows} linhas × {cols} colunas",
+        "types": {
+          "paragraph": "Texto",
+          "heading": "Título",
+          "bulletList": "Lista com marcadores",
+          "orderedList": "Lista numerada",
+          "blockquote": "Citação",
+          "codeBlock": "Bloco de código",
+          "callout": "Destaque",
+          "horizontalRule": "Divisor",
+          "image": "Imagem",
+          "embed": "Incorporação",
+          "videoBlock": "Vídeo",
+          "table": "Tabela",
+          "quiz": "Quiz",
+          "exerciseRef": "Exercício de código",
+          "aiPromptRef": "Prompt de IA",
+          "scenarioRef": "Cenário"
+        }
+      },
+      "lock": {
+        "note": "Modo tradução: edite o texto — não é possível adicionar, remover ou reordenar blocos."
+      },
+      "video": {
+        "title": "Vídeo",
+        "delete": "Excluir vídeo",
+        "titleLabel": "Título (obrigatório)",
+        "defaultTitle": "Vídeo",
+        "hint": "Os alunos veem um aviso “Vídeo em breve” até a hospedagem de vídeos ser lançada."
+      },
+      "quiz": {
+        "kinds": {
+          "single": "Escolha única",
+          "multiple": "Múltipla escolha",
+          "match": "Associação",
+          "order": "Ordenação"
+        },
+        "matchLegend": "Pares — cada item e sua resposta certa",
+        "matchItem": "Item {n}",
+        "matchItemPlaceholder": "Item",
+        "matchAnswer": "Resposta do item {n}",
+        "matchAnswerPlaceholder": "Resposta correspondente",
+        "removePair": "Remover par {n}",
+        "addPair": "Adicionar par",
+        "distractors": "Respostas extras (distratores, opcional)",
+        "distractor": "Resposta extra {n}",
+        "removeDistractor": "Remover resposta extra {n}",
+        "addDistractor": "Adicionar resposta extra",
+        "orderLegend": "Itens na ordem certa — os alunos os veem embaralhados",
+        "orderItem": "Item {n}",
+        "moveUp": "Mover item {n} para cima",
+        "moveDown": "Mover item {n} para baixo"
       }
     }
   }

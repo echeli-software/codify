@@ -15,6 +15,10 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { isAllowedHref } from '@codify/lesson-schema';
 import { CalloutExtension } from './callout.extension.js';
 import {
+  BlockCommands,
+  CodeBlockAttrs,
+  StructureLock,
+  LessonVideo,
   LessonAiPromptRef,
   LessonDocument,
   LessonEmbed,
@@ -34,6 +38,7 @@ import {
 export type LessonNodeViewType =
   | 'image'
   | 'embed'
+  | 'videoBlock'
   | 'quiz'
   | 'exerciseRef'
   | 'aiPromptRef'
@@ -47,6 +52,10 @@ export interface BuildExtensionsOptions {
   /** Editor-level shortcuts that open UI owned by the Angular component. */
   onOpenLink?: () => void;
   onOpenBlockMenu?: (trigger: 'slash' | 'shortcut') => void;
+  /** Translation mode: reject edits that change the block structure. */
+  structureLocked?: () => boolean;
+  /** Alt+F10: focus the floating marks toolbar. */
+  onFocusMarksToolbar?: () => void;
 }
 
 export function buildLessonExtensions(
@@ -61,6 +70,11 @@ export function buildLessonExtensions(
         'Mod-k': () => {
           if (!opts.onOpenLink) return false;
           opts.onOpenLink();
+          return true;
+        },
+        'Alt-F10': () => {
+          if (!opts.onFocusMarksToolbar) return false;
+          opts.onFocusMarksToolbar();
           return true;
         },
         'Mod-/': () => {
@@ -113,6 +127,10 @@ export function buildLessonExtensions(
     CalloutExtension,
     LessonImage.configure({ nodeView: views.image ?? null }),
     LessonEmbed.configure({ nodeView: views.embed ?? null }),
+    LessonVideo.configure({ nodeView: views.videoBlock ?? null }),
+    CodeBlockAttrs,
+    BlockCommands,
+    StructureLock.configure({ enabled: opts.structureLocked ?? (() => false) }),
     LessonTable,
     LessonTableRow,
     LessonTableHeader,

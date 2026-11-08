@@ -26,12 +26,15 @@ import {
   type TableHeaderNode,
   type TableNode,
   type TableRowNode,
+  type VideoBlockNode,
 } from '@codify/lesson-schema';
+import { LessonCodeBlock } from './code/lesson-code-block.js';
 import { LessonInline } from './lesson-inline.js';
 import {
   LessonEmbed,
   LessonQuiz,
   LessonRef,
+  LessonVideo,
 } from './lesson-interactive-blocks.js';
 import {
   LESSON_IMAGE_RESOLVER,
@@ -77,6 +80,8 @@ type Cell = TableHeaderNode | TableCellNode;
     LessonQuiz,
     LessonEmbed,
     LessonRef,
+    LessonVideo,
+    LessonCodeBlock,
   ],
   templateUrl: './lesson-blocks.html',
   styleUrl: './lesson-blocks.scss',
@@ -121,6 +126,9 @@ export class LessonBlocks {
   protected embed(b: AnyBlockNode): EmbedNode {
     return b as EmbedNode;
   }
+  protected video(b: AnyBlockNode): VideoBlockNode {
+    return b as VideoBlockNode;
+  }
   protected quiz(b: AnyBlockNode): QuizNode {
     return b as QuizNode;
   }
@@ -134,15 +142,6 @@ export class LessonBlocks {
 
   protected calloutLabel(b: AnyBlockNode): string {
     return CALLOUT_LABELS[this.callout(b).attrs?.kind] ?? 'Note';
-  }
-
-  protected codeText(b: AnyBlockNode): string {
-    return (this.code(b).content ?? []).map((t) => t.text).join('');
-  }
-
-  protected codeLanguage(b: AnyBlockNode): string {
-    const lang = this.code(b).attrs?.language ?? 'plaintext';
-    return /^[A-Za-z0-9+#._-]{1,40}$/.test(lang) ? lang : 'plaintext';
   }
 
   protected imageSrc(b: AnyBlockNode): string | null {

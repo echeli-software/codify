@@ -1,8 +1,10 @@
 import { Component, input, signal, type Type } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { I18nService, provideI18n } from '@codify/i18n';
 import {
   gradeQuiz,
   kitchenSinkLessonDoc,
+  orderAnswerTokens,
   stripQuizAnswers,
   LESSON_DOC_VERSION,
   type LessonDoc,
@@ -54,8 +56,9 @@ async function mount(providers: unknown[] = []): Promise<{
 }> {
   await TestBed.configureTestingModule({
     imports: [TestHost],
-    providers: providers as never[],
+    providers: [provideI18n(), ...(providers as never[])],
   }).compileComponents();
+  await TestBed.inject(I18nService).setLocale('en-US');
   const fixture = TestBed.createComponent(TestHost);
   fixture.detectChanges();
   await fixture.whenStable();
@@ -99,7 +102,10 @@ describe('LessonBlockRenderer', () => {
       el.querySelector('pre code.language-typescript')?.textContent,
     ).toContain('function greet');
     expect(el.querySelector('hr')).toBeTruthy();
-    expect(el.querySelectorAll('cdf-lesson-quiz')).toHaveLength(2);
+    expect(el.querySelectorAll('cdf-lesson-quiz')).toHaveLength(4);
+    expect(el.querySelector('.cdf-video__soon')?.textContent).toContain(
+      'Video coming soon',
+    );
     expect(el.querySelectorAll('cdf-lesson-ref')).toHaveLength(3);
   });
 
@@ -155,9 +161,9 @@ describe('LessonBlockRenderer', () => {
       expect(
         el.querySelector('figure.cdf-figure')?.getAttribute('data-width'),
       ).toBe('wide');
-      expect(el.querySelector('figcaption')?.textContent).toContain(
-        'component tree',
-      );
+      expect(
+        el.querySelector('figure.cdf-figure figcaption')?.textContent,
+      ).toContain('component tree');
     });
 
     it('renders a stored local copy through LESSON_IMAGE_RESOLVER (reactively)', async () => {
@@ -308,6 +314,187 @@ describe('LessonBlockRenderer', () => {
       expect(el.querySelector('.cdf-quiz__option--answer')).toBeNull();
       expect(el.textContent).not.toContain('computed() is read-only');
     });
+  });
+
+  describe('code blocks', () => {
+    it('numbers lines, emphasises highlightLines and highlights lazily', async () => {
+      const { fixture, el } = await mount();
+      const lines = el.querySelectorAll('.cdf-code__line');
+      expect(lines).toHaveLength(3);
+      expect(lines[1].classList).toContain('cdf-code__line--hl');
+      expect(lines[0].querySelector('.cdf-code__ln')?.textContent).toBe('1');
+      expect(
+        lines[0].querySelector('.cdf-code__ln')?.getAttribute('aria-hidden'),
+      ).toBe('true');
+      // The highlight.js chunk loads on first use.
+      await new Promise((r) => setTimeout(r, 50));
+      await settle(fixture);
+      expect(el.querySelector('.cdf-code .hljs-keyword')?.textContent).toBe(
+        'function',
+      );
+      expect(el.querySelector('.cdf-code-block__lang')?.textContent).toContain(
+        'TypeScript',
+      );
+    });
+
+    it('copies the source with an announced, translated result', async () => {
+      const writeText = jest.fn(async () => undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+      });
+      const { fixture, el } = await mount();
+      const button = el.querySelector<HTMLButtonElement>(
+        '.cdf-code-block__copy',
+      )!;
+      expect(button.textContent?.trim()).toBe('Copy');
+      button.click();
+      await new Promise((r) => setTimeout(r));
+      await settle(fixture);
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining('function greet(name: string)'),
+      );
+      expect(button.textContent?.trim()).toBe('Copied');
+      expect(
+        el.querySelector('.cdf-code-block [role="status"]')?.textContent,
+      ).toContain('copied');
+    });
+
+    it('hides the copy button when copyable is false', async () => {
+      const { fixture, host, el } = await mount();
+      host.doc.set({
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'codeBlock',
+            attrs: { language: 'bogus', copyable: false },
+            content: [{ type: 'text', text: '<b>x</b>' }],
+          },
+        ],
+      });
+      await settle(fixture);
+      expect(el.querySelector('.cdf-code-block__copy')).toBeNull();
+      // Unknown language → escaped plain text, never markup.
+      expect(el.querySelector('.cdf-code b')).toBeNull();
+      expect(el.querySelector('.cdf-code')?.textContent).toContain('<b>x</b>');
+    });
+  });
+
+  describe('match and order quizzes', () => {
+    it('pairs with selects and reports only a complete match', async () => {
+      const { fixture, host, el } = await mount();
+      const selects = el.querySelectorAll<HTMLSelectElement>('#quiz-q3 select');
+      expect(selects).toHaveLength(3);
+      expect(el.querySelector('#quiz-q3 label')?.getAttribute('for')).toBe(
+        selects[0].id,
+      );
+      const choose = (i: number, value: string) => {
+        selects[i].value = value;
+        selects[i].dispatchEvent(new Event('change'));
+      };
+      choose(0, 'x');
+      choose(1, 'y');
+      await settle(fixture);
+      expect(host.answers['q3'] ?? []).toEqual([]);
+      choose(2, 'z');
+      await settle(fixture);
+      expect(host.answers['q3']).toEqual(['a:x', 'b:y', 'c:z']);
+    });
+
+    it('reorders with move buttons, keeps focus and announces', async () => {
+      const { fixture, host, el } = await mount();
+      const items = () =>
+        Array.from(el.querySelectorAll('#quiz-q4 .cdf-quiz__order-item')).map(
+          (li) => li.querySelector('.cdf-quiz__text')?.textContent?.trim(),
+        );
+      const before = items();
+      expect(before).toHaveLength(3);
+      const firstDown = el.querySelector<HTMLButtonElement>(
+        '#quiz-q4 .cdf-quiz__order-item .cdf-quiz__move:last-child',
+      )!;
+      expect(firstDown.getAttribute('aria-label')).toMatch(/^Move “.+” down$/);
+      firstDown.click();
+      await settle(fixture);
+      expect(items()).toEqual([before[1], before[0], before[2]]);
+      expect(host.answers['q4']).toHaveLength(3);
+      expect(host.answers['q4'][0]).toMatch(/^0:/);
+      expect(
+        el.querySelector('#quiz-q4 [role="status"]')?.textContent,
+      ).toContain('is now 2 of 3');
+      await new Promise((r) => setTimeout(r, 20));
+      expect(
+        (document.activeElement as HTMLElement)?.getAttribute('aria-label'),
+      ).toBe(`Move “${before[0]}” down`);
+    });
+
+    it('shows the revealed correct order and pairs after grading', async () => {
+      const { fixture, host, el } = await mount();
+      host.result.set(
+        gradeQuiz(kitchenSinkLessonDoc(), {
+          q3: ['a:y', 'b:x', 'c:z'],
+          q4: orderAnswerTokens(['a', 'b', 'c']),
+        }),
+      );
+      await settle(fixture);
+      const match = el.querySelector('#quiz-q3')!;
+      expect(match.textContent).toContain('Correct answer: Writable state');
+      expect(
+        Array.from(match.querySelectorAll('select')).every((s) => s.disabled),
+      ).toBe(true);
+      expect(el.querySelector('#quiz-q4')?.classList).toContain(
+        'cdf-quiz--correct',
+      );
+    });
+  });
+
+  describe('embeds — round 3', () => {
+    it('applies aspectRatio and renders StackBlitz / Figma from rebuilt srcs', async () => {
+      const { fixture, host, el } = await mount();
+      host.doc.set({
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'embed',
+            attrs: {
+              provider: 'stackblitz',
+              url: 'https://stackblitz.com/edit/demo',
+              title: 'Demo',
+              aspectRatio: '4:3',
+              meta: { authorName: 'Ana' },
+            },
+          },
+          {
+            type: 'embed',
+            attrs: {
+              provider: 'figma',
+              url: 'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/x',
+              title: 'Design',
+            },
+          },
+        ],
+      });
+      await settle(fixture);
+      const frames = el.querySelectorAll<HTMLElement>('.cdf-embed__frame');
+      expect(frames[0].style.aspectRatio).toBe('4 / 3');
+      expect(frames[1].style.aspectRatio).toBe('16 / 9');
+      const srcs = Array.from(el.querySelectorAll('iframe')).map((f) =>
+        f.getAttribute('src'),
+      );
+      expect(srcs[0]).toBe('https://stackblitz.com/edit/demo?embed=1');
+      expect(srcs[1]).toMatch(/^https:\/\/www\.figma\.com\/embed\?/);
+      expect(el.querySelector('.cdf-embed__caption')?.textContent).toContain(
+        'by Ana',
+      );
+    });
+  });
+
+  it('aligns images', async () => {
+    const { el } = await mount();
+    expect(
+      el.querySelector('figure.cdf-figure')?.getAttribute('data-align'),
+    ).toBe('center');
   });
 
   describe('ref blocks', () => {

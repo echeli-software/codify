@@ -369,6 +369,22 @@
         "savedAt": "Saved at {time}",
         "paused": "Unsaved — autosave paused until the errors are fixed",
         "failed": "Autosave failed — save manually"
+      },
+      "previewStudent": "Preview as student",
+      "previewTitle": "Student preview — mobile and desktop",
+      "previewMobile": "Mobile (390 px)",
+      "previewDesktop": "Desktop (1024 px)",
+      "previewNote": "Shown the way students get it: answer keys are hidden and quizzes aren’t graded here.",
+      "issueBlock": "Block {n}",
+      "multipliers": {
+        "title": "Promotions on this lesson",
+        "none": "No promotions apply to this lesson.",
+        "scopeLesson": "This lesson",
+        "scopeCourse": "Whole course",
+        "running": "Running now",
+        "notRunning": "Not running",
+        "always": "Always on",
+        "manage": "Manage in Promotions"
       }
     },
     "exercise": {
@@ -1020,7 +1036,27 @@
       "source": "Source ({locale})",
       "translation": "Translation ({locale})",
       "editContent": "Edit lesson body",
-      "collapse": "Collapse"
+      "collapse": "Collapse",
+      "bulk": {
+        "title": "Bulk import / export",
+        "needsType": "Pick an entity type to export or import its translations.",
+        "scope": "{type} · {locale}",
+        "format": "Format",
+        "export": "Export file",
+        "file": "Translation file (CSV or JSON)",
+        "import": "Import",
+        "badFile": "Choose a .csv or .json file.",
+        "ready": "{valid, plural, =0 {Nothing to import} one {# row ready to import} other {# rows ready to import}} · {skipped} skipped",
+        "imported": "{count, plural, =0 {Nothing imported} one {# translation imported} other {# translations imported}}",
+        "errors": "{count, plural, one {# row has a problem} other {# rows have problems}} — nothing was imported.",
+        "rowError": "Row {row}: {message}",
+        "sourceChanged": "{count, plural, one {# row was translated from an older source text and stays marked outdated.} other {# rows were translated from an older source text and stay marked outdated.}}"
+      },
+      "markComplete": "Mark complete",
+      "completed": "Marked complete.",
+      "entityPct": "Entity {pct} translated",
+      "entityCompleteness": "Translated fields of this entity in this locale",
+      "problemsTitle": "Some translations were not saved"
     },
     "media": {
       "title": "Media library",

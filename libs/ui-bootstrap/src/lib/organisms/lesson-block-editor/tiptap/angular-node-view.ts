@@ -10,6 +10,7 @@
 import {
   ApplicationRef,
   createComponent,
+  reflectComponentType,
   type ComponentRef,
   type EnvironmentInjector,
   type InputSignal,
@@ -28,6 +29,8 @@ export interface LessonNodeViewComponent {
 /** What the node views need from Angular's DI to mount components. */
 export interface NodeViewHost {
   injector: EnvironmentInjector;
+  /** Translation mode; passed to views that declare a `structureLocked` input. */
+  structureLocked?: () => boolean;
 }
 
 const INTERACTIVE =
@@ -55,10 +58,15 @@ export function angularNodeView(
     dom.appendChild(ref.location.nativeElement);
     const appRef = host.injector.get(ApplicationRef);
     appRef.attachView(ref.hostView);
+    const takesLock = !!reflectComponentType(component)?.inputs.some(
+      (i) => i.propName === 'structureLocked',
+    );
 
     const sync = (): void => {
       ref.setInput('attrs', { ...node.attrs });
       ref.setInput('editable', editor.isEditable);
+      if (takesLock)
+        ref.setInput('structureLocked', host.structureLocked?.() ?? false);
       ref.changeDetectorRef.detectChanges();
     };
     sync();

@@ -9,7 +9,7 @@
     /></span>
     <h4 class="cdf-nv__title" [id]="uid + '-title'">Quiz</h4>
     <span class="cdf-nv__meta" [id]="uid + '-meta'">id: {{ quiz().id }}</span>
-    @if (editable()) {
+    @if (canEditStructure()) {
     <button
       type="button"
       class="cdf-nv__icon-btn"
@@ -33,30 +33,180 @@
     ></textarea>
   </label>
 
-  <fieldset class="cdf-nv__kind" [disabled]="!editable()">
+  <fieldset class="cdf-nv__kind" [disabled]="!canEditStructure()">
     <legend class="cdf-nv__label">Answer type</legend>
+    @for (k of kinds; track k) {
     <label>
       <input
         type="radio"
         [name]="uid + '-kind'"
-        value="single"
-        [checked]="quiz().kind === 'single'"
-        (change)="setKind('single')"
+        [value]="k"
+        [checked]="quiz().kind === k"
+        (change)="setKind(k)"
       />
-      Single choice
+      {{ 'ui.lessonEditor.quiz.kinds.' + k | translate }}
     </label>
-    <label>
-      <input
-        type="radio"
-        [name]="uid + '-kind'"
-        value="multiple"
-        [checked]="quiz().kind === 'multiple'"
-        (change)="setKind('multiple')"
-      />
-      Multiple choice
-    </label>
+    }
   </fieldset>
 
+  @switch (quiz().kind) { @case ('match') {
+  <fieldset class="cdf-nv__options" [disabled]="!editable()">
+    <legend class="cdf-nv__label">
+      {{ 'ui.lessonEditor.quiz.matchLegend' | translate }}
+    </legend>
+    <ol class="cdf-nv__option-list">
+      @for (opt of quiz().options; track opt.id; let i = $index) {
+      <li class="cdf-nv__option cdf-nv__option--pair">
+        <input
+          type="text"
+          class="cdf-nv__option-text"
+          [value]="opt.text"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.matchItem' | translate: { n: i + 1 }
+          "
+          [placeholder]="'ui.lessonEditor.quiz.matchItemPlaceholder' | translate"
+          (input)="setOptionText(opt.id, $event)"
+        />
+        <span class="cdf-nv__pair-arrow" aria-hidden="true">↔</span>
+        @if (pairs().get(opt.id); as target) {
+        <input
+          type="text"
+          class="cdf-nv__option-text"
+          [value]="target.text"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.matchAnswer' | translate: { n: i + 1 }
+          "
+          [placeholder]="
+            'ui.lessonEditor.quiz.matchAnswerPlaceholder' | translate
+          "
+          (input)="setTargetText(target.id, $event)"
+        />
+        }
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.removePair' | translate: { n: i + 1 }
+          "
+          [disabled]="!canEditStructure() || quiz().options.length <= 2"
+          (click)="removeOption(opt.id)"
+        >
+          <cdf-editor-icon name="XSquare" size="16" />
+        </button>
+      </li>
+      }
+    </ol>
+    @if (canEditStructure()) {
+    <button
+      type="button"
+      class="cdf-nv__text-btn"
+      [disabled]="quiz().options.length >= maxOptions"
+      (click)="addOption()"
+    >
+      <cdf-editor-icon name="Plus" size="16" />
+      {{ 'ui.lessonEditor.quiz.addPair' | translate }}
+    </button>
+    }
+    <p class="cdf-nv__label">
+      {{ 'ui.lessonEditor.quiz.distractors' | translate }}
+    </p>
+    <ul class="cdf-nv__option-list">
+      @for (t of distractors(); track t.id; let i = $index) {
+      <li class="cdf-nv__option">
+        <input
+          type="text"
+          class="cdf-nv__option-text"
+          [value]="t.text"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.distractor' | translate: { n: i + 1 }
+          "
+          (input)="setTargetText(t.id, $event)"
+        />
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.removeDistractor' | translate: { n: i + 1 }
+          "
+          [disabled]="!canEditStructure()"
+          (click)="removeDistractor(t.id)"
+        >
+          <cdf-editor-icon name="XSquare" size="16" />
+        </button>
+      </li>
+      }
+    </ul>
+    @if (canEditStructure()) {
+    <button type="button" class="cdf-nv__text-btn" (click)="addDistractor()">
+      <cdf-editor-icon name="Plus" size="16" />
+      {{ 'ui.lessonEditor.quiz.addDistractor' | translate }}
+    </button>
+    }
+  </fieldset>
+  } @case ('order') {
+  <fieldset class="cdf-nv__options" [disabled]="!editable()">
+    <legend class="cdf-nv__label">
+      {{ 'ui.lessonEditor.quiz.orderLegend' | translate }}
+    </legend>
+    <ol class="cdf-nv__option-list">
+      @for (opt of quiz().options; track opt.id; let i = $index; let last =
+      $last) {
+      <li class="cdf-nv__option">
+        <input
+          type="text"
+          class="cdf-nv__option-text"
+          [value]="opt.text"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.orderItem' | translate: { n: i + 1 }
+          "
+          (input)="setOptionText(opt.id, $event)"
+        />
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.moveUp' | translate: { n: i + 1 }
+          "
+          [disabled]="!canEditStructure() || i === 0"
+          (click)="moveOption(i, -1)"
+        >
+          <cdf-editor-icon name="ArrowUp" size="16" />
+        </button>
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="
+            'ui.lessonEditor.quiz.moveDown' | translate: { n: i + 1 }
+          "
+          [disabled]="!canEditStructure() || last"
+          (click)="moveOption(i, 1)"
+        >
+          <cdf-editor-icon name="ArrowDown" size="16" />
+        </button>
+        <button
+          type="button"
+          class="cdf-nv__icon-btn"
+          [attr.aria-label]="'Remove option ' + (i + 1)"
+          [disabled]="!canEditStructure() || quiz().options.length <= 2"
+          (click)="removeOption(opt.id)"
+        >
+          <cdf-editor-icon name="XSquare" size="16" />
+        </button>
+      </li>
+      }
+    </ol>
+    @if (canEditStructure()) {
+    <button
+      type="button"
+      class="cdf-nv__text-btn"
+      [disabled]="quiz().options.length >= maxOptions"
+      (click)="addOption()"
+    >
+      <cdf-editor-icon name="Plus" size="16" /> Add option
+    </button>
+    }
+  </fieldset>
+  } @default {
   <fieldset class="cdf-nv__options" [disabled]="!editable()">
     <legend class="cdf-nv__label">
       Options — mark the correct {{ quiz().kind === 'single' ? 'one' : 'ones' }}
@@ -71,6 +221,7 @@
           [type]="quiz().kind === 'single' ? 'radio' : 'checkbox'"
           [name]="uid + '-correct'"
           [checked]="isCorrect(opt.id)"
+          [disabled]="!canEditStructure()"
           [attr.aria-label]="'Option ' + (i + 1) + ' is correct'"
           (change)="toggleCorrect(opt.id)"
         />
@@ -86,7 +237,7 @@
           type="button"
           class="cdf-nv__icon-btn"
           [attr.aria-label]="'Remove option ' + (i + 1)"
-          [disabled]="quiz().options.length <= 2"
+          [disabled]="!canEditStructure() || quiz().options.length <= 2"
           (click)="removeOption(opt.id)"
         >
           <cdf-editor-icon name="XSquare" size="16" />
@@ -94,6 +245,7 @@
       </li>
       }
     </ol>
+    @if (canEditStructure()) {
     <button
       type="button"
       class="cdf-nv__text-btn"
@@ -102,7 +254,9 @@
     >
       <cdf-editor-icon name="Plus" size="16" /> Add option
     </button>
+    }
   </fieldset>
+  } }
 
   <label class="cdf-nv__field">
     <span class="cdf-nv__label">Explanation (shown after answering)</span>

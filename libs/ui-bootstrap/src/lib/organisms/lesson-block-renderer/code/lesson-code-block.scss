@@ -1,0 +1,212 @@
+// Code block chrome + syntax token colours. The block keeps the prose `pre`
+// look (inverted surface); token colours are mixed towards the code's
+// foreground so they stay readable in both themes.
+:host {
+  display: block;
+}
+
+.cdf-code-block {
+  margin: 0;
+  border-radius: var(--cdf-radius-md);
+  overflow: hidden;
+  background: var(--cdf-color-text);
+  color: var(--cdf-color-bg);
+
+  --cdf-code-fg: var(--cdf-color-bg);
+  --cdf-code-muted: color-mix(in srgb, var(--cdf-code-fg) 55%, transparent);
+  --cdf-code-keyword: color-mix(
+    in srgb,
+    var(--cdf-color-primary) 55%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-string: color-mix(
+    in srgb,
+    var(--cdf-color-success) 60%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-number: color-mix(
+    in srgb,
+    var(--cdf-color-warning) 65%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-title: color-mix(
+    in srgb,
+    var(--cdf-color-info) 60%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-type: color-mix(
+    in srgb,
+    var(--cdf-color-accent) 55%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-danger: color-mix(
+    in srgb,
+    var(--cdf-color-danger) 60%,
+    var(--cdf-code-fg)
+  );
+  --cdf-code-hl: color-mix(in srgb, var(--cdf-color-warning) 22%, transparent);
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: var(--cdf-space-2);
+    padding: var(--cdf-space-1) var(--cdf-space-2) var(--cdf-space-1)
+      var(--cdf-space-4);
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--cdf-code-fg) 15%, transparent);
+    font-size: var(--cdf-font-size-xs, 12px);
+    color: var(--cdf-code-muted);
+  }
+
+  &__lang {
+    flex: 1;
+    min-width: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__copy {
+    min-height: 32px;
+    padding: 2px var(--cdf-space-3);
+    border: 1px solid color-mix(in srgb, var(--cdf-code-fg) 35%, transparent);
+    border-radius: var(--cdf-radius-sm);
+    background: transparent;
+    color: var(--cdf-code-fg);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, var(--cdf-code-fg) 12%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cdf-code-fg);
+      outline-offset: 2px;
+    }
+
+    &[data-state='copied'] {
+      border-color: var(--cdf-code-string);
+      color: var(--cdf-code-string);
+    }
+  }
+
+  &__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+// Override the prose `pre` box: the figure carries the background.
+.cdf-code-block pre.cdf-code {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  padding: var(--cdf-space-3) 0;
+  overflow-x: auto;
+
+  &:focus-visible {
+    outline: 2px solid var(--cdf-color-primary);
+    outline-offset: -2px;
+  }
+
+  code {
+    display: block;
+    min-width: max-content;
+    white-space: pre;
+    font-family: var(--cdf-font-family-mono);
+    font-size: var(--cdf-font-size-sm);
+    line-height: 1.6;
+  }
+}
+
+.cdf-code__line {
+  display: block;
+  padding-inline: var(--cdf-space-4);
+
+  &--hl {
+    background: var(--cdf-code-hl);
+    box-shadow: inset 3px 0 0 var(--cdf-code-number);
+  }
+}
+
+.cdf-code__ln {
+  display: inline-block;
+  min-width: 2.5ch;
+  margin-inline-end: var(--cdf-space-3);
+  text-align: end;
+  color: var(--cdf-code-muted);
+  user-select: none;
+}
+
+.cdf-code__text:empty::before {
+  content: '\200b';
+}
+
+// highlight.js token classes (theme from our tokens).
+:host ::ng-deep {
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--cdf-code-muted);
+    font-style: italic;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-section,
+  .hljs-doctag,
+  .hljs-name {
+    color: var(--cdf-code-keyword);
+  }
+
+  .hljs-string,
+  .hljs-regexp,
+  .hljs-addition,
+  .hljs-template-tag,
+  .hljs-template-variable {
+    color: var(--cdf-code-string);
+  }
+
+  .hljs-number,
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-variable,
+  .hljs-meta {
+    color: var(--cdf-code-number);
+  }
+
+  .hljs-title,
+  .hljs-title.function_,
+  .hljs-function {
+    color: var(--cdf-code-title);
+  }
+
+  .hljs-type,
+  .hljs-built_in,
+  .hljs-class,
+  .hljs-title.class_,
+  .hljs-selector-class,
+  .hljs-selector-id {
+    color: var(--cdf-code-type);
+  }
+
+  .hljs-deletion {
+    color: var(--cdf-code-danger);
+  }
+
+  .hljs-emphasis {
+    font-style: italic;
+  }
+
+  .hljs-strong {
+    font-weight: var(--cdf-font-weight-semibold, 600);
+  }
+}

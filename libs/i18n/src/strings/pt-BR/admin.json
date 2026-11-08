@@ -369,6 +369,22 @@
         "savedAt": "Salvo às {time}",
         "paused": "Não salvo — salvamento automático pausado até corrigir os erros",
         "failed": "Falha no salvamento automático — salve manualmente"
+      },
+      "previewStudent": "Ver como aluno",
+      "previewTitle": "Pré-visualização do aluno — celular e computador",
+      "previewMobile": "Celular (390 px)",
+      "previewDesktop": "Computador (1024 px)",
+      "previewNote": "Do jeito que o aluno vê: o gabarito fica oculto e os quizzes não são corrigidos aqui.",
+      "issueBlock": "Bloco {n}",
+      "multipliers": {
+        "title": "Promoções nesta lição",
+        "none": "Nenhuma promoção se aplica a esta lição.",
+        "scopeLesson": "Esta lição",
+        "scopeCourse": "Curso inteiro",
+        "running": "Ativa agora",
+        "notRunning": "Inativa",
+        "always": "Sempre ativa",
+        "manage": "Gerenciar em Promoções"
       }
     },
     "exercise": {
@@ -1020,7 +1036,27 @@
       "source": "Origem ({locale})",
       "translation": "Tradução ({locale})",
       "editContent": "Editar corpo da aula",
-      "collapse": "Recolher"
+      "collapse": "Recolher",
+      "bulk": {
+        "title": "Importar / exportar em lote",
+        "needsType": "Escolha um tipo de entidade para exportar ou importar as traduções.",
+        "scope": "{type} · {locale}",
+        "format": "Formato",
+        "export": "Exportar arquivo",
+        "file": "Arquivo de tradução (CSV ou JSON)",
+        "import": "Importar",
+        "badFile": "Escolha um arquivo .csv ou .json.",
+        "ready": "{valid, plural, =0 {Nada para importar} one {# linha pronta para importar} other {# linhas prontas para importar}} · {skipped} ignoradas",
+        "imported": "{count, plural, =0 {Nada importado} one {# tradução importada} other {# traduções importadas}}",
+        "errors": "{count, plural, one {# linha tem problema} other {# linhas têm problemas}} — nada foi importado.",
+        "rowError": "Linha {row}: {message}",
+        "sourceChanged": "{count, plural, one {# linha foi traduzida de um texto-fonte antigo e continua marcada como desatualizada.} other {# linhas foram traduzidas de um texto-fonte antigo e continuam marcadas como desatualizadas.}}"
+      },
+      "markComplete": "Marcar como concluída",
+      "completed": "Marcada como concluída.",
+      "entityPct": "Entidade {pct} traduzida",
+      "entityCompleteness": "Campos traduzidos desta entidade neste idioma",
+      "problemsTitle": "Algumas traduções não foram salvas"
     },
     "media": {
       "title": "Biblioteca de mídia",

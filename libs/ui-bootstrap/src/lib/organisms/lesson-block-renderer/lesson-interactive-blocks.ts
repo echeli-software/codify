@@ -7,14 +7,18 @@ import {
   input,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
+import { TranslatePipe } from '@codify/i18n';
 import {
   EMBED_PROVIDER_LABELS,
+  embedAspectRatioCss,
   embedSrcFor,
   type EmbedNode,
   type LessonRefActivation,
   type QuizAttrs,
+  type VideoBlockNode,
 } from '@codify/lesson-schema';
 import { LessonRenderContext } from './lesson-render-context.js';
+import { LessonQuizMatch, LessonQuizOrder } from './lesson-quiz-kinds.js';
 
 let nextId = 0;
 
@@ -26,6 +30,7 @@ let nextId = 0;
 @Component({
   selector: 'cdf-lesson-quiz',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe, LessonQuizMatch, LessonQuizOrder],
   template: `
     @let q = quiz();
     @let r = result();
@@ -40,41 +45,59 @@ let nextId = 0;
     >
       <legend class="cdf-quiz__question">{{ q.question }}</legend>
       <p class="cdf-quiz__hint" [id]="uid + '-hint'">
-        {{
-          q.kind === 'single' ? 'Choose one answer.' : 'Choose all that apply.'
-        }}
-      </p>
-      <ul class="cdf-quiz__options">
-        @for (opt of q.options; track opt.id) {
-          <li
-            class="cdf-quiz__option"
-            [class.cdf-quiz__option--selected]="isSelected(opt.id)"
-            [class.cdf-quiz__option--answer]="isAnswer(opt.id)"
-            [class.cdf-quiz__option--wrong]="
-              !!r && isSelected(opt.id) && !isAnswer(opt.id)
-            "
-          >
-            <label>
-              <input
-                [type]="q.kind === 'single' ? 'radio' : 'checkbox'"
-                [name]="uid"
-                [value]="opt.id"
-                [checked]="isSelected(opt.id)"
-                [disabled]="locked()"
-                (change)="toggle(opt.id, $any($event.target).checked)"
-              />
-              <span class="cdf-quiz__text">{{ opt.text }}</span>
-              @if (isAnswer(opt.id)) {
-                <span class="cdf-quiz__tag">Correct answer</span>
-              } @else if (!!r && isSelected(opt.id)) {
-                <span class="cdf-quiz__tag cdf-quiz__tag--wrong"
-                  >Your answer</span
-                >
-              }
-            </label>
-          </li>
+        @switch (q.kind) {
+          @case ('match') {
+            {{ 'ui.lesson.quiz.matchHint' | translate }}
+          }
+          @case ('order') {
+            {{ 'ui.lesson.quiz.orderHint' | translate }}
+          }
+          @default {
+            {{
+              q.kind === 'single'
+                ? 'Choose one answer.'
+                : 'Choose all that apply.'
+            }}
+          }
         }
-      </ul>
+      </p>
+      @if (q.kind === 'match') {
+        <cdf-lesson-quiz-match [quiz]="q" [result]="r" [locked]="locked()" />
+      } @else if (q.kind === 'order') {
+        <cdf-lesson-quiz-order [quiz]="q" [result]="r" [locked]="locked()" />
+      } @else {
+        <ul class="cdf-quiz__options">
+          @for (opt of q.options; track opt.id) {
+            <li
+              class="cdf-quiz__option"
+              [class.cdf-quiz__option--selected]="isSelected(opt.id)"
+              [class.cdf-quiz__option--answer]="isAnswer(opt.id)"
+              [class.cdf-quiz__option--wrong]="
+                !!r && isSelected(opt.id) && !isAnswer(opt.id)
+              "
+            >
+              <label>
+                <input
+                  [type]="q.kind === 'single' ? 'radio' : 'checkbox'"
+                  [name]="uid"
+                  [value]="opt.id"
+                  [checked]="isSelected(opt.id)"
+                  [disabled]="locked()"
+                  (change)="toggle(opt.id, $any($event.target).checked)"
+                />
+                <span class="cdf-quiz__text">{{ opt.text }}</span>
+                @if (isAnswer(opt.id)) {
+                  <span class="cdf-quiz__tag">Correct answer</span>
+                } @else if (!!r && isSelected(opt.id)) {
+                  <span class="cdf-quiz__tag cdf-quiz__tag--wrong"
+                    >Your answer</span
+                  >
+                }
+              </label>
+            </li>
+          }
+        </ul>
+      }
       @if (r) {
         <div class="cdf-quiz__feedback" role="status" [id]="uid + '-feedback'">
           <strong>{{ r.correct ? 'Correct!' : 'Not quite.' }}</strong>
@@ -133,16 +156,17 @@ export class LessonQuiz {
 @Component({
   selector: 'cdf-lesson-embed',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     @let n = node();
     <figure class="cdf-embed" [attr.data-provider]="n.attrs.provider">
       @if (safeSrc(); as src) {
-        <div class="cdf-embed__frame">
+        <div class="cdf-embed__frame" [style.aspect-ratio]="ratio()">
           <iframe
             [src]="src"
             [title]="n.attrs.title"
             loading="lazy"
-            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox allow-forms"
             allow="fullscreen; picture-in-picture; encrypted-media; clipboard-write"
             referrerpolicy="strict-origin-when-cross-origin"
             allowfullscreen
@@ -150,6 +174,9 @@ export class LessonQuiz {
         </div>
         <figcaption class="cdf-embed__caption">
           {{ n.attrs.title }} · {{ providerLabel() }}
+          @if (n.attrs.meta?.authorName; as author) {
+            · {{ 'ui.lesson.embed.by' | translate: { author } }}
+          }
         </figcaption>
       } @else {
         <p class="cdf-embed__unavailable" role="note">
@@ -178,6 +205,54 @@ export class LessonEmbed {
       EMBED_PROVIDER_LABELS[this.node().attrs.provider] ??
       this.node().attrs.provider,
   );
+  /** CSS aspect-ratio from `attrs.aspectRatio` (default 16 / 9). */
+  protected readonly ratio = computed(() =>
+    embedAspectRatioCss(this.node().attrs.aspectRatio),
+  );
+}
+
+/**
+ * Video block (docs/06 §2–3). Hosted video lands with the Cloudflare Stream
+ * pipeline; until then every video block renders this "coming soon"
+ * placeholder with its title and caption.
+ */
+@Component({
+  selector: 'cdf-lesson-video',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
+  template: `
+    @let a = node().attrs;
+    <figure class="cdf-video" role="group" [attr.aria-labelledby]="uid">
+      <div class="cdf-video__frame">
+        <svg
+          class="cdf-video__icon"
+          viewBox="0 0 24 24"
+          width="40"
+          height="40"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M4 5h11a2 2 0 0 1 2 2v2.4l4-2.4v10l-4-2.4V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+          />
+        </svg>
+        <p class="cdf-video__soon">
+          {{ 'ui.lesson.video.comingSoon' | translate }}
+        </p>
+      </div>
+      <figcaption class="cdf-video__caption">
+        <strong [id]="uid">{{ a.title }}</strong>
+        @if (a.caption) {
+          <span>{{ a.caption }}</span>
+        }
+      </figcaption>
+    </figure>
+  `,
+  styleUrl: './lesson-blocks.scss',
+})
+export class LessonVideo {
+  readonly node = input.required<VideoBlockNode>();
+  protected readonly uid = `cdf-video-${nextId++}`;
 }
 
 const REF_COPY: Record<

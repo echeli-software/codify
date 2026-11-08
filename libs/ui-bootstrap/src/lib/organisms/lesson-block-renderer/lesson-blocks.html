@@ -32,16 +32,14 @@
   <cdf-lesson-blocks [blocks]="callout(block).content" />
 </div>
 } @case ('codeBlock') {
-<pre
-  class="cdf-code"
-  [attr.data-language]="codeLanguage(block)"
-><code [class]="'language-' + codeLanguage(block)" [textContent]="codeText(block)"></code></pre>
+<cdf-lesson-code [node]="code(block)" />
 } @case ('horizontalRule') {
 <hr />
 } @case ('image') {
 <figure
   class="cdf-figure"
   [attr.data-width]="image(block).attrs.width ?? 'full'"
+  [attr.data-align]="image(block).attrs.align ?? 'center'"
 >
   @if (imageSrc(block); as src) {
   <img
@@ -56,6 +54,8 @@
 </figure>
 } @case ('embed') {
 <cdf-lesson-embed [node]="embed(block)" />
+} @case ('videoBlock') {
+<cdf-lesson-video [node]="video(block)" />
 } @case ('table') { @let parts = tableParts(block);
 <div
   class="cdf-table-wrap"

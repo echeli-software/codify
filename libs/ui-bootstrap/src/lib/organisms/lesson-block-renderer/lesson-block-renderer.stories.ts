@@ -78,3 +78,60 @@ export const Disabled: Story = {
     ),
   }),
 };
+
+/** Code blocks: lazy syntax highlighting, line numbers, emphasised lines, copy. */
+export const CodeBlocks: Story = {
+  render: () => ({
+    props: {
+      doc: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'codeBlock',
+            attrs: {
+              language: 'python',
+              showLineNumbers: true,
+              highlightLines: '2-3',
+              copyable: true,
+            },
+            content: [
+              {
+                type: 'text',
+                text: 'def greet(name: str) -> str:\n    message = f"Hello, {name}!"\n    return message\n\nprint(greet("Ada"))',
+              },
+            ],
+          },
+          {
+            type: 'codeBlock',
+            attrs: { language: 'bash', copyable: false },
+            content: [{ type: 'text', text: 'pnpm exec nx run student:serve' }],
+          },
+        ],
+      },
+    },
+    template: frame(`<cdf-lesson-block-renderer [doc]="doc" />`),
+  }),
+};
+
+/** Matching + ordering quizzes after grading (answers revealed on pass). */
+export const MatchAndOrderGraded: Story = {
+  render: () => {
+    const answers = {
+      quiz: ['a'],
+      q2: ['a', 'b'],
+      q3: ['a:x', 'b:y', 'c:z'],
+      q4: ['0:a', '1:b', '2:c'],
+    };
+    return {
+      props: {
+        doc: STUDENT_DOC,
+        answers,
+        result: gradeQuiz(kitchenSinkLessonDoc(), answers),
+      },
+      template: frame(
+        `<cdf-lesson-block-renderer [doc]="doc" [quizAnswers]="answers" [quizResult]="result" />`,
+      ),
+    };
+  },
+};

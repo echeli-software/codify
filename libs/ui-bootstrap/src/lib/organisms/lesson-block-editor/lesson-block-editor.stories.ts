@@ -50,7 +50,7 @@ export default meta;
 type Story = StoryObj<LessonBlockEditor>;
 
 const frame = (inner: string) =>
-  `<div style="padding:24px; max-width:880px;">${inner}</div>`;
+  `<div style="padding:24px; max-width:1120px;">${inner}</div>`;
 
 export const Empty: Story = {
   render: () => ({
@@ -75,6 +75,16 @@ export const Readonly: Story = {
     props: { doc: kitchenSinkLessonDoc() },
     template: frame(
       `<cdf-lesson-block-editor [ngModel]="doc" [readonly]="true" />`,
+    ),
+  }),
+};
+
+/** Translation mode (docs/11 §3): text editable, block structure locked. */
+export const TranslationMode: Story = {
+  render: () => ({
+    props: { doc: kitchenSinkLessonDoc() },
+    template: frame(
+      `<cdf-lesson-block-editor [(ngModel)]="doc" [lockStructure]="true" [showProperties]="false" />`,
     ),
   }),
 };

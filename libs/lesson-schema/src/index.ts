@@ -128,6 +128,6 @@ export {
   type BlockVisitor,
   type LessonDocRefs,
 } from './lib/walk.js';
-export { lessonStructureIssues } from './lib/structure.js';
+export { lessonStructureIssues, LOCKED_BLOCK_ATTRS } from './lib/structure.js';
 export { emptyLessonDoc } from './lib/empty.js';
 export { kitchenSinkLessonDoc } from './lib/fixtures.js';

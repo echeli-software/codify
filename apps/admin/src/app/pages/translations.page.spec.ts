@@ -7,7 +7,14 @@ import {
   type TranslationCompleteness,
   type TranslationRow,
 } from '@codify/api-client';
-import { TranslationsPage, buildUpserts, rowKey } from './translations.page';
+import {
+  TranslationsPage,
+  buildUpserts,
+  fileFormat,
+  problemsOf,
+  rowKey,
+} from './translations.page';
+import { ProblemDetailsError } from '@codify/api-client';
 
 const row = (over: Partial<TranslationRow> = {}): TranslationRow => ({
   entityType: 'PLAN',
@@ -77,6 +84,16 @@ describe('TranslationsPage — platform entities', () => {
       list: jest.fn().mockResolvedValue({ items: rows, total: rows.length }),
       completeness: jest.fn().mockResolvedValue(completeness()),
       upsert: jest.fn().mockResolvedValue({ updated: 2 }),
+      markComplete: jest.fn().mockResolvedValue({ completed: 1 }),
+      exportFile: jest.fn(),
+      importFile: jest.fn().mockResolvedValue({
+        dryRun: true,
+        imported: 0,
+        valid: 1,
+        skipped: 0,
+        errors: [],
+        sourceChanged: [],
+      }),
     };
     await TestBed.configureTestingModule({
       imports: [TranslationsPage],
@@ -192,5 +209,139 @@ describe('TranslationsPage — platform entities', () => {
       [],
     );
     expect(buildUpserts([r], new Map([[rowKey(r), '  ']]))).toEqual([]);
+  });
+});
+
+describe('TranslationsPage — import / export / mark complete (AUT-8)', () => {
+  it('detects file formats and reads problem lists', () => {
+    expect(fileFormat({ name: 'x.CSV', type: '' })).toBe('csv');
+    expect(fileFormat({ name: 'x', type: 'application/json' })).toBe('json');
+    expect(fileFormat({ name: 'x.xlsx', type: '' })).toBeNull();
+    const err = new ProblemDetailsError({
+      status: 400,
+      data: { problems: ['items[0].value content: Expected 3 block(s)'] },
+    } as never);
+    expect(problemsOf(err)).toEqual([
+      'items[0].value content: Expected 3 block(s)',
+    ]);
+    expect(problemsOf(new Error('x'))).toEqual([]);
+  });
+
+  async function mount() {
+    const client = {
+      list: jest.fn().mockResolvedValue({
+        items: [
+          {
+            entityType: 'COURSE',
+            entityId: 'c1',
+            label: 'Fundamentos',
+            field: 'title',
+            sourceLocale: 'pt-BR',
+            sourceValue: 'Fundamentos',
+            locale: 'en-US',
+            value: 'Basics',
+            outdated: true,
+            status: 'outdated',
+            updatedAt: null,
+          },
+        ],
+        total: 1,
+      }),
+      completeness: jest.fn().mockResolvedValue({
+        locales: {},
+        entities: [
+          {
+            entityType: 'COURSE',
+            entityId: 'c1',
+            label: 'Fundamentos',
+            locale: 'en-US',
+            total: 2,
+            translated: 1,
+            outdated: 1,
+            pct: 50,
+          },
+        ],
+      }),
+      upsert: jest.fn(),
+      markComplete: jest.fn().mockResolvedValue({ completed: 1 }),
+      exportFile: jest.fn(),
+      importFile: jest.fn().mockResolvedValue({
+        dryRun: true,
+        imported: 0,
+        valid: 1,
+        skipped: 0,
+        errors: [],
+        sourceChanged: [],
+      }),
+    };
+    await TestBed.configureTestingModule({
+      imports: [TranslationsPage],
+      providers: [
+        provideRouter([]),
+        provideI18n(),
+        { provide: TranslationsClient, useValue: client },
+        {
+          provide: ContentTranslationService,
+          useValue: { invalidate: jest.fn() },
+        },
+        {
+          provide: ToastService,
+          useValue: { success: jest.fn(), error: jest.fn() },
+        },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TranslationsPage);
+    fixture.detectChanges();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { fixture, client, page: fixture.componentInstance as any };
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('shows per-entity completeness and marks an outdated row complete', async () => {
+    const { fixture, client } = await mount();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.textContent).toContain('Entity 50% translated');
+    el.querySelector<HTMLElement>('[data-testid="mark-complete"] button, [data-testid="mark-complete"]')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(client.markComplete).toHaveBeenCalledWith([
+      { entityType: 'COURSE', entityId: 'c1', field: 'title', locale: 'en-US' },
+    ]);
+  });
+
+  it('needs an entity type, then dry-runs a picked file and imports it', async () => {
+    const { fixture, client, page } = await mount();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('[data-testid="import-file"]')).toBeNull();
+    page.setFilter('type', 'COURSE');
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    const file = {
+      name: 'tr.csv',
+      type: 'text/csv',
+      text: async () => 'entityId,locale,field,sourceValue,translatedValue',
+    };
+    await page.pickFile({ target: { files: [file] } });
+    fixture.detectChanges();
+    expect(client.importFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ entityType: 'COURSE', format: 'csv', dryRun: true }),
+    );
+    expect(el.querySelector('[data-testid="import-report"]')?.textContent).toContain(
+      '1 row ready to import',
+    );
+    client.importFile.mockResolvedValueOnce({
+      dryRun: false,
+      imported: 1,
+      valid: 1,
+      skipped: 0,
+      errors: [],
+      sourceChanged: [],
+    });
+    await page.runImport();
+    expect(client.importFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dryRun: false }),
+    );
   });
 });

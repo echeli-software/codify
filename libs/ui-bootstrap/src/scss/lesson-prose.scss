@@ -189,6 +189,23 @@
       margin-inline: calc(var(--cdf-space-6) * -1);
     }
 
+    // align (docs/06 §3): placement of images narrower than the column.
+    &[data-align='center'] img {
+      margin-inline: auto;
+    }
+
+    &[data-align='right'] img {
+      margin-inline-start: auto;
+    }
+
+    &[data-align='right'] figcaption {
+      text-align: end;
+    }
+
+    &[data-align='left'] figcaption {
+      text-align: start;
+    }
+
     figcaption {
       margin-top: var(--cdf-space-1);
       font-size: var(--cdf-font-size-sm);

@@ -40,13 +40,18 @@ import {
   toggleHeaderRow,
 } from '@tiptap/pm/tables';
 import {
+  EMBED_ASPECT_RATIOS,
   EMBED_PROVIDER_LABELS,
+  IMAGE_ALIGNS,
+  LOCKED_BLOCK_ATTRS,
   isAllowedImageSrc,
   parseEmbedUrl,
   type EmbedProvider,
+  type ImageAlign,
   type ImageWidth,
   type QuizAttrs,
 } from '@codify/lesson-schema';
+import type { Node as PmNode } from '@tiptap/pm/model';
 
 export interface NodeViewOption {
   /** Interactive node view (editor only). Null → static renderHTML. */
@@ -72,7 +77,19 @@ declare module '@tiptap/core' {
         caption?: string | null;
         assetId?: string | null;
         width?: ImageWidth | null;
+        align?: ImageAlign | null;
       }) => ReturnType;
+    };
+    lessonBlockMove: {
+      /** Move the top-level block holding the selection up / down one slot. */
+      moveTopBlock: (direction: -1 | 1) => ReturnType;
+      /** Delete the top-level block holding the selection. */
+      deleteTopBlock: () => ReturnType;
+      /** Patch the attrs of the top-level block at `pos`. */
+      setTopBlockAttrs: (
+        pos: number,
+        attrs: Record<string, unknown>,
+      ) => ReturnType;
     };
     lessonTable: {
       insertLessonTable: (opts?: {
@@ -223,6 +240,7 @@ export const LessonImage = Node.create<NodeViewOption>({
       caption: { default: null, rendered: false },
       assetId: { default: null, rendered: false },
       width: { default: 'full', rendered: false },
+      align: { default: 'center', rendered: false },
     };
   },
   parseHTML() {
@@ -235,7 +253,9 @@ export const LessonImage = Node.create<NodeViewOption>({
           // Pasted data: / javascript: images never enter the doc.
           if (!isAllowedImageSrc(src)) return false;
           const width = img.getAttribute('data-width') as ImageWidth | null;
+          const align = img.getAttribute('data-align') as ImageAlign | null;
           return {
+            align: align && IMAGE_ALIGNS.includes(align) ? align : 'center',
             src,
             alt: img.getAttribute('alt') ?? '',
             caption: img.getAttribute('data-caption'),
@@ -256,6 +276,7 @@ export const LessonImage = Node.create<NodeViewOption>({
         'data-caption': node.attrs['caption'],
         'data-asset-id': node.attrs['assetId'],
         'data-width': node.attrs['width'],
+        'data-align': node.attrs['align'],
       },
     ];
   },
@@ -288,6 +309,9 @@ export const LessonEmbed = Node.create<NodeViewOption>({
       provider: { default: 'youtube', rendered: false },
       url: { default: '', rendered: false },
       title: { default: '', rendered: false },
+      aspectRatio: { default: '16:9', rendered: false },
+      /** Server-filled oEmbed metadata; kept as-is by the editor. */
+      meta: { default: null, rendered: false },
     };
   },
   parseHTML() {
@@ -298,10 +322,16 @@ export const LessonEmbed = Node.create<NodeViewOption>({
           const div = el as HTMLElement;
           const parsed = parseEmbedUrl(div.getAttribute('data-url'));
           if (!parsed) return false;
+          const ratio = div.getAttribute('data-aspect-ratio');
           return {
             provider: parsed.provider,
             url: div.getAttribute('data-url'),
             title: div.getAttribute('data-title') ?? '',
+            aspectRatio:
+              ratio &&
+              (EMBED_ASPECT_RATIOS as readonly string[]).includes(ratio)
+                ? ratio
+                : '16:9',
           };
         },
       },
@@ -316,6 +346,7 @@ export const LessonEmbed = Node.create<NodeViewOption>({
         'data-embed': provider,
         'data-url': node.attrs['url'],
         'data-title': node.attrs['title'],
+        'data-aspect-ratio': node.attrs['aspectRatio'],
       },
       `${EMBED_PROVIDER_LABELS[provider] ?? provider}: ${node.attrs['title'] || node.attrs['url']}`,
     ];
@@ -350,6 +381,7 @@ export const LessonEmbed = Node.create<NodeViewOption>({
                 provider: parsed.provider,
                 url: text,
                 title: `${EMBED_PROVIDER_LABELS[parsed.provider]} embed`,
+                aspectRatio: '16:9',
               },
             });
           },
@@ -390,6 +422,7 @@ export const LessonQuiz = Node.create<NodeViewOption>({
       question: { default: '', rendered: false },
       kind: { default: 'single', rendered: false },
       options: { default: [], rendered: false },
+      targets: { default: null, rendered: false },
       correctOptionIds: { default: [], rendered: false },
       explanation: { default: null, rendered: false },
     };
@@ -425,6 +458,224 @@ export const LessonQuiz = Node.create<NodeViewOption>({
   },
   addNodeView() {
     return this.options.nodeView;
+  },
+});
+
+// ─── Video (placeholder until the video pipeline) ─────────────────────────
+
+export const LessonVideo = Node.create<NodeViewOption>({
+  name: 'videoBlock',
+  group: 'rootBlock',
+  atom: true,
+  draggable: true,
+  selectable: true,
+  addOptions() {
+    return { nodeView: null };
+  },
+  addAttributes() {
+    return {
+      assetId: { default: null, rendered: false },
+      title: { default: '', rendered: false },
+      caption: { default: null, rendered: false },
+      posterSrc: { default: null, rendered: false },
+      durationSec: { default: null, rendered: false },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'div[data-video-block]',
+        getAttrs: (el) => ({
+          title: (el as HTMLElement).getAttribute('data-title') ?? '',
+        }),
+      },
+    ];
+  },
+  renderHTML({ node }) {
+    return [
+      'div',
+      {
+        class: 'cdf-video-placeholder',
+        'data-video-block': '',
+        'data-title': node.attrs['title'],
+      },
+      `Video: ${node.attrs['title'] || '(untitled)'}`,
+    ];
+  },
+  addNodeView() {
+    return this.options.nodeView;
+  },
+});
+
+// ─── Code block attrs (docs/06 §3) ─────────────────────────────────────────
+
+/** Extra codeBlock attrs on top of StarterKit's `language`. */
+export const CodeBlockAttrs = Extension.create({
+  name: 'lessonCodeBlockAttrs',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['codeBlock'],
+        attributes: {
+          showLineNumbers: {
+            default: false,
+            parseHTML: (el) => el.getAttribute('data-line-numbers') === 'true',
+            renderHTML: (a) =>
+              a['showLineNumbers'] ? { 'data-line-numbers': 'true' } : {},
+          },
+          highlightLines: {
+            default: null,
+            parseHTML: (el) => el.getAttribute('data-highlight-lines'),
+            renderHTML: (a) =>
+              a['highlightLines']
+                ? { 'data-highlight-lines': a['highlightLines'] }
+                : {},
+          },
+          copyable: {
+            default: true,
+            parseHTML: (el) => el.getAttribute('data-copyable') !== 'false',
+            renderHTML: (a) =>
+              a['copyable'] === false ? { 'data-copyable': 'false' } : {},
+          },
+        },
+      },
+    ];
+  },
+});
+
+// ─── Top-level block commands (properties panel, drag handle, keyboard) ───
+
+/** Position + node of the top-level block holding `pos`. */
+export function topBlockAt(
+  doc: PmNode,
+  pos: number,
+): { pos: number; node: PmNode; index: number } | null {
+  if (doc.childCount === 0) return null;
+  const clamped = Math.max(0, Math.min(pos, doc.content.size));
+  const $pos = doc.resolve(clamped);
+  let index = $pos.index(0);
+  if (index >= doc.childCount) index = doc.childCount - 1;
+  let start = 0;
+  for (let i = 0; i < index; i++) start += doc.child(i).nodeSize;
+  return { pos: start, node: doc.child(index), index };
+}
+
+export const BlockCommands = Extension.create({
+  name: 'lessonBlockMove',
+  addCommands() {
+    return {
+      moveTopBlock:
+        (direction) =>
+        ({ state, tr, dispatch }) => {
+          const top = topBlockAt(state.doc, state.selection.from);
+          if (!top) return false;
+          const target = top.index + direction;
+          if (target < 0 || target >= state.doc.childCount) return false;
+          if (dispatch) {
+            const neighbour = state.doc.child(target);
+            const node = top.node;
+            const wasNodeSel = state.selection instanceof NodeSelection;
+            const offset = state.selection.from - top.pos;
+            tr.delete(top.pos, top.pos + node.nodeSize);
+            const insertAt =
+              direction < 0
+                ? top.pos - neighbour.nodeSize
+                : top.pos + neighbour.nodeSize;
+            tr.insert(insertAt, node);
+            tr.setSelection(
+              wasNodeSel || node.isAtom
+                ? NodeSelection.create(tr.doc, insertAt)
+                : TextSelection.near(
+                    tr.doc.resolve(
+                      Math.min(
+                        insertAt + Math.max(1, offset),
+                        insertAt + node.nodeSize - 1,
+                      ),
+                    ),
+                  ),
+            );
+            tr.scrollIntoView();
+          }
+          return true;
+        },
+      deleteTopBlock:
+        () =>
+        ({ state, tr, dispatch }) => {
+          const top = topBlockAt(state.doc, state.selection.from);
+          if (!top) return false;
+          if (dispatch) {
+            tr.delete(top.pos, top.pos + top.node.nodeSize);
+            if (tr.doc.childCount === 0)
+              tr.insert(0, state.schema.nodes['paragraph'].create());
+            tr.setSelection(
+              TextSelection.near(
+                tr.doc.resolve(Math.min(top.pos, tr.doc.content.size)),
+              ),
+            );
+          }
+          return true;
+        },
+      setTopBlockAttrs:
+        (pos, attrs) =>
+        ({ state, tr, dispatch }) => {
+          const node = state.doc.nodeAt(pos);
+          if (!node) return false;
+          if (dispatch)
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+          return true;
+        },
+    };
+  },
+  addKeyboardShortcuts() {
+    return {
+      'Alt-Shift-ArrowUp': () => this.editor.commands.moveTopBlock(-1),
+      'Alt-Shift-ArrowDown': () => this.editor.commands.moveTopBlock(1),
+    };
+  },
+});
+
+// ─── Structure lock (translations, docs/11 §3) ─────────────────────────────
+
+/**
+ * Skeleton of a doc: every non-inline node's type plus the attributes a
+ * translation may not change (LOCKED_BLOCK_ATTRS, quiz option / target
+ * ids). Two docs with the same signature differ only in translatable text.
+ */
+export function structureSignature(doc: PmNode): string {
+  const parts: string[] = [];
+  doc.descendants((node) => {
+    if (node.isInline) return false;
+    const locked = LOCKED_BLOCK_ATTRS[node.type.name] ?? [];
+    const attrs: unknown[] = locked.map((k) => node.attrs[k] ?? null);
+    if (node.type.name === 'quiz') {
+      const ids = (v: unknown) =>
+        Array.isArray(v) ? v.map((o) => (o as { id?: string })?.id) : null;
+      attrs.push(ids(node.attrs['options']), ids(node.attrs['targets']));
+    }
+    parts.push(`${node.type.name}${attrs.length ? JSON.stringify(attrs) : ''}`);
+    return true;
+  });
+  return parts.join('|');
+}
+
+/** Rejects any transaction that changes the doc's structure signature. */
+export const StructureLock = Extension.create<{ enabled: () => boolean }>({
+  name: 'lessonStructureLock',
+  addOptions() {
+    return { enabled: () => false };
+  },
+  addProseMirrorPlugins() {
+    const enabled = this.options.enabled;
+    return [
+      new Plugin({
+        key: new PluginKey('lessonStructureLock'),
+        filterTransaction: (tr, state) => {
+          if (!tr.docChanged || !enabled()) return true;
+          if (tr.getMeta('lessonStructureLockBypass')) return true;
+          return structureSignature(tr.doc) === structureSignature(state.doc);
+        },
+      }),
+    ];
   },
 });
 

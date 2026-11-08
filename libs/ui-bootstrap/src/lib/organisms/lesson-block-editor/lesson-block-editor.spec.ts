@@ -9,6 +9,8 @@ import {
   type QuizNode,
 } from '@codify/lesson-schema';
 import { LessonBlockEditor } from './lesson-block-editor.js';
+// Brings the lesson command augmentations (moveTopBlock, …) into scope.
+import './tiptap/lesson-nodes.js';
 import {
   LESSON_ASSET_UPLOADER,
   type LessonAssetUploader,
@@ -105,10 +107,36 @@ describe('LessonBlockEditor', () => {
     expect(out?.content.map((b) => b.type)).toEqual(
       expect.arrayContaining(source.content.map((b) => b.type)),
     );
-    const quiz = out?.content.find((b) => b.type === 'quiz') as QuizNode;
-    expect(quiz.attrs).toEqual(
-      (source.content.find((b) => b.type === 'quiz') as QuizNode).attrs,
+    const quizzes = (out?.content ?? []).filter(
+      (b): b is QuizNode => b.type === 'quiz',
     );
+    const sourceQuizzes = source.content.filter(
+      (b): b is QuizNode => b.type === 'quiz',
+    );
+    expect(quizzes.map((q) => q.attrs.kind)).toEqual([
+      'single',
+      'multiple',
+      'match',
+      'order',
+    ]);
+    quizzes.forEach((q, i) =>
+      expect(q.attrs).toEqual({
+        targets: null,
+        ...sourceQuizzes[i].attrs,
+      }),
+    );
+    // Round-3 attrs survive the editor.
+    const code = out?.content.find((b) => b.type === 'codeBlock');
+    expect(code?.attrs).toMatchObject({
+      language: 'typescript',
+      showLineNumbers: true,
+      highlightLines: '2',
+      copyable: true,
+    });
+    expect(out?.content.find((b) => b.type === 'image')?.attrs).toMatchObject({
+      align: 'center',
+    });
+    expect(out?.content.some((b) => b.type === 'videoBlock')).toBe(true);
     const embed = out?.content.find((b) => b.type === 'embed') as EmbedNode;
     expect(embed.attrs.provider).toBe('youtube');
   });
@@ -340,6 +368,8 @@ describe('LessonBlockEditor', () => {
         .getDoc()!
         .content.find((b) => b.type === 'embed') as EmbedNode;
       expect(embed.attrs).toEqual({
+        aspectRatio: '16:9',
+        meta: null,
         provider: 'vimeo',
         url: 'https://vimeo.com/76979871',
         title: 'Talk recording',
@@ -404,6 +434,230 @@ describe('LessonBlockEditor', () => {
     expect(ref).toEqual({
       type: 'exerciseRef',
       attrs: { exerciseId: '0192f3a4-0000-7000-8000-000000000001' },
+    });
+  });
+
+  describe('quiz kinds (match / order)', () => {
+    it('builds a valid matching quiz from rows', async () => {
+      const { fixture, cmp, el } = await mount();
+      toolbarButton(el, 'quiz').click();
+      await settle(fixture);
+      const view = el.querySelector<HTMLElement>('.cdf-node-view--quiz')!;
+      view.querySelector<HTMLInputElement>('input[value="match"]')!.click();
+      await settle(fixture);
+      type(view.querySelector('textarea')!, 'Match them');
+      const inputs = view.querySelectorAll<HTMLInputElement>(
+        '.cdf-nv__option--pair .cdf-nv__option-text',
+      );
+      expect(inputs).toHaveLength(4);
+      ['signal', 'Writable', 'computed', 'Derived'].forEach((v, i) =>
+        type(inputs[i], v),
+      );
+      await settle(fixture);
+      const quiz = cmp
+        .getDoc()!
+        .content.find((b) => b.type === 'quiz') as QuizNode;
+      expect(quiz.attrs.kind).toBe('match');
+      expect(quiz.attrs.targets?.map((t) => t.text)).toEqual([
+        'Writable',
+        'Derived',
+      ]);
+      expect(quiz.attrs.correctOptionIds).toEqual(
+        quiz.attrs.options.map(
+          (o, i) => `${o.id}:${quiz.attrs.targets![i].id}`,
+        ),
+      );
+      expect(lessonDocSchema.safeParse(cmp.getDoc()).success).toBe(true);
+    });
+
+    it('builds an ordering quiz whose key follows the listed order', async () => {
+      const { fixture, cmp, el } = await mount();
+      toolbarButton(el, 'quiz').click();
+      await settle(fixture);
+      const view = el.querySelector<HTMLElement>('.cdf-node-view--quiz')!;
+      view.querySelector<HTMLInputElement>('input[value="order"]')!.click();
+      await settle(fixture);
+      type(view.querySelector('textarea')!, 'Order them');
+      const inputs = view.querySelectorAll<HTMLInputElement>(
+        '.cdf-nv__option-text',
+      );
+      type(inputs[0], 'First');
+      type(inputs[1], 'Second');
+      await settle(fixture);
+      view
+        .querySelector<HTMLButtonElement>('[aria-label="Move item 1 down"]')!
+        .click();
+      await settle(fixture);
+      const quiz = cmp
+        .getDoc()!
+        .content.find((b) => b.type === 'quiz') as QuizNode;
+      expect(quiz.attrs.options.map((o) => o.text)).toEqual([
+        'Second',
+        'First',
+      ]);
+      expect(quiz.attrs.correctOptionIds).toEqual(
+        quiz.attrs.options.map((o) => o.id),
+      );
+      expect(lessonDocSchema.safeParse(cmp.getDoc()).success).toBe(true);
+    });
+  });
+
+  describe('editor UX (docs/06 §9)', () => {
+    const codeDoc = (): LessonDoc => ({
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Intro' }],
+        },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] },
+        {
+          type: 'codeBlock',
+          attrs: { language: 'plaintext' },
+          content: [{ type: 'text', text: 'a\nb' }],
+        },
+      ],
+    });
+
+    it('edits code-block language, line numbers and highlighted lines in the properties panel', async () => {
+      const { fixture, cmp, el } = await mount(codeDoc());
+      const editor = cmp.tiptap!;
+      editor.commands.setTextSelection(editor.state.doc.content.size - 2);
+      await settle(fixture);
+      const panel = el.querySelector<HTMLElement>(
+        '[data-testid="block-properties"]',
+      )!;
+      expect(panel.textContent).toContain('Code block');
+      const lang = panel.querySelector<HTMLSelectElement>(
+        '[data-testid="code-language"]',
+      )!;
+      lang.value = 'python';
+      lang.dispatchEvent(new Event('change'));
+      panel.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+      const hl = panel.querySelector<HTMLInputElement>(
+        'input[inputmode="numeric"]',
+      )!;
+      type(hl, '1-x');
+      await settle(fixture);
+      expect(hl.getAttribute('aria-invalid')).toBe('true');
+      type(hl, '2');
+      await settle(fixture);
+      const code = cmp.getDoc()!.content[2] as { attrs: unknown };
+      expect(code.attrs).toMatchObject({
+        language: 'python',
+        showLineNumbers: true,
+        highlightLines: '2',
+      });
+      expect(lessonDocSchema.safeParse(cmp.getDoc()).success).toBe(true);
+    });
+
+    it('moves blocks with the panel buttons and Alt+Shift+Arrow, announcing the move', async () => {
+      const { fixture, cmp, el } = await mount(codeDoc());
+      const editor = cmp.tiptap!;
+      editor.commands.setTextSelection(3); // inside the heading
+      await settle(fixture);
+      const panel = el.querySelector<HTMLElement>(
+        '[data-testid="block-properties"]',
+      )!;
+      Array.from(panel.querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('Move block down'))!
+        .click();
+      await settle(fixture);
+      // (StarterKit keeps a trailing paragraph after the code block.)
+      expect(
+        cmp
+          .getDoc()!
+          .content.map((b) => b.type)
+          .slice(0, 3),
+      ).toEqual(['paragraph', 'heading', 'codeBlock']);
+      expect(el.querySelector('.cdf-lesson-editor__sr')?.textContent).toContain(
+        'position 2',
+      );
+      expect(editor.commands.moveTopBlock(-1)).toBe(true);
+      expect(cmp.getDoc()!.content[0].type).toBe('heading');
+    });
+
+    it('lists headings and interactive blocks in the outline and jumps to them', async () => {
+      const { fixture, cmp, el } = await mount(kitchenSinkLessonDoc());
+      el.querySelector<HTMLButtonElement>(
+        '[data-testid="toggle-outline"]',
+      )!.click();
+      await settle(fixture);
+      const outline = el.querySelector<HTMLElement>(
+        '[data-testid="editor-outline"]',
+      )!;
+      const items = Array.from(outline.querySelectorAll('button')).map((b) =>
+        b.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+      expect(items[0]).toBe('Every block, once');
+      expect(items.some((t) => t?.startsWith('Quiz'))).toBe(true);
+      expect(items.some((t) => t?.startsWith('Video'))).toBe(true);
+      const quizBtn = Array.from(outline.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Match each API'),
+      )!;
+      quizBtn.click();
+      await settle(fixture);
+      const sel = cmp.tiptap!.state.selection;
+      expect(cmp.tiptap!.state.doc.nodeAt(sel.from)?.attrs['id']).toBe('q3');
+    });
+
+    it('shows the floating marks toolbar for a text selection', async () => {
+      const { fixture, cmp, el } = await mount(codeDoc());
+      const editor = cmp.tiptap!;
+      editor.commands.focus();
+      editor.commands.setTextSelection({ from: 8, to: 13 });
+      await settle(fixture);
+      const bar = el.querySelector<HTMLElement>(
+        '[data-testid="marks-toolbar"]',
+      );
+      expect(bar?.getAttribute('role')).toBe('toolbar');
+      bar!.querySelector<HTMLButtonElement>('[data-mark="bold"]')!.click();
+      await settle(fixture);
+      const p = cmp.getDoc()!.content[1] as {
+        content: { marks?: { type: string }[] }[];
+      };
+      expect(
+        p.content.some((t) => t.marks?.some((m) => m.type === 'bold')),
+      ).toBe(true);
+    });
+
+    it('inserts a video block from the block menu', async () => {
+      const { fixture, cmp } = await mount();
+      cmp.insertBlock('videoBlock');
+      await settle(fixture);
+      const video = cmp.getDoc()!.content.find((b) => b.type === 'videoBlock');
+      expect(video?.attrs).toMatchObject({ title: 'Video' });
+      expect(lessonDocSchema.safeParse(cmp.getDoc()).success).toBe(true);
+    });
+
+    it('locks the block structure in translation mode but allows text edits', async () => {
+      await TestBed.configureTestingModule({
+        imports: [LessonBlockEditor],
+        providers: [provideI18n()],
+      }).compileComponents();
+      await TestBed.inject(I18nService).setLocale('en-US');
+      const fixture = TestBed.createComponent(LessonBlockEditor);
+      fixture.componentRef.setInput('lockStructure', true);
+      const cmp = fixture.componentInstance;
+      cmp.writeValue(kitchenSinkLessonDoc());
+      await settle(fixture);
+      const editor = cmp.tiptap!;
+      const before = cmp.structureSignature();
+      // Text edits pass.
+      editor.commands.setTextSelection(3);
+      editor.commands.insertContent('Olá ');
+      expect(JSON.stringify(cmp.getDoc())).toContain('Olá ');
+      // Structural edits are rejected.
+      editor.commands.insertRootBlock({ type: 'horizontalRule' });
+      editor.commands.moveTopBlock(1);
+      editor.commands.deleteTopBlock();
+      expect(cmp.structureSignature()).toBe(before);
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="drag-handle"]'),
+      ).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Translation mode');
     });
   });
 });

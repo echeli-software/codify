@@ -29,7 +29,10 @@ import {
   ToastService,
 } from '@codify/ui-bootstrap';
 import {
+  ProblemDetailsError,
   TranslationsClient,
+  type TranslationFileFormat,
+  type TranslationImportReport,
   type ContentLocale,
   type TranslatableEntityType,
   type TranslationCompleteness,
@@ -75,6 +78,24 @@ export function parseDoc(value: string | null | undefined): LessonDoc {
   } catch {
     return emptyLessonDoc();
   }
+}
+
+/** Import format from a file name / MIME type (null = unsupported). */
+export function fileFormat(
+  file: Pick<File, 'name' | 'type'>,
+): TranslationFileFormat | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.csv') || file.type === 'text/csv') return 'csv';
+  if (name.endsWith('.json') || file.type === 'application/json') return 'json';
+  return null;
+}
+
+/** Problems of a failed save / import (`problems` list, else the detail). */
+export function problemsOf(err: unknown): string[] {
+  if (!(err instanceof ProblemDetailsError)) return [];
+  const raw = err.data?.['problems'];
+  if (Array.isArray(raw)) return raw.map(String);
+  return [];
 }
 
 /** Edited values → upsert payload (skips values identical to what's stored). */
@@ -201,6 +222,137 @@ export function buildUpserts(
         }
       </section>
 
+      <section
+        class="admin-card bulk"
+        aria-labelledby="bulk-title"
+        data-testid="translations-bulk"
+      >
+        <h2 id="bulk-title">
+          {{ 'admin.translations.bulk.title' | translate }}
+        </h2>
+        @if (!entityType()) {
+          <p class="muted small">
+            {{ 'admin.translations.bulk.needsType' | translate }}
+          </p>
+        } @else {
+          <p class="muted small">
+            {{
+              'admin.translations.bulk.scope'
+                | translate
+                  : {
+                      type:
+                        ('admin.translations.types.' + entityType()
+                        | translate),
+                      locale: locale(),
+                    }
+            }}
+          </p>
+          <div class="bulk__row">
+            <cdf-form-field
+              [label]="'admin.translations.bulk.format' | translate"
+              controlId="tr-format"
+            >
+              <cdf-select
+                inputId="tr-format"
+                [options]="formatOptions"
+                [ngModel]="format()"
+                (ngModelChange)="format.set($event)"
+              />
+            </cdf-form-field>
+            <cdf-button
+              kind="secondary"
+              [loading]="exporting()"
+              (click)="exportFile()"
+              data-testid="export-translations"
+            >
+              {{ 'admin.translations.bulk.export' | translate }}
+            </cdf-button>
+            <label class="file-pick">
+              <span class="side__label">{{
+                'admin.translations.bulk.file' | translate
+              }}</span>
+              <input
+                type="file"
+                accept=".csv,.json,text/csv,application/json"
+                data-testid="import-file"
+                (change)="pickFile($event)"
+              />
+            </label>
+            <cdf-button
+              kind="primary"
+              [disabled]="!importText()"
+              [loading]="importing()"
+              (click)="runImport()"
+              data-testid="import-translations"
+            >
+              {{ 'admin.translations.bulk.import' | translate }}
+            </cdf-button>
+          </div>
+          @if (importReport(); as rep) {
+            <div class="bulk__report" role="status" data-testid="import-report">
+              @if (rep.errors.length > 0) {
+                <p class="text-danger">
+                  {{
+                    'admin.translations.bulk.errors'
+                      | translate: { count: rep.errors.length }
+                  }}
+                </p>
+                <ul class="issue-list">
+                  @for (e of rep.errors; track $index) {
+                    <li>
+                      {{
+                        'admin.translations.bulk.rowError'
+                          | translate: { row: e.row, message: e.message }
+                      }}
+                    </li>
+                  }
+                </ul>
+              } @else if (rep.dryRun) {
+                <p>
+                  {{
+                    'admin.translations.bulk.ready'
+                      | translate: { valid: rep.valid, skipped: rep.skipped }
+                  }}
+                </p>
+              } @else {
+                <p>
+                  {{
+                    'admin.translations.bulk.imported'
+                      | translate: { count: rep.imported }
+                  }}
+                </p>
+              }
+              @if (rep.sourceChanged.length > 0) {
+                <p class="muted small">
+                  {{
+                    'admin.translations.bulk.sourceChanged'
+                      | translate: { count: rep.sourceChanged.length }
+                  }}
+                </p>
+              }
+            </div>
+          }
+        }
+      </section>
+
+      @if (saveProblems().length > 0) {
+        <section
+          class="admin-card issues"
+          role="alert"
+          aria-labelledby="tr-problems-title"
+          data-testid="translation-problems"
+        >
+          <h2 id="tr-problems-title">
+            {{ 'admin.translations.problemsTitle' | translate }}
+          </h2>
+          <ul class="issue-list">
+            @for (p of saveProblems(); track $index) {
+              <li>{{ p }}</li>
+            }
+          </ul>
+        </section>
+      }
+
       <div class="filters">
         <cdf-form-field
           [label]="'admin.translations.entityType' | translate"
@@ -286,10 +438,34 @@ export function buildUpserts(
                     'admin.translations.edited' | translate
                   }}</cdf-badge>
                 }
+                @if (entityPct(r); as pct) {
+                  <span
+                    class="muted small"
+                    [title]="
+                      'admin.translations.entityCompleteness' | translate
+                    "
+                    >{{
+                      'admin.translations.entityPct'
+                        | translate
+                          : { pct: (pct.pct / 100 | locale: 'percent') }
+                    }}</span
+                  >
+                }
                 @if (r.updatedAt) {
                   <span class="muted small push">{{
                     r.updatedAt | locale: 'relative'
                   }}</span>
+                }
+                @if (r.status === 'outdated' && !isEdited(r)) {
+                  <cdf-button
+                    kind="ghost"
+                    size="sm"
+                    [loading]="completing() === key(r)"
+                    (click)="markComplete(r)"
+                    data-testid="mark-complete"
+                  >
+                    {{ 'admin.translations.markComplete' | translate }}
+                  </cdf-button>
                 }
               </header>
               @if (r.field === 'contentJson') {
@@ -313,6 +489,8 @@ export function buildUpserts(
                       </h3>
                       <cdf-lesson-block-editor
                         [formControl]="docBinding.control"
+                        [lockStructure]="true"
+                        [showProperties]="false"
                       />
                     </div>
                   </div>
@@ -412,6 +590,27 @@ export function buildUpserts(
         color: var(--cdf-color-text-muted);
         margin: 0 0 4px;
       }
+      .bulk__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--cdf-space-3);
+      }
+      .file-pick {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .file-pick input {
+        max-width: 100%;
+      }
+      .bulk__report {
+        margin-top: var(--cdf-space-2);
+      }
+      .issues h2 {
+        color: var(--cdf-color-danger);
+      }
       .source {
         margin: 0;
         padding: 8px;
@@ -450,6 +649,27 @@ export class TranslationsPage implements HasUnsavedChanges {
     null,
   );
   protected readonly openDoc = signal<string | null>(null);
+  protected readonly format = signal<TranslationFileFormat>('csv');
+  protected readonly formatOptions: SelectOption<TranslationFileFormat>[] = [
+    { value: 'csv', label: 'CSV' },
+    { value: 'json', label: 'JSON' },
+  ];
+  protected readonly exporting = signal(false);
+  protected readonly importing = signal(false);
+  protected readonly importText = signal<string | null>(null);
+  private importFormat: TranslationFileFormat = 'csv';
+  protected readonly importReport = signal<TranslationImportReport | null>(
+    null,
+  );
+  protected readonly saveProblems = signal<string[]>([]);
+  protected readonly completing = signal<string | null>(null);
+  /** `type|id|locale` → per-entity completeness. */
+  private readonly entityCompleteness = computed(() => {
+    const map = new Map<string, { pct: number }>();
+    for (const e of this.completeness()?.entities ?? [])
+      map.set(`${e.entityType}|${e.entityId}|${e.locale}`, e);
+    return map;
+  });
   private openRow: TranslationRow | null = null;
   protected readonly docBinding = new EditorDocBinding(
     (doc) => {
@@ -611,10 +831,122 @@ export class TranslationsPage implements HasUnsavedChanges {
     this.edit(r, JSON.stringify(doc));
   }
 
+  protected entityPct(r: TranslationRow): { pct: number } | null {
+    return (
+      this.entityCompleteness().get(
+        `${r.entityType}|${r.entityId}|${r.locale}`,
+      ) ?? null
+    );
+  }
+
+  /** Explicit "mark complete" (docs/11 §3): clears outdated, audited. */
+  protected async markComplete(r: TranslationRow): Promise<void> {
+    this.completing.set(rowKey(r));
+    try {
+      await this.client.markComplete([
+        {
+          entityType: r.entityType,
+          entityId: r.entityId,
+          field: r.field,
+          locale: r.locale as ContentLocale,
+        },
+      ]);
+      this.content.invalidate(r.entityType, r.entityId);
+      this.toast.success(this.i18n.t('admin.translations.completed'));
+      void this.load();
+      void this.loadCompleteness();
+    } catch (err) {
+      this.saveProblems.set(problemsOf(err));
+      this.errorsSvc.toast(err, 'admin.errors.saveFailed');
+    } finally {
+      this.completing.set(null);
+    }
+  }
+
+  protected async exportFile(): Promise<void> {
+    const type = this.entityType();
+    if (!type) return;
+    this.exporting.set(true);
+    try {
+      const { filename, blob } = await this.client.exportFile(
+        type,
+        this.locale(),
+        this.format(),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      this.errorsSvc.toast(err, 'admin.errors.loadFailed');
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  /** Read the picked file and dry-run it (preview of the report). */
+  protected async pickFile(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    this.importReport.set(null);
+    this.importText.set(null);
+    if (!file) return;
+    const format = fileFormat(file);
+    if (!format) {
+      this.toast.error(this.i18n.t('admin.translations.bulk.badFile'));
+      return;
+    }
+    this.importFormat = format;
+    this.importText.set(await file.text());
+    await this.sendImport(true);
+  }
+
+  protected async runImport(): Promise<void> {
+    await this.sendImport(false);
+  }
+
+  private async sendImport(dryRun: boolean): Promise<void> {
+    const type = this.entityType();
+    const content = this.importText();
+    if (!type || !content) return;
+    this.importing.set(true);
+    try {
+      const report = await this.client.importFile({
+        entityType: type,
+        locale: this.locale(),
+        format: this.importFormat,
+        content,
+        dryRun,
+      });
+      this.importReport.set(report);
+      if (!dryRun) {
+        this.importText.set(null);
+        this.toast.success(
+          this.i18n.t('admin.translations.bulk.imported', {
+            count: report.imported,
+          }),
+        );
+        void this.load();
+        void this.loadCompleteness();
+      }
+    } catch (err) {
+      const report =
+        err instanceof ProblemDetailsError
+          ? (err.data?.['report'] as TranslationImportReport | undefined)
+          : undefined;
+      if (report) this.importReport.set(report);
+      else this.errorsSvc.toast(err, 'admin.errors.saveFailed');
+    } finally {
+      this.importing.set(false);
+    }
+  }
+
   protected async saveAll(): Promise<void> {
     const items = buildUpserts([...this.editedRows.values()], this.edits());
     if (items.length === 0) return;
     this.saving.set(true);
+    this.saveProblems.set([]);
     try {
       const res = await this.client.upsert(items);
       for (const it of items)
@@ -628,6 +960,8 @@ export class TranslationsPage implements HasUnsavedChanges {
       void this.load();
       void this.loadCompleteness();
     } catch (err) {
+      // Lesson bodies that break the source structure etc. (FIX-6).
+      this.saveProblems.set(problemsOf(err));
       this.errorsSvc.toast(err, 'admin.errors.saveFailed');
     } finally {
       this.saving.set(false);

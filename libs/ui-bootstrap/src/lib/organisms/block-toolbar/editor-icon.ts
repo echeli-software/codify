@@ -47,6 +47,12 @@ import {
   phosphorWarningCircle,
   phosphorXSquare,
   phosphorDotsSixVertical,
+  phosphorVideoCamera,
+  phosphorArrowUp,
+  phosphorArrowDown,
+  phosphorTreeView,
+  phosphorSidebarSimple,
+  phosphorEye,
 } from '@ng-icons/phosphor-icons/regular';
 
 /**
@@ -98,6 +104,12 @@ const ICONS = {
   phosphorUploadSimple,
   phosphorWarningCircle,
   phosphorXSquare,
+  phosphorVideoCamera,
+  phosphorArrowUp,
+  phosphorArrowDown,
+  phosphorTreeView,
+  phosphorSidebarSimple,
+  phosphorEye,
 };
 
 export type EditorIconName = keyof typeof ICONS extends `phosphor${infer N}`

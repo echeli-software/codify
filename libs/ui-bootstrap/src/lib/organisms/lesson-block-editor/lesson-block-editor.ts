@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Editor } from '@tiptap/core';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { I18nService } from '@codify/i18n';
 // Side-effect imports — bring in the chained-command type augmentations
 // from each Tiptap extension so editor.chain().toggleHeading() etc. type-check.
@@ -27,12 +28,21 @@ import {
 } from '@codify/lesson-schema';
 import { buildLessonExtensions } from './tiptap/extensions.js';
 import { angularNodeView } from './tiptap/angular-node-view.js';
-import { isInTable, newQuizAttrs } from './tiptap/lesson-nodes.js';
+import {
+  isInTable,
+  newQuizAttrs,
+  structureSignature,
+  topBlockAt,
+} from './tiptap/lesson-nodes.js';
+import { BlockProperties, type SelectedBlock } from './block-properties.js';
+import { EditorIcon } from '../block-toolbar/editor-icon.js';
+import { TranslatePipe } from '@codify/i18n';
 import { QuizBlockView } from './node-views/quiz-block-view.js';
 import { RefBlockView } from './node-views/ref-block-view.js';
 import {
   EmbedBlockView,
   ImageBlockView,
+  VideoBlockView,
 } from './node-views/media-block-views.js';
 import {
   EmbedPanel,
@@ -56,6 +66,39 @@ interface MenuState {
   left: number;
 }
 
+/** An outline entry (docs/06 §9 outline view). */
+export interface OutlineItem {
+  pos: number;
+  type: string;
+  /** Heading level (2/3); 0 for other blocks. */
+  level: number;
+  label: string;
+}
+
+const OUTLINE_TYPES = new Set([
+  'heading',
+  'quiz',
+  'exerciseRef',
+  'aiPromptRef',
+  'scenarioRef',
+  'embed',
+  'videoBlock',
+  'table',
+  'codeBlock',
+  'image',
+]);
+
+/** Marks offered by the floating selection toolbar. */
+const BUBBLE_MARKS = [
+  { cmd: 'bold', icon: 'TextB' },
+  { cmd: 'italic', icon: 'TextItalic' },
+  { cmd: 'strike', icon: 'TextStrikethrough' },
+  { cmd: 'code', icon: 'Code' },
+  { cmd: 'highlight', icon: 'Highlighter' },
+  { cmd: 'link', icon: 'Link' },
+] as const;
+type BubbleMark = (typeof BUBBLE_MARKS)[number]['cmd'];
+
 /**
  * Tiptap-backed lesson editor.
  *
@@ -73,7 +116,16 @@ interface MenuState {
 @Component({
   selector: 'cdf-lesson-block-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BlockToolbar, BlockMenu, LinkPanel, ImagePanel, EmbedPanel],
+  imports: [
+    BlockToolbar,
+    BlockMenu,
+    LinkPanel,
+    ImagePanel,
+    EmbedPanel,
+    BlockProperties,
+    EditorIcon,
+    TranslatePipe,
+  ],
   templateUrl: './lesson-block-editor.html',
   styleUrl: './lesson-block-editor.scss',
   providers: [
@@ -88,6 +140,13 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   /** Empty-document hint; defaults to `ui.lessonEditor.placeholder`. */
   readonly placeholder = input<string>();
   readonly readonly = input(false);
+  /**
+   * Translation mode (docs/11 §3): text is editable, but blocks can't be
+   * added, removed, reordered or have their behavioural attrs changed.
+   */
+  readonly lockStructure = input(false);
+  /** Show the right-side block properties panel (docs/06 §9). */
+  readonly showProperties = input(true);
 
   private readonly hostEl = inject(ElementRef<HTMLElement>);
   private readonly i18n = inject(I18nService);
@@ -104,6 +163,20 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   protected readonly link = signal({ href: '', newTab: false, hasLink: false });
   protected readonly announcement = signal('');
   private readonly disabledByForm = signal(false);
+  /** Outline (heading + interactive block tree) toggle. */
+  protected readonly outlineOpen = signal(false);
+  protected readonly propertiesOpen = signal(true);
+  protected readonly outline = signal<OutlineItem[]>([]);
+  protected readonly selectedBlock = signal<SelectedBlock | null>(null);
+  /** Floating marks toolbar position (null = hidden). */
+  protected readonly bubble = signal<{ top: number; left: number } | null>(
+    null,
+  );
+  protected readonly bubbleMarks = BUBBLE_MARKS;
+  /** Drag handle position + the block it moves. */
+  protected readonly handle = signal<{ top: number; pos: number } | null>(null);
+  private readonly bubbleEl = viewChild<ElementRef<HTMLElement>>('bubbleEl');
+  private readonly bodyEl = viewChild<ElementRef<HTMLElement>>('bodyEl');
 
   protected readonly isReadonly = computed(
     () => this.readonly() || this.disabledByForm(),
@@ -150,7 +223,10 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
     effect(() => {
       const host = this.editorContainer().nativeElement;
       if (this.editor) return;
-      const nodeHost = { injector: this.injector };
+      const nodeHost = {
+        injector: this.injector,
+        structureLocked: () => this.lockStructure(),
+      };
       this.editor = new Editor({
         element: host,
         extensions: buildLessonExtensions({
@@ -163,9 +239,12 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
             scenarioRef: angularNodeView(RefBlockView, nodeHost),
             image: angularNodeView(ImageBlockView, nodeHost),
             embed: angularNodeView(EmbedBlockView, nodeHost),
+            videoBlock: angularNodeView(VideoBlockView, nodeHost),
           },
           onOpenLink: () => this.openLinkPanel(),
           onOpenBlockMenu: () => this.openMenu(),
+          structureLocked: () => this.lockStructure(),
+          onFocusMarksToolbar: () => this.focusBubble(),
         }),
         editable: !this.isReadonly(),
         content: (this.pendingValue ?? emptyLessonDoc()) as unknown as Record<
@@ -185,7 +264,14 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
           this.onChangeFn(this.currentDoc(editor));
         },
         onSelectionUpdate: () => this.refreshState(),
-        onBlur: () => this.onTouchedFn(),
+        onFocus: () => this.refreshState(),
+        onBlur: ({ event }) => {
+          this.onTouchedFn();
+          // Keep the bubble while focus moves into it.
+          const next = (event as FocusEvent).relatedTarget as Node | null;
+          if (!next || !this.bubbleEl()?.nativeElement.contains(next))
+            this.bubble.set(null);
+        },
       });
       this.refreshState();
     });
@@ -211,9 +297,15 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
     }
     this.suppressEmit = true;
     try {
-      this.editor.commands.setContent(
-        doc as unknown as Record<string, unknown>,
-      );
+      // Loading a doc is never a structural "edit" (translation lock).
+      this.editor
+        .chain()
+        .command(({ tr }) => {
+          tr.setMeta('lessonStructureLockBypass', true);
+          return true;
+        })
+        .setContent(doc as unknown as Record<string, unknown>)
+        .run();
       this.refreshState();
     } finally {
       this.suppressEmit = false;
@@ -243,6 +335,10 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   protected runCommand(cmd: BlockToolbarCommand): void {
     const editor = this.editor;
     if (!editor) return;
+    if (this.lockStructure() && STRUCTURAL_COMMANDS.has(cmd)) {
+      this.announce('ui.lessonEditor.announce.locked');
+      return;
+    }
     const chain = () => editor.chain().focus();
     switch (cmd) {
       case 'undo':
@@ -330,6 +426,10 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   protected openMenu(): void {
     const editor = this.editor;
     if (!editor || this.isReadonly()) return;
+    if (this.lockStructure()) {
+      this.announce('ui.lessonEditor.announce.locked');
+      return;
+    }
     let top = 0;
     let left = 0;
     try {
@@ -417,6 +517,16 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
           .insertRootBlock({ type: 'scenarioRef', attrs: { scenarioId: '' } })
           .run();
         break;
+      case 'videoBlock':
+        chain()
+          .insertRootBlock({
+            type: 'videoBlock',
+            attrs: { title: this.i18n.t('ui.lessonEditor.video.defaultTitle') },
+          })
+          .run();
+        this.announce('ui.lessonEditor.announce.videoInserted');
+        this.refreshState();
+        return;
       default:
         return;
     }
@@ -492,6 +602,254 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
     this.editor?.commands.focus();
   }
 
+  // ─── Floating marks toolbar ──────────────────────────────────────────────
+  protected bubbleActive(cmd: BubbleMark): boolean {
+    const s = this.state();
+    return cmd === 'link' ? s.link : s[cmd];
+  }
+
+  protected applyBubble(cmd: BubbleMark): void {
+    const editor = this.editor;
+    if (!editor) return;
+    if (cmd === 'link') {
+      this.bubble.set(null);
+      this.openLinkPanel();
+      return;
+    }
+    editor.chain().focus().toggleMark(cmd).run();
+    this.refreshState();
+  }
+
+  /** Alt+F10 from the text, ←/→ inside, Escape back to the text. */
+  protected focusBubble(): void {
+    queueMicrotask(() =>
+      this.bubbleEl()
+        ?.nativeElement.querySelector<HTMLElement>('button')
+        ?.focus(),
+    );
+  }
+
+  protected bubbleKeydown(event: KeyboardEvent): void {
+    const buttons = Array.from(
+      this.bubbleEl()?.nativeElement.querySelectorAll<HTMLElement>('button') ??
+        [],
+    );
+    const i = buttons.indexOf(event.target as HTMLElement);
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.editor?.commands.focus();
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const d = event.key === 'ArrowRight' ? 1 : -1;
+      buttons[(i + d + buttons.length) % buttons.length]?.focus();
+    }
+  }
+
+  private updateBubble(e: Editor): void {
+    const sel = e.state.selection;
+    // Shown for any non-empty text selection; hidden again on blur (unless
+    // focus moved into the toolbar itself, see onBlur).
+    const inBubble = !!this.bubbleEl()?.nativeElement.contains(
+      document.activeElement,
+    );
+    if (
+      this.isReadonly() ||
+      sel.empty ||
+      !(sel instanceof TextSelection) ||
+      e.isActive('codeBlock')
+    ) {
+      if (!inBubble) this.bubble.set(null);
+      return;
+    }
+    try {
+      const start = e.view.coordsAtPos(sel.from);
+      const end = e.view.coordsAtPos(sel.to);
+      const box = this.bodyEl()?.nativeElement.getBoundingClientRect();
+      if (!box) return;
+      const top = Math.min(start.top, end.top) - box.top - 44;
+      const left = Math.max(
+        0,
+        Math.min(start.left - box.left, Math.max(0, box.width - 260)),
+      );
+      this.bubble.set({ top: Math.max(0, top), left });
+    } catch {
+      this.bubble.set({ top: 0, left: 0 }); // jsdom: no layout
+    }
+  }
+
+  // ─── Drag handle + block moves ───────────────────────────────────────────
+  /** Track the top-level block under the pointer for the drag handle. */
+  protected trackPointer(event: MouseEvent): void {
+    const e = this.editor;
+    if (!e || this.isReadonly() || this.lockStructure()) return;
+    if ((event.target as HTMLElement)?.closest?.('.cdf-lesson-editor__handle'))
+      return;
+    const hit = e.view.posAtCoords({ left: event.clientX, top: event.clientY });
+    if (!hit) return;
+    this.placeHandle(e, hit.pos);
+  }
+
+  private placeHandle(e: Editor, pos: number): void {
+    const top = topBlockAt(e.state.doc, pos);
+    const body = this.bodyEl()?.nativeElement;
+    if (!top || !body) return;
+    const dom = e.view.nodeDOM(top.pos) as HTMLElement | null;
+    if (!dom?.getBoundingClientRect) return;
+    const y =
+      dom.getBoundingClientRect().top - body.getBoundingClientRect().top;
+    const cur = this.handle();
+    if (!cur || cur.pos !== top.pos || cur.top !== y)
+      this.handle.set({ top: y, pos: top.pos });
+  }
+
+  /** Native drag of the handle moves the whole block (ProseMirror drop). */
+  protected startDrag(event: DragEvent): void {
+    const e = this.editor;
+    const h = this.handle();
+    if (!e || !h || this.lockStructure()) return;
+    const sel = NodeSelection.create(e.state.doc, h.pos);
+    e.view.dispatch(e.state.tr.setSelection(sel));
+    const dom = e.view.nodeDOM(h.pos) as HTMLElement | null;
+    event.dataTransfer?.setData('text/plain', '');
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    if (dom && event.dataTransfer?.setDragImage)
+      event.dataTransfer.setDragImage(dom, 0, 0);
+    // Same contract ProseMirror's own drag start uses.
+    (e.view as unknown as { dragging: unknown }).dragging = {
+      slice: sel.content(),
+      move: true,
+      node: sel,
+    };
+  }
+
+  /** Click / Enter on the handle selects the block (then Alt+Shift+↑/↓). */
+  protected selectHandleBlock(): void {
+    const e = this.editor;
+    const h = this.handle();
+    if (!e || !h) return;
+    e.chain()
+      .focus()
+      .command(({ tr }) => {
+        tr.setSelection(NodeSelection.create(tr.doc, h.pos));
+        return true;
+      })
+      .run();
+    this.announce('ui.lessonEditor.announce.blockSelected');
+  }
+
+  protected moveBlock(direction: -1 | 1): void {
+    const e = this.editor;
+    if (!e || this.lockStructure()) return;
+    if (e.chain().focus().moveTopBlock(direction).run()) {
+      const top = topBlockAt(e.state.doc, e.state.selection.from);
+      this.announce('ui.lessonEditor.announce.blockMoved', {
+        n: (top?.index ?? 0) + 1,
+      });
+      this.refreshState();
+    }
+  }
+
+  protected deleteBlock(): void {
+    const e = this.editor;
+    if (!e || this.lockStructure()) return;
+    if (e.chain().focus().deleteTopBlock().run()) {
+      this.announce('ui.lessonEditor.announce.blockDeleted');
+      this.refreshState();
+    }
+  }
+
+  protected patchBlock(attrs: Record<string, unknown>): void {
+    const e = this.editor;
+    const b = this.selectedBlock();
+    if (!e || !b) return;
+    e.commands.setTopBlockAttrs(b.pos, attrs);
+    this.refreshState();
+  }
+
+  // ─── Outline ─────────────────────────────────────────────────────────────
+  protected outlineTypeKey(item: OutlineItem): string {
+    return `ui.lessonEditor.props.types.${item.type}`;
+  }
+
+  protected goTo(item: OutlineItem): void {
+    const e = this.editor;
+    if (!e) return;
+    const node = e.state.doc.nodeAt(item.pos);
+    if (!node) return;
+    e.chain()
+      .focus()
+      .command(({ tr }) => {
+        tr.setSelection(
+          node.isAtom
+            ? NodeSelection.create(tr.doc, item.pos)
+            : TextSelection.near(tr.doc.resolve(item.pos + 1)),
+        );
+        tr.scrollIntoView();
+        return true;
+      })
+      .run();
+    try {
+      (e.view.nodeDOM(item.pos) as HTMLElement | null)?.scrollIntoView?.({
+        block: 'center',
+      });
+    } catch {
+      /* jsdom */
+    }
+  }
+
+  private refreshOutline(e: Editor): void {
+    const items: OutlineItem[] = [];
+    e.state.doc.forEach((node, pos) => {
+      if (!OUTLINE_TYPES.has(node.type.name)) return;
+      const label =
+        node.type.name === 'heading'
+          ? node.textContent
+          : String(
+              node.attrs['question'] ??
+                node.attrs['title'] ??
+                node.attrs['alt'] ??
+                node.attrs['language'] ??
+                '',
+            );
+      items.push({
+        pos,
+        type: node.type.name,
+        level:
+          node.type.name === 'heading' ? Number(node.attrs['level']) || 2 : 0,
+        label: label.trim(),
+      });
+    });
+    const prev = this.outline();
+    if (JSON.stringify(prev) !== JSON.stringify(items)) this.outline.set(items);
+  }
+
+  private refreshSelectedBlock(e: Editor): void {
+    const top = topBlockAt(e.state.doc, e.state.selection.from);
+    if (!top) {
+      this.selectedBlock.set(null);
+      return;
+    }
+    const node = top.node;
+    const next: SelectedBlock = {
+      pos: top.pos,
+      index: top.index,
+      total: e.state.doc.childCount,
+      type: node.type.name,
+      attrs: { ...node.attrs },
+      ...(node.type.name === 'table'
+        ? { rows: node.childCount, cols: node.firstChild?.childCount ?? 0 }
+        : {}),
+    };
+    const prev = this.selectedBlock();
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(next))
+      this.selectedBlock.set(next);
+  }
+
+  /** Structure signature of the current doc (tests / translation tooling). */
+  structureSignature(): string | null {
+    return this.editor ? structureSignature(this.editor.state.doc) : null;
+  }
+
   // ─── Internals ───────────────────────────────────────────────────────────
   private currentDoc(editor: Editor): LessonDoc {
     const json = editor.getJSON() as unknown as LessonDoc;
@@ -500,8 +858,8 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
   }
 
   /** Polite live-region message (a `ui.lessonEditor.announce.*` key). */
-  private announce(key: string): void {
-    const message = this.i18n.t(key);
+  private announce(key: string, params?: Record<string, unknown>): void {
+    const message = this.i18n.t(key, params);
     this.announcement.set('');
     queueMicrotask(() => this.announcement.set(message));
   }
@@ -535,6 +893,11 @@ export class LessonBlockEditor implements ControlValueAccessor, OnDestroy {
       canUndo: e.can().undo(),
       canRedo: e.can().redo(),
     });
+    this.refreshSelectedBlock(e);
+    this.refreshOutline(e);
+    this.updateBubble(e);
+    if (!this.handle() || e.state.selection instanceof NodeSelection)
+      this.placeHandle(e, e.state.selection.from);
   }
 
   /** Expose the host element for tests + outside CSS scoping. */
@@ -565,6 +928,30 @@ interface EditorSelectionState {
   canUndo: boolean;
   canRedo: boolean;
 }
+
+/** Toolbar commands that add / remove blocks (blocked in translation mode). */
+const STRUCTURAL_COMMANDS = new Set<BlockToolbarCommand>([
+  'paragraph',
+  'h2',
+  'h3',
+  'bulletList',
+  'orderedList',
+  'blockquote',
+  'codeBlock',
+  'callout',
+  'divider',
+  'image',
+  'embed',
+  'table',
+  'quiz',
+  'insert',
+  'addRowAfter',
+  'addColumnAfter',
+  'deleteRow',
+  'deleteColumn',
+  'toggleHeaderRow',
+  'deleteTable',
+]);
 
 function emptySelectionState(): EditorSelectionState {
   return {

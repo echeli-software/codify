@@ -1,6 +1,7 @@
 :host {
   display: block;
   width: 100%;
+  container-type: inline-size;
 }
 
 .cdf-lesson-editor {
@@ -23,8 +24,225 @@
     overflow: hidden;
   }
 
+  &__toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    background: var(--cdf-color-surface);
+    border-bottom: 1px solid var(--cdf-color-border);
+  }
+
+  &__toolbar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__views {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  &__view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 2px 8px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-sm);
+    background: var(--cdf-color-surface);
+    color: var(--cdf-color-text);
+    font: inherit;
+    font-size: var(--cdf-font-size-sm);
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--cdf-color-primary-subtle);
+      border-color: var(--cdf-color-primary);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &__lock {
+    margin: 0;
+    padding: var(--cdf-space-1) var(--cdf-space-3);
+    background: color-mix(
+      in srgb,
+      var(--cdf-color-warning) 14%,
+      var(--cdf-color-surface)
+    );
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  // Outline | body | properties. Side columns collapse under the body on
+  // narrow editors (container query on the host).
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+
+    &--outline {
+      grid-template-columns: 200px minmax(0, 1fr);
+    }
+
+    &--props {
+      grid-template-columns: minmax(0, 1fr) 240px;
+    }
+
+    &--outline.cdf-lesson-editor__layout--props {
+      grid-template-columns: 200px minmax(0, 1fr) 240px;
+    }
+  }
+
+  &__outline,
+  &__props {
+    min-width: 0;
+    border-color: var(--cdf-color-border);
+    border-style: solid;
+    border-width: 0;
+  }
+
+  &__outline {
+    border-inline-end-width: 1px;
+    padding: var(--cdf-space-3);
+    font-size: var(--cdf-font-size-sm);
+  }
+
+  &__props {
+    border-inline-start-width: 1px;
+
+    cdf-block-properties {
+      position: sticky;
+      top: 56px;
+    }
+  }
+
+  &__side-title {
+    margin: 0 0 var(--cdf-space-2);
+    font-size: var(--cdf-font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__muted {
+    margin: 0;
+    color: var(--cdf-color-text-muted);
+  }
+
+  &__outline-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li[data-level='3'] {
+      padding-inline-start: var(--cdf-space-3);
+    }
+  }
+
+  &__outline-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--cdf-radius-sm);
+    background: transparent;
+    color: var(--cdf-color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+
+    &:hover,
+    &.is-current {
+      background: var(--cdf-color-primary-subtle);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &__outline-kind {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cdf-color-text-muted);
+  }
+
   &__body {
     position: relative;
+    min-width: 0;
+  }
+
+  &__handle {
+    position: absolute;
+    inset-inline-start: 4px;
+    z-index: 2;
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 28px;
+    margin-top: var(--cdf-space-5);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--cdf-radius-sm);
+    background: transparent;
+    color: var(--cdf-color-text-muted);
+    cursor: grab;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--cdf-color-border);
+      background: var(--cdf-color-surface);
+      color: var(--cdf-color-text);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
+  }
+
+  &__bubble {
+    position: absolute;
+    z-index: var(--cdf-z-dropdown);
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--cdf-color-border);
+    border-radius: var(--cdf-radius-md);
+    background: var(--cdf-color-surface-elev, var(--cdf-color-surface));
+    box-shadow: var(--cdf-shadow-md, 0 4px 16px rgb(0 0 0 / 0.15));
+  }
+
+  &__bubble-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: var(--cdf-radius-sm);
+    background: transparent;
+    color: var(--cdf-color-text);
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--cdf-color-primary-subtle);
+      color: var(--cdf-color-primary-text, var(--cdf-color-primary));
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--cdf-shadow-focus-ring);
+    }
   }
 
   // The actual prose styling for `.ProseMirror` content lives in the global
@@ -50,5 +268,29 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
     margin: 0;
+  }
+}
+
+@container (max-width: 760px) {
+  .cdf-lesson-editor__layout,
+  .cdf-lesson-editor__layout--outline,
+  .cdf-lesson-editor__layout--props,
+  .cdf-lesson-editor__layout--outline.cdf-lesson-editor__layout--props {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cdf-lesson-editor__outline {
+    border-inline-end-width: 0;
+    border-bottom-width: 1px;
+  }
+
+  .cdf-lesson-editor__props {
+    border-inline-start-width: 0;
+    border-top-width: 1px;
+    order: 3;
+
+    cdf-block-properties {
+      position: static;
+    }
   }
 }

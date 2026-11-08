@@ -4,14 +4,21 @@ import {
   DestroyRef,
   computed,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { emptyLessonDoc, type LessonDoc } from '@codify/lesson-schema';
-import { I18nService, TranslatePipe } from '@codify/i18n';
+import {
+  emptyLessonDoc,
+  stripQuizAnswers,
+  validateLessonDoc,
+  type LessonDoc,
+  type QuizAnswers,
+} from '@codify/lesson-schema';
+import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
 import {
   Badge,
   BreadcrumbBar,
@@ -27,6 +34,8 @@ import {
   Input,
   LessonBlockEditor,
   LessonBlockRenderer,
+  ModalFrame,
+  ModalService,
   Select,
   type SelectOption,
   Skeleton,
@@ -41,8 +50,11 @@ import {
   ScenariosClient,
   type CourseDetail,
   type Lesson,
+  type LessonMultiplier,
   type LessonType,
 } from '@codify/api-client';
+import { AuthService } from '@codify/auth';
+import { canAccess } from '../core/roles';
 import {
   AdminErrors,
   contentIssuesOf,
@@ -61,6 +73,103 @@ import {
 import { type HasUnsavedChanges, warnOnUnload } from '../core/unsaved-changes';
 import { EditorDocBinding } from '../core/editor-doc';
 import { Autosave, formatClockTime } from '../core/autosave';
+
+/**
+ * "Preview as student" (docs/04 Lessons, docs/06 §9): the doc as a student
+ * gets it (answer keys stripped, quizzes interactive but ungraded) at a
+ * mobile and a desktop width side by side.
+ */
+@Component({
+  selector: 'cdf-admin-lesson-preview',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ModalFrame, LessonBlockRenderer, TranslatePipe],
+  template: `
+    <cdf-modal-frame [title]="'admin.lesson.previewTitle' | translate">
+      <p class="muted small">{{ 'admin.lesson.previewNote' | translate }}</p>
+      <div class="previews">
+        <section
+          class="device device--mobile"
+          [attr.aria-label]="'admin.lesson.previewMobile' | translate"
+        >
+          <h3 class="device__label">
+            {{ 'admin.lesson.previewMobile' | translate }}
+          </h3>
+          <div class="device__screen" data-testid="preview-mobile">
+            <h2 class="device__title">{{ title() }}</h2>
+            <cdf-lesson-block-renderer
+              [doc]="studentDoc()"
+              [(quizAnswers)]="mobileAnswers"
+            />
+          </div>
+        </section>
+        <section
+          class="device device--desktop"
+          [attr.aria-label]="'admin.lesson.previewDesktop' | translate"
+        >
+          <h3 class="device__label">
+            {{ 'admin.lesson.previewDesktop' | translate }}
+          </h3>
+          <div class="device__screen" data-testid="preview-desktop">
+            <h2 class="device__title">{{ title() }}</h2>
+            <cdf-lesson-block-renderer
+              [doc]="studentDoc()"
+              [(quizAnswers)]="desktopAnswers"
+            />
+          </div>
+        </section>
+      </div>
+    </cdf-modal-frame>
+  `,
+  styles: [
+    `
+      .previews {
+        display: flex;
+        gap: var(--cdf-space-4);
+        align-items: flex-start;
+        overflow-x: auto;
+        padding-bottom: var(--cdf-space-2);
+      }
+      .device {
+        flex: 0 0 auto;
+      }
+      .device__label {
+        margin: 0 0 var(--cdf-space-1);
+        font-size: var(--cdf-font-size-sm);
+        color: var(--cdf-color-text-muted);
+      }
+      .device__screen {
+        border: 1px solid var(--cdf-color-border);
+        border-radius: var(--cdf-radius-md);
+        background: var(--cdf-color-bg);
+        padding: var(--cdf-space-4);
+        max-height: 70vh;
+        overflow: auto;
+        /* Own containing block so the renderer lays out at this width. */
+        container-type: inline-size;
+      }
+      .device--mobile .device__screen {
+        width: 390px;
+        border-radius: 24px;
+      }
+      .device--desktop .device__screen {
+        width: 1024px;
+      }
+      .device__title {
+        margin-top: 0;
+      }
+    `,
+  ],
+})
+export class LessonPreviewDialog {
+  readonly doc = input<LessonDoc | null>(null);
+  readonly title = input('');
+  protected readonly studentDoc = computed(() => {
+    const d = this.doc();
+    return d ? stripQuizAnswers(d) : null;
+  });
+  protected mobileAnswers: QuizAnswers = {};
+  protected desktopAnswers: QuizAnswers = {};
+}
 
 interface MetaForm {
   title: string;
@@ -99,6 +208,7 @@ interface MetaForm {
     Select,
     Skeleton,
     TranslatePipe,
+    LocalePipe,
   ],
   template: `
     <div class="admin-page admin-page--wide">
@@ -159,6 +269,14 @@ interface MetaForm {
               }
             </div>
             <cdf-button
+              kind="secondary"
+              (click)="openPreview()"
+              data-testid="preview-lesson"
+            >
+              <cdf-icon name="eye" size="sm" />
+              {{ 'admin.lesson.previewStudent' | translate }}
+            </cdf-button>
+            <cdf-button
               kind="primary"
               [loading]="saving()"
               [disabled]="!dirty()"
@@ -186,9 +304,15 @@ interface MetaForm {
               <cdf-icon name="warning" size="sm" />
               {{ 'admin.lesson.issuesTitle' | translate }}
             </h2>
-            <ul class="issue-list">
+            <ul class="issue-list" data-testid="content-issues">
               @for (i of issues(); track $index) {
                 <li>
+                  @if (blockOf(i.path); as n) {
+                    <strong>{{
+                      'admin.lesson.issueBlock' | translate: { n }
+                    }}</strong>
+                    ·
+                  }
                   <code>{{ i.path || '/' }}</code> — {{ i.message }}
                 </li>
               }
@@ -291,6 +415,73 @@ interface MetaForm {
               (ngModelChange)="markDirty()"
               [label]="'admin.lesson.freePreview' | translate"
             />
+
+            <h2 class="pane-title refs-title">
+              {{ 'admin.lesson.multipliers.title' | translate }}
+            </h2>
+            @if (multipliers(); as list) {
+              @if (list.length === 0) {
+                <p class="muted small">
+                  {{ 'admin.lesson.multipliers.none' | translate }}
+                </p>
+              } @else {
+                <ul
+                  class="plain-list mult-list"
+                  data-testid="lesson-multipliers"
+                >
+                  @for (m of list; track m.id) {
+                    <li class="mult">
+                      <strong
+                        >×{{ m.value | locale: 'number' }}
+                        {{
+                          'admin.promotions.targets.' + m.target | translate
+                        }}</strong
+                      >
+                      <cdf-badge
+                        [variant]="m.activeNow ? 'success' : 'neutral'"
+                        [subtle]="true"
+                        >{{
+                          (m.activeNow
+                            ? 'admin.lesson.multipliers.running'
+                            : 'admin.lesson.multipliers.notRunning'
+                          ) | translate
+                        }}</cdf-badge
+                      >
+                      <div class="muted small">
+                        {{ 'admin.promotions.kinds.' + m.kind | translate }} ·
+                        {{
+                          (m.scope === 'lesson'
+                            ? 'admin.lesson.multipliers.scopeLesson'
+                            : 'admin.lesson.multipliers.scopeCourse'
+                          ) | translate
+                        }}
+                      </div>
+                      <div class="muted small">
+                        @if (m.startsAt || m.endsAt) {
+                          {{
+                            m.startsAt ? (m.startsAt | locale: 'datetime') : '…'
+                          }}
+                          →
+                          {{ m.endsAt ? (m.endsAt | locale: 'datetime') : '…' }}
+                        } @else {
+                          {{ 'admin.lesson.multipliers.always' | translate }}
+                        }
+                      </div>
+                      @if (m.description) {
+                        <div class="small">{{ m.description }}</div>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+              @if (canManagePromotions()) {
+                <a class="small" [routerLink]="['/promotions']">{{
+                  'admin.lesson.multipliers.manage' | translate
+                }}</a>
+              }
+            } @else {
+              <cdf-skeleton shape="text" />
+            }
 
             <h2 class="pane-title refs-title">
               {{ 'admin.lesson.refs.title' | translate }}
@@ -447,6 +638,17 @@ interface MetaForm {
         border-top: 1px dashed var(--cdf-color-border);
         padding-top: var(--cdf-space-2);
       }
+      .mult-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cdf-space-2);
+        margin: 0;
+      }
+      .mult {
+        border: 1px solid var(--cdf-color-border);
+        border-radius: var(--cdf-radius-sm);
+        padding: 6px 8px;
+      }
       .issues h2 {
         display: flex;
         align-items: center;
@@ -468,8 +670,15 @@ export class LessonsPage implements HasUnsavedChanges {
   private readonly confirm = inject(ConfirmDialogService);
   private readonly errorsSvc = inject(AdminErrors);
   private readonly i18n = inject(I18nService);
+  private readonly modals = inject(ModalService);
+  private readonly auth = inject(AuthService);
 
   protected readonly modes = ['edit', 'split', 'preview'] as const;
+  /** Promotions applying to this lesson (null while loading). */
+  protected readonly multipliers = signal<LessonMultiplier[] | null>(null);
+  protected readonly canManagePromotions = computed(() =>
+    canAccess('promotions', this.auth.role()),
+  );
   protected readonly mode = signal<'edit' | 'split' | 'preview'>('split');
   protected readonly companion = lessonCompanion;
   protected readonly lesson = signal<Lesson | null>(null);
@@ -578,6 +787,7 @@ export class LessonsPage implements HasUnsavedChanges {
       const l = await this.lessons.detail(id);
       if (seq !== this.loadSeq) return;
       this.applyLesson(l);
+      void this.loadMultipliers(l.id, seq);
       // Breadcrumb + ref candidates come from the parent course (by id).
       const course = await this.courses.detail(l.courseId);
       if (seq !== this.loadSeq) return;
@@ -605,6 +815,31 @@ export class LessonsPage implements HasUnsavedChanges {
     };
     this.docVersion.update((v) => v + 1);
     this.dirty.set(false);
+  }
+
+  private async loadMultipliers(id: string, seq: number): Promise<void> {
+    this.multipliers.set(null);
+    try {
+      const list = await this.lessons.multipliers(id);
+      if (seq === this.loadSeq) this.multipliers.set(list);
+    } catch {
+      if (seq === this.loadSeq) this.multipliers.set([]);
+    }
+  }
+
+  /** "Preview as student" at mobile + desktop widths. */
+  protected openPreview(): void {
+    this.modals.open(LessonPreviewDialog, {
+      size: 'xl',
+      scrollable: true,
+      inputs: { doc: this.doc, title: this.meta.title },
+    });
+  }
+
+  /** 1-based top-level block number of an issue path (`content.3.…`). */
+  protected blockOf(path: string): number | null {
+    const m = /^content\.(\d+)/.exec(path);
+    return m ? Number(m[1]) + 1 : null;
   }
 
   /** Resolve the exercise / AI prompt / scenario ids of the course's lessons. */
@@ -652,6 +887,8 @@ export class LessonsPage implements HasUnsavedChanges {
   private canAutosave(): boolean {
     if (!this.lesson() || !this.dirty()) return false;
     if (!this.meta.title.trim()) return false;
+    // docs/06 §6: never send a doc that fails lessonDocSchema.
+    if (!validateLessonDoc(this.doc).ok) return false;
     return !(
       this.issues().length > 0 && this.autosave.isCurrent(this.issuesRev)
     );
@@ -669,7 +906,12 @@ export class LessonsPage implements HasUnsavedChanges {
     if (this.dirty()) {
       const rejected =
         this.issues().length > 0 && this.autosave.isCurrent(this.issuesRev);
-      if (!this.meta.title.trim() || rejected) return 'paused';
+      if (
+        !this.meta.title.trim() ||
+        rejected ||
+        !validateLessonDoc(this.doc).ok
+      )
+        return 'paused';
       if (this.autosaveFailed()) return 'failed';
       return 'unsaved';
     }
@@ -705,6 +947,13 @@ export class LessonsPage implements HasUnsavedChanges {
     }
     if (!auto) this.autosave.cancel();
     this.titleError.set(null);
+    // docs/06 §6: validate client-side first and list problems inline.
+    const local = validateLessonDoc(this.doc);
+    if (!local.ok) {
+      this.issues.set(local.issues);
+      this.issuesRev = this.autosave.revision;
+      return;
+    }
     this.issues.set([]);
     this.saving.set(true);
     const rev = this.autosave.revision;

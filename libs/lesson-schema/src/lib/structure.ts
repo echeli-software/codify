@@ -14,7 +14,7 @@ import type { LessonDocIssue } from './schema.js';
 type Json = Record<string, unknown>;
 
 /** Attributes that must be identical between source and translation. */
-const LOCKED_ATTRS: Record<string, readonly string[]> = {
+export const LOCKED_BLOCK_ATTRS: Readonly<Record<string, readonly string[]>> = {
   heading: ['level'],
   orderedList: ['start'],
   callout: ['kind'],
@@ -87,7 +87,7 @@ export function lessonStructureIssues(
       }
       const sa = obj(s['attrs']) ?? {};
       const ta = obj(t['attrs']) ?? {};
-      for (const key of LOCKED_ATTRS[type] ?? []) {
+      for (const key of LOCKED_BLOCK_ATTRS[type] ?? []) {
         if (!same(sa[key], ta[key]))
           push(`${here}.attrs.${key}`, `"${key}" must match the source`);
       }

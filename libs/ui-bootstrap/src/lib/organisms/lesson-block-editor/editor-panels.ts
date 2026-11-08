@@ -19,11 +19,15 @@ import {
   signal,
 } from '@angular/core';
 import {
+  EMBED_ASPECT_RATIOS,
   EMBED_PROVIDER_LABELS,
+  IMAGE_ALIGNS,
   isAllowedHref,
   isAllowedImageSrc,
   parseEmbedUrl,
+  type EmbedAspectRatio,
   type EmbedProvider,
+  type ImageAlign,
   type ImageWidth,
 } from '@codify/lesson-schema';
 import { I18nService, TranslatePipe } from '@codify/i18n';
@@ -174,6 +178,7 @@ export interface ImagePanelResult {
   caption: string | null;
   assetId: string | null;
   width: ImageWidth;
+  align: ImageAlign;
 }
 
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
@@ -329,6 +334,19 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
           </option>
         </select>
       </label>
+      <label class="cdf-editor-panel__field">
+        <span>{{ 'ui.lessonEditor.image.align' | translate }}</span>
+        <select
+          [value]="align()"
+          (change)="align.set($any($event.target).value)"
+        >
+          @for (a of aligns; track a) {
+            <option [value]="a" [selected]="align() === a">
+              {{ 'ui.lessonEditor.image.aligns.' + a | translate }}
+            </option>
+          }
+        </select>
+      </label>
 
       <div class="cdf-editor-panel__actions">
         <span class="cdf-editor-panel__spacer"></span>
@@ -366,6 +384,8 @@ export class ImagePanel implements OnDestroy {
   protected readonly alt = signal('');
   protected readonly caption = signal('');
   protected readonly width = signal<ImageWidth>('full');
+  protected readonly align = signal<ImageAlign>('center');
+  protected readonly aligns = IMAGE_ALIGNS;
   protected readonly status = signal<UploadStatus>('idle');
   protected readonly progress = signal<number | null>(null);
   protected readonly error = signal('');
@@ -482,6 +502,7 @@ export class ImagePanel implements OnDestroy {
       caption: this.caption().trim() || null,
       assetId: this.assetId(),
       width: this.width(),
+      align: this.align(),
     });
   }
 }
@@ -492,6 +513,7 @@ export interface EmbedPanelResult {
   provider: EmbedProvider;
   url: string;
   title: string;
+  aspectRatio: EmbedAspectRatio;
 }
 
 @Component({
@@ -544,6 +566,17 @@ export interface EmbedPanelResult {
           (input)="title.set($any($event.target).value)"
         />
       </label>
+      <label class="cdf-editor-panel__field">
+        <span>{{ 'ui.lessonEditor.embed.aspectRatio' | translate }}</span>
+        <select
+          [value]="ratio()"
+          (change)="ratio.set($any($event.target).value)"
+        >
+          @for (r of ratios; track r) {
+            <option [value]="r" [selected]="ratio() === r">{{ r }}</option>
+          }
+        </select>
+      </label>
       <div class="cdf-editor-panel__actions">
         <span class="cdf-editor-panel__spacer"></span>
         <button
@@ -572,6 +605,8 @@ export class EmbedPanel {
   protected readonly uid = `cdf-embed-panel-${nextId++}`;
   protected readonly url = signal('');
   protected readonly title = signal('');
+  protected readonly ratio = signal<EmbedAspectRatio>('16:9');
+  protected readonly ratios = EMBED_ASPECT_RATIOS;
   protected readonly parsed = computed(() => parseEmbedUrl(this.url()));
   protected readonly urlError = computed(
     () => this.url() !== '' && !this.parsed(),
@@ -595,6 +630,7 @@ export class EmbedPanel {
       provider: parsed.provider,
       url: this.url(),
       title: this.title().trim(),
+      aspectRatio: this.ratio(),
     });
   }
 }

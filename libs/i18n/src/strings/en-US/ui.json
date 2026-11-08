@@ -171,6 +171,29 @@
         "in-progress": "In progress",
         "completed": "Completed",
         "locked": "Locked"
+      },
+      "code": {
+        "label": "Code · {language}",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Couldn't copy",
+        "copiedAnnounce": "Code copied to the clipboard"
+      },
+      "quiz": {
+        "matchHint": "Match each item with its answer.",
+        "matchChoose": "Choose an answer…",
+        "correctMatch": "Correct answer: {answer}",
+        "orderHint": "Put the items in the right order with the arrow buttons.",
+        "moveUp": "Move “{item}” up",
+        "moveDown": "Move “{item}” down",
+        "moved": "“{item}” is now {position} of {total}",
+        "orderConfirm": "This order is my answer"
+      },
+      "embed": {
+        "by": "by {author}"
+      },
+      "video": {
+        "comingSoon": "Video coming soon"
       }
     },
     "level": {
@@ -428,15 +451,23 @@
           "url": "The upload returned an unsupported URL.",
           "failedWith": "Upload failed: {message}",
           "failed": "Upload failed."
+        },
+        "align": "Alignment",
+        "aligns": {
+          "left": "Left",
+          "center": "Center",
+          "right": "Right"
         }
       },
       "embed": {
         "title": "Embed",
         "urlPlaceholder": "https://www.youtube.com/watch?v=…",
         "detected": "Detected {provider}.",
-        "help": "YouTube, Vimeo, CodePen, CodeSandbox or Loom links only.",
+        "help": "YouTube, Vimeo, CodePen, CodeSandbox, Loom, StackBlitz or Figma links only.",
         "titleLabel": "Title (read by screen readers)",
-        "insert": "Insert embed"
+        "insert": "Insert embed",
+        "aspectRatio": "Aspect ratio",
+        "invalidProvider": "Use a YouTube, Vimeo, CodePen, CodeSandbox, Loom, StackBlitz or Figma link."
       },
       "placeholder": "Start writing the lesson…",
       "contentLabel": "Lesson content",
@@ -445,7 +476,120 @@
         "quizInserted": "Quiz block inserted.",
         "blockInserted": "Block inserted.",
         "imageInserted": "Image inserted.",
-        "embedInserted": "Embed inserted."
+        "embedInserted": "Embed inserted.",
+        "blockMoved": "Block moved to position {n}.",
+        "blockDeleted": "Block deleted.",
+        "blockSelected": "Block selected. Alt+Shift+Arrow keys move it.",
+        "videoInserted": "Video block inserted.",
+        "locked": "Translation mode: the block structure can’t change."
+      },
+      "views": {
+        "label": "Editor panels",
+        "outline": "Outline",
+        "properties": "Properties"
+      },
+      "outline": {
+        "title": "Outline",
+        "empty": "Add headings or interactive blocks to see them here.",
+        "untitled": "(untitled)"
+      },
+      "handle": {
+        "label": "Drag to move this block, or press to select it (Alt+Shift+↑/↓ moves it)"
+      },
+      "bubble": {
+        "label": "Text formatting",
+        "bold": "Bold",
+        "italic": "Italic",
+        "strike": "Strikethrough",
+        "code": "Inline code",
+        "highlight": "Highlight",
+        "link": "Link"
+      },
+      "props": {
+        "title": "Block properties",
+        "none": "Place the cursor in a block to see its properties.",
+        "noFields": "This block has no extra properties.",
+        "position": "Block {n} of {total}",
+        "moveUp": "Move block up",
+        "moveDown": "Move block down",
+        "delete": "Delete block",
+        "level": "Heading level",
+        "levels": {
+          "2": "Heading 2",
+          "3": "Heading 3"
+        },
+        "calloutKind": "Callout type",
+        "calloutKinds": {
+          "info": "Info",
+          "tip": "Tip",
+          "warn": "Warning",
+          "danger": "Danger",
+          "success": "Success"
+        },
+        "language": "Language",
+        "lineNumbers": "Show line numbers",
+        "highlightLines": "Highlight lines",
+        "highlightHelp": "Line numbers and ranges, e.g. 3,7-9",
+        "highlightInvalid": "Use numbers and ranges like 3,7-9.",
+        "copyable": "Show a copy button",
+        "quizHint": "Edit the question and answers in the block itself.",
+        "quizKind": "Answer type",
+        "refId": "Linked id",
+        "notSet": "not set",
+        "embedProvider": "Provider",
+        "embedMeta": "Fetched title: {title}",
+        "tableSize": "{rows} rows × {cols} columns",
+        "types": {
+          "paragraph": "Text",
+          "heading": "Heading",
+          "bulletList": "Bulleted list",
+          "orderedList": "Numbered list",
+          "blockquote": "Quote",
+          "codeBlock": "Code block",
+          "callout": "Callout",
+          "horizontalRule": "Divider",
+          "image": "Image",
+          "embed": "Embed",
+          "videoBlock": "Video",
+          "table": "Table",
+          "quiz": "Quiz",
+          "exerciseRef": "Code exercise",
+          "aiPromptRef": "AI prompt",
+          "scenarioRef": "Scenario"
+        }
+      },
+      "lock": {
+        "note": "Translation mode: edit the text — blocks can’t be added, removed or reordered."
+      },
+      "video": {
+        "title": "Video",
+        "delete": "Delete video",
+        "titleLabel": "Title (required)",
+        "defaultTitle": "Video",
+        "hint": "Students see a “Video coming soon” placeholder until video hosting ships."
+      },
+      "quiz": {
+        "kinds": {
+          "single": "Single choice",
+          "multiple": "Multiple choice",
+          "match": "Matching",
+          "order": "Ordering"
+        },
+        "matchLegend": "Pairs — each item and its correct answer",
+        "matchItem": "Item {n}",
+        "matchItemPlaceholder": "Item",
+        "matchAnswer": "Answer for item {n}",
+        "matchAnswerPlaceholder": "Matching answer",
+        "removePair": "Remove pair {n}",
+        "addPair": "Add pair",
+        "distractors": "Extra answers (distractors, optional)",
+        "distractor": "Extra answer {n}",
+        "removeDistractor": "Remove extra answer {n}",
+        "addDistractor": "Add extra answer",
+        "orderLegend": "Items in the correct order — students see them shuffled",
+        "orderItem": "Item {n}",
+        "moveUp": "Move item {n} up",
+        "moveDown": "Move item {n} down"
       }
     }
   }
