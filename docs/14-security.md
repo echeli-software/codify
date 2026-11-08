@@ -7,6 +7,7 @@ Threat model is consumer SaaS in Brazil + global. Highest-impact surfaces: code 
 - **Clerk** for all auth. JWT-based sessions, signed by Clerk, verified via JWKS in NestJS middleware.
 - Methods enabled: email magic link, Google, Apple. Phone optional.
 - MFA: required for `ADMIN` role; optional for others (encouraged in onboarding for paid users).
+  - As built (`apps/api/src/app/auth/staff-session.ts`): for `ADMIN` **and `SUPPORT`** (SUPPORT can suspend, refund and read PII, so it gets the same bar; `TEACHER` stays optional) the API requires the Clerk session token's factor-verification-age claim `fva = [minutesSinceFirstFactor, minutesSinceSecondFactor]` to show a second factor verified in this session (`fva[1] ≥ 0`), else `403 { code: "MFA_REQUIRED" }`; a token without `fva` fails closed. Dev tokens (no claims) are exempt. `GET /me` and `GET /me/account-status` stay reachable so the admin app can identify the user; it then shows a translated re-authentication screen (`/reauth`). `STAFF_MFA_ROLES` (comma list, default `ADMIN,SUPPORT`; `none` = break-glass off) configures the roles.
 - Session lifetime: 7 days rolling refresh; absolute max 30 days.
 - Logout: client clears local state + Clerk's `signOut`; server invalidates via Clerk webhook on `session.removed`.
 
@@ -184,6 +185,8 @@ Purge job (`AccountPurgeService`, daily 03:17 UTC, behind `JOBS_ENABLED`): accou
 - Strong recommendation: admin login restricted by IP allowlist when feasible. Initial: standard Clerk-protected with mandatory MFA for `ADMIN`.
 - Admin actions on user data display warning + require typed confirmation for destructive ops ("Type the user email to confirm deletion").
 - Admin sessions: 12-hour absolute timeout (vs 7-day for students).
+  - As built: the same check refuses ADMIN / SUPPORT sessions whose first factor was verified more than `STAFF_SESSION_MAX_HOURS` (default 12) ago — `fva[0]` — with `403 { code: "SESSION_TOO_OLD", maxSessionHours }`; signing in again (or Clerk step-up reverification) resets it. Also set the Clerk instance's session maximum lifetime so idle tokens can't be refreshed indefinitely.
+- Role changes: `PATCH /api/admin/users/:id/role` (ADMIN only, never your own account), audited `user.role_changed` with before/after (docs/04 §10).
 
 ## 19. Disclosure & incident response
 

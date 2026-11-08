@@ -145,6 +145,13 @@
       "description": "O admin é só para a equipe. Sua conta não tem o papel necessário.",
       "backToLogin": "Voltar ao login"
     },
+    "reauth": {
+      "mfaTitle": "Verificação em duas etapas obrigatória",
+      "mfaBody": "Contas da equipe com esta função precisam usar a verificação em duas etapas. Ative-a nas configurações de segurança da sua conta e entre novamente.",
+      "expiredTitle": "Sua sessão expirou",
+      "expiredBody": "Por segurança, as sessões da equipe terminam {hours} horas após o login. Entre novamente para continuar.",
+      "signInAgain": "Entrar novamente"
+    },
     "denied": {
       "title": "Você não pode abrir esta seção",
       "description": "“{section}” exige um destes papéis: {roles}. Você entrou como {role}.",

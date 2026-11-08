@@ -70,6 +70,14 @@ export const envSchema = z
     /** Comma list of origins allowed in the token's `azp` claim. */
     CLERK_AUTHORIZED_PARTIES: commaList,
     CLERK_WEBHOOK_SIGNING_SECRET: optionalString,
+    /**
+     * Roles that need a second factor + a sign-in younger than
+     * STAFF_SESSION_MAX_HOURS (Clerk `fva` claim, docs/14 §1, §18). Comma
+     * list; default `ADMIN,SUPPORT`; `none` disables (break-glass only).
+     */
+    STAFF_MFA_ROLES: optionalString,
+    /** Absolute staff session age in hours (default 12). */
+    STAFF_SESSION_MAX_HOURS: z.coerce.number().positive().max(720).optional(),
 
     // ─── HTTP hardening ──────────────────────────────────────────────────
     /** Comma list of allowed browser origins. Dev default: localhost apps. */

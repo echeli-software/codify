@@ -5,6 +5,7 @@ import {
   DefaultValuePipe,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Query,
   Req,
@@ -23,6 +24,11 @@ import {
   type MeResponse,
 } from './users.dto.js';
 import { IntRangePipe } from '../common/int-range.pipe.js';
+import { UserRoleService } from './user-role.service.js';
+import {
+  ChangeUserRoleDto,
+  type UserRoleChangeResult,
+} from './user-role.dto.js';
 
 @Controller('users')
 export class UsersController {
@@ -109,5 +115,25 @@ export class MeController {
       userAgent: (req.headers['user-agent'] as string) ?? null,
     });
     return updated;
+  }
+}
+
+/**
+ * PATCH /admin/users/:id/role — ADMIN only (docs/04 Users, docs/14 §11).
+ * 403 ROLE_CHANGE_SELF for your own account; audited `user.role_changed`
+ * with `diff.before.role` / `diff.after.role` (+ optional `reason`).
+ */
+@Controller('admin/users')
+export class AdminUserRoleController {
+  constructor(private readonly roles: UserRoleService) {}
+
+  @Roles('ADMIN')
+  @Patch(':id/role')
+  changeRole(
+    @CurrentUser() actor: ApiUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: ChangeUserRoleDto,
+  ): Promise<UserRoleChangeResult> {
+    return this.roles.changeRole(actor, id, body.role, body.reason);
   }
 }

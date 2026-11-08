@@ -10,6 +10,12 @@ export const appRoutes: Route[] = [
     loadComponent: () => import('./pages/login.page').then((m) => m.LoginPage),
   },
   {
+    // Staff session refused for MFA / 12 h age (core/staff-session.ts).
+    path: 'reauth',
+    loadComponent: () =>
+      import('./pages/reauth.page').then((m) => m.ReauthPage),
+  },
+  {
     path: 'forbidden',
     loadComponent: () =>
       import('./pages/forbidden.page').then((m) => m.ForbiddenPage),

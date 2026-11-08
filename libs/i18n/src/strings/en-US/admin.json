@@ -145,6 +145,13 @@
       "description": "The admin app is for staff only. Your account doesn't have the required role.",
       "backToLogin": "Back to login"
     },
+    "reauth": {
+      "mfaTitle": "Two-step verification required",
+      "mfaBody": "Staff accounts with this role must use two-step verification. Turn it on in your account security settings, then sign in again.",
+      "expiredTitle": "Your session has expired",
+      "expiredBody": "For security, staff sessions end {hours} hours after sign-in. Sign in again to continue.",
+      "signInAgain": "Sign in again"
+    },
     "denied": {
       "title": "You can't open this section",
       "description": "“{section}” requires one of these roles: {roles}. You're signed in as {role}.",

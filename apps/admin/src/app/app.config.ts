@@ -11,6 +11,7 @@ import { apiClientInterceptors, provideApiClient } from '@codify/api-client';
 import { API_BASE_URL, CLERK_PUBLISHABLE_KEY } from './api-base-url';
 import { appRoutes } from './app.routes';
 import { adminTelemetryInterceptor } from './core/telemetry';
+import { staffSessionInterceptor } from './core/staff-session';
 import {
   ApiContentTranslationSource,
   MeLocalePersistence,
@@ -25,6 +26,8 @@ export const appConfig: ApplicationConfig = {
         authInterceptor(),
         ...apiClientInterceptors(),
         adminTelemetryInterceptor,
+        // 403 MFA_REQUIRED / SESSION_TOO_OLD → /reauth (docs/14 §1, §18).
+        staffSessionInterceptor,
       ]),
     ),
     provideAuth({

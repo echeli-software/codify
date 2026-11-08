@@ -16,6 +16,11 @@ import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ApiUser } from './auth.types.js';
 import {
+  type StaffSessionPolicy,
+  staffSessionBlockFor,
+  staffSessionPolicyFromEnv,
+} from './staff-session.js';
+import {
   ClerkService,
   type ClerkProfile,
   buildDisplayName,
@@ -50,6 +55,8 @@ interface ResolvedRow extends AccountLifecycle {
 export interface ResolvedAccount {
   user: ApiUser;
   lifecycle: AccountLifecycle;
+  /** Verified Clerk session claims (undefined for dev tokens). */
+  claims?: Record<string, unknown>;
 }
 
 interface NewUserProfile {
@@ -77,12 +84,16 @@ interface NewUserProfile {
  * (`restorableUntil` while the 14-day window is open, else null). A
  * suspended account may only call `GET /me/account-status`; everything else
  * is 403 `ACCOUNT_SUSPENDED`. A purged (anonymised) account is treated as
- * unauthenticated. `lastSeenAt` is written at most once per
+ * unauthenticated. Staff sessions (ADMIN, SUPPORT by default) also need a
+ * second factor and a sign-in younger than 12 h (staff-session.ts):
+ * 403 `MFA_REQUIRED` / `SESSION_TOO_OLD` except on `GET /me`.
+ * `lastSeenAt` is written at most once per
  * LAST_SEEN_INTERVAL_MS per active user, never on every request.
  */
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   private readonly logger = new Logger(AuthMiddleware.name);
+  private readonly staffPolicy: StaffSessionPolicy;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -90,7 +101,12 @@ export class AuthMiddleware implements NestMiddleware {
     private readonly clerk: ClerkService,
     /** Welcome + return-from-lapse hooks (docs/10 §3, §13). */
     @Optional() private readonly lifecycle?: UserLifecycleService,
-  ) {}
+  ) {
+    this.staffPolicy = staffSessionPolicyFromEnv({
+      STAFF_MFA_ROLES: config.get('STAFF_MFA_ROLES'),
+      STAFF_SESSION_MAX_HOURS: config.get('STAFF_SESSION_MAX_HOURS'),
+    });
+  }
 
   async use(req: Request, _res: Response, next: NextFunction): Promise<void> {
     const header = req.headers['authorization'];
@@ -109,6 +125,15 @@ export class AuthMiddleware implements NestMiddleware {
           // Thrown (not next(err)) so Nest's exception filter renders it as
           // problem+json.
           if (block) throw new ForbiddenException(block);
+          // ADMIN / SUPPORT: second factor + session < 12 h (docs/14 §1, §18).
+          const staff = staffSessionBlockFor(
+            account.user.role,
+            account.claims,
+            req.method,
+            path,
+            this.staffPolicy,
+          );
+          if (staff) throw new ForbiddenException(staff);
           req.user = account.user;
         }
       }
@@ -139,7 +164,7 @@ export class AuthMiddleware implements NestMiddleware {
 
     const verified = await this.clerk.verify(token);
     if (!verified) return null;
-    return this.findOrProvision(verified.sub, async () => {
+    const account = await this.findOrProvision(verified.sub, async () => {
       const profile =
         (await this.clerk.fetchProfile(verified.sub)) ??
         profileFromClaims(verified.sub, verified.claims);
@@ -149,6 +174,7 @@ export class AuthMiddleware implements NestMiddleware {
         role: 'STUDENT',
       };
     });
+    return account ? { ...account, claims: verified.claims } : null;
   }
 
   private async findOrProvision(
