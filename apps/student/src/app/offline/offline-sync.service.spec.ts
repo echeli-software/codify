@@ -2,9 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import {
   GamificationClient,
+  ItemsClient,
+  MeClient,
   ProblemDetailsError,
   ProgressClient,
   QuizzesClient,
+  ScenariosClient,
 } from '@codify/api-client';
 import { AuthService } from '@codify/auth';
 import { RewardOrchestrator } from '@codify/gamification-engine';
@@ -26,6 +29,8 @@ import {
   SYNC_MAX_ATTEMPTS,
   backoffDelay,
   classifySyncFailure,
+  estimatePending,
+  mergeSlotChanges,
 } from './offline-sync.service';
 
 const problem = (
@@ -64,6 +69,10 @@ describe('OfflineSyncService', () => {
   let quizzes: { submit: jest.Mock };
   let toast: { show: jest.Mock };
   let bundle: unknown;
+  let scenarios: { complete: jest.Mock };
+  let items: { equip: jest.Mock; saveConfig: jest.Mock };
+  let me: { update: jest.Mock };
+  let telemetry: { track: jest.Mock; trackAt: jest.Mock };
 
   async function setup(
     initial: QueuedEvent[] = [],
@@ -77,6 +86,13 @@ describe('OfflineSyncService', () => {
     quizzes = { submit: jest.fn() };
     toast = { show: jest.fn() };
     bundle = null;
+    scenarios = { complete: jest.fn().mockRejectedValue(problem(503)) };
+    items = {
+      equip: jest.fn().mockRejectedValue(problem(503)),
+      saveConfig: jest.fn().mockRejectedValue(problem(503)),
+    };
+    me = { update: jest.fn().mockRejectedValue(problem(503)) };
+    telemetry = { track: jest.fn(), trackAt: jest.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: EVENT_QUEUE_STORE, useValue: store },
@@ -87,6 +103,9 @@ describe('OfflineSyncService', () => {
         { provide: AuthService, useValue: { user } },
         { provide: ProgressClient, useValue: progress },
         { provide: QuizzesClient, useValue: quizzes },
+        { provide: ScenariosClient, useValue: scenarios },
+        { provide: ItemsClient, useValue: items },
+        { provide: MeClient, useValue: me },
         {
           provide: GamificationClient,
           useValue: {
@@ -108,7 +127,7 @@ describe('OfflineSyncService', () => {
           useValue: { patch: jest.fn().mockResolvedValue(undefined) },
         },
         { provide: AppToastService, useValue: toast },
-        { provide: TelemetryService, useValue: { track: jest.fn() } },
+        { provide: TelemetryService, useValue: telemetry },
         { provide: I18nService, useValue: { t: (k: string) => k } },
       ],
     });
@@ -438,6 +457,189 @@ describe('OfflineSyncService', () => {
       );
       expect(svc.lastReconciled.quizAttempt()?.result.passed).toBe(true);
       expect(await store.size()).toBe(0);
+    });
+  });
+
+  describe('more queue kinds (docs/16 §7)', () => {
+    it('plays a scenario offline, queues it with the local walk, replays it with its key', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      const out = await svc.completeScenario('l1', 's1', ['a', 'x'], {
+        estimate: { xp: 30, coins: 10 },
+        rubricScore: { depth: 2, outcome: 'resolved', completed: true },
+      });
+      expect(out.status).toBe('queued');
+      expect(scenarios.complete).not.toHaveBeenCalled();
+      expect(svc.pendingLessonIds().has('l1')).toBe(true);
+      expect(svc.pendingEstimate()).toMatchObject({
+        xp: 30,
+        coins: 10,
+        lessons: 1,
+      });
+
+      scenarios.complete.mockResolvedValue({
+        runId: 'r1',
+        completed: true,
+        depth: 2,
+        path: [],
+      });
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(scenarios.complete).toHaveBeenCalledWith('s1', ['a', 'x'], {
+        idempotencyKey: (out as { clientEventId: string }).clientEventId,
+        clientTimestamp: expect.any(String),
+      });
+      expect(await store.size()).toBe(0);
+      expect(svc.lastReconciled.scenarioComplete()?.lessonId).toBe('l1');
+    });
+
+    it('coalesces offline avatar equips per slot and tells the user when a newer change won', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      await svc.queueAvatarEquip([{ slot: 'HAT', itemId: 'h1' }]);
+      await svc.queueAvatarEquip([
+        { slot: 'HAT', itemId: 'h2' },
+        { slot: 'PET', itemId: null },
+      ]);
+      expect(await store.size()).toBe(1);
+      items.equip.mockResolvedValue({
+        config: null,
+        equipped: {},
+        stale: true,
+      });
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(items.equip.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+        ['HAT', 'h2'],
+        ['PET', null],
+      ]);
+      expect(items.equip.mock.calls[0][2]).toMatchObject({
+        clientTimestamp: expect.any(String),
+      });
+      expect(toast.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'studentPlatform.sync.avatarNewer',
+        }),
+      );
+      expect(svc.lastReconciled.avatar()?.stale).toBe(true);
+    });
+
+    it('queues preference updates offline (merged) and sends them as PATCH /me', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      expect(await svc.updatePreferences({ locale: 'en-US' })).toBe(false);
+      await svc.updatePreferences({ timezone: 'Europe/Lisbon' });
+      expect(await store.size()).toBe(1);
+      me.update.mockResolvedValue({});
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(me.update).toHaveBeenCalledWith({
+        locale: 'en-US',
+        timezone: 'Europe/Lisbon',
+      });
+      expect(await store.size()).toBe(0);
+    });
+
+    it('reports lessons opened offline with their real time', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      await svc.markLessonSeen('l1', 'c1');
+      await svc.markLessonSeen('l1', 'c1');
+      expect(await store.size()).toBe(1);
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(telemetry.trackAt).toHaveBeenCalledWith(
+        'lesson_progress_seen',
+        { lessonId: 'l1', courseId: 'c1' },
+        expect.any(Number),
+      );
+      expect(await store.size()).toBe(0);
+    });
+
+    it('a background 409 shows "already completed elsewhere"', async () => {
+      const svc = await setup();
+      online.set(false);
+      TestBed.tick();
+      await svc.completeLesson('l1', { title: 'Hooks' });
+      progress.complete.mockRejectedValue(
+        problem(409, 'LESSON_ALREADY_COMPLETED', okResponse('l1') as never),
+      );
+      online.set(true);
+      TestBed.tick();
+      await settle();
+      expect(toast.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'studentPlatform.sync.completedElsewhereTitled',
+          params: { title: 'Hooks' },
+        }),
+      );
+      expect(svc.pendingCount()).toBe(0);
+    });
+
+    it('estimates only completions that will count', () => {
+      const base = { userId: 'u', attempts: 0, clientTimestamp: 1 };
+      expect(
+        estimatePending([
+          {
+            ...base,
+            kind: 'lesson_complete',
+            clientEventId: 'a',
+            lessonId: 'l1',
+            estimate: { xp: 10, coins: 5 },
+          },
+          {
+            ...base,
+            kind: 'lesson_complete',
+            clientEventId: 'b',
+            lessonId: 'l1',
+            estimate: { xp: 10, coins: 5 },
+          },
+          {
+            ...base,
+            kind: 'quiz_attempt',
+            clientEventId: 'c',
+            lessonId: 'l2',
+            answers: {},
+            localCheck: { allCorrect: false, correct: 0, total: 1 },
+            estimate: { xp: 20, coins: 5 },
+          },
+          {
+            ...base,
+            kind: 'quiz_attempt',
+            clientEventId: 'd',
+            lessonId: 'l3',
+            answers: {},
+            localCheck: { allCorrect: true, correct: 1, total: 1 },
+            estimate: { xp: 20, coins: 7 },
+          },
+          {
+            ...base,
+            kind: 'avatar_config_update',
+            clientEventId: 'e',
+            config: {},
+          },
+        ] as QueuedEvent[]),
+      ).toEqual({ xp: 30, coins: 12, lessons: 2, lessonIds: ['l1', 'l3'] });
+      expect(
+        mergeSlotChanges(
+          [{ slot: 'HAT', itemId: 'a' }],
+          [
+            { slot: 'HAT', itemId: null },
+            { slot: 'PET', itemId: 'p' },
+          ],
+        ),
+      ).toEqual([
+        { slot: 'HAT', itemId: null },
+        { slot: 'PET', itemId: 'p' },
+      ]);
     });
   });
 });

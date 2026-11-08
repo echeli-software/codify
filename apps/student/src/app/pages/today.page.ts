@@ -65,16 +65,24 @@ import { AppToastService } from '../platform/app-toast.service.js';
 import {
   OnboardingFlowComponent,
   firstLessonRoute,
+  recommendForGoal,
   type OnboardingGoal,
 } from '../components/onboarding-flow.component.js';
 import { StarterPetGiftComponent } from '../components/starter-pet-gift.component.js';
 import { FriendsActivityComponent } from '../components/friends-activity.component.js';
+import { NetworkStatusService } from '../offline/network-status.service.js';
+import {
+  OfflineSyncService,
+  type PendingEstimate,
+} from '../offline/offline-sync.service.js';
+import { withResponseCache } from '../offline/response-cache.js';
+import { CachedDataChip } from '../offline/cached-data-chip.component.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { NotificationBell } from '../components/notification-bell.component.js';
 import { GrowthLinksService } from './shared/growth-links.service.js';
 import { DownloadService } from '../offline/download.service.js';
 import { formatCountdown } from './shared/countdown.js';
 import { FeatureFlagsService } from '../platform/feature-flags.service.js';
-import { PromoBanner } from '../components/promotions/promo-banner.component.js';
 
 const KIND_MAP: Record<QuestView['kind'], DailyQuest['kind']> = {
   LESSON_COUNT: 'lesson-count',
@@ -124,6 +132,73 @@ export function pickContinue(
   })[0];
 }
 
+/**
+ * docs/16 §8 "Offline: client UI optimistically advances quest progress":
+ * queued lesson completions count towards lesson-count quests and their
+ * estimated XP towards XP quests until the server recomputes on sync.
+ */
+export function optimisticQuests(
+  quests: readonly DailyQuest[],
+  pending: Pick<PendingEstimate, 'lessons' | 'xp'>,
+): DailyQuest[] {
+  if (!pending.lessons && !pending.xp) return [...quests];
+  return quests.map((q) => {
+    if (q.completed) return q;
+    const add =
+      q.kind === 'lesson-count'
+        ? pending.lessons
+        : q.kind === 'xp-amount'
+          ? pending.xp
+          : 0;
+    if (!add) return q;
+    const progress = Math.min(q.target, q.progress + add);
+    return { ...q, progress, completed: progress >= q.target };
+  });
+}
+
+/**
+ * "Recommended next" (docs/05 Today): courses for the learner's track — the
+ * onboarding goal and the categories of what they're enrolled in — ahead
+ * of the rest of the catalog; never a course they're already in.
+ */
+export function recommendCourses(
+  catalog: readonly CourseListItem[],
+  opts: {
+    goal: OnboardingGoal | null;
+    enrolledIds: ReadonlySet<string>;
+    enrolledCategoryIds: ReadonlySet<string>;
+    categories: readonly Pick<Category, 'id' | 'name'>[];
+    limit?: number;
+  },
+): CourseListItem[] {
+  const limit = opts.limit ?? 3;
+  const open = catalog.filter((c) => !opts.enrolledIds.has(c.id));
+  const byTrack = [...open]
+    .map((c, i) => ({
+      c,
+      i,
+      s: c.categoryIds.some((id) => opts.enrolledCategoryIds.has(id)) ? 1 : 0,
+    }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.c);
+  const ranked = opts.goal
+    ? recommendForGoal(opts.goal, byTrack, opts.categories, byTrack.length)
+    : byTrack;
+  return ranked.slice(0, limit);
+}
+
+/** The goal picked during onboarding on this device (localStorage). */
+export function storedGoal(raw: string | null): OnboardingGoal | null {
+  try {
+    const g = raw ? (JSON.parse(raw) as { goal?: unknown }).goal : null;
+    return g === 'career' || g === 'newTech' || g === 'ai' || g === 'softSkills'
+      ? g
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Should first-run onboarding show? New accounts with no XP and no courses. */
 export function needsOnboarding(opts: {
   totalXp: number;
@@ -143,7 +218,6 @@ export function needsOnboarding(opts: {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PromoBanner,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -170,6 +244,7 @@ export function needsOnboarding(opts: {
     StarterPetGiftComponent,
     FriendsActivityComponent,
     NotificationBell,
+    CachedDataChip,
     TranslatePipe,
     ContentTranslatePipe,
   ],
@@ -192,6 +267,13 @@ export class TodayPage {
   private readonly items = inject(ItemsClient);
   private readonly growth = inject(GrowthLinksService);
   private readonly downloads = inject(DownloadService);
+  private readonly network = inject(NetworkStatusService);
+  private readonly telemetry = inject(TelemetryService);
+  protected readonly sync = inject(OfflineSyncService);
+  /** Epoch ms of the oldest cached section shown offline, or null. */
+  protected readonly fromCache = signal<number | null>(null);
+  private readonly serverQuests = signal<DailyQuest[] | null>(null);
+  private enrolledCategoryIds = new Set<string>();
   /** Hides the shop link while `shop.enabled` is off. */
   protected readonly flags = inject(FeatureFlagsService);
   protected readonly xpSvc = inject(XpService);
@@ -203,7 +285,11 @@ export class TodayPage {
   );
   protected readonly loadingSummary = signal(true);
   protected readonly loadingLearning = signal(true);
-  protected readonly quests = signal<DailyQuest[] | null>(null);
+  /** Today's quests, advanced optimistically by queued completions. */
+  protected readonly quests = computed<DailyQuest[] | null>(() => {
+    const q = this.serverQuests();
+    return q ? optimisticQuests(q, this.sync.pendingEstimate()) : null;
+  });
   protected readonly questsFailed = signal(false);
   protected readonly continueCard = signal<ContinueCard | null>(null);
   protected readonly enrollmentCount = signal(0);
@@ -216,10 +302,14 @@ export class TodayPage {
   private enrolledCourseIds = new Set<string>();
 
   protected readonly recommendations = computed(() =>
-    this.catalog()
-      .filter((c) => !this.enrolledCourseIds.has(c.id))
-      .slice(0, 3),
+    recommendCourses(this.catalog(), {
+      goal: this.goal(),
+      enrolledIds: this.enrolledCourseIds,
+      enrolledCategoryIds: this.enrolledCategoryIds,
+      categories: this.categories(),
+    }),
   );
+  private readonly goal = signal<OnboardingGoal | null>(null);
 
   protected readonly equipped = computed<
     Partial<Record<AvatarSlot, AvatarSprite>>
@@ -273,6 +363,7 @@ export class TodayPage {
   });
 
   constructor() {
+    this.goal.set(this.readGoal());
     const timer = setInterval(() => this.now.set(Date.now()), 60_000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
     void this.loadAll();
@@ -284,7 +375,32 @@ export class TodayPage {
     await ev.target.complete();
   }
 
+  private readGoal(): OnboardingGoal | null {
+    const key = this.onboardingKey();
+    try {
+      return key ? storedGoal(localStorage.getItem(key)) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Last-response cache for offline (docs/16 §3), per user. */
+  private cached<T>(name: string, fetch: () => Promise<T>): Promise<T> {
+    return withResponseCache(
+      this.auth.user()?.id,
+      `today:${name}`,
+      this.network.online(),
+      fetch,
+    ).then((r) => {
+      const at = r.fromCache;
+      if (at !== null)
+        this.fromCache.update((v) => (v === null ? at : Math.min(v, at)));
+      return r.value;
+    });
+  }
+
   private async loadAll(): Promise<void> {
+    this.fromCache.set(null);
     const [totalXp, enrollments] = await Promise.all([
       this.loadSummary(),
       this.loadLearning(),
@@ -299,11 +415,13 @@ export class TodayPage {
   private async loadSummary(): Promise<number | null> {
     try {
       const [summary, quests] = await Promise.all([
-        this.gamification.summary(),
-        this.gamification.questsToday().catch(() => {
-          this.questsFailed.set(true);
-          return [] as QuestView[];
-        }),
+        this.cached('summary', () => this.gamification.summary()),
+        this.cached('quests', () => this.gamification.questsToday()).catch(
+          () => {
+            this.questsFailed.set(true);
+            return [] as QuestView[];
+          },
+        ),
       ]);
       this.orchestrator.reconcile({
         totalXp: summary.totalXp,
@@ -311,7 +429,7 @@ export class TodayPage {
         streakDays: summary.streak.currentDays,
         freezesAvailable: summary.streak.freezesAvailable,
       });
-      this.quests.set(quests.map(toDailyQuest));
+      this.serverQuests.set(quests.map(toDailyQuest));
       return summary.totalXp;
     } catch (err) {
       this.toast.error(err);
@@ -325,14 +443,21 @@ export class TodayPage {
   private async loadLearning(): Promise<number | null> {
     try {
       const [mine, catalog, categories] = await Promise.all([
-        this.enrollments.mine(),
-        this.courses.list({ status: 'PUBLISHED', take: 24 }),
-        this.categoriesClient
-          .list({ take: 100 })
+        this.cached('enrollments', () => this.enrollments.mine()),
+        this.cached('catalog', () =>
+          this.courses.list({ status: 'PUBLISHED', take: 24 }),
+        ),
+        this.cached('categories', () =>
+          this.categoriesClient.list({ take: 100 }),
+        )
           .then((r) => r.items)
           .catch(() => []),
       ]);
       this.enrolledCourseIds = new Set(mine.map((e) => e.courseId));
+      const byId = new Map(catalog.items.map((c) => [c.id, c]));
+      this.enrolledCategoryIds = new Set(
+        mine.flatMap((e) => byId.get(e.courseId)?.categoryIds ?? []),
+      );
       this.enrollmentCount.set(mine.length);
       this.catalog.set(catalog.items);
       this.categories.set(categories);
@@ -356,9 +481,16 @@ export class TodayPage {
       : 0;
     try {
       const [detail, prog] = await Promise.all([
-        this.courses.detail(e.course.slug),
-        this.progress.forCourse(e.courseId),
+        this.cached(`course:${e.courseId}`, () =>
+          this.courses.detail(e.course.slug),
+        ),
+        this.cached(`progress:${e.courseId}`, () =>
+          this.progress.forCourse(e.courseId),
+        ),
       ]);
+      // Queued offline completions count as done for "continue".
+      for (const id of this.sync.pendingLessonIds())
+        prog.items.push({ lessonId: id } as (typeof prog.items)[number]);
       const done = new Set(prog.items.map((i) => i.lessonId));
       const next =
         detail.modules.flatMap((m) => m.lessons).find((l) => !done.has(l.id)) ??
@@ -376,7 +508,9 @@ export class TodayPage {
 
   private async loadLeague(): Promise<void> {
     try {
-      this.league.set(await this.leagues.currentLeague());
+      this.league.set(
+        await this.cached('league', () => this.leagues.currentLeague()),
+      );
     } catch {
       // No cohort yet this week (404) or offline — the widget just hides.
       this.league.set(null);
@@ -385,7 +519,7 @@ export class TodayPage {
 
   private async loadAvatar(): Promise<void> {
     try {
-      this.avatar.set(await this.items.avatar());
+      this.avatar.set(await this.cached('avatar', () => this.items.avatar()));
     } catch {
       // Falls back to the initials avatar.
       this.avatar.set(null);
@@ -429,6 +563,13 @@ export class TodayPage {
     course: CourseListItem | null;
   }): Promise<void> {
     this.onboarding.set(false);
+    // docs/05 §9 funnel (docs/10 §2 onboarding steps).
+    this.telemetry.onboardingStep('goal', { goal: ev.goal ?? 'skipped' });
+    this.telemetry.onboardingStep('track', {
+      courseId: ev.course?.id ?? null,
+      skipped: !ev.course,
+    });
+    this.goal.set(ev.goal);
     const key = this.onboardingKey();
     try {
       if (key)

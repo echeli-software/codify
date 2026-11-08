@@ -15,6 +15,12 @@
   ],
   "references": [
     {
+      "path": "../../libs/domain/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/ui-core/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/gamification-engine/tsconfig.lib.json"
     },
     {

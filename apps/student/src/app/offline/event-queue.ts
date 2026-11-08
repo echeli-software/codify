@@ -29,6 +29,11 @@ interface QueuedEventBase {
   dropTimestamp?: boolean;
   /** Display title for the Sync sheet ("Lesson 'Hooks' — waiting to sync"). */
   lessonTitle?: string;
+  /**
+   * Locally estimated reward of a queued completion (lesson base XP / coins)
+   * for the offline "estimated balance" (docs/16 §8). Server is canonical.
+   */
+  estimate?: { xp: number; coins: number };
 }
 
 export interface QueuedLessonComplete extends QueuedEventBase {
@@ -48,7 +53,75 @@ export interface QueuedQuizAttempt extends QueuedEventBase {
   localCheck?: { allCorrect: boolean; correct: number; total: number };
 }
 
-export type QueuedEvent = QueuedLessonComplete | QueuedQuizAttempt;
+/**
+ * A scenario played locally from the downloaded graph (docs/16 §7): the
+ * choice path is replayed on sync (`POST /scenarios/:id/complete` with the
+ * Idempotency-Key), where the server walks and scores it again.
+ */
+export interface QueuedScenarioComplete extends QueuedEventBase {
+  kind: 'scenario_complete';
+  lessonId: string;
+  scenarioId: string;
+  chosenPath: string[];
+  /** Local walk result (display only — the server re-scores). */
+  rubricScore?: { depth: number; outcome: string | null; completed: boolean };
+}
+
+/** Offline re-equip from owned items (docs/16 §3, LWW by clientTimestamp). */
+export interface QueuedAvatarEquip extends QueuedEventBase {
+  kind: 'avatar_equip';
+  /** Latest change per slot; `itemId: null` unequips. */
+  slotChanges: { slot: string; itemId: string | null }[];
+}
+
+/** Offline avatar config edit (docs/16 §8, LWW by clientTimestamp). */
+export interface QueuedAvatarConfig extends QueuedEventBase {
+  kind: 'avatar_config_update';
+  config: Record<string, unknown>;
+}
+
+/** A lesson opened offline — reported on sync (analytics / resume). */
+export interface QueuedLessonSeen extends QueuedEventBase {
+  kind: 'lesson_progress_seen';
+  lessonId: string;
+  courseId?: string;
+}
+
+/** Offline settings change replayed as `PATCH /me` (latest wins). */
+export interface QueuedPreferenceUpdate extends QueuedEventBase {
+  kind: 'preference_update';
+  prefs: PreferencePatch;
+}
+
+/** The `PATCH /me` fields a device may change offline. */
+export interface PreferencePatch {
+  locale?: string;
+  timezone?: string;
+  quietHoursStart?: number;
+  quietHoursEnd?: number;
+  marketingEmailOptIn?: boolean;
+}
+
+export type QueuedEvent =
+  | QueuedLessonComplete
+  | QueuedQuizAttempt
+  | QueuedScenarioComplete
+  | QueuedAvatarEquip
+  | QueuedAvatarConfig
+  | QueuedLessonSeen
+  | QueuedPreferenceUpdate;
+
+/** Kinds that complete (or grade) a lesson — they show the pending clock. */
+export const LESSON_COMPLETION_KINDS: readonly QueuedEventKind[] = [
+  'lesson_complete',
+  'quiz_attempt',
+  'scenario_complete',
+];
+
+/** The lesson an event is about, if any. */
+export function eventLessonId(ev: QueuedEvent): string | null {
+  return 'lessonId' in ev ? ev.lessonId : null;
+}
 export type QueuedEventKind = QueuedEvent['kind'];
 
 /** Persistence seam for the queue (IndexedDB in the app, memory in tests). */

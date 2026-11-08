@@ -21,7 +21,16 @@
       "coins": "{count, plural, one {# coin} other {# coins}}",
       "xp": "{count} XP",
       "more": "More",
-      "moreNav": "More sections"
+      "moreNav": "More sections",
+      "breadcrumb": "Breadcrumb",
+      "searchLabel": "Search courses and lessons",
+      "searchPlaceholder": "Search courses and lessons",
+      "searchOffline": "Search works when you’re online",
+      "searchResults": "Search results",
+      "searching": "Searching…",
+      "noResults": "No matches",
+      "searchCourse": "Course",
+      "coinsEstimated": "About {count, plural, one {# coin} other {# coins}} — estimated; final coins are applied when synced"
     },
     "offline": {
       "openSheet": "Open sync status",
@@ -43,8 +52,16 @@
         "lesson": "Lesson completed — waiting to sync",
         "lessonTitled": "Lesson “{title}” completed — waiting to sync",
         "quiz": "Quiz answers — waiting to be graded",
-        "quizTitled": "Quiz “{title}” — waiting to be graded"
-      }
+        "quizTitled": "Quiz “{title}” — waiting to be graded",
+        "scenario": "Scenario played — waiting to sync",
+        "scenarioTitled": "Scenario “{title}” played — waiting to sync",
+        "avatarEquip": "Avatar items changed — waiting to sync",
+        "avatarConfig": "Avatar look changed — waiting to sync",
+        "preferences": "Settings changed — waiting to sync",
+        "seen": "Lesson opened — waiting to sync",
+        "seenTitled": "Lesson “{title}” opened — waiting to sync"
+      },
+      "cachedData": "Offline · showing what you saw {when}"
     },
     "sync": {
       "discardedOtherUser": "{count, plural, one {# offline change from the previous account on this device was discarded — it was not credited to you.} other {# offline changes from the previous account on this device were discarded — they were not credited to you.}}",
@@ -54,7 +71,11 @@
       "paywall": "A lesson you completed offline now needs a subscription, so it wasn't credited.",
       "dropped": "An offline change couldn't be synced: {reason}",
       "allSynced": "All progress is synced.",
-      "someRemaining": "{count, plural, one {# change is still waiting to sync.} other {# changes are still waiting to sync.}}"
+      "someRemaining": "{count, plural, one {# change is still waiting to sync.} other {# changes are still waiting to sync.}}",
+      "scenarioSynced": "Your offline scenario play-through synced.",
+      "avatarNewer": "Your avatar was changed more recently on another device — that version was kept.",
+      "completedElsewhere": "Already completed elsewhere — your progress is up to date.",
+      "completedElsewhereTitled": "“{title}” was already completed on another device — nothing was lost."
     },
     "session": {
       "signOutTitle": "Sign out?",

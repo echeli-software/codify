@@ -22,6 +22,11 @@
           {
             "glob": "manifest.webmanifest",
             "input": "apps/student/src"
+          },
+          {
+            "glob": "editor.main.css",
+            "input": "node_modules/monaco-editor/min/vs/editor",
+            "output": "monaco"
           }
         ],
         "styles": ["apps/student/src/styles.scss"]
@@ -31,8 +36,8 @@
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "1mb",
-              "maximumError": "1.5mb"
+              "maximumWarning": "600kb",
+              "maximumError": "1mb"
             },
             {
               "type": "anyComponentStyle",

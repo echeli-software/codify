@@ -192,11 +192,14 @@ describe('LessonPage state machine', () => {
           provide: OfflineSyncService,
           useValue: {
             ...sync,
+            markLessonSeen: jest.fn().mockResolvedValue(undefined),
             pendingCount: signal(0),
+            pendingLessonIds: signal(new Set<string>()),
             paywall: syncPaywall,
             lastReconciled: {
               lessonComplete: signal(null),
               quizAttempt: signal(null),
+              scenarioComplete: signal(null),
             },
           },
         },
@@ -205,11 +208,15 @@ describe('LessonPage state machine', () => {
           useValue: {
             ...downloads,
             markRead: jest.fn().mockResolvedValue(undefined),
+            downloadedLessonIds: jest.fn().mockResolvedValue(new Set(['l3'])),
             downloads: signal([]),
           },
         },
         { provide: NetworkStatusService, useValue: { online } },
-        { provide: TelemetryService, useValue: { track } },
+        {
+          provide: TelemetryService,
+          useValue: { track, paywallCta: jest.fn() },
+        },
         {
           provide: RewardOrchestrator,
           useValue: { grant, toast: signal(null), reconcile: jest.fn() },
@@ -309,7 +316,11 @@ describe('LessonPage state machine', () => {
     expect(page.canSubmitQuiz()).toBe(true);
     await page.submitQuiz();
     await flush(fixture);
-    expect(sync.submitQuiz).toHaveBeenCalledWith(LESSON_ID, { q1: ['a'] });
+    expect(sync.submitQuiz).toHaveBeenCalledWith(
+      LESSON_ID,
+      { q1: ['a'] },
+      { title: 'Quick quiz', estimate: { xp: 20, coins: 5 } },
+    );
     expect(page.quizResult()?.passed).toBe(false);
     expect(page.completion()).toBeNull();
     expect(grant).not.toHaveBeenCalled();
@@ -409,5 +420,123 @@ describe('LessonPage state machine', () => {
     syncPaywall.set({ lessonId: LESSON_ID, at: Date.now() });
     await flush(fixture);
     expect(page.state()).toBe('paywall');
+  });
+
+  describe('player chrome (docs/05 Lesson player)', () => {
+    afterEach(() => localStorage.clear());
+
+    it('asks before leaving with unsaved quiz answers', async () => {
+      lessons.detail.mockResolvedValue(quizLesson);
+      const { fixture, page } = await create();
+      expect(page.confirmExit()).toBe(true);
+      page.answers.set({ q1: ['a'] });
+      const leaving = page.confirmExit() as Promise<boolean>;
+      await flush(fixture);
+      expect(page.exitOpen()).toBe(true);
+      page.resolveExit(false);
+      await expect(leaving).resolves.toBe(false);
+      const again = page.confirmExit() as Promise<boolean>;
+      page.resolveExit(true);
+      await expect(again).resolves.toBe(true);
+    });
+
+    it('remembers the reading text size', async () => {
+      lessons.detail.mockResolvedValue(quizLesson);
+      const { fixture, page } = await create();
+      page.setTextSize('xl');
+      await flush(fixture);
+      expect(localStorage.getItem('codify.lesson.textSize')).toBe('xl');
+      expect(page.scale()).toBeGreaterThan(1);
+    });
+
+    it('offline: "Next" and the outline come from the cached curriculum', async () => {
+      online.set(false);
+      localStorage.setItem(
+        'codify.courseCache.c1',
+        JSON.stringify({
+          detail: {
+            id: 'c1',
+            slug: 'course',
+            title: 'Course',
+            modules: [
+              {
+                id: 'm1',
+                order: 0,
+                title: 'M',
+                lessons: [
+                  {
+                    id: LESSON_ID,
+                    order: 0,
+                    type: 'QUIZ',
+                    isFree: true,
+                    estimatedMinutes: 1,
+                    title: 'Quick quiz',
+                  },
+                  {
+                    id: 'l2',
+                    order: 1,
+                    type: 'READING',
+                    isFree: true,
+                    estimatedMinutes: 1,
+                    title: 'Not downloaded',
+                  },
+                  {
+                    id: 'l3',
+                    order: 2,
+                    type: 'READING',
+                    isFree: true,
+                    estimatedMinutes: 1,
+                    title: 'Downloaded',
+                  },
+                ],
+              },
+            ],
+          },
+          completedIds: [],
+          savedAt: 1,
+        }),
+      );
+      downloads.getLessonBundle.mockResolvedValue({
+        lessonId: LESSON_ID,
+        courseId: 'c1',
+        title: 'Quick quiz',
+        type: 'QUIZ',
+        isFree: true,
+        baseXp: 20,
+        baseCoins: 5,
+        contentJson: quizLesson.contentJson,
+        sizeBytes: 10,
+      });
+      const { page } = await create();
+      expect(page.next()).toEqual({ id: 'l3', title: 'Downloaded' });
+      expect(page.position()).toEqual({ index: 1, total: 3 });
+      expect(page.outline()[0].lessons).toHaveLength(3);
+    });
+
+    it('queues a reading completion with the estimated reward', async () => {
+      lessons.detail.mockResolvedValue({
+        ...quizLesson,
+        type: 'READING',
+        contentJson: {
+          type: 'doc',
+          version: 1,
+          content: [{ type: 'paragraph' }],
+        },
+      });
+      sync.completeLesson.mockResolvedValue({
+        status: 'queued',
+        clientEventId: 'e1',
+      });
+      const { fixture, page } = await create();
+      await page.completeLesson();
+      await flush(fixture);
+      expect(sync.completeLesson).toHaveBeenCalledWith(LESSON_ID, {
+        title: 'Quick quiz',
+        estimate: { xp: 20, coins: 5 },
+      });
+      expect(
+        fixture.nativeElement.querySelector('[data-testid=lesson-estimated]'),
+      ).toBeTruthy();
+    });
   });
 });

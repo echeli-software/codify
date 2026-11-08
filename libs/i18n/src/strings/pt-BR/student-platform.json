@@ -21,7 +21,16 @@
       "coins": "{count, plural, one {# moeda} other {# moedas}}",
       "xp": "{count} XP",
       "more": "Mais",
-      "moreNav": "Mais seções"
+      "moreNav": "Mais seções",
+      "breadcrumb": "Trilha de navegação",
+      "searchLabel": "Buscar cursos e aulas",
+      "searchPlaceholder": "Buscar cursos e aulas",
+      "searchOffline": "A busca funciona quando você está online",
+      "searchResults": "Resultados da busca",
+      "searching": "Buscando…",
+      "noResults": "Nenhum resultado",
+      "searchCourse": "Curso",
+      "coinsEstimated": "Cerca de {count, plural, one {# moeda} other {# moedas}} — estimativa; as moedas finais entram ao sincronizar"
     },
     "offline": {
       "openSheet": "Abrir status de sincronização",
@@ -43,8 +52,16 @@
         "lesson": "Lição concluída — aguardando sincronização",
         "lessonTitled": "Lição “{title}” concluída — aguardando sincronização",
         "quiz": "Respostas do quiz — aguardando correção",
-        "quizTitled": "Quiz “{title}” — aguardando correção"
-      }
+        "quizTitled": "Quiz “{title}” — aguardando correção",
+        "scenario": "Cenário jogado — aguardando sincronizar",
+        "scenarioTitled": "Cenário “{title}” jogado — aguardando sincronizar",
+        "avatarEquip": "Itens do avatar alterados — aguardando sincronizar",
+        "avatarConfig": "Visual do avatar alterado — aguardando sincronizar",
+        "preferences": "Configurações alteradas — aguardando sincronizar",
+        "seen": "Aula aberta — aguardando sincronizar",
+        "seenTitled": "Aula “{title}” aberta — aguardando sincronizar"
+      },
+      "cachedData": "Offline · mostrando o que você viu {when}"
     },
     "sync": {
       "discardedOtherUser": "{count, plural, one {# alteração offline da conta anterior neste aparelho foi descartada — ela não foi creditada a você.} other {# alterações offline da conta anterior neste aparelho foram descartadas — elas não foram creditadas a você.}}",
@@ -54,7 +71,11 @@
       "paywall": "Uma lição concluída offline agora exige assinatura e não foi creditada.",
       "dropped": "Uma alteração offline não pôde ser sincronizada: {reason}",
       "allSynced": "Todo o progresso está sincronizado.",
-      "someRemaining": "{count, plural, one {# alteração ainda aguarda sincronização.} other {# alterações ainda aguardam sincronização.}}"
+      "someRemaining": "{count, plural, one {# alteração ainda aguarda sincronização.} other {# alterações ainda aguardam sincronização.}}",
+      "scenarioSynced": "Seu cenário jogado offline foi sincronizado.",
+      "avatarNewer": "Seu avatar foi alterado mais recentemente em outro dispositivo — essa versão foi mantida.",
+      "completedElsewhere": "Já concluída em outro lugar — seu progresso está em dia.",
+      "completedElsewhereTitled": "“{title}” já foi concluída em outro dispositivo — nada foi perdido."
     },
     "session": {
       "signOutTitle": "Sair?",

@@ -24,6 +24,7 @@ import { StudentLocalePersistence } from './platform/locale-persistence';
 import { isNativeRuntime } from './platform/runtime';
 import { accountStateInterceptor } from './pages/account/account-state';
 import { translationFallbackInterceptor } from './platform/translation-fallback.interceptor';
+import { TELEMETRY_CONSENT, consentAllows } from './telemetry/consent';
 import { MissingTranslationHandler } from '@ngx-translate/core';
 import { ReportingMissingTranslationHandler } from './platform/missing-translation';
 
@@ -66,6 +67,8 @@ export const appConfig: ApplicationConfig = {
       provide: MissingTranslationHandler,
       useClass: ReportingMissingTranslationHandler,
     },
+    // docs/14 §13: analytics only after web consent (native: store disclosure).
+    { provide: TELEMETRY_CONSENT, useValue: () => consentAllows('analytics') },
     // docs/11 §6: persist the chosen locale on the user (PATCH /me).
     { provide: LOCALE_PERSISTENCE, useExisting: StudentLocalePersistence },
     // docs/11 §3: content translations — API online, downloads offline.

@@ -159,7 +159,24 @@
       "emptyFiltered": "Nenhum curso corresponde a este filtro",
       "emptyHint": "Volte em breve ou escolha outra categoria.",
       "count": "{count, plural, one {# curso} other {# cursos}}",
-      "level": "Nível {level}"
+      "level": "Nível {level}",
+      "filtersLabel": "Filtros",
+      "filterFree": "Prévia grátis",
+      "filterPremium": "Só premium",
+      "language": "Idioma",
+      "anyLanguage": "Todos",
+      "languageName": {
+        "pt-BR": "Português",
+        "en-US": "English"
+      },
+      "sort": "Ordenar",
+      "sortBy": {
+        "recommended": "Recomendados",
+        "newest": "Mais novos",
+        "popular": "Mais populares",
+        "shortest": "Mais curtos"
+      },
+      "clearFilters": "Limpar filtros"
     },
     "myCourses": {
       "title": "Meus cursos",
@@ -300,7 +317,8 @@
       "leagueLine": "#{rank} de {size} · reinicia em {time}",
       "recommendedTitle": "Recomendados para você",
       "seeCatalog": "Ver catálogo",
-      "noRecommendations": "Você já está inscrito em todos os cursos — novos cursos estão a caminho."
+      "noRecommendations": "Você já está inscrito em todos os cursos — novos cursos estão a caminho.",
+      "estimated": "Pendente: cerca de +{coins} moedas e +{xp} XP — estimativa; as moedas finais entram ao sincronizar."
     },
     "onboarding": {
       "label": "Comece no Codify",
@@ -379,6 +397,27 @@
       },
       "error": {
         "title": "Não foi possível abrir esta lição"
+      },
+      "outline": "Roteiro do módulo",
+      "outlineDone": "Concluída",
+      "outlineTodo": "Não concluída",
+      "willSyncEstimated": "Estimativa — as moedas finais entram ao sincronizar.",
+      "settings": {
+        "title": "Configurações de leitura",
+        "textSize": "Tamanho do texto",
+        "size": {
+          "sm": "Pequeno",
+          "md": "Padrão",
+          "lg": "Grande",
+          "xl": "Muito grande"
+        },
+        "sound": "Efeitos sonoros"
+      },
+      "exit": {
+        "title": "Sair desta aula?",
+        "body": "Suas respostas ainda não foram salvas. Se sair agora, vai precisar responder de novo.",
+        "stay": "Continuar",
+        "leave": "Sair"
       }
     },
     "exercise": {
@@ -387,7 +426,11 @@
       "grading": "Sua submissão está na fila — corrigindo…",
       "gradingTimeout": "A correção está demorando mais que o normal. Tente enviar de novo em instantes.",
       "workerLost": "O corretor parou inesperadamente. Envie de novo.",
-      "diagnostics": "{message}"
+      "diagnostics": "{message}",
+      "preview": "Pré-visualização",
+      "browserGraded": "Roda no seu navegador: os testes verificam a página da pré-visualização.",
+      "browserTimeout": "A página não respondeu a tempo — verifique se há um laço infinito.",
+      "notDownloaded": "Baixe este curso para ver o exercício offline."
     },
     "capstone": {
       "intro": "Projeto final — sua resposta é avaliada pela rubrica abaixo."
@@ -403,7 +446,9 @@
         "duplicate": "Isso já foi enviado.",
         "graderUnavailable": "{seconds, plural, =0 {O corretor de IA está ocupado. Nada foi registrado — tente de novo em instantes.} one {O corretor de IA está ocupado. Nada foi registrado — tente de novo em # segundo.} other {O corretor de IA está ocupado. Nada foi registrado — tente de novo em # segundos.}}",
         "queueBusy": "{seconds, plural, =0 {Muita gente executando código agora. Tente de novo em instantes.} one {Muita gente executando código agora. Tente de novo em # segundo.} other {Muita gente executando código agora. Tente de novo em # segundos.}}"
-      }
+      },
+      "scenarioQueued": "Jogado offline — será pontuado e sincronizado quando você voltar a ficar online.",
+      "scenarioOffline": "Baixe este curso para jogar o cenário offline."
     },
     "course": {
       "title": "Curso",
@@ -459,8 +504,13 @@
         "moduleNamed": "Baixar o módulo {title}",
         "saved": "Salvo",
         "lessonNamed": "Baixar a lição {title}",
-        "lessonSaved": "Salva para offline"
-      }
+        "lessonSaved": "Salva para offline",
+        "offer": "Quer ler este curso offline? Baixe agora.",
+        "offerCourse": "Baixar curso",
+        "offerNext": "{count, plural, one {Baixar a próxima aula} other {Baixar as próximas # aulas}}",
+        "offerLater": "Agora não"
+      },
+      "pendingSync": "Vai sincronizar quando você estiver online"
     },
     "billing": {
       "title": "Assinatura",
@@ -1128,6 +1178,33 @@
         "LOCKED": "Bloqueado — conclua {prereq} antes"
       },
       "legend": "Bronze: uma lição concluída. Prata: metade das lições com nota média de 70%+. Ouro: todas as lições com 90%+."
+    },
+    "consent": {
+      "title": "Cookies e análises",
+      "body": "Usamos armazenamento necessário para manter você conectado e fazer o aprendizado offline funcionar. Com sua permissão, também medimos o uso do app e enviamos relatórios de erro para melhorar o Codify.",
+      "policy": "Política de Privacidade",
+      "categories": "Escolha o que permitir",
+      "necessary": "Necessários",
+      "necessaryHint": "Login, downloads offline e suas configurações. Sempre ativos.",
+      "analytics": "Análises de uso",
+      "analyticsHint": "Quais telas e recursos são usados — sem nomes, e-mails ou respostas.",
+      "errors": "Relatórios de erro",
+      "errorsHint": "Relatórios de falha para corrigirmos bugs (vale a partir da próxima abertura).",
+      "save": "Salvar escolhas",
+      "acceptAll": "Aceitar tudo",
+      "necessaryOnly": "Só os necessários",
+      "customize": "Personalizar",
+      "saved": "Suas escolhas foram salvas neste dispositivo."
+    },
+    "timeZone": {
+      "title": "Fuso horário",
+      "hint": "Seu dia de sequência e as missões diárias reiniciam à meia-noite neste fuso.",
+      "label": "Fuso horário",
+      "useDevice": "Atualizar",
+      "useDeviceNamed": "Usar o fuso deste dispositivo ({zone})",
+      "askUpdate": "Seu dispositivo está em {device}, mas sua conta usa {current}. Atualizar o fuso horário?",
+      "saved": "Fuso horário definido: {zone}.",
+      "savedOffline": "Fuso horário definido: {zone} — vai sincronizar quando você estiver online."
     }
   }
 }

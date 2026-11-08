@@ -39,6 +39,15 @@ h2 {
   }
 }
 
+.estimate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--cdf-space-2) 0 0;
+  font-size: var(--cdf-font-size-xs);
+  color: var(--cdf-color-text-muted);
+}
+
 .stats__row {
   display: flex;
   align-items: center;

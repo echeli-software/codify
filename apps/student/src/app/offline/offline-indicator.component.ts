@@ -246,9 +246,22 @@ export class OfflineIndicator {
 
   protected describeKey(e: QueuedEvent): string {
     const titled = e.lessonTitle ? 'Titled' : '';
-    return e.kind === 'quiz_attempt'
-      ? `studentPlatform.offline.event.quiz${titled}`
-      : `studentPlatform.offline.event.lesson${titled}`;
+    switch (e.kind) {
+      case 'quiz_attempt':
+        return `studentPlatform.offline.event.quiz${titled}`;
+      case 'scenario_complete':
+        return `studentPlatform.offline.event.scenario${titled}`;
+      case 'avatar_equip':
+        return 'studentPlatform.offline.event.avatarEquip';
+      case 'avatar_config_update':
+        return 'studentPlatform.offline.event.avatarConfig';
+      case 'preference_update':
+        return 'studentPlatform.offline.event.preferences';
+      case 'lesson_progress_seen':
+        return `studentPlatform.offline.event.seen${titled}`;
+      default:
+        return `studentPlatform.offline.event.lesson${titled}`;
+    }
   }
 
   protected async syncNow(): Promise<void> {

@@ -7,6 +7,13 @@ import {
   untracked,
 } from '@angular/core';
 import {
+  NavigationEnd,
+  Router,
+  type ActivatedRouteSnapshot,
+} from '@angular/router';
+import { I18nService } from '@codify/i18n';
+import { TELEMETRY_CONSENT } from './consent.js';
+import {
   AnalyticsClient,
   ProblemDetailsError,
   type AnalyticsEventInput,
@@ -28,6 +35,34 @@ const EVENT_NAME = /^[a-z][a-z0-9_]{1,63}$/;
 /** Mirrors the API's per-event props cap. */
 const MAX_PROPS_BYTES = 4096;
 const ANON_KEY = 'codify.telemetry.anonymousId';
+/** Screen time below this is a redirect / bounce, not a view. */
+const MIN_SCREEN_MS = 500;
+
+/**
+ * Names emitted before the docs/10 §14 catalogue settled → catalogue name.
+ * Callers may still use the old name; the wire always carries the new one.
+ */
+export const LEGACY_EVENT_NAMES: Readonly<Record<string, string>> = {
+  download_started: 'course_download_start',
+  download_completed: 'course_download_complete',
+  download_failed: 'course_download_fail',
+  download_eviction: 'cache_evicted',
+  push_opened: 'push_open',
+  sync_flush_completed: 'sync_flush',
+  sync_flush_failed: 'sync_flush',
+};
+
+/** Route pattern of a snapshot (`/lessons/:id`), never the concrete URL. */
+export function routePattern(root: ActivatedRouteSnapshot | null): string {
+  const parts: string[] = [];
+  let node: ActivatedRouteSnapshot | null = root;
+  while (node) {
+    const path = node.routeConfig?.path;
+    if (path) parts.push(path);
+    node = node.firstChild;
+  }
+  return '/' + parts.join('/');
+}
 
 /**
  * Where events wait while the device is offline (or a send failed). The
@@ -78,6 +113,8 @@ export class TelemetryService {
   private readonly network = inject(NetworkStatusService);
   private readonly auth = inject(AuthService);
   private readonly store = inject(TELEMETRY_BUFFER);
+  private readonly i18n = inject(I18nService, { optional: true });
+  private readonly consent = inject(TELEMETRY_CONSENT, { optional: true });
 
   readonly anonymousId = readOrCreateAnonymousId();
   private readonly platform = runtimePlatform();
@@ -85,6 +122,8 @@ export class TelemetryService {
   private inFlight: Promise<void> | null = null;
   private restored: Promise<void>;
   private lastUserId: string | null | undefined = undefined;
+  private screen: { route: string; since: number } | null = null;
+  private offlineSince: number | null = null;
 
   constructor() {
     this.restored = this.restore();
@@ -92,7 +131,21 @@ export class TelemetryService {
     if (typeof window !== 'undefined') {
       const timer = setInterval(() => void this.flush(), TELEMETRY_FLUSH_MS);
       const onVisibility = () => {
-        if (document.visibilityState === 'hidden') void this.flush();
+        if (document.visibilityState !== 'hidden') {
+          if (this.screen) this.screen.since = Date.now();
+          return;
+        }
+        // Close the current screen's time before the tab may go away.
+        if (this.screen) {
+          const ms = Date.now() - this.screen.since;
+          if (ms >= MIN_SCREEN_MS)
+            this.track('screen_time', {
+              route: this.screen.route,
+              durationMs: ms,
+            });
+          this.screen.since = Date.now();
+        }
+        void this.flush();
       };
       document.addEventListener('visibilitychange', onVisibility);
       inject(DestroyRef).onDestroy(() => {
@@ -101,10 +154,36 @@ export class TelemetryService {
       });
     }
 
-    // Back online → drain what was buffered.
+    // Back online → drain what was buffered; time offline sessions
+    // (docs/16 §11 `offline_session_minutes`).
     effect(() => {
-      if (this.network.online()) untracked(() => void this.flush());
+      const online = this.network.online();
+      untracked(() => {
+        if (!online) {
+          this.offlineSince ??= Date.now();
+          return;
+        }
+        if (this.offlineSince !== null) {
+          const ms = Date.now() - this.offlineSince;
+          this.offlineSince = null;
+          if (ms >= 60_000)
+            this.track('offline_session_minutes', {
+              minutes: Math.round(ms / 60_000),
+            });
+        }
+        void this.flush();
+      });
     });
+
+    // Route views + screen time per route (docs/05 §9).
+    const router = inject(Router, { optional: true });
+    if (router) {
+      const sub = router.events.subscribe((e) => {
+        if (e instanceof NavigationEnd)
+          this.onRoute(routePattern(router.routerState.snapshot.root));
+      });
+      inject(DestroyRef).onDestroy(() => sub.unsubscribe());
+    }
 
     // Sign-in / sign-out / account switch → flush so events are attributed
     // to the session they happened in as closely as possible.
@@ -121,13 +200,33 @@ export class TelemetryService {
 
   /** Record one event. Invalid names are dropped silently. Never throws. */
   track(name: string, props?: Record<string, unknown>): void {
+    this.trackAt(name, props, Date.now());
+  }
+
+  /**
+   * Record an event that happened at `at` (epoch ms) — e.g. an offline
+   * `lesson_progress_seen` replayed on sync. Common props (docs/10 §14):
+   * `locale` and `online` are added here; platform / appVersion ride on
+   * the batch.
+   */
+  trackAt(
+    name: string,
+    props: Record<string, unknown> | undefined,
+    at: number,
+  ): void {
     try {
+      name = LEGACY_EVENT_NAMES[name] ?? name;
       if (!EVENT_NAME.test(name)) return;
+      if (this.consent && !this.consent()) return;
       const event: AnalyticsEventInput = {
         name,
-        occurredAt: new Date().toISOString(),
+        occurredAt: new Date(at).toISOString(),
       };
-      const clean = sanitizeProps(props);
+      const clean = sanitizeProps({
+        ...props,
+        locale: this.i18n?.currentLocale?.() ?? undefined,
+        online: this.network.online(),
+      });
       if (clean) event.props = clean;
       this.queue.push(event);
       if (this.queue.length > TELEMETRY_MAX_BUFFER) {
@@ -137,6 +236,33 @@ export class TelemetryService {
     } catch {
       /* telemetry must never break the app */
     }
+  }
+
+  /** A paywall call-to-action was tapped (docs/05 §9 funnel). */
+  paywallCta(props: {
+    source: string;
+    planId?: string | null;
+    lessonId?: string | null;
+  }): void {
+    this.track('paywall_cta_tap', props);
+  }
+
+  /** One onboarding step finished (docs/05 §9 `onboarding_step_complete`). */
+  onboardingStep(step: string, props: Record<string, unknown> = {}): void {
+    this.track('onboarding_step_complete', { step, ...props });
+  }
+
+  private onRoute(route: string): void {
+    const now = Date.now();
+    const prev = this.screen;
+    if (prev && prev.route === route) return;
+    if (prev && now - prev.since >= MIN_SCREEN_MS)
+      this.track('screen_time', {
+        route: prev.route,
+        durationMs: now - prev.since,
+      });
+    this.screen = { route, since: now };
+    this.track('page_view', { route });
   }
 
   /** Events waiting to be sent (tests / debugging). */

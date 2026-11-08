@@ -43,6 +43,7 @@ import {
   toForm,
   type PrefsForm,
 } from './prefs-form.js';
+import { TimeZoneSetting } from '../../components/time-zone-setting.component.js';
 
 /** One-off kinds that make no sense to toggle afterwards. */
 const HIDDEN_KINDS: ReadonlySet<NotificationKind> = new Set(['WELCOME']);
@@ -72,6 +73,7 @@ const HIDDEN_KINDS: ReadonlySet<NotificationKind> = new Set(['WELCOME']);
     Icon,
     OfflineState,
     TranslatePipe,
+    TimeZoneSetting,
   ],
   template: `
     <ion-header>
@@ -303,6 +305,9 @@ const HIDDEN_KINDS: ReadonlySet<NotificationKind> = new Set(['WELCOME']);
                 </label>
               </div>
             </cdf-app-card>
+
+            <!-- docs/11 §6: time zone override (saves on its own). -->
+            <cdf-time-zone-setting />
 
             <div class="ns__actions">
               @if (changes().invalid) {

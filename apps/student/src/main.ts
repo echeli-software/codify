@@ -3,10 +3,13 @@ import type { Provider } from '@angular/core';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
 import { SENTRY_DSN } from './app/api-base-url';
+import { consentAllows } from './app/telemetry/consent';
 
 async function main(): Promise<void> {
   const extra: Provider[] = [];
-  if (SENTRY_DSN) {
+  // docs/14 §13: on the web, error reporting waits for consent (the banner);
+  // a later "allow" takes effect on the next launch.
+  if (SENTRY_DSN && consentAllows('errors')) {
     // Lazy chunk: builds without a DSN never load the Sentry SDK.
     try {
       const { initSentry } = await import('./app/platform/sentry');

@@ -11,8 +11,11 @@ import {
   TELEMETRY_BUFFER,
   TELEMETRY_MAX_BATCH,
   TelemetryService,
+  routePattern,
   type TelemetryBuffer,
 } from './telemetry.service';
+import { TELEMETRY_CONSENT } from './consent';
+import type { ActivatedRouteSnapshot } from '@angular/router';
 
 describe('TelemetryService', () => {
   let send: jest.Mock;
@@ -21,7 +24,10 @@ describe('TelemetryService', () => {
   let saved: AnalyticsEventInput[];
   let buffer: TelemetryBuffer;
 
-  function setup(initialSaved: AnalyticsEventInput[] = []) {
+  function setup(
+    initialSaved: AnalyticsEventInput[] = [],
+    consent?: () => boolean,
+  ) {
     send = jest.fn().mockResolvedValue({ accepted: 1 });
     online = signal(true);
     user = signal(null);
@@ -38,6 +44,7 @@ describe('TelemetryService', () => {
         { provide: NetworkStatusService, useValue: { online } },
         { provide: AuthService, useValue: { user } },
         { provide: TELEMETRY_BUFFER, useValue: buffer },
+        ...(consent ? [{ provide: TELEMETRY_CONSENT, useValue: consent }] : []),
       ],
     });
     const svc = TestBed.inject(TelemetryService);
@@ -119,5 +126,45 @@ describe('TelemetryService', () => {
     TestBed.tick();
     await svc.flush();
     expect(send).toHaveBeenCalled();
+  });
+
+  it('sends catalogue names for legacy event names and adds common props', async () => {
+    const svc = setup();
+    svc.track('download_started', { courseId: 'c1' });
+    await svc.flush();
+    const ev = send.mock.calls[0][0].events[0];
+    expect(ev.name).toBe('course_download_start');
+    expect(ev.props).toMatchObject({ courseId: 'c1', online: true });
+  });
+
+  it('drops events while consent is withheld', async () => {
+    let allowed = false;
+    const svc = setup([], () => allowed);
+    svc.track('page_view', { route: '/today' });
+    expect(svc.pendingCount()).toBe(0);
+    allowed = true;
+    svc.track('page_view', { route: '/today' });
+    expect(svc.pendingCount()).toBe(1);
+  });
+
+  it('trackAt keeps the original time (offline replays)', async () => {
+    const svc = setup();
+    const at = Date.parse('2026-11-01T10:00:00Z');
+    svc.trackAt('lesson_progress_seen', { lessonId: 'l1' }, at);
+    await svc.flush();
+    expect(send.mock.calls[0][0].events[0].occurredAt).toBe(
+      '2026-11-01T10:00:00.000Z',
+    );
+  });
+
+  it('reports route patterns, never concrete ids', () => {
+    const snap = {
+      routeConfig: { path: '' },
+      firstChild: {
+        routeConfig: { path: 'lessons/:id' },
+        firstChild: null,
+      },
+    } as unknown as ActivatedRouteSnapshot;
+    expect(routePattern(snap)).toBe('/lessons/:id');
   });
 });

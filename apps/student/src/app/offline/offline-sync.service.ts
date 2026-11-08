@@ -9,11 +9,17 @@ import {
 } from '@angular/core';
 import {
   GamificationClient,
+  ItemsClient,
+  MeClient,
   ProblemDetailsError,
   ProgressClient,
   QuizzesClient,
+  ScenariosClient,
   toProblemDetails,
+  type AvatarResponse,
   type CompleteLessonResponse,
+  type CompleteResult as ScenarioCompleteResult,
+  type ItemSlot,
   type QuizAttemptResult,
 } from '@codify/api-client';
 import { AuthService } from '@codify/auth';
@@ -27,10 +33,18 @@ import { TelemetryService } from '../telemetry/telemetry.service.js';
 import { DownloadService } from './download.service.js';
 import {
   EVENT_QUEUE_STORE,
+  LESSON_COMPLETION_KINDS,
+  eventLessonId,
   newClientEventId,
+  type PreferencePatch,
+  type QueuedAvatarConfig,
+  type QueuedAvatarEquip,
   type QueuedEvent,
   type QueuedLessonComplete,
+  type QueuedLessonSeen,
+  type QueuedPreferenceUpdate,
   type QueuedQuizAttempt,
+  type QueuedScenarioComplete,
 } from './event-queue.js';
 import { IdentityCacheService } from './identity-cache.service.js';
 import { checkQuizAnswer } from './quiz-hash.js';
@@ -139,6 +153,59 @@ export type QuizSubmitOutcome =
   | { status: 'graded'; result: QuizAttemptResult }
   | { status: 'queued'; clientEventId: string; localCheck?: LocalQuizCheck };
 
+/** Result of finishing a scenario play-through (docs/16 §7). */
+export type ScenarioCompleteOutcome =
+  | { status: 'synced'; result: ScenarioCompleteResult }
+  | { status: 'queued'; clientEventId: string };
+
+export interface ScenarioReconciled {
+  lessonId: string;
+  result: ScenarioCompleteResult;
+  clientEventId: string;
+}
+
+/** Offline estimate on top of the canonical totals (docs/16 §8). */
+export interface PendingEstimate {
+  xp: number;
+  coins: number;
+  /** Queued lesson completions (lesson / quiz / scenario). */
+  lessons: number;
+  /** …of which are exercise-free lesson completions for quest progress. */
+  lessonIds: string[];
+}
+
+/** Sum the local reward estimates of queued completions. */
+export function estimatePending(
+  events: readonly QueuedEvent[],
+): PendingEstimate {
+  const ids = new Set<string>();
+  let xp = 0;
+  let coins = 0;
+  for (const e of events) {
+    if (!LESSON_COMPLETION_KINDS.includes(e.kind)) continue;
+    const id = eventLessonId(e);
+    if (!id || ids.has(id)) continue;
+    // A queued quiz attempt only counts when the local check passed.
+    if (e.kind === 'quiz_attempt' && !e.localCheck?.allCorrect) continue;
+    if (e.kind === 'scenario_complete' && e.rubricScore?.completed === false)
+      continue;
+    ids.add(id);
+    xp += e.estimate?.xp ?? 0;
+    coins += e.estimate?.coins ?? 0;
+  }
+  return { xp, coins, lessons: ids.size, lessonIds: [...ids] };
+}
+
+/** Merge per-slot equip changes: the latest change of a slot wins. */
+export function mergeSlotChanges(
+  prev: readonly { slot: string; itemId: string | null }[],
+  next: readonly { slot: string; itemId: string | null }[],
+): { slot: string; itemId: string | null }[] {
+  const map = new Map(prev.map((c) => [c.slot, c.itemId]));
+  for (const c of next) map.set(c.slot, c.itemId);
+  return [...map].map(([slot, itemId]) => ({ slot, itemId }));
+}
+
 export interface LessonReconciled {
   lessonId: string;
   response: CompleteLessonResponse;
@@ -193,6 +260,9 @@ type SendResult =
 export class OfflineSyncService {
   private readonly progressClient = inject(ProgressClient);
   private readonly quizzes = inject(QuizzesClient);
+  private readonly scenarios = inject(ScenariosClient);
+  private readonly items = inject(ItemsClient);
+  private readonly me = inject(MeClient);
   private readonly gamification = inject(GamificationClient);
   private readonly orchestrator = inject(RewardOrchestrator);
   private readonly auth = inject(AuthService);
@@ -213,8 +283,13 @@ export class OfflineSyncService {
   );
   private readonly _lessonReconciled = signal<LessonReconciled | null>(null);
   private readonly _quizReconciled = signal<QuizReconciled | null>(null);
+  private readonly _scenarioReconciled = signal<ScenarioReconciled | null>(
+    null,
+  );
+  private readonly _avatarReconciled = signal<AvatarResponse | null>(null);
 
   private readonly ready: Promise<void>;
+  private flushConflicts = 0;
   private inFlight: Promise<FlushResult> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private knownUserId: string | null | undefined = undefined;
@@ -240,7 +315,22 @@ export class OfflineSyncService {
   readonly lastReconciled = {
     lessonComplete: this._lessonReconciled.asReadonly(),
     quizAttempt: this._quizReconciled.asReadonly(),
+    scenarioComplete: this._scenarioReconciled.asReadonly(),
+    /** Canonical avatar after queued equips / config edits synced. */
+    avatar: this._avatarReconciled.asReadonly(),
   };
+  /** Lessons with a queued completion — the curriculum shows a clock icon. */
+  readonly pendingLessonIds = computed(
+    () =>
+      new Set(
+        this.pending()
+          .filter((e) => LESSON_COMPLETION_KINDS.includes(e.kind))
+          .map((e) => eventLessonId(e))
+          .filter((id): id is string => !!id),
+      ),
+  );
+  /** "Estimated" XP / coins of queued completions (docs/16 §8). */
+  readonly pendingEstimate = computed(() => estimatePending(this.pending()));
   /** Back-compat alias of `lastReconciled.lessonComplete`. */
   readonly reconciled = this._lessonReconciled.asReadonly();
 
@@ -274,7 +364,7 @@ export class OfflineSyncService {
    */
   async completeLesson(
     lessonId: string,
-    opts: { title?: string } = {},
+    opts: { title?: string; estimate?: { xp: number; coins: number } } = {},
   ): Promise<CompleteOutcome> {
     const userId = this.auth.user()?.id;
     if (!userId) throw new Error('Not signed in');
@@ -294,10 +384,12 @@ export class OfflineSyncService {
       lessonId,
       attempts: 0,
       ...(opts.title ? { lessonTitle: opts.title } : {}),
+      ...(opts.estimate ? { estimate: opts.estimate } : {}),
     };
     if (!existing) {
       await this.store.enqueue(ev);
       await this.refresh();
+      if (!this.network.online()) this.trackEnqueued(ev.kind);
     }
 
     if (!this.network.online() || this._authBlocked()) {
@@ -319,6 +411,7 @@ export class OfflineSyncService {
   async submitQuiz(
     lessonId: string,
     answers: Record<string, string[]>,
+    opts: { title?: string; estimate?: { xp: number; coins: number } } = {},
   ): Promise<QuizSubmitOutcome> {
     const userId = this.auth.user()?.id;
     if (!userId) throw new Error('Not signed in');
@@ -371,9 +464,12 @@ export class OfflineSyncService {
       answers,
       attempts: 0,
       ...(localCheck ? { localCheck } : {}),
+      ...(opts.title ? { lessonTitle: opts.title } : {}),
+      ...(opts.estimate ? { estimate: opts.estimate } : {}),
     };
     await this.store.enqueue(ev);
     await this.refresh();
+    this.trackEnqueued(ev.kind);
     this.telemetry.track('quiz_submit', {
       lessonId,
       offline: true,
@@ -381,6 +477,166 @@ export class OfflineSyncService {
     });
     this.scheduleRetry();
     return { status: 'queued', clientEventId: ev.clientEventId, localCheck };
+  }
+
+  /**
+   * Record a finished scenario play-through. Online → the API (with an
+   * Idempotency-Key, so a lost response replays safely); offline, or the
+   * request never landed → queued `scenario_complete` with the local walk
+   * result, replayed on sync where the server re-scores the path.
+   */
+  async completeScenario(
+    lessonId: string,
+    scenarioId: string,
+    path: string[],
+    opts: {
+      title?: string;
+      estimate?: { xp: number; coins: number };
+      rubricScore?: QueuedScenarioComplete['rubricScore'];
+    } = {},
+  ): Promise<ScenarioCompleteOutcome> {
+    const userId = this.auth.user()?.id;
+    if (!userId) throw new Error('Not signed in');
+    await this.ready;
+    const clientTimestamp = Date.now();
+    const key = newClientEventId();
+    if (this.network.online() && !this._authBlocked()) {
+      try {
+        const result = await this.scenarios.complete(scenarioId, path, {
+          idempotencyKey: key,
+        });
+        return { status: 'synced', result };
+      } catch (err) {
+        if (classifySyncFailure(err) !== 'retry') throw err;
+      }
+    }
+    // Keep the best local play per lesson (a completed path beats a partial one).
+    const existing = this._events().find(
+      (e): e is QueuedScenarioComplete =>
+        e.kind === 'scenario_complete' &&
+        e.userId === userId &&
+        e.lessonId === lessonId,
+    );
+    if (existing?.rubricScore?.completed && !opts.rubricScore?.completed) {
+      return { status: 'queued', clientEventId: existing.clientEventId };
+    }
+    const ev: QueuedScenarioComplete = {
+      kind: 'scenario_complete',
+      clientEventId: existing?.clientEventId ?? key,
+      clientTimestamp,
+      userId,
+      lessonId,
+      scenarioId,
+      chosenPath: path,
+      attempts: 0,
+      ...(opts.rubricScore ? { rubricScore: opts.rubricScore } : {}),
+      ...(opts.title ? { lessonTitle: opts.title } : {}),
+      ...(opts.estimate ? { estimate: opts.estimate } : {}),
+    };
+    await this.store.enqueue(ev);
+    await this.refresh();
+    this.trackEnqueued(ev.kind);
+    this.scheduleRetry();
+    return { status: 'queued', clientEventId: ev.clientEventId };
+  }
+
+  /**
+   * Queue avatar equips made offline (re-equip from owned items only,
+   * docs/16 §3). Changes coalesce into one event per user (latest per
+   * slot); the server applies them last-write-wins by clientTimestamp.
+   */
+  async queueAvatarEquip(
+    changes: { slot: ItemSlot; itemId: string | null }[],
+  ): Promise<string> {
+    const userId = this.requireUser();
+    await this.ready;
+    const prev = this.singleton<QueuedAvatarEquip>('avatar_equip', userId);
+    const ev: QueuedAvatarEquip = {
+      kind: 'avatar_equip',
+      clientEventId: prev?.clientEventId ?? newClientEventId(),
+      clientTimestamp: Date.now(),
+      userId,
+      attempts: 0,
+      slotChanges: mergeSlotChanges(prev?.slotChanges ?? [], changes),
+    };
+    return this.enqueueAndKick(ev);
+  }
+
+  /** Queue an offline avatar config edit (merged with a pending one). */
+  async queueAvatarConfig(config: Record<string, unknown>): Promise<string> {
+    const userId = this.requireUser();
+    await this.ready;
+    const prev = this.singleton<QueuedAvatarConfig>(
+      'avatar_config_update',
+      userId,
+    );
+    const ev: QueuedAvatarConfig = {
+      kind: 'avatar_config_update',
+      clientEventId: prev?.clientEventId ?? newClientEventId(),
+      clientTimestamp: Date.now(),
+      userId,
+      attempts: 0,
+      config: { ...(prev?.config ?? {}), ...config },
+    };
+    return this.enqueueAndKick(ev);
+  }
+
+  /**
+   * Change account settings (`PATCH /me`): sent now when online, queued
+   * as `preference_update` otherwise (merged; the latest value wins).
+   * Resolves `true` when the server already has it.
+   */
+  async updatePreferences(prefs: PreferencePatch): Promise<boolean> {
+    const userId = this.requireUser();
+    await this.ready;
+    if (this.network.online() && !this._authBlocked()) {
+      try {
+        await this.me.update(prefs);
+        return true;
+      } catch (err) {
+        if (classifySyncFailure(err) !== 'retry') throw err;
+      }
+    }
+    const prev = this.singleton<QueuedPreferenceUpdate>(
+      'preference_update',
+      userId,
+    );
+    await this.enqueueAndKick({
+      kind: 'preference_update',
+      clientEventId: prev?.clientEventId ?? newClientEventId(),
+      clientTimestamp: Date.now(),
+      userId,
+      attempts: 0,
+      prefs: { ...(prev?.prefs ?? {}), ...prefs },
+    });
+    return false;
+  }
+
+  /**
+   * A lesson was opened while offline: queue `lesson_progress_seen` so the
+   * open is reported (with its real time) once the device syncs.
+   */
+  async markLessonSeen(lessonId: string, courseId?: string): Promise<void> {
+    const userId = this.auth.user()?.id;
+    if (!userId || this.network.online()) return;
+    await this.ready;
+    const dup = this._events().some(
+      (e) =>
+        e.kind === 'lesson_progress_seen' &&
+        e.userId === userId &&
+        e.lessonId === lessonId,
+    );
+    if (dup) return;
+    const ev: QueuedLessonSeen = {
+      kind: 'lesson_progress_seen',
+      clientEventId: newClientEventId(),
+      clientTimestamp: Date.now(),
+      userId,
+      attempts: 0,
+      lessonId,
+      ...(courseId ? { courseId } : {}),
+    };
+    await this.enqueueAndKick(ev);
   }
 
   /**
@@ -434,6 +690,38 @@ export class OfflineSyncService {
   }
 
   // ─── Internals ──────────────────────────────────────────────────────────
+
+  private requireUser(): string {
+    const userId = this.auth.user()?.id;
+    if (!userId) throw new Error('Not signed in');
+    return userId;
+  }
+
+  /** The user's pending coalescing event of `kind`, if any. */
+  private singleton<T extends QueuedEvent>(
+    kind: T['kind'],
+    userId: string,
+  ): T | undefined {
+    return this._events().find(
+      (e): e is T => e.kind === kind && e.userId === userId,
+    );
+  }
+
+  private async enqueueAndKick(ev: QueuedEvent): Promise<string> {
+    await this.store.enqueue(ev);
+    await this.refresh();
+    this.trackEnqueued(ev.kind);
+    if (this.network.online() && !this._authBlocked()) void this.flush();
+    else this.scheduleRetry();
+    return ev.clientEventId;
+  }
+
+  private trackEnqueued(kind: string): void {
+    this.telemetry.track('offline_queue_enqueued', {
+      kind,
+      queueDepth: this.pendingCount(),
+    });
+  }
 
   private async prime(): Promise<void> {
     try {
@@ -498,13 +786,14 @@ export class OfflineSyncService {
     this._lastError.set(null);
     if (manual) this._authBlocked.set(false);
     const started = Date.now();
-    this.telemetry.track('sync_flush_started', {
+    this.telemetry.track('queue_depth_on_flush', {
       queueDepth: events.length,
       manual,
     });
     let synced = 0;
     let dropped = 0;
     let halted = false;
+    this.flushConflicts = 0;
     try {
       for (const ev of due) {
         if (!this.network.online() || this.auth.user()?.id !== userId) {
@@ -526,15 +815,16 @@ export class OfflineSyncService {
     }
 
     const remaining = this.pendingCount();
-    this.telemetry.track(
-      halted ? 'sync_flush_failed' : 'sync_flush_completed',
-      {
-        synced,
-        dropped,
-        remaining,
-        durationMs: Date.now() - started,
-      },
-    );
+    // docs/10 §14 catalogue name; `halted` marks a flush that stopped early.
+    this.telemetry.track('sync_flush', {
+      sent: synced + dropped,
+      succeeded: synced - this.flushConflicts,
+      conflicts: this.flushConflicts,
+      failed: dropped,
+      remaining,
+      halted,
+      durationMs: Date.now() - started,
+    });
     if (synced > 0) void this.reconcileTotals();
     return { synced, dropped, remaining };
   }
@@ -547,10 +837,20 @@ export class OfflineSyncService {
     ev: QueuedEvent,
     foreground: boolean,
   ): Promise<SendResult> {
-    const opts = ev.dropTimestamp
+    const opts: { clientTimestamp?: string } = ev.dropTimestamp
       ? {}
       : { clientTimestamp: new Date(ev.clientTimestamp).toISOString() };
     try {
+      if (ev.kind !== 'lesson_complete' && ev.kind !== 'quiz_attempt') {
+        await this.sendOther(ev, opts.clientTimestamp, foreground);
+        await this.store.remove(ev.clientEventId);
+        await this.refresh();
+        return {
+          next: 'continue',
+          synced: true,
+          outcome: { status: 'queued', clientEventId: ev.clientEventId },
+        };
+      }
       if (ev.kind === 'lesson_complete') {
         const response = await this.progressClient.complete(
           ev.lessonId,
@@ -602,6 +902,81 @@ export class OfflineSyncService {
     }
   }
 
+  /** Replay a non-lesson queued event (scenario / avatar / prefs / seen). */
+  private async sendOther(
+    ev: Exclude<QueuedEvent, QueuedLessonComplete | QueuedQuizAttempt>,
+    clientTimestamp: string | undefined,
+    foreground: boolean,
+  ): Promise<void> {
+    switch (ev.kind) {
+      case 'scenario_complete': {
+        const result = await this.scenarios.complete(
+          ev.scenarioId,
+          ev.chosenPath,
+          { idempotencyKey: ev.clientEventId, clientTimestamp },
+        );
+        this._scenarioReconciled.set({
+          lessonId: ev.lessonId,
+          result,
+          clientEventId: ev.clientEventId,
+        });
+        if (!foreground && result.completed) {
+          this.toast.show({
+            message: 'studentPlatform.sync.scenarioSynced',
+            params: { title: ev.lessonTitle ?? '' },
+            kind: 'success',
+          });
+        }
+        return;
+      }
+      case 'avatar_equip': {
+        let last: AvatarResponse | null = null;
+        let stale = false;
+        for (const c of ev.slotChanges) {
+          last = await this.items.equip(c.slot as ItemSlot, c.itemId, {
+            clientTimestamp,
+            idempotencyKey: `${ev.clientEventId}:${c.slot}`,
+          });
+          stale ||= !!last.stale;
+        }
+        if (last) this._avatarReconciled.set(last);
+        if (stale) this.noteAvatarStale(foreground);
+        return;
+      }
+      case 'avatar_config_update': {
+        const res = await this.items.saveConfig(ev.config, {
+          clientTimestamp,
+          idempotencyKey: ev.clientEventId,
+        });
+        this._avatarReconciled.set(res);
+        if (res.stale) this.noteAvatarStale(foreground);
+        return;
+      }
+      case 'preference_update':
+        await this.me.update(ev.prefs);
+        return;
+      case 'lesson_progress_seen':
+        this.telemetry.trackAt(
+          'lesson_progress_seen',
+          { lessonId: ev.lessonId, courseId: ev.courseId ?? null },
+          ev.clientTimestamp,
+        );
+        return;
+    }
+  }
+
+  private noteAvatarStale(foreground: boolean): void {
+    this.telemetry.track('sync_conflict', {
+      kind: 'avatar',
+      resolution: 'server_newer',
+    });
+    if (!foreground)
+      this.toast.show({
+        message: 'studentPlatform.sync.avatarNewer',
+        kind: 'info',
+      });
+  }
+
   private async handleFailure(
     ev: QueuedEvent,
     err: unknown,
@@ -624,6 +999,21 @@ export class OfflineSyncService {
       case 'reconcile': {
         await this.store.remove(ev.clientEventId);
         await this.refresh();
+        this.flushConflicts += 1;
+        this.telemetry.track('sync_conflict', {
+          kind: ev.kind,
+          resolution: 'server_kept',
+        });
+        if (ev.kind === 'lesson_complete' && !foreground) {
+          // docs/16 §8: another device completed it first.
+          this.toast.show({
+            message: ev.lessonTitle
+              ? 'studentPlatform.sync.completedElsewhereTitled'
+              : 'studentPlatform.sync.completedElsewhere',
+            params: { title: ev.lessonTitle ?? '' },
+            kind: 'info',
+          });
+        }
         if (ev.kind === 'lesson_complete') {
           const cb = (problem.data ?? {}) as ConflictBody;
           const response: CompleteLessonResponse = {
@@ -689,8 +1079,9 @@ export class OfflineSyncService {
       reason,
       code: problem.code ?? null,
     });
+    const lessonId = eventLessonId(ev) ?? '';
     if (kind === 'paywall') {
-      this._paywall.set({ lessonId: ev.lessonId, at: Date.now() });
+      this._paywall.set({ lessonId, at: Date.now() });
       if (!foreground) {
         this.toast.show({
           message: 'studentPlatform.sync.paywall',
@@ -700,7 +1091,7 @@ export class OfflineSyncService {
       return {
         next: 'continue',
         synced: false,
-        outcome: { status: 'paywall', lessonId: ev.lessonId, error: problem },
+        outcome: { status: 'paywall', lessonId, error: problem },
       };
     }
     const messageKey = errorMessageKey(problem);
@@ -716,7 +1107,7 @@ export class OfflineSyncService {
       synced: false,
       outcome: {
         status: 'rejected',
-        lessonId: ev.lessonId,
+        lessonId,
         error: problem,
         messageKey,
       },

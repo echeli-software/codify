@@ -33,6 +33,7 @@ import {
 import { AppToastService } from '../../platform/app-toast.service.js';
 import { TelemetryService } from '../../telemetry/telemetry.service.js';
 import { AccountStateService, RESTORE_PATH } from '../account/account-state.js';
+import { ConsentBanner } from '../../components/consent-banner.component.js';
 
 /**
  * Settings → Data & privacy (docs/14 §13, docs/05 Settings): download a
@@ -56,6 +57,7 @@ import { AccountStateService, RESTORE_PATH } from '../account/account-state.js';
     BottomSheet,
     Icon,
     TranslatePipe,
+    ConsentBanner,
   ],
   template: `
     <ion-header>
@@ -104,6 +106,11 @@ import { AccountStateService, RESTORE_PATH } from '../account/account-state.js';
             >
           </cdf-app-card>
         </section>
+      </div>
+
+      <!-- docs/14 §13: change the web cookie / analytics choice. -->
+      <div class="pv__consent">
+        <cdf-consent-banner mode="settings" />
       </div>
 
       <cdf-bottom-sheet

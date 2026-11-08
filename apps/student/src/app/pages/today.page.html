@@ -14,7 +14,7 @@
   </ion-refresher>
 
   <div class="today">
-    <cdf-promo-banner />
+    <cdf-cached-data-chip [savedAt]="fromCache()" />
     <header class="hero" data-testid="today-hero">
       <a
         class="hero__avatar"
@@ -64,7 +64,13 @@
         >
         }
       </div>
-      }
+      @if (sync.pendingEstimate(); as est) { @if (est.coins > 0 || est.xp > 0) {
+      <p class="estimate" data-testid="today-estimated">
+        <cdf-icon name="hourglass" size="xs" />
+        {{ 'student.today.estimated' | translate: { coins: est.coins, xp: est.xp
+        } }}
+      </p>
+      } } }
     </cdf-app-card>
 
     <section aria-labelledby="today-continue">
@@ -186,7 +192,8 @@
               [author]="c.authorDisplayName"
               [lessonCount]="c.lessonCount"
               [estimatedMinutes]="c.estimatedMinutes"
-              [hasFreePreview]="false"
+              [hasFreePreview]="c.hasFreePreview === true"
+              [coverUrl]="c.coverUrl"
             />
           </a>
         </li>

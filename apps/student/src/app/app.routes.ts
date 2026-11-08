@@ -5,6 +5,7 @@ import {
   rootRedirectGuard,
 } from './pages/shared/route-guards.js';
 import { featureGuard } from './platform/feature-flags.service.js';
+import { lessonExitGuard } from './pages/lesson/lesson-exit.guard.js';
 
 export const appRoutes: Route[] = [
   // `/` — Today when signed in, the public landing otherwise.
@@ -124,6 +125,8 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'lessons/:id',
+        // docs/05 Lesson player: confirm before leaving unsaved answers.
+        canDeactivate: [lessonExitGuard],
         loadComponent: () =>
           import('./pages/lesson.page').then((m) => m.LessonPage),
       },

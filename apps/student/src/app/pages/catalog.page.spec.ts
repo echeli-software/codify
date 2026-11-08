@@ -8,7 +8,15 @@ import {
   PlansClient,
   type CourseListItem,
 } from '@codify/api-client';
-import { CatalogPage, plansForCourse } from './catalog.page';
+import { signal } from '@angular/core';
+import { AuthService } from '@codify/auth';
+import { TelemetryService } from '../telemetry/telemetry.service';
+import {
+  CatalogPage,
+  DEFAULT_FILTERS,
+  catalogQuery,
+  plansForCourse,
+} from './catalog.page';
 
 const course = (id: string, title: string): CourseListItem =>
   ({
@@ -39,6 +47,8 @@ describe('CatalogPage', () => {
         provideRouter([]),
         provideIonicAngular(),
         provideI18n(),
+        { provide: AuthService, useValue: { user: signal({ id: 'u1' }) } },
+        { provide: TelemetryService, useValue: { track: jest.fn() } },
         { provide: CoursesClient, useValue: { list } },
         {
           provide: CategoriesClient,
@@ -91,5 +101,34 @@ describe('CatalogPage', () => {
       'All',
       'Web',
     ]);
+  });
+
+  it('maps filters to the server-side catalog query', () => {
+    expect(catalogQuery(DEFAULT_FILTERS)).toEqual({
+      status: 'PUBLISHED',
+      take: 100,
+    });
+    expect(
+      catalogQuery({
+        q: ' react ',
+        categoryId: 'c1',
+        difficulty: 2,
+        access: 'free',
+        language: 'en-US',
+        sort: 'popular',
+      }),
+    ).toEqual({
+      status: 'PUBLISHED',
+      take: 100,
+      categoryId: 'c1',
+      q: 'react',
+      difficulty: 2,
+      free: true,
+      language: 'en-US',
+      sort: 'popular',
+    });
+    expect(
+      catalogQuery({ ...DEFAULT_FILTERS, access: 'premium' }),
+    ).toMatchObject({ premium: true });
   });
 });

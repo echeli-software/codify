@@ -159,7 +159,24 @@
       "emptyFiltered": "No courses match this filter",
       "emptyHint": "Check back soon, or pick a different category.",
       "count": "{count, plural, one {# course} other {# courses}}",
-      "level": "Level {level}"
+      "level": "Level {level}",
+      "filtersLabel": "Filters",
+      "filterFree": "Free preview",
+      "filterPremium": "Premium only",
+      "language": "Language",
+      "anyLanguage": "Any",
+      "languageName": {
+        "pt-BR": "Português",
+        "en-US": "English"
+      },
+      "sort": "Sort",
+      "sortBy": {
+        "recommended": "Recommended",
+        "newest": "Newest",
+        "popular": "Most popular",
+        "shortest": "Shortest"
+      },
+      "clearFilters": "Clear filters"
     },
     "myCourses": {
       "title": "My courses",
@@ -300,7 +317,8 @@
       "leagueLine": "#{rank} of {size} · resets in {time}",
       "recommendedTitle": "Recommended for you",
       "seeCatalog": "See catalog",
-      "noRecommendations": "You're enrolled in everything we have — new courses are on the way."
+      "noRecommendations": "You're enrolled in everything we have — new courses are on the way.",
+      "estimated": "Pending: about +{coins} coins and +{xp} XP — estimated; final coins are applied when synced."
     },
     "onboarding": {
       "label": "Get started with Codify",
@@ -379,6 +397,27 @@
       },
       "error": {
         "title": "Couldn't open this lesson"
+      },
+      "outline": "Module outline",
+      "outlineDone": "Completed",
+      "outlineTodo": "Not completed",
+      "willSyncEstimated": "Estimated — final coins applied when synced.",
+      "settings": {
+        "title": "Reading settings",
+        "textSize": "Text size",
+        "size": {
+          "sm": "Small",
+          "md": "Default",
+          "lg": "Large",
+          "xl": "Extra large"
+        },
+        "sound": "Sound effects"
+      },
+      "exit": {
+        "title": "Leave this lesson?",
+        "body": "Your answers aren’t saved yet. If you leave now, you’ll have to answer again.",
+        "stay": "Keep going",
+        "leave": "Leave"
       }
     },
     "exercise": {
@@ -387,7 +426,11 @@
       "grading": "Your submission is in the queue — grading…",
       "gradingTimeout": "Grading is taking longer than usual. Try submitting again in a moment.",
       "workerLost": "The grader stopped unexpectedly. Please submit again.",
-      "diagnostics": "{message}"
+      "diagnostics": "{message}",
+      "preview": "Preview",
+      "browserGraded": "Runs in your browser: tests check the page in the preview.",
+      "browserTimeout": "The page didn’t answer in time — check for an endless loop.",
+      "notDownloaded": "Download this course to see the exercise offline."
     },
     "capstone": {
       "intro": "Capstone project — your answer is graded against the rubric below."
@@ -403,7 +446,9 @@
         "duplicate": "That was already submitted.",
         "graderUnavailable": "{seconds, plural, =0 {The AI grader is busy. Nothing was recorded — try again in a moment.} one {The AI grader is busy. Nothing was recorded — try again in # second.} other {The AI grader is busy. Nothing was recorded — try again in # seconds.}}",
         "queueBusy": "{seconds, plural, =0 {Lots of people are running code right now. Try again in a moment.} one {Lots of people are running code right now. Try again in # second.} other {Lots of people are running code right now. Try again in # seconds.}}"
-      }
+      },
+      "scenarioQueued": "Played offline — it will be scored and synced when you’re back online.",
+      "scenarioOffline": "Download this course to play the scenario offline."
     },
     "course": {
       "title": "Course",
@@ -459,8 +504,13 @@
         "moduleNamed": "Download module {title}",
         "saved": "Saved",
         "lessonNamed": "Download lesson {title}",
-        "lessonSaved": "Saved for offline"
-      }
+        "lessonSaved": "Saved for offline",
+        "offer": "Want to read this course offline? Download it now.",
+        "offerCourse": "Download course",
+        "offerNext": "{count, plural, one {Download the next lesson} other {Download the next # lessons}}",
+        "offerLater": "Not now"
+      },
+      "pendingSync": "Will sync when you’re online"
     },
     "billing": {
       "title": "Subscription",
@@ -1128,6 +1178,33 @@
         "LOCKED": "Locked — finish {prereq} first"
       },
       "legend": "Bronze: one lesson done. Silver: half the lessons with an average score of 70%+. Gold: every lesson with 90%+."
+    },
+    "consent": {
+      "title": "Cookies and analytics",
+      "body": "We use necessary storage to keep you signed in and to make offline learning work. With your OK we also measure how the app is used and report crashes, to make Codify better.",
+      "policy": "Privacy Policy",
+      "categories": "Choose what to allow",
+      "necessary": "Necessary",
+      "necessaryHint": "Sign-in, offline downloads and your settings. Always on.",
+      "analytics": "Product analytics",
+      "analyticsHint": "Which screens and features are used — no names, emails or answers.",
+      "errors": "Error reporting",
+      "errorsHint": "Crash reports so we can fix bugs (applies from the next launch).",
+      "save": "Save choices",
+      "acceptAll": "Accept all",
+      "necessaryOnly": "Necessary only",
+      "customize": "Customize",
+      "saved": "Your choices were saved on this device."
+    },
+    "timeZone": {
+      "title": "Time zone",
+      "hint": "Your streak day and daily quests reset at midnight in this time zone.",
+      "label": "Time zone",
+      "useDevice": "Update",
+      "useDeviceNamed": "Use this device’s time zone ({zone})",
+      "askUpdate": "Your device is set to {device}, but your account uses {current}. Update your time zone?",
+      "saved": "Time zone set to {zone}.",
+      "savedOffline": "Time zone set to {zone} — it will sync when you’re online."
     }
   }
 }

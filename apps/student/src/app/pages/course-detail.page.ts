@@ -1,9 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -51,6 +54,8 @@ import {
   errorMessageKey,
 } from '../platform/app-toast.service.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { OfflineSyncService } from '../offline/offline-sync.service.js';
+import { ShellBreadcrumbs } from '../components/shell-breadcrumbs.service.js';
 import { classifyLoadError } from './lesson/lesson-state.js';
 import { loadCourse, saveCourse } from './shared/course-cache.js';
 import { paywallRows } from './shared/plan-view.js';
@@ -154,7 +159,22 @@ export function courseAccess(opts: {
             class="cd__hero"
             data-testid="course-hero"
           >
+            @if (c.coverUrl) {
+              <img
+                class="cd__cover"
+                data-testid="course-cover"
+                [src]="c.coverUrl"
+                alt=""
+                decoding="async"
+              />
+            }
             <h1>{{ title() }}</h1>
+            @if (freeCount() > 0 && paidCount() > 0) {
+              <p class="cd__preview" data-testid="free-preview-badge">
+                <cdf-icon name="gift" size="xs" />
+                {{ 'billing.freePreview' | translate }}
+              </p>
+            }
             <p class="cd__muted">
               {{
                 'ui.course.byAuthor'
@@ -268,6 +288,53 @@ export function courseAccess(opts: {
               }
             </div>
           </cdf-app-card>
+
+          <!-- docs/16 §10 first-time download flow (after enrolling). -->
+          @if (offerDownload()) {
+            <cdf-app-card
+              padding="normal"
+              class="cd__offer"
+              data-testid="download-offer"
+            >
+              <p class="cd__offer-text">
+                <cdf-icon name="download" size="sm" />
+                {{ 'student.course.download.offer' | translate }}
+              </p>
+              <div class="cd__actions">
+                <cdf-app-button
+                  kind="primary"
+                  size="sm"
+                  [disabled]="!online()"
+                  (buttonClick)="acceptOffer('course')"
+                  data-testid="download-offer-course"
+                >
+                  {{ 'student.course.download.offerCourse' | translate }}
+                </cdf-app-button>
+                @if (nextToDownload().length > 0) {
+                  <cdf-app-button
+                    kind="secondary"
+                    size="sm"
+                    [disabled]="!online()"
+                    (buttonClick)="acceptOffer('next')"
+                    data-testid="download-offer-next"
+                  >
+                    {{
+                      'student.course.download.offerNext'
+                        | translate: { count: nextToDownload().length }
+                    }}
+                  </cdf-app-button>
+                }
+                <cdf-app-button
+                  kind="ghost"
+                  size="sm"
+                  (buttonClick)="offerDownload.set(false)"
+                  data-testid="download-offer-dismiss"
+                >
+                  {{ 'student.course.download.offerLater' | translate }}
+                </cdf-app-button>
+              </div>
+            </cdf-app-card>
+          }
 
           <!-- Plans that include this course -->
           @if (plansForCourse().length > 0) {
@@ -544,6 +611,20 @@ export function courseAccess(opts: {
                           [estimateMinutes]="l.estimatedMinutes || null"
                           [routerLink]="['/lessons', l.id]"
                         />
+                        @if (sync.pendingLessonIds().has(l.id)) {
+                          <span
+                            class="cd__pending"
+                            data-testid="lesson-pending-sync"
+                            [attr.title]="
+                              'student.course.pendingSync' | translate
+                            "
+                            [attr.aria-label]="
+                              'student.course.pendingSync' | translate
+                            "
+                          >
+                            <cdf-icon name="hourglass" size="sm" />
+                          </span>
+                        }
                         @if (downloadedLessons().has(l.id)) {
                           <span
                             class="cd__saved"
@@ -610,6 +691,39 @@ export function courseAccess(opts: {
         color: var(--cdf-color-text-muted);
         font-size: var(--cdf-font-size-sm);
         margin: 2px 0 var(--cdf-space-2);
+      }
+      .cd__cover {
+        display: block;
+        width: calc(100% + 2 * var(--cdf-space-4, 16px));
+        margin: calc(-1 * var(--cdf-space-4, 16px))
+          calc(-1 * var(--cdf-space-4, 16px)) var(--cdf-space-3, 12px);
+        aspect-ratio: 16 / 7;
+        object-fit: cover;
+        border-radius: 12px 12px 0 0;
+        background: var(--cdf-color-surface-2, #f3f4f6);
+      }
+      .cd__preview {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        margin: 0 0 var(--cdf-space-1);
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: var(--cdf-font-size-xs);
+        font-weight: 600;
+        color: var(--cdf-color-success-text, #166534);
+        background: var(--cdf-color-success-subtle, #dcfce7);
+      }
+      .cd__offer-text {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 0 0 var(--cdf-space-2);
+        font-weight: 600;
+      }
+      .cd__pending {
+        display: inline-flex;
+        color: var(--cdf-color-warning, #b45309);
       }
       .cd__offline {
         display: inline-flex;
@@ -758,6 +872,11 @@ export class CourseDetailPage {
   private readonly network = inject(NetworkStatusService);
   private readonly toast = inject(AppToastService);
   private readonly telemetry = inject(TelemetryService);
+  /** Pending-sync clock per lesson (docs/16 §10). */
+  protected readonly sync = inject(OfflineSyncService);
+  /** "Download this course for offline?" after enrolling (docs/16 §10). */
+  protected readonly offerDownload = signal(false);
+  private readonly breadcrumbs = inject(ShellBreadcrumbs);
   private readonly i18n = inject(I18nService);
 
   protected readonly online = this.network.online;
@@ -894,6 +1013,19 @@ export class CourseDetailPage {
   });
 
   constructor() {
+    // Desktop header breadcrumb (docs/05 §1): Catalog › Course.
+    effect(() => {
+      const c = this.course();
+      const t = this.title();
+      untracked(() => {
+        if (!c) return;
+        this.breadcrumbs.set(this, [
+          { label: 'studentPlatform.nav.catalog', url: '/catalog', key: true },
+          { label: t },
+        ]);
+      });
+    });
+    inject(DestroyRef).onDestroy(() => this.breadcrumbs.clear(this));
     void this.downloads.hydrate();
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const slug = pm.get('slug');
@@ -1000,6 +1132,12 @@ export class CourseDetailPage {
       this.enrollment.set(mine.find((e) => e.courseId === c.id) ?? null);
       this.downloads.onEnrolled(c.id);
       this.toast.show({ message: 'student.course.enrolled', kind: 'success' });
+      // Skipped when auto-download already handles it (docs/16 §10).
+      if (
+        !this.downloads.prefs().autoDownloadEnrolled &&
+        this.dl().state === 'none'
+      )
+        this.offerDownload.set(true);
     } catch (err) {
       this.toast.error(err);
     } finally {
@@ -1078,6 +1216,40 @@ export class CourseDetailPage {
   }
 
   // ─── Downloads ────────────────────────────────────────────────────────
+
+  /** The next (up to 3) accessible, not yet downloaded lessons. */
+  protected readonly nextToDownload = computed(() => {
+    const all = this.allLessons();
+    const start = Math.max(
+      0,
+      all.findIndex((l) => !this.completedIds().has(l.id)),
+    );
+    return all
+      .slice(start)
+      .filter(
+        (l) =>
+          (l.isFree || this.hasAccess()) && !this.downloadedLessons().has(l.id),
+      )
+      .slice(0, 3)
+      .map((l) => l.id);
+  });
+
+  protected async acceptOffer(what: 'course' | 'next'): Promise<void> {
+    const c = this.course();
+    this.offerDownload.set(false);
+    if (!c) return;
+    this.telemetry.track('download_offer_accepted', { courseId: c.id, what });
+    if (what === 'course') return this.downloadCourse();
+    try {
+      await this.downloads.downloadCourse(c.id, {
+        lessonIds: this.nextToDownload(),
+        scope: 'lesson',
+      });
+    } catch (err) {
+      this.toast.error(err);
+    }
+    await this.refreshDownloadedLessons();
+  }
 
   protected async downloadCourse(): Promise<void> {
     const c = this.course();

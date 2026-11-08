@@ -51,6 +51,14 @@
           "https://fonts.gstatic.com/**"
         ]
       }
+    },
+    {
+      "name": "code-editor",
+      "installMode": "lazy",
+      "updateMode": "lazy",
+      "resources": {
+        "files": ["/monaco/**", "/worker-*.js"]
+      }
     }
   ],
   "dataGroups": []

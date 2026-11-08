@@ -28,6 +28,10 @@ import {
   ErrorState,
 } from '@codify/ui-ionic';
 import { errorMessageKey } from '../platform/app-toast.service.js';
+import { AuthService } from '@codify/auth';
+import { NetworkStatusService } from '../offline/network-status.service.js';
+import { withResponseCache } from '../offline/response-cache.js';
+import { CachedDataChip } from '../offline/cached-data-chip.component.js';
 
 /** Completion fraction 0–1 for an enrollment's progress. */
 export function enrollmentProgress(e: Pick<MyEnrollment, 'progress'>): number {
@@ -58,6 +62,7 @@ export function enrollmentProgress(e: Pick<MyEnrollment, 'progress'>): number {
     TranslatePipe,
     LocalePipe,
     ContentTranslatePipe,
+    CachedDataChip,
   ],
   template: `
     <ion-header>
@@ -74,6 +79,7 @@ export function enrollmentProgress(e: Pick<MyEnrollment, 'progress'>): number {
       </ion-refresher>
       <div class="mc">
         <p class="mc__sub">{{ 'student.myCourses.subtitle' | translate }}</p>
+        <cdf-cached-data-chip [savedAt]="fromCache()" />
         @if (loading()) {
           <cdf-app-skeleton shape="rect" [height]="96" />
           <cdf-app-skeleton shape="rect" [height]="96" />
@@ -212,6 +218,10 @@ export function enrollmentProgress(e: Pick<MyEnrollment, 'progress'>): number {
 })
 export class MyCoursesPage {
   private readonly enrollments = inject(EnrollmentsClient);
+  private readonly auth = inject(AuthService);
+  private readonly network = inject(NetworkStatusService);
+  /** Epoch ms of the cached list shown offline (docs/16 §3), or null. */
+  protected readonly fromCache = signal<number | null>(null);
 
   protected readonly loading = signal(true);
   protected readonly errorKey = signal<string | null>(null);
@@ -225,7 +235,14 @@ export class MyCoursesPage {
     this.loading.set(true);
     this.errorKey.set(null);
     try {
-      this.items.set(await this.enrollments.mine());
+      const res = await withResponseCache(
+        this.auth.user()?.id,
+        'myCourses',
+        this.network.online(),
+        () => this.enrollments.mine(),
+      );
+      this.items.set(res.value);
+      this.fromCache.set(res.fromCache);
     } catch (err) {
       this.errorKey.set(errorMessageKey(err));
     } finally {

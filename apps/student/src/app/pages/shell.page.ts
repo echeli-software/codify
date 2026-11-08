@@ -6,7 +6,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs';
 import { AuthService } from '@codify/auth';
 import { I18nService, LocalePipe, TranslatePipe } from '@codify/i18n';
 import {
@@ -35,6 +37,12 @@ import { AppSessionService } from '../platform/app-session.service.js';
 import { SignOutConfirm } from '../platform/sign-out-confirm.component.js';
 import { StoragePrompt } from '../platform/storage-prompt.component.js';
 import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { GlobalSearch } from '../components/global-search.component.js';
+import { TimeZoneSync } from '../components/time-zone.js';
+import {
+  ShellBreadcrumbs,
+  type Crumb,
+} from '../components/shell-breadcrumbs.service.js';
 import {
   FeatureFlagsService,
   type StudentFeature,
@@ -139,6 +147,7 @@ const DESKTOP_QUERY = '(min-width: 768px)';
     NotificationBell,
     StoragePrompt,
     SignOutConfirm,
+    GlobalSearch,
   ],
   template: `
     <header class="bar" data-testid="shell-header">
@@ -155,6 +164,32 @@ const DESKTOP_QUERY = '(min-width: 768px)';
         <cdf-app-avatar size="sm" [src]="avatarUrl()" [name]="displayName()" />
         <span class="bar__name">{{ displayName() }}</span>
       </button>
+
+      @if (desktop()) {
+        <!-- docs/05 §1: desktop header breadcrumb + global search. -->
+        <nav
+          class="bar__crumbs"
+          data-testid="shell-breadcrumb"
+          [attr.aria-label]="'studentPlatform.shell.breadcrumb' | translate"
+        >
+          <ol>
+            @for (c of crumbs(); track $index; let last = $last) {
+              <li>
+                @if (c.url && !last) {
+                  <a [routerLink]="c.url">{{
+                    c.key ? (c.label | translate) : c.label
+                  }}</a>
+                } @else {
+                  <span [attr.aria-current]="last ? 'page' : null">{{
+                    c.key ? (c.label | translate) : c.label
+                  }}</span>
+                }
+              </li>
+            }
+          </ol>
+        </nav>
+        <cdf-global-search class="bar__search" />
+      }
 
       <div
         class="bar__stats"
@@ -183,11 +218,20 @@ const DESKTOP_QUERY = '(min-width: 768px)';
         <span
           class="stat stat--coins"
           cdfCoinTarget
+          data-testid="shell-coins"
+          [attr.data-estimated]="estimate().coins > 0 || null"
           [attr.title]="
-            'studentPlatform.shell.coins' | translate: { count: coins() }
+            estimate().coins > 0
+              ? ('studentPlatform.shell.coinsEstimated'
+                | translate: { count: coins() + estimate().coins })
+              : ('studentPlatform.shell.coins' | translate: { count: coins() })
           "
         >
-          <cdf-icon name="diamond" size="xs" />{{ coins() | locale: 'compact' }}
+          <cdf-icon name="diamond" size="xs" />
+          @if (estimate().coins > 0) {
+            <span aria-hidden="true">≈</span>
+          }
+          {{ coins() + estimate().coins | locale: 'compact' }}
         </span>
         <span
           class="stat stat--xp"
@@ -320,6 +364,57 @@ const DESKTOP_QUERY = '(min-width: 768px)';
           max-width: 240px;
         }
       }
+      .bar__crumbs {
+        display: none;
+        min-width: 0;
+        flex: 0 1 auto;
+        font-size: 13px;
+      }
+      .bar__crumbs ol {
+        display: flex;
+        gap: 6px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .bar__crumbs li {
+        display: inline-flex;
+        gap: 6px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .bar__crumbs li + li::before {
+        content: '›';
+        color: var(--cdf-color-text-muted, #6b7280);
+      }
+      .bar__crumbs a {
+        color: var(--cdf-color-text-muted, #6b7280);
+        text-decoration: none;
+      }
+      .bar__crumbs a:hover,
+      .bar__crumbs a:focus-visible {
+        text-decoration: underline;
+      }
+      .bar__crumbs span[aria-current] {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .bar__search {
+        flex: 0 1 280px;
+        margin-inline-start: 8px;
+      }
+      @media (min-width: 1024px) {
+        .bar__crumbs {
+          display: block;
+        }
+        .bar__name {
+          display: none;
+        }
+      }
       .bar__stats {
         display: flex;
         align-items: center;
@@ -447,6 +542,33 @@ export class ShellPage {
   protected readonly xp = computed(() => this.xpState.displayed());
   protected readonly coins = computed(() => this.coinState.displayed());
   protected readonly streak = computed(() => this.streakState.currentDays());
+  /** Estimated rewards of queued offline completions (docs/16 §8). */
+  protected readonly estimate = this.sync.pendingEstimate;
+
+  private readonly breadcrumbs = inject(ShellBreadcrumbs);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects),
+      takeUntilDestroyed(),
+    ),
+    { initialValue: this.router.url },
+  );
+  /** Page-provided trail, else the nav label of the top-level route. */
+  protected readonly crumbs = computed<Crumb[]>(() => {
+    const own = this.breadcrumbs.trail();
+    if (own) return own.crumbs;
+    const top = (this.url() ?? '').split(/[/?#]/).filter(Boolean)[0] ?? 'today';
+    const nav = NAV.find((n) => n.path === top);
+    const label =
+      nav?.labelKey ??
+      (top === 'subscription'
+        ? 'studentPlatform.nav.subscription'
+        : top === 'courses' || top === 'lessons'
+          ? 'studentPlatform.nav.catalog'
+          : 'studentPlatform.shell.brand');
+    return [{ label, key: true }];
+  });
 
   /** Phone: 5 primary tabs (rest under "More"); desktop sidebar: all. */
   protected readonly tabs = computed<ShellTab[]>(() => {
@@ -469,6 +591,8 @@ export class ShellPage {
 
   constructor() {
     void this.downloads.hydrate();
+    // docs/11 §6: send the device time zone on first sign-in / when it moves.
+    void inject(TimeZoneSync).check();
     if (typeof window !== 'undefined' && window.matchMedia) {
       const mq = window.matchMedia(DESKTOP_QUERY);
       const onChange = () => this.desktop.set(mq.matches);

@@ -97,6 +97,10 @@ export interface DownloadedLesson {
   /** For instant offline quiz feedback via `checkQuizAnswerHash`. */
   quizAnswerHashes?: LessonOfflineBundle['quizAnswerHashes'];
   imageSrcs?: string[];
+  /** SCENARIO lessons: graph for local play (docs/16 §3). */
+  scenario?: LessonOfflineBundle['scenario'];
+  /** EXERCISE lessons: starter code + visible tests (read-only offline). */
+  exercise?: LessonOfflineBundle['exercise'];
 }
 
 /** Back-compat progress shape (course detail page). */
@@ -1360,6 +1364,8 @@ function toDownloadedLesson(
     updatedAt: bundle.updatedAt ?? m.updatedAt,
     quizAnswerHashes: bundle.quizAnswerHashes,
     imageSrcs: bundle.imageSrcs ?? [],
+    ...(bundle.scenario ? { scenario: bundle.scenario } : {}),
+    ...(bundle.exercise ? { exercise: bundle.exercise } : {}),
     sizeBytes: 0,
   };
   return { ...base, sizeBytes: jsonBytes(base) + imageBytes };

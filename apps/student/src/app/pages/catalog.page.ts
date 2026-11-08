@@ -21,9 +21,12 @@ import {
   type Category,
   CoursesClient,
   type CourseListItem,
+  type CourseSort,
+  type ListCoursesQuery,
   PlansClient,
   type Plan,
 } from '@codify/api-client';
+import { AuthService } from '@codify/auth';
 import { ContentTranslatePipe, I18nService, TranslatePipe } from '@codify/i18n';
 import {
   AppSkeleton,
@@ -35,7 +38,10 @@ import {
 } from '@codify/ui-ionic';
 import { errorMessageKey } from '../platform/app-toast.service.js';
 import { StaleGuard } from './shared/stale-guard.js';
-import { PromoBadge } from '../components/promotions/promo-badge.component.js';
+import { NetworkStatusService } from '../offline/network-status.service.js';
+import { withResponseCache } from '../offline/response-cache.js';
+import { CachedDataChip } from '../offline/cached-data-chip.component.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 
 interface CourseCardVM {
   id: string;
@@ -47,7 +53,59 @@ interface CourseCardVM {
   difficulty: string;
   categories: CourseCategoryRef[];
   plans: string[];
+  coverUrl: string | null;
+  hasFreePreview: boolean;
+  premiumOnly: boolean;
 }
+
+/** Catalog filters (docs/05 Learn → Catalog). */
+export interface CatalogFilters {
+  q: string;
+  categoryId: string | null;
+  difficulty: number | null;
+  /** 'free' = free preview available; 'premium' = subscription only. */
+  access: 'all' | 'free' | 'premium';
+  language: string | null;
+  sort: CourseSort;
+}
+
+export const DEFAULT_FILTERS: CatalogFilters = {
+  q: '',
+  categoryId: null,
+  difficulty: null,
+  access: 'all',
+  language: null,
+  sort: 'recommended',
+};
+
+/** Filters → `GET /courses` query (server-side search / filter / sort). */
+export function catalogQuery(f: CatalogFilters): ListCoursesQuery {
+  const q = f.q.trim();
+  return {
+    status: 'PUBLISHED',
+    take: 100,
+    ...(f.categoryId ? { categoryId: f.categoryId } : {}),
+    ...(q ? { q } : {}),
+    ...(f.difficulty ? { difficulty: f.difficulty } : {}),
+    ...(f.access === 'free' ? { free: true } : {}),
+    ...(f.access === 'premium' ? { premium: true } : {}),
+    ...(f.language ? { language: f.language } : {}),
+    ...(f.sort !== 'recommended' ? { sort: f.sort } : {}),
+  };
+}
+
+/** Stable cache key of a filter set (offline: last result per filter). */
+export function catalogCacheKey(f: CatalogFilters): string {
+  return `catalog:${JSON.stringify(catalogQuery(f))}`;
+}
+
+export const CATALOG_SORTS: readonly CourseSort[] = [
+  'recommended',
+  'newest',
+  'popular',
+  'shortest',
+];
+export const CATALOG_LANGUAGES = ['pt-BR', 'en-US'] as const;
 
 /** Plans (names) that unlock a course: all-access or a shared category. */
 export function plansForCourse(
@@ -68,15 +126,16 @@ export function plansForCourse(
 }
 
 /**
- * Student catalog (docs/05 §3 Learn → Catalog). Category tabs drive a
- * server-side filtered list; every filter change goes through a
- * `StaleGuard`, so a slow response for an old tab can never replace the
- * results of the current one. Search filters the loaded page client-side.
+ * Student catalog (docs/05 §3 Learn → Catalog). Search (debounced), the
+ * category tabs, filter chips (difficulty, free preview, premium only,
+ * language) and the sort drive a server-side query; every change goes
+ * through a `StaleGuard`, so a slow response for an old filter can never
+ * replace the results of the current one. The last response per filter is
+ * cached per user and shown offline with an "Offline" chip (docs/16 §3).
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PromoBadge,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -85,6 +144,7 @@ export function plansForCourse(
     IonRefresher,
     IonRefresherContent,
     AppSkeleton,
+    CachedDataChip,
     CourseCard,
     EmptyState,
     ErrorState,
@@ -108,7 +168,7 @@ export function plansForCourse(
           <cdf-search-bar
             [placeholder]="'student.catalog.searchPlaceholder' | translate"
             [ariaLabel]="'student.catalog.searchLabel' | translate"
-            (query)="search.set($event)"
+            (query)="setSearch($event)"
           />
           <a
             class="catalog__mine"
@@ -145,6 +205,85 @@ export function plansForCourse(
           }
         </div>
 
+        <div
+          class="catalog__filters"
+          role="group"
+          [attr.aria-label]="'student.catalog.filtersLabel' | translate"
+          data-testid="catalog-filters"
+        >
+          @for (lv of levels; track lv) {
+            <button
+              type="button"
+              class="catalog__chip"
+              [attr.aria-pressed]="filters().difficulty === lv"
+              [attr.data-filter-level]="lv"
+              (click)="toggleLevel(lv)"
+            >
+              {{ 'student.catalog.level' | translate: { level: lv } }}
+            </button>
+          }
+          <button
+            type="button"
+            class="catalog__chip"
+            data-testid="filter-free"
+            [attr.aria-pressed]="filters().access === 'free'"
+            (click)="toggleAccess('free')"
+          >
+            {{ 'student.catalog.filterFree' | translate }}
+          </button>
+          <button
+            type="button"
+            class="catalog__chip"
+            data-testid="filter-premium"
+            [attr.aria-pressed]="filters().access === 'premium'"
+            (click)="toggleAccess('premium')"
+          >
+            {{ 'student.catalog.filterPremium' | translate }}
+          </button>
+          <label class="catalog__select">
+            <span>{{ 'student.catalog.language' | translate }}</span>
+            <select
+              data-testid="filter-language"
+              [value]="filters().language ?? ''"
+              (change)="setLanguage($any($event.target).value)"
+            >
+              <option value="">
+                {{ 'student.catalog.anyLanguage' | translate }}
+              </option>
+              @for (l of languages; track l) {
+                <option [value]="l" [selected]="filters().language === l">
+                  {{ 'student.catalog.languageName.' + l | translate }}
+                </option>
+              }
+            </select>
+          </label>
+          <label class="catalog__select">
+            <span>{{ 'student.catalog.sort' | translate }}</span>
+            <select
+              data-testid="catalog-sort"
+              (change)="setSort($any($event.target).value)"
+            >
+              @for (o of sorts; track o) {
+                <option [value]="o" [selected]="filters().sort === o">
+                  {{ 'student.catalog.sortBy.' + o | translate }}
+                </option>
+              }
+            </select>
+          </label>
+          @if (filtered()) {
+            <button
+              type="button"
+              class="catalog__clear"
+              data-testid="filters-clear"
+              (click)="clearFilters()"
+            >
+              {{ 'student.catalog.clearFilters' | translate }}
+            </button>
+          }
+        </div>
+
+        <cdf-cached-data-chip [savedAt]="fromCache()" />
+
         <section
           role="tabpanel"
           [id]="panelId"
@@ -170,7 +309,7 @@ export function plansForCourse(
             <cdf-empty-state
               icon="school"
               [title]="
-                (search() || activeCategoryId()
+                (filtered()
                   ? 'student.catalog.emptyFiltered'
                   : 'student.catalog.empty'
                 ) | translate
@@ -191,9 +330,6 @@ export function plansForCourse(
                     [routerLink]="['/courses', c.slug]"
                     [attr.data-course-slug]="c.slug"
                   >
-                    <span class="catalog__promo"
-                      ><cdf-promo-badge [courseId]="c.id"
-                    /></span>
                     <cdf-course-card
                       [title]="c.id | tContent: 'COURSE' : 'title' : c.title"
                       [author]="c.author"
@@ -201,7 +337,9 @@ export function plansForCourse(
                       [estimatedMinutes]="c.estimatedMinutes"
                       [difficulty]="c.difficulty"
                       [categories]="c.categories"
-                      [hasFreePreview]="false"
+                      [hasFreePreview]="c.hasFreePreview"
+                      [premiumOnly]="c.premiumOnly"
+                      [coverUrl]="c.coverUrl"
                     />
                     @if (c.plans.length > 0) {
                       <span class="catalog__plans">
@@ -258,6 +396,58 @@ export function plansForCourse(
         cursor: pointer;
         min-height: 36px;
       }
+      .catalog__filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--cdf-space-1);
+        align-items: center;
+        margin-bottom: var(--cdf-space-2);
+      }
+      .catalog__chip,
+      .catalog__clear {
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        border-radius: 999px;
+        padding: 4px 12px;
+        min-height: 36px;
+        font: inherit;
+        font-size: var(--cdf-font-size-sm);
+        cursor: pointer;
+      }
+      .catalog__chip[aria-pressed='true'] {
+        background: var(--cdf-color-primary-subtle, #eef2ff);
+        border-color: var(--cdf-color-primary);
+        color: var(--cdf-color-primary);
+        font-weight: 600;
+      }
+      .catalog__clear {
+        border-color: transparent;
+        text-decoration: underline;
+      }
+      .catalog__select {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: var(--cdf-font-size-sm);
+        color: var(--cdf-color-text-muted);
+      }
+      .catalog__select select {
+        min-height: 36px;
+        border-radius: 8px;
+        border: 1px solid var(--cdf-color-border);
+        background: var(--cdf-color-surface);
+        color: var(--cdf-color-text);
+        font: inherit;
+        padding: 0 6px;
+        max-width: 160px;
+      }
+      .catalog__chip:focus-visible,
+      .catalog__clear:focus-visible,
+      .catalog__select select:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
       .catalog__tab[aria-selected='true'] {
         background: var(--cdf-color-primary);
         color: var(--cdf-color-on-primary, #fff);
@@ -297,14 +487,7 @@ export function plansForCourse(
           grid-template-columns: repeat(4, minmax(0, 1fr));
         }
       }
-      .catalog__promo {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 1;
-      }
       .catalog__card {
-        position: relative;
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -331,17 +514,37 @@ export class CatalogPage {
   private readonly categoriesClient = inject(CategoriesClient);
   private readonly plansClient = inject(PlansClient);
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
+  private readonly network = inject(NetworkStatusService);
+  private readonly telemetry = inject(TelemetryService);
   private readonly guard = new StaleGuard();
 
   protected readonly panelId = 'catalog-panel';
+  protected readonly levels = [1, 2, 3, 4, 5];
+  protected readonly sorts = CATALOG_SORTS;
+  protected readonly languages = CATALOG_LANGUAGES;
   protected readonly loading = signal(true);
   protected readonly errorKey = signal<string | null>(null);
+  /** Epoch ms of the cached list shown offline, or null when live. */
+  protected readonly fromCache = signal<number | null>(null);
   protected readonly courses = signal<CourseListItem[]>([]);
   protected readonly categories = signal<Category[]>([]);
   protected readonly plans = signal<Plan[]>([]);
-  protected readonly activeCategoryId = signal<string | null>(null);
-  protected readonly search = signal('');
+  protected readonly filters = signal<CatalogFilters>({ ...DEFAULT_FILTERS });
+  protected readonly activeCategoryId = computed(
+    () => this.filters().categoryId,
+  );
   protected readonly skeletonRows = Array.from({ length: 8 }, (_, i) => i);
+  protected readonly filtered = computed(() => {
+    const f = this.filters();
+    return (
+      !!f.q.trim() ||
+      !!f.categoryId ||
+      !!f.difficulty ||
+      f.access !== 'all' ||
+      !!f.language
+    );
+  });
 
   protected readonly tabs = computed(() => [
     { id: null as string | null, name: '' },
@@ -360,32 +563,26 @@ export class CatalogPage {
   protected readonly cards = computed<CourseCardVM[]>(() => {
     const lookup = this.categoryById();
     const plans = this.plans();
-    const q = this.search().trim().toLowerCase();
     this.i18n.currentLocale();
-    return this.courses()
-      .filter(
-        (c) =>
-          !q ||
-          c.title.toLowerCase().includes(q) ||
-          (c.description ?? '').toLowerCase().includes(q) ||
-          c.authorDisplayName.toLowerCase().includes(q),
-      )
-      .map((c) => ({
-        id: c.id,
-        slug: c.slug,
-        title: c.title,
-        author: c.authorDisplayName,
-        lessonCount: c.lessonCount,
-        estimatedMinutes: c.estimatedMinutes,
-        difficulty: c.difficulty
-          ? this.i18n.t('student.catalog.level', { level: c.difficulty })
-          : '',
-        categories: c.categoryIds
-          .map((id) => lookup.get(id))
-          .filter((x): x is Category => !!x)
-          .map((cat) => ({ id: cat.id, label: cat.name })),
-        plans: plansForCourse(c, plans),
-      }));
+    return this.courses().map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      author: c.authorDisplayName,
+      lessonCount: c.lessonCount,
+      estimatedMinutes: c.estimatedMinutes,
+      difficulty: c.difficulty
+        ? this.i18n.t('student.catalog.level', { level: c.difficulty })
+        : '',
+      categories: c.categoryIds
+        .map((id) => lookup.get(id))
+        .filter((x): x is Category => !!x)
+        .map((cat) => ({ id: cat.id, label: cat.name })),
+      plans: plansForCourse(c, plans),
+      coverUrl: c.coverUrl ?? null,
+      hasFreePreview: c.hasFreePreview === true,
+      premiumOnly: c.hasFreePreview === false && c.lessonCount > 0,
+    }));
   });
 
   constructor() {
@@ -400,8 +597,40 @@ export class CatalogPage {
   }
 
   protected setCategory(id: string | null): void {
-    if (this.activeCategoryId() === id) return;
-    this.activeCategoryId.set(id);
+    if (this.filters().categoryId === id) return;
+    this.patch({ categoryId: id });
+  }
+
+  protected setSearch(q: string): void {
+    if (q.trim() === this.filters().q.trim()) return;
+    this.patch({ q });
+  }
+
+  protected toggleLevel(level: number): void {
+    this.patch({
+      difficulty: this.filters().difficulty === level ? null : level,
+    });
+  }
+
+  protected toggleAccess(access: 'free' | 'premium'): void {
+    this.patch({ access: this.filters().access === access ? 'all' : access });
+  }
+
+  protected setLanguage(lang: string): void {
+    this.patch({ language: lang || null });
+  }
+
+  protected setSort(sort: string): void {
+    if ((CATALOG_SORTS as readonly string[]).includes(sort))
+      this.patch({ sort: sort as CourseSort });
+  }
+
+  protected clearFilters(): void {
+    this.patch({ ...DEFAULT_FILTERS, sort: this.filters().sort });
+  }
+
+  private patch(p: Partial<CatalogFilters>): void {
+    this.filters.update((f) => ({ ...f, ...p }));
     void this.loadCourses();
   }
 
@@ -439,10 +668,19 @@ export class CatalogPage {
     await ev.target.complete();
   }
 
+  private get userId(): string | null {
+    return this.auth.user()?.id ?? null;
+  }
+
   private async loadCategories(): Promise<void> {
     try {
-      const res = await this.categoriesClient.list({ take: 100 });
-      this.categories.set(res.items);
+      const res = await withResponseCache(
+        this.userId,
+        'catalog:categories',
+        this.network.online(),
+        () => this.categoriesClient.list({ take: 100 }),
+      );
+      this.categories.set(res.value.items);
     } catch {
       // Non-fatal: the "All" tab still works without category tabs.
       this.categories.set([]);
@@ -451,7 +689,13 @@ export class CatalogPage {
 
   private async loadPlans(): Promise<void> {
     try {
-      this.plans.set((await this.plansClient.list()).items);
+      const res = await withResponseCache(
+        this.userId,
+        'catalog:plans',
+        this.network.online(),
+        () => this.plansClient.list(),
+      );
+      this.plans.set(res.value.items);
     } catch {
       // Non-fatal: the "included in" chips are a hint only.
       this.plans.set([]);
@@ -459,21 +703,29 @@ export class CatalogPage {
   }
 
   private async loadCourses(): Promise<void> {
-    const categoryId = this.activeCategoryId();
+    const f = this.filters();
     this.loading.set(true);
     this.errorKey.set(null);
     const res = await this.guard.run(() =>
-      this.coursesClient.list({
-        status: 'PUBLISHED',
-        ...(categoryId ? { categoryId } : {}),
-        take: 100,
-      }),
+      withResponseCache(
+        this.userId,
+        catalogCacheKey(f),
+        this.network.online(),
+        () => this.coursesClient.list(catalogQuery(f)),
+      ),
     );
     if (res.stale) return;
     if (res.ok) {
-      this.courses.set(res.value.items);
+      this.courses.set(res.value.value.items);
+      this.fromCache.set(res.value.fromCache);
+      if (f.q.trim() && !res.value.fromCache)
+        this.telemetry.track('catalog_search', {
+          results: res.value.value.items.length,
+          length: f.q.trim().length,
+        });
     } else {
       this.courses.set([]);
+      this.fromCache.set(null);
       this.errorKey.set(errorMessageKey(res.error));
     }
     this.loading.set(false);

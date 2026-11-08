@@ -25,6 +25,7 @@ import {
   PlansClient,
   ProgressClient,
   type CompleteLessonResponse,
+  type CourseDetail,
   type Lesson,
   type Plan,
   type QuizAttemptResult,
@@ -36,12 +37,13 @@ import {
   type LessonQuizResult,
 } from '@codify/ui-bootstrap';
 import type { LessonDoc, QuizAnswers } from '@codify/lesson-schema';
-import { RewardOrchestrator } from '@codify/gamification-engine';
+import { RewardOrchestrator, SoundService } from '@codify/gamification-engine';
 import { I18nService, TranslatePipe } from '@codify/i18n';
 import {
   AppButton,
   AppCard,
   AppSkeleton,
+  BottomSheet,
   CoinBadge,
   EmptyState,
   ErrorState,
@@ -85,6 +87,20 @@ import {
   type RequiredPlan,
 } from './lesson/lesson-state.js';
 import { provideNativeLessonImages } from '../offline/native-lesson-images.js';
+import { LessonOutline } from '../components/lesson-outline.component.js';
+import { loadCourse, saveCourse } from './shared/course-cache.js';
+import {
+  TEXT_SCALES,
+  buildOutline,
+  lessonNeighbours,
+  readTextSize,
+  textScale,
+  writeTextSize,
+  type OutlineModule,
+  type TextSizeId,
+} from './lesson/lesson-nav.js';
+import type { ConfirmsExit } from './lesson/lesson-exit.guard.js';
+import { ShellBreadcrumbs } from '../components/shell-breadcrumbs.service.js';
 
 interface Completion {
   xp: number;
@@ -125,6 +141,7 @@ interface Neighbour {
     AppButton,
     AppCard,
     AppSkeleton,
+    BottomSheet,
     CoinBadge,
     EmptyState,
     ErrorState,
@@ -137,6 +154,7 @@ interface Neighbour {
     LessonExerciseComponent,
     LessonAiPromptComponent,
     LessonScenarioComponent,
+    LessonOutline,
     TranslatePipe,
   ],
   template: `
@@ -151,126 +169,202 @@ interface Neighbour {
         <ion-title>{{
           lesson()?.title ?? ('student.lesson.title' | translate)
         }}</ion-title>
+        <ion-buttons slot="end">
+          @if (outline().length > 0) {
+            <button
+              type="button"
+              class="lp__tool lp__tool--outline"
+              data-testid="lesson-outline-btn"
+              [attr.aria-label]="'student.lesson.outline' | translate"
+              [attr.aria-expanded]="outlineOpen()"
+              (click)="outlineOpen.set(true)"
+            >
+              <cdf-icon name="apps" size="md" />
+            </button>
+          }
+          <button
+            type="button"
+            class="lp__tool"
+            data-testid="lesson-settings-btn"
+            [attr.aria-label]="'student.lesson.settings.title' | translate"
+            [attr.aria-expanded]="settingsOpen()"
+            (click)="settingsOpen.set(true)"
+          >
+            <cdf-icon name="settings" size="md" />
+          </button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="ion-padding">
-      <div class="lp" [attr.data-state]="state()" data-testid="lesson-page">
-        @switch (state()) {
-          @case ('loading') {
-            <div class="lp__skel" aria-busy="true">
-              <cdf-app-skeleton shape="text" />
-              <cdf-app-skeleton shape="text" />
-              <cdf-app-skeleton shape="rect" [height]="160" />
-            </div>
-          }
-          @case ('paywall') {
-            <cdf-app-card
-              padding="spacious"
-              class="lp__paywall"
-              data-testid="lesson-paywall"
-            >
-              <cdf-icon name="shield" size="lg" />
-              <h1>{{ 'student.lesson.paywall.title' | translate }}</h1>
-              <p>{{ 'student.lesson.paywall.body' | translate }}</p>
-              @if (requiredPlans().length > 0) {
-                <ul class="lp__plans" data-testid="lesson-required-plans">
-                  @for (p of requiredPlans(); track p.id) {
-                    <li [attr.data-plan-id]="p.id">{{ p.name }}</li>
-                  }
-                </ul>
-              }
-              <div class="lp__actions">
-                <cdf-app-button
-                  kind="primary"
-                  (buttonClick)="openPaywall()"
-                  data-testid="paywall-cta"
-                >
-                  {{ 'student.lesson.paywall.cta' | translate }}
-                </cdf-app-button>
-                <cdf-app-button kind="ghost" [routerLink]="backHref()">
-                  {{ 'student.lesson.backToCourse' | translate }}
-                </cdf-app-button>
+      <div class="lp-layout" [class.lp-layout--rail]="outline().length > 0">
+        @if (outline().length > 0) {
+          <aside class="lp-rail" data-testid="lesson-rail">
+            <cdf-lesson-outline [modules]="outline()" />
+          </aside>
+        }
+        <div class="lp" [attr.data-state]="state()" data-testid="lesson-page">
+          @switch (state()) {
+            @case ('loading') {
+              <div class="lp__skel" aria-busy="true">
+                <cdf-app-skeleton shape="text" />
+                <cdf-app-skeleton shape="text" />
+                <cdf-app-skeleton shape="rect" [height]="160" />
               </div>
-            </cdf-app-card>
-          }
-          @case ('notFound') {
-            <cdf-empty-state
-              icon="school"
-              data-testid="lesson-not-found"
-              [title]="'student.lesson.notFound.title' | translate"
-              [description]="'student.lesson.notFound.body' | translate"
-            >
-              <cdf-app-button kind="primary" routerLink="/catalog">{{
-                'student.myCourses.browse' | translate
-              }}</cdf-app-button>
-            </cdf-empty-state>
-          }
-          @case ('offlineMissing') {
-            <cdf-offline-state
-              data-testid="lesson-offline"
-              [title]="'student.lesson.offline.title' | translate"
-              [description]="'student.lesson.offline.body' | translate"
-              [hasDownloads]="downloads.downloads().length > 0"
-              [queued]="sync.pendingCount()"
-              (retry)="reload()"
-              (openDownloads)="openDownloads()"
-            />
-          }
-          @case ('error') {
-            <cdf-error-state
-              data-testid="lesson-error"
-              [title]="'student.lesson.error.title' | translate"
-              [description]="
-                errorKey() ?? 'studentPlatform.errors.unknown' | translate
-              "
-              (retry)="reload()"
-            />
-          }
-          @case ('ready') {
-            @if (lesson(); as l) {
-              <article
-                class="lp__article"
-                data-testid="lesson-article"
-                [attr.data-lesson-type]="l.type"
+            }
+            @case ('paywall') {
+              <cdf-app-card
+                padding="spacious"
+                class="lp__paywall"
+                data-testid="lesson-paywall"
               >
-                @if (fromCache()) {
-                  <p class="lp__offline" data-testid="offline-read">
-                    <cdf-icon name="cloud-offline" size="xs" />
-                    {{ 'student.lesson.readingOffline' | translate }}
-                  </p>
+                <cdf-icon name="shield" size="lg" />
+                <h1>{{ 'student.lesson.paywall.title' | translate }}</h1>
+                <p>{{ 'student.lesson.paywall.body' | translate }}</p>
+                @if (requiredPlans().length > 0) {
+                  <ul class="lp__plans" data-testid="lesson-required-plans">
+                    @for (p of requiredPlans(); track p.id) {
+                      <li [attr.data-plan-id]="p.id">{{ p.name }}</li>
+                    }
+                  </ul>
                 }
-                <header class="lp__head">
-                  @if (position(); as pos) {
-                    <p class="lp__eyebrow">
-                      {{ 'student.lesson.position' | translate: pos }}
+                <div class="lp__actions">
+                  <cdf-app-button
+                    kind="primary"
+                    (buttonClick)="openPaywall(true)"
+                    data-testid="paywall-cta"
+                  >
+                    {{ 'student.lesson.paywall.cta' | translate }}
+                  </cdf-app-button>
+                  <cdf-app-button kind="ghost" [routerLink]="backHref()">
+                    {{ 'student.lesson.backToCourse' | translate }}
+                  </cdf-app-button>
+                </div>
+              </cdf-app-card>
+            }
+            @case ('notFound') {
+              <cdf-empty-state
+                icon="school"
+                data-testid="lesson-not-found"
+                [title]="'student.lesson.notFound.title' | translate"
+                [description]="'student.lesson.notFound.body' | translate"
+              >
+                <cdf-app-button kind="primary" routerLink="/catalog">{{
+                  'student.myCourses.browse' | translate
+                }}</cdf-app-button>
+              </cdf-empty-state>
+            }
+            @case ('offlineMissing') {
+              <cdf-offline-state
+                data-testid="lesson-offline"
+                [title]="'student.lesson.offline.title' | translate"
+                [description]="'student.lesson.offline.body' | translate"
+                [hasDownloads]="downloads.downloads().length > 0"
+                [queued]="sync.pendingCount()"
+                (retry)="reload()"
+                (openDownloads)="openDownloads()"
+              />
+            }
+            @case ('error') {
+              <cdf-error-state
+                data-testid="lesson-error"
+                [title]="'student.lesson.error.title' | translate"
+                [description]="
+                  errorKey() ?? 'studentPlatform.errors.unknown' | translate
+                "
+                (retry)="reload()"
+              />
+            }
+            @case ('ready') {
+              @if (lesson(); as l) {
+                <article
+                  class="lp__article"
+                  data-testid="lesson-article"
+                  [attr.data-lesson-type]="l.type"
+                >
+                  @if (fromCache()) {
+                    <p class="lp__offline" data-testid="offline-read">
+                      <cdf-icon name="cloud-offline" size="xs" />
+                      {{ 'student.lesson.readingOffline' | translate }}
                     </p>
                   }
-                  <h1>{{ l.title }}</h1>
-                  <p class="lp__meta">
-                    @if (l.estimatedMinutes) {
-                      <span
-                        ><cdf-icon name="hourglass" size="xs" />
-                        {{
-                          'ui.duration.minutes'
-                            | translate: { m: l.estimatedMinutes }
-                        }}</span
-                      >
+                  <header class="lp__head">
+                    @if (position(); as pos) {
+                      <p class="lp__eyebrow">
+                        {{ 'student.lesson.position' | translate: pos }}
+                      </p>
                     }
-                    <cdf-xp-badge [value]="l.baseXp" size="sm" />
-                    <cdf-coin-badge [value]="l.baseCoins" size="sm" />
-                  </p>
-                </header>
+                    <h1>{{ l.title }}</h1>
+                    <p class="lp__meta">
+                      @if (l.estimatedMinutes) {
+                        <span
+                          ><cdf-icon name="hourglass" size="xs" />
+                          {{
+                            'ui.duration.minutes'
+                              | translate: { m: l.estimatedMinutes }
+                          }}</span
+                        >
+                      }
+                      <cdf-xp-badge [value]="l.baseXp" size="sm" />
+                      <cdf-coin-badge [value]="l.baseCoins" size="sm" />
+                    </p>
+                  </header>
 
-                @if (showDoc()) {
-                  <cdf-lesson-block-renderer
-                    [doc]="doc()"
-                    [(quizAnswers)]="answers"
-                    [quizResult]="quizResult()"
-                    [interactionDisabled]="submittingQuiz()"
-                  >
-                    <ng-template cdfLessonRef let-ref>
-                      @switch (ref.kind) {
+                  @if (showDoc()) {
+                    <div
+                      class="lp__body"
+                      data-testid="lesson-body"
+                      [attr.data-text-size]="textSize()"
+                      [style.zoom]="scale()"
+                    >
+                      <cdf-lesson-block-renderer
+                        [doc]="doc()"
+                        [(quizAnswers)]="answers"
+                        [quizResult]="quizResult()"
+                        [interactionDisabled]="submittingQuiz()"
+                      >
+                        <ng-template cdfLessonRef let-ref>
+                          @switch (ref.kind) {
+                            @case ('exercise') {
+                              <cdf-lesson-exercise
+                                [lessonId]="l.id"
+                                (completed)="onRunnerCompleted($event)"
+                                (paywall)="onRunnerPaywall($event)"
+                              />
+                            }
+                            @case ('aiPrompt') {
+                              <cdf-lesson-ai-prompt
+                                [lessonId]="l.id"
+                                (completed)="onRunnerCompleted($event)"
+                                (paywall)="onRunnerPaywall($event)"
+                              />
+                            }
+                            @case ('scenario') {
+                              <cdf-lesson-scenario
+                                [lessonId]="l.id"
+                                [lessonTitle]="l.title"
+                                [estimate]="{
+                                  xp: l.baseXp,
+                                  coins: l.baseCoins,
+                                }"
+                                (completed)="onRunnerCompleted($event)"
+                                (paywall)="onRunnerPaywall($event)"
+                              />
+                            }
+                          }
+                        </ng-template>
+                      </cdf-lesson-block-renderer>
+                    </div>
+                  }
+
+                  @if (runnerByType(); as kind) {
+                    <section
+                      class="lp__runner"
+                      [attr.aria-label]="
+                        'student.lesson.runnerLabel.' + kind | translate
+                      "
+                    >
+                      @switch (kind) {
                         @case ('exercise') {
                           <cdf-lesson-exercise
                             [lessonId]="l.id"
@@ -288,67 +382,100 @@ interface Neighbour {
                         @case ('scenario') {
                           <cdf-lesson-scenario
                             [lessonId]="l.id"
+                            [lessonTitle]="l.title"
+                            [estimate]="{ xp: l.baseXp, coins: l.baseCoins }"
                             (completed)="onRunnerCompleted($event)"
                             (paywall)="onRunnerPaywall($event)"
                           />
                         }
                       }
-                    </ng-template>
-                  </cdf-lesson-block-renderer>
-                }
+                    </section>
+                  }
 
-                @if (runnerByType(); as kind) {
-                  <section
-                    class="lp__runner"
-                    [attr.aria-label]="
-                      'student.lesson.runnerLabel.' + kind | translate
-                    "
-                  >
-                    @switch (kind) {
-                      @case ('exercise') {
-                        <cdf-lesson-exercise
-                          [lessonId]="l.id"
-                          (completed)="onRunnerCompleted($event)"
-                          (paywall)="onRunnerPaywall($event)"
-                        />
-                      }
-                      @case ('aiPrompt') {
-                        <cdf-lesson-ai-prompt
-                          [lessonId]="l.id"
-                          (completed)="onRunnerCompleted($event)"
-                          (paywall)="onRunnerPaywall($event)"
-                        />
-                      }
-                      @case ('scenario') {
-                        <cdf-lesson-scenario
-                          [lessonId]="l.id"
-                          (completed)="onRunnerCompleted($event)"
-                          (paywall)="onRunnerPaywall($event)"
-                        />
-                      }
-                    }
-                  </section>
-                }
-
-                @if (quizFeedback(); as fb) {
-                  <div
-                    class="lp__quiz-result"
-                    role="status"
-                    data-testid="quiz-result"
-                    [attr.data-passed]="fb.passed"
-                  >
-                    <cdf-icon
-                      [name]="fb.passed ? 'check-circle' : 'x-circle'"
-                      size="md"
-                    />
-                    <span>{{ fb.key | translate: fb.params }}</span>
-                  </div>
-                }
-              </article>
+                  @if (quizFeedback(); as fb) {
+                    <div
+                      class="lp__quiz-result"
+                      role="status"
+                      data-testid="quiz-result"
+                      [attr.data-passed]="fb.passed"
+                    >
+                      <cdf-icon
+                        [name]="fb.passed ? 'check-circle' : 'x-circle'"
+                        size="md"
+                      />
+                      <span>{{ fb.key | translate: fb.params }}</span>
+                    </div>
+                  }
+                </article>
+              }
             }
           }
-        }
+        </div>
       </div>
+
+      <cdf-bottom-sheet
+        [(open)]="outlineOpen"
+        [title]="'student.lesson.outline' | translate"
+      >
+        <cdf-lesson-outline
+          [modules]="outline()"
+          (navigated)="outlineOpen.set(false)"
+        />
+      </cdf-bottom-sheet>
+
+      <cdf-bottom-sheet
+        [(open)]="settingsOpen"
+        [title]="'student.lesson.settings.title' | translate"
+      >
+        <fieldset class="lp__setting" data-testid="lesson-text-size">
+          <legend>{{ 'student.lesson.settings.textSize' | translate }}</legend>
+          <div class="lp__sizes" role="radiogroup">
+            @for (t of textScales; track t.id) {
+              <label class="lp__size">
+                <input
+                  type="radio"
+                  name="lp-text-size"
+                  [value]="t.id"
+                  [checked]="textSize() === t.id"
+                  (change)="setTextSize(t.id)"
+                />
+                <span [style.font-size.em]="t.scale">{{
+                  'student.lesson.settings.size.' + t.id | translate
+                }}</span>
+              </label>
+            }
+          </div>
+        </fieldset>
+        <label class="lp__toggle">
+          <input
+            type="checkbox"
+            data-testid="lesson-sound-toggle"
+            [checked]="sound.soundEnabled()"
+            (change)="sound.setSoundEnabled($any($event.target).checked)"
+          />
+          <span>{{ 'student.lesson.settings.sound' | translate }}</span>
+        </label>
+      </cdf-bottom-sheet>
+
+      <cdf-bottom-sheet
+        [(open)]="exitOpen"
+        (openChange)="!$event && resolveExit(false)"
+        [title]="'student.lesson.exit.title' | translate"
+      >
+        <p>{{ 'student.lesson.exit.body' | translate }}</p>
+        <div sheetFooter class="lp__exit">
+          <cdf-app-button kind="ghost" (buttonClick)="resolveExit(false)">
+            {{ 'student.lesson.exit.stay' | translate }}
+          </cdf-app-button>
+          <cdf-app-button
+            kind="danger"
+            data-testid="lesson-exit-confirm"
+            (buttonClick)="resolveExit(true)"
+          >
+            {{ 'student.lesson.exit.leave' | translate }}
+          </cdf-app-button>
+        </div>
+      </cdf-bottom-sheet>
 
       @if (paywallContent(); as pc) {
         <cdf-paywall-sheet
@@ -386,8 +513,8 @@ interface Neighbour {
                 }
               </div>
               @if (c.queued) {
-                <small class="lp__hint">{{
-                  'student.lesson.willSync' | translate
+                <small class="lp__hint" data-testid="lesson-estimated">{{
+                  'student.lesson.willSyncEstimated' | translate
                 }}</small>
               }
               @if (next(); as n) {
@@ -453,6 +580,85 @@ interface Neighbour {
       .lp {
         max-width: 720px;
         margin: 0 auto;
+        min-width: 0;
+      }
+      .lp-rail {
+        display: none;
+      }
+      /* docs/05: module outline rail at ≥ lg; a sheet below. */
+      @media (min-width: 1024px) {
+        .lp-layout--rail {
+          display: grid;
+          grid-template-columns: minmax(200px, 260px) minmax(0, 720px);
+          gap: var(--cdf-space-4);
+          justify-content: center;
+          align-items: start;
+        }
+        .lp-layout--rail .lp {
+          margin: 0;
+          width: 100%;
+        }
+        .lp-rail {
+          display: block;
+          position: sticky;
+          top: 0;
+          max-height: calc(100vh - 160px);
+          overflow: auto;
+          padding-right: 4px;
+        }
+        .lp__tool--outline {
+          display: none;
+        }
+      }
+      .lp__tool {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 999px;
+        background: none;
+        color: inherit;
+        cursor: pointer;
+      }
+      .lp__tool:focus-visible {
+        outline: 2px solid var(--cdf-color-primary);
+        outline-offset: 2px;
+      }
+      .lp__setting {
+        border: 0;
+        padding: 0;
+        margin: 0 0 var(--cdf-space-3);
+      }
+      .lp__setting legend {
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .lp__sizes {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .lp__size {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid var(--cdf-color-border);
+        border-radius: 999px;
+      }
+      .lp__toggle {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-height: 44px;
+      }
+      .lp__exit {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
       }
       .lp__skel {
         display: flex;
@@ -567,7 +773,7 @@ interface Neighbour {
     `,
   ],
 })
-export class LessonPage {
+export class LessonPage implements ConfirmsExit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly lessonsClient = inject(LessonsClient);
@@ -581,6 +787,31 @@ export class LessonPage {
   private readonly i18n = inject(I18nService);
   protected readonly sync = inject(OfflineSyncService);
   protected readonly downloads = inject(DownloadService);
+  protected readonly sound = inject(SoundService);
+
+  protected readonly textScales = TEXT_SCALES;
+  protected readonly textSize = signal<TextSizeId>(readTextSize());
+  protected readonly scale = computed(() => textScale(this.textSize()));
+  protected readonly settingsOpen = signal(false);
+  protected readonly outlineOpen = signal(false);
+  protected readonly exitOpen = signal(false);
+  private exitResolver: ((leave: boolean) => void) | null = null;
+  /** The course curriculum (live, or the cached copy offline). */
+  private readonly courseDetail = signal<CourseDetail | null>(null);
+  private readonly completedIds = signal<ReadonlySet<string>>(new Set());
+  private readonly downloadedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly outline = computed<OutlineModule[]>(() => {
+    const d = this.courseDetail();
+    const l = this.lesson();
+    if (!d || !l) return [];
+    const completed = new Set(this.completedIds());
+    if (this.completion()?.queued === false) completed.add(l.id);
+    return buildOutline(d, l.id, {
+      completed,
+      pending: this.sync.pendingLessonIds(),
+      downloaded: this.downloadedIds(),
+    });
+  });
 
   protected readonly state = signal<LessonViewState>('loading');
   protected readonly lesson = signal<Lesson | null>(null);
@@ -711,6 +942,18 @@ export class LessonPage {
       );
     });
     effect(() => {
+      const r = this.sync.lastReconciled.scenarioComplete();
+      const l = untracked(() => this.lesson());
+      if (!r || !l || r.lessonId !== l.id || !r.result.completed) return;
+      untracked(() =>
+        this.completion.set({
+          xp: r.result.reward?.xp ?? 0,
+          coins: r.result.reward?.coins ?? 0,
+          queued: false,
+        }),
+      );
+    });
+    effect(() => {
       const r = this.sync.lastReconciled.quizAttempt();
       const l = untracked(() => this.lesson());
       if (!r || !l || r.lessonId !== l.id) return;
@@ -725,7 +968,65 @@ export class LessonPage {
       untracked(() => this.showPaywall(l.id, null));
     });
 
-    inject(DestroyRef).onDestroy(() => this.trackAbandon());
+    // Desktop header breadcrumb (docs/05 §1): Catalog › Course › Lesson.
+    const crumbs = inject(ShellBreadcrumbs);
+    effect(() => {
+      const l = this.lesson();
+      const d = this.courseDetail();
+      untracked(() => {
+        if (!l) return;
+        crumbs.set(this, [
+          { label: 'studentPlatform.nav.catalog', url: '/catalog', key: true },
+          ...(d ? [{ label: d.title, url: `/courses/${d.slug}` }] : []),
+          { label: l.title },
+        ]);
+      });
+    });
+    inject(DestroyRef).onDestroy(() => crumbs.clear(this));
+
+    // Closing the tab with unsaved answers (docs/05 "Exit … with confirm").
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (this.hasUnsaved()) e.preventDefault();
+    };
+    if (typeof window !== 'undefined')
+      window.addEventListener('beforeunload', onUnload);
+
+    inject(DestroyRef).onDestroy(() => {
+      this.trackAbandon();
+      if (typeof window !== 'undefined')
+        window.removeEventListener('beforeunload', onUnload);
+      this.exitResolver?.(true);
+    });
+  }
+
+  /** Quiz answers given but not submitted, nothing completed yet. */
+  protected hasUnsaved(): boolean {
+    if (this.state() !== 'ready' || this.completion()) return false;
+    if (this.quizResult() || this.quizQueued() || this.submittingQuiz())
+      return false;
+    return Object.values(this.answers()).some((a) => (a?.length ?? 0) > 0);
+  }
+
+  /** CanDeactivate (lessonExitGuard): confirm before dropping answers. */
+  confirmExit(): boolean | Promise<boolean> {
+    if (!this.hasUnsaved()) return true;
+    this.exitResolver?.(false);
+    this.exitOpen.set(true);
+    return new Promise<boolean>((resolve) => {
+      this.exitResolver = resolve;
+    });
+  }
+
+  protected resolveExit(leave: boolean): void {
+    const r = this.exitResolver;
+    this.exitResolver = null;
+    this.exitOpen.set(false);
+    r?.(leave);
+  }
+
+  protected setTextSize(id: TextSizeId): void {
+    this.textSize.set(id);
+    writeTextSize(id);
   }
 
   protected reload(): void {
@@ -748,6 +1049,7 @@ export class LessonPage {
     this.next.set(null);
     this.position.set(null);
     this.courseSlug.set(null);
+    this.outlineOpen.set(false);
     this.openedAt = Date.now();
   }
 
@@ -796,7 +1098,28 @@ export class LessonPage {
       this.state.set('offlineMissing');
       return;
     }
-    this.show(lessonFromBundle(bundle), true);
+    const lesson = lessonFromBundle(bundle);
+    this.show(lesson, true);
+    await this.contextFromCache(lesson, seq);
+  }
+
+  /** Offline: position, outline and "Next" from the cached curriculum. */
+  private async contextFromCache(lesson: Lesson, seq: number): Promise<void> {
+    const cached = loadCourse(lesson.courseId);
+    const downloaded = await this.downloads
+      .downloadedLessonIds(lesson.courseId)
+      .catch(() => new Set<string>());
+    if (seq !== this.loadSeq || !cached) return;
+    this.courseSlug.set(cached.detail.slug);
+    this.courseDetail.set(cached.detail);
+    this.completedIds.set(new Set(cached.completedIds));
+    this.downloadedIds.set(downloaded);
+    const nb = lessonNeighbours(cached.detail, lesson.id, {
+      offline: true,
+      downloaded,
+    });
+    this.position.set(nb.position);
+    this.next.set(nb.next);
   }
 
   private show(lesson: Lesson, fromCache: boolean): void {
@@ -804,6 +1127,8 @@ export class LessonPage {
     this.fromCache.set(fromCache);
     this.state.set('ready');
     void this.downloads.markRead(lesson.courseId);
+    // docs/16 §7: an offline open is reported once the device syncs.
+    if (fromCache) void this.sync.markLessonSeen(lesson.id, lesson.courseId);
     this.telemetry.track('lesson_open', {
       lessonId: lesson.id,
       courseId: lesson.courseId,
@@ -830,18 +1155,27 @@ export class LessonPage {
       }
     }
     if (course.status === 'fulfilled') {
-      this.courseSlug.set(course.value.slug);
-      const all = course.value.modules.flatMap((m) => m.lessons);
-      const idx = all.findIndex((l) => l.id === lesson.id);
-      const mod = course.value.modules.find((m) =>
-        m.lessons.some((l) => l.id === lesson.id),
-      );
-      if (mod) {
-        const i = mod.lessons.findIndex((l) => l.id === lesson.id);
-        this.position.set({ index: i + 1, total: mod.lessons.length });
-      }
-      const n = idx >= 0 ? all[idx + 1] : undefined;
-      this.next.set(n ? { id: n.id, title: n.title } : null);
+      const detail = course.value;
+      this.courseSlug.set(detail.slug);
+      this.courseDetail.set(detail);
+      const done =
+        progress.status === 'fulfilled'
+          ? new Set(progress.value.items.map((i) => i.lessonId))
+          : new Set<string>();
+      this.completedIds.set(done);
+      // Keep the curriculum for offline "Next" / outline (docs/16 §3).
+      saveCourse(detail, done);
+      const downloaded = await this.downloads
+        .downloadedLessonIds(detail.id)
+        .catch(() => new Set<string>());
+      if (seq !== this.loadSeq) return;
+      this.downloadedIds.set(downloaded);
+      const nb = lessonNeighbours(detail, lesson.id, {
+        offline: false,
+        downloaded,
+      });
+      this.position.set(nb.position);
+      this.next.set(nb.next);
     }
   }
 
@@ -863,13 +1197,23 @@ export class LessonPage {
     }
   }
 
-  protected openPaywall(): void {
+  protected openPaywall(cta = false): void {
+    if (cta)
+      this.telemetry.paywallCta({
+        source: 'lesson',
+        lessonId: this.lesson()?.id ?? null,
+      });
     this.paywallOpen.set(true);
     this.telemetry.track('plans_view', { source: 'paywall' });
     if (!this.paywallContent()) void this.router.navigateByUrl('/subscription');
   }
 
   protected choosePlan(priceId: string): void {
+    this.telemetry.paywallCta({
+      source: 'lesson_sheet',
+      planId: priceId,
+      lessonId: this.lesson()?.id ?? null,
+    });
     this.paywallOpen.set(false);
     void this.router.navigate(['/subscription'], {
       queryParams: { price: priceId },
@@ -891,6 +1235,7 @@ export class LessonPage {
       const outcome: QuizSubmitOutcome = await this.sync.submitQuiz(
         l.id,
         this.answers(),
+        { title: l.title, estimate: { xp: l.baseXp, coins: l.baseCoins } },
       );
       this.attempts.update((n) => n + 1);
       if (outcome.status === 'graded') {
@@ -949,7 +1294,10 @@ export class LessonPage {
     const sourceEl = (ev?.currentTarget as HTMLElement | null) ?? null;
     this.completing.set(true);
     try {
-      const outcome = await this.sync.completeLesson(l.id, { title: l.title });
+      const outcome = await this.sync.completeLesson(l.id, {
+        title: l.title,
+        estimate: { xp: l.baseXp, coins: l.baseCoins },
+      });
       switch (outcome.status) {
         case 'synced':
           this.applyCompletion(outcome.response, sourceEl);
@@ -1009,9 +1357,9 @@ export class LessonPage {
 
   /** The runner already played the reward; reflect the completed state. */
   protected onRunnerCompleted(r: RunnerCompletion): void {
-    if (this.completion()) return;
-    this.completion.set({ xp: r.xp, coins: r.coins, queued: false });
-    this.trackComplete(false);
+    if (this.completion()?.queued === false) return;
+    this.completion.set({ xp: r.xp, coins: r.coins, queued: !!r.queued });
+    if (!r.queued) this.trackComplete(false);
   }
 
   protected onRunnerPaywall(err: unknown): void {

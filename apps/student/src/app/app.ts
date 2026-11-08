@@ -1,5 +1,6 @@
 import { Component, Injector, afterNextRender, inject } from '@angular/core';
 import { IonicRoot } from './platform/ionic-root.component.js';
+import { ConsentBanner } from './components/consent-banner.component.js';
 
 /**
  * Root of the student app. The Ionic shell (`ion-app`, root outlet, toast
@@ -13,11 +14,15 @@ import { IonicRoot } from './platform/ionic-root.component.js';
  * chunk — see `platform/boot.ts`.
  */
 @Component({
-  imports: [IonicRoot],
+  imports: [IonicRoot, ConsentBanner],
   selector: 'app-root',
   template: `@defer (on immediate) {
-    <cdf-ionic-root />
-  }`,
+      <cdf-ionic-root />
+    }
+    <!-- docs/14 §13: web cookie / analytics consent (lazy chunk). -->
+    @defer (on idle) {
+      <cdf-consent-banner />
+    }`,
 })
 export class App {
   private readonly injector = inject(Injector);
