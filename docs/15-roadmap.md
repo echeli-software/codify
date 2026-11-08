@@ -377,14 +377,14 @@ Deliverables:
 
 **Acceptance**:
 
-- ⬜ An 11-year-old date of birth stops onboarding and removes the account.
-- ⬜ A 15-year-old's profile is hidden from non-friends and absent from
-  search; their web checkout requires the guardian step.
-- ⬜ An adult who accepts the prompt receives a campaign push and email; one
+- ✅ An 11-year-old date of birth stops onboarding and removes the account.
+- ✅ A 15-year-old's profile is hidden from non-friends and absent from
+  search; their web checkout requires the guardian step. (There is no student user search; league rows don't link the profile and the activity feed is refused.)
+- ✅ An adult who accepts the prompt receives a campaign push and email; one
   who declines receives neither.
-- ⬜ A desktop Chrome user who allowed notifications gets the streak
-  reminder as a web push, respecting quiet hours.
-- ⬜ Admin can filter users by country and age group.
+- ◑ A desktop Chrome user who allowed notifications gets the streak
+  reminder as a web push, respecting quiet hours. Verified up to the push service (encrypted payload decrypted, shown by the Angular service worker, quiet hours honoured); a real Chrome receiving it through FCM is to be checked on staging.
+- ✅ Admin can filter users by country and age group.
 
 ## Future (post-launch backlog)
 
