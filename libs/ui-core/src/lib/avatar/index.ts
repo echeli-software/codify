@@ -1,0 +1,21 @@
+// Avatar config palettes + validation (docs/08 §5).
+export {
+  AVATAR_CONFIG_KEYS,
+  AVATAR_POSES,
+  BASE_BODIES,
+  DEFAULT_AVATAR_CONFIG,
+  EYE_COLORS,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  SKIN_TONES,
+  SKIN_TONE_HEX,
+  normalizeAvatarConfig,
+  randomAvatarConfig,
+  validateAvatarConfig,
+  type AvatarConfig,
+  type AvatarConfigValidation,
+  type AvatarPose,
+  type BaseBodyId,
+  type BaseHairStyle,
+  type SkinTone,
+} from './avatar-config.js';

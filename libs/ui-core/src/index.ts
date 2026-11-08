@@ -8,3 +8,4 @@ export * from './lib/level/index.js';
 export * from './lib/validate/index.js';
 export * from './lib/color/index.js';
 export * from './lib/random/index.js';
+export * from './lib/avatar/index.js';
