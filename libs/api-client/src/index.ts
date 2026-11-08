@@ -36,6 +36,8 @@ export {
   type CourseLessonSummary,
   type CourseDetail,
   type ListCoursesQuery,
+  type CourseContentQuery,
+  type CourseTranslationMeta,
   type CourseSort,
   type CreateCourseBody,
   type UpdateCourseBody,

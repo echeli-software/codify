@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 
 import { COURSE_SORTS, type CourseSort } from './course-discovery.js';
+import type { TranslationMeta } from '../lessons/lessons.dto.js';
 
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
 const COURSE_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
@@ -186,6 +187,22 @@ export class ListCoursesQueryDto {
   @IsOptional()
   @IsIn(COURSE_SORTS)
   sort?: CourseSort;
+
+  // ─── Content locale (docs/11 §3 fetch pattern) ───────────────────────
+
+  /** Content locale for titles/descriptions; overrides Accept-Language. */
+  @IsOptional()
+  @IsString()
+  @Length(2, 16)
+  locale?: string;
+
+  /**
+   * 'false' → only courses whose title/description exist in the requested
+   * locale (no source-locale fallback). Default 'true'.
+   */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  fallback?: 'true' | 'false';
 }
 
 export interface CourseListItem {
@@ -213,6 +230,13 @@ export interface CourseListItem {
   lessonCount: number;
   /** At least one live lesson is free ("free preview available", docs/05 §3). */
   hasFreePreview?: boolean;
+  /**
+   * List/detail reads (docs/11 §3 fetch pattern): `locale` = the content
+   * locale asked for, `source` = the locale the text was served in
+   * (≠ `locale` when any of it fell back), `fallback` = whether it did.
+   * Detail counts module + lesson titles too.
+   */
+  _translation?: TranslationMeta;
 }
 
 export interface CourseLessonSummary {

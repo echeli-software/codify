@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  Optional,
   Param,
   Patch,
   Post,
@@ -17,6 +18,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import { CoursesService } from './courses.service.js';
+import { ContentLocalizer } from '../translations/content-localizer.service.js';
 import {
   CreateCourseDto,
   ListCoursesQueryDto,
@@ -41,19 +43,29 @@ function pickLocale(header: string | undefined): string {
  * their own courses, enforced inside the service).
  *
  * Title + description are stored in ContentTranslation rows with the
- * source-locale on POST. The Accept-Language header lets the response
- * resolve title in the caller's preferred locale and falls back to
- * source.
+ * source-locale on POST. Reads resolve them in the caller's content locale
+ * (`?locale=`, else Accept-Language, else `User.locale` — docs/11 §3) and
+ * fall back to the source, reporting it in `_translation` and
+ * `X-Translation-Fallback`; `?fallback=false` drops (list) or 404s
+ * (detail) instead.
  */
 @Controller('courses')
 export class CoursesController {
   constructor(
     private readonly courses: CoursesService,
     private readonly audit: AuditService,
+    @Optional() private readonly localizer?: ContentLocalizer,
   ) {}
 
+  /** The request's content locale (first Accept-Language tag without a localizer). */
+  private async locale(acceptLanguage: string | undefined): Promise<string> {
+    return (
+      (await this.localizer?.requestLocale()) ?? pickLocale(acceptLanguage)
+    );
+  }
+
   @Get()
-  list(
+  async list(
     @CurrentUser() actor: ApiUser,
     @Query() query: ListCoursesQueryDto,
     @Headers('accept-language') acceptLanguage?: string,
@@ -62,16 +74,24 @@ export class CoursesController {
     // the query is ignored. Staff above teacher may filter freely.
     const scopedQuery: ListCoursesQueryDto =
       actor.role === 'TEACHER' ? { ...query, authorId: actor.userId } : query;
-    return this.courses.list(actor, scopedQuery, pickLocale(acceptLanguage));
+    return this.courses.list(
+      actor,
+      scopedQuery,
+      await this.locale(acceptLanguage),
+    );
   }
 
   @Get(':idOrSlug')
-  detail(
+  async detail(
     @CurrentUser() actor: ApiUser,
     @Param('idOrSlug') idOrSlug: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<CourseDetail> {
-    return this.courses.getDetail(actor, idOrSlug, pickLocale(acceptLanguage));
+    return this.courses.getDetail(
+      actor,
+      idOrSlug,
+      await this.locale(acceptLanguage),
+    );
   }
 
   @Roles('ADMIN', 'TEACHER')

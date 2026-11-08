@@ -14,7 +14,10 @@ import type {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CourseInsightsService } from './course-insights.service.js';
-import { noteTranslationFallback } from '../translations/translation-context.js';
+import {
+  noteTranslationFallback,
+  requestAllowsFallback,
+} from '../translations/translation-context.js';
 import type { ApiUser } from '../auth/auth.types.js';
 import {
   discoveryFilters,
@@ -30,6 +33,7 @@ import type {
   ListCoursesQueryDto,
   UpdateCourseDto,
 } from './courses.dto.js';
+import type { TranslationMeta } from '../lessons/lessons.dto.js';
 
 interface ResolvedTitle {
   title: string;
@@ -88,7 +92,39 @@ export class CoursesService {
       where.id = { in: [...incomplete] };
     }
 
-    const discovery = await discoveryFilters(this.prisma, query);
+    const discovery: Prisma.CourseWhereInput[] = await discoveryFilters(
+      this.prisma,
+      query,
+    );
+    // `?fallback=false` (docs/11 §3): only courses fully readable in the
+    // requested locale. Filtered before paging so `total` stays exact.
+    if (query.fallback === 'false') {
+      const candidates = await this.prisma.course.findMany({
+        where: discovery.length ? { ...where, AND: discovery } : where,
+        select: { id: true, sourceLocale: true },
+      });
+      const foreign = candidates.filter((c) => c.sourceLocale !== locale);
+      const rows = foreign.length
+        ? await this.prisma.contentTranslation.findMany({
+            where: {
+              entityType: 'COURSE',
+              entityId: { in: foreign.map((c) => c.id) },
+              field: { in: ['title', 'description'] },
+            },
+          })
+        : [];
+      const keep = candidates
+        .filter(
+          (c) =>
+            !fellBack(
+              rows.filter((t) => t.entityId === c.id),
+              locale,
+              c.sourceLocale,
+            ),
+        )
+        .map((c) => c.id);
+      discovery.push({ id: { in: keep } });
+    }
     if (discovery.length) where.AND = discovery;
 
     const skip = query.skip ?? 0;
@@ -159,26 +195,23 @@ export class CoursesService {
 
     const covers = await this.coverUrls(rows.map((r) => r.coverAssetId));
     const freePreview = await freePreviewCourseIds(this.prisma, courseIds);
-    for (const r of rows)
-      if (
-        fellBack(
-          translations.filter((t) => t.entityId === r.id),
-          locale,
-          r.sourceLocale,
-        )
-      )
-        noteTranslationFallback(r.sourceLocale);
     return {
-      items: rows.map((r) => ({
-        ...toListItem(
-          r,
-          translations.filter((t) => t.entityId === r.id),
-          locale,
-          lessonCountByCourseId.get(r.id) ?? 0,
-          covers,
-        ),
-        hasFreePreview: freePreview.has(r.id),
-      })),
+      items: rows.map((r) => {
+        const own = translations.filter((t) => t.entityId === r.id);
+        const fb = fellBack(own, locale, r.sourceLocale);
+        if (fb) noteTranslationFallback(r.sourceLocale);
+        return {
+          ...toListItem(
+            r,
+            own,
+            locale,
+            lessonCountByCourseId.get(r.id) ?? 0,
+            covers,
+          ),
+          hasFreePreview: freePreview.has(r.id),
+          _translation: translationMeta(locale, r.sourceLocale, fb),
+        };
+      }),
       total,
     };
   }
@@ -290,15 +323,22 @@ export class CoursesService {
       })),
     }));
 
-    // docs/11 §3: tell the client when any title fell back to the source.
-    if (
-      fellBack(
-        [...courseTranslations, ...childTranslations],
-        locale,
-        course.sourceLocale,
-      )
-    )
+    // docs/11 §3: tell the client when any title fell back to the source;
+    // `?fallback=false` turns that into 404 TRANSLATION_NOT_AVAILABLE.
+    const fb = fellBack(
+      [...courseTranslations, ...childTranslations],
+      locale,
+      course.sourceLocale,
+    );
+    if (fb) {
+      if (!requestAllowsFallback())
+        throw new NotFoundException({
+          code: 'TRANSLATION_NOT_AVAILABLE',
+          message: `This course has no complete ${locale} translation`,
+          locale,
+        });
       noteTranslationFallback(course.sourceLocale);
+    }
 
     return {
       ...list,
@@ -306,6 +346,7 @@ export class CoursesService {
         m.lessons.some((l) => l.isFree),
       ),
       modules,
+      _translation: translationMeta(locale, course.sourceLocale, fb),
     };
   }
 
@@ -639,6 +680,19 @@ function pickTitleAndDescription(
     title,
     description,
     fromTranslation: !!titleAtLocale && titleAtLocale.locale !== sourceLocale,
+  };
+}
+
+/** `_translation` of a list/detail response (docs/11 §3 fetch pattern). */
+function translationMeta(
+  locale: string,
+  sourceLocale: string,
+  fellBack: boolean,
+): TranslationMeta {
+  return {
+    locale,
+    source: fellBack ? sourceLocale : locale,
+    fallback: fellBack,
   };
 }
 

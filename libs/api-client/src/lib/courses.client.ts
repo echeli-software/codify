@@ -37,6 +37,29 @@ export interface CourseListItem {
   lessonCount: number;
   /** At least one live lesson is free ("free preview available"). */
   hasFreePreview?: boolean;
+  /**
+   * List/detail reads (docs/11 §3): content locale asked for / served in,
+   * and whether any text fell back to the course's source locale (detail
+   * counts module + lesson titles too).
+   */
+  _translation?: CourseTranslationMeta;
+}
+
+export interface CourseTranslationMeta {
+  locale: string;
+  source: string;
+  fallback: boolean;
+}
+
+/** Content-locale options for course reads (docs/11 §3 fetch pattern). */
+export interface CourseContentQuery {
+  /** Content locale; overrides Accept-Language. */
+  locale?: string;
+  /**
+   * `false` → no source-locale fallback: the list drops courses not fully
+   * translated; the detail answers 404 `TRANSLATION_NOT_AVAILABLE`.
+   */
+  fallback?: boolean;
 }
 
 export interface CourseLessonSummary {
@@ -64,7 +87,7 @@ export interface CourseListResponse {
   total: number;
 }
 
-export interface ListCoursesQuery {
+export interface ListCoursesQuery extends CourseContentQuery {
   status?: CourseStatus;
   categoryId?: string;
   authorId?: string;
@@ -122,10 +145,18 @@ export class CoursesClient {
     );
   }
 
-  detail(idOrSlug: string): Promise<CourseDetail> {
+  detail(
+    idOrSlug: string,
+    query: CourseContentQuery = {},
+  ): Promise<CourseDetail> {
+    let params = new HttpParams();
+    if (query.locale) params = params.set('locale', query.locale);
+    if (query.fallback !== undefined)
+      params = params.set('fallback', String(query.fallback));
     return firstValueFrom(
       this.http.get<CourseDetail>(
         `${this.config.baseUrl}/courses/${encodeURIComponent(idOrSlug)}`,
+        { params },
       ),
     );
   }
