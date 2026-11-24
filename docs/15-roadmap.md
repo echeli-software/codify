@@ -424,6 +424,23 @@ Deliverables:
   - Admin: new prices default to USD; revenue figures are reported per
     currency (no FX conversion), USD first.
   - Store purchases (RevenueCat) are unchanged: the stores localise prices.
+- **Time and place**
+  - No Brazilian default anywhere: the fallback time zone is UTC, not
+    `America/Sao_Paulo`, and a user's zone always comes from their device.
+  - Every scheduled message reaches people at a sensible local time. Jobs
+    that today fire at a fixed UTC hour picked for Brazilian mornings
+    (renewal reminders, reactivation, weekly recap and the like) run hourly
+    and pick users by their local time, like the streak reminder does.
+- **Text and legal**
+  - No Brazil-only wording in the default (English) product text: pricing
+    page, marketing page, emails and store copy speak of USD and cards;
+    PIX, Boleto, instalments and R$ appear only for Brazilian users.
+  - The draft privacy policy and terms become an international base text
+    with regional sections (Brazil / LGPD, EU and UK / GDPR, United States),
+    still drafts for legal review; company details stay placeholders.
+  - The consent banner works for visitors from any region.
+- **Docs** — the design docs say "international first" wherever they said
+  Brazil first (00, 05, 09, 10, 11, 13, 14).
 - **Curriculum** — English source with pt-BR translation
   ([20-curriculum.md](./20-curriculum.md)).
 
@@ -442,6 +459,10 @@ each EU country choose between 13 and 16.
 - ⬜ A scenario, an AI-prompt lesson and an exercise show in Portuguese to
   a pt-BR learner and in English to everyone else.
 - ⬜ Revenue reports show USD and BRL separately.
+- ⬜ A user in Tokyo and a user in Lisbon each get the renewal reminder
+  and the weekly recap during their own daytime.
+- ⬜ The English pricing and legal pages mention nothing Brazil-specific
+  unless the visitor is in Brazil.
 
 ## Future (post-launch backlog)
 
