@@ -386,6 +386,63 @@ Deliverables:
   reminder as a web push, respecting quiet hours. Verified up to the push service (encrypted payload decrypted, shown by the Angular service worker, quiet hours honoured); a real Chrome receiving it through FCM is to be checked on staging.
 - ✅ Admin can filter users by country and age group.
 
+## Phase 15 — International first (November 2026)
+
+**Goal**: the product owner decided on 23–24 November 2026 that Codify is
+**international first**: English is the first language and pricing is
+international, with Portuguese (pt-BR) as the second language and
+Brazil-specific payment options kept for Brazilian users. This replaces the
+"Brazil first" stance of the earlier phases.
+
+Deliverables:
+
+- **Language**
+  - Default language is `en-US` everywhere a default exists: new users, the
+    site settings, the i18n fallback, emails and push copy when a user's
+    language is unknown, and the admin app. `pt-BR` is the second language.
+  - Content source language is `en-US`: courses, modules and lessons
+    default to it, and the built-in catalogue (categories, badges, quests,
+    shop items and categories, plans) has English base text with pt-BR
+    translations.
+  - A new user's language comes from the browser or device
+    (`Accept-Language`), falling back to English; their time zone from the
+    device, falling back to UTC.
+  - Scenario dialogue, AI-prompt tasks and rubric labels, and exercise
+    text (starter-code comments, test names) become translatable, so a
+    course is complete in both languages.
+- **Payments**
+  - The international currency is **USD**; every plan has USD prices. A
+    plan may also have prices in a regional currency.
+  - Each user has one pricing currency, chosen by the server from their
+    country (docs/15 Phase 14): `BR` → BRL when the plan has BRL prices,
+    everyone else and unknown countries → USD. The plans API returns only
+    that currency's prices; checkout refuses a price in another currency.
+  - Brazil-specific options stay, for the BRL prices only: card
+    instalments, and PIX / Boleto as the annual prepay.
+  - International checkout is card first; Stripe's wallet methods (Apple
+    Pay, Google Pay, Link) are left on.
+  - Admin: new prices default to USD; revenue figures are reported per
+    currency (no FX conversion), USD first.
+  - Store purchases (RevenueCat) are unchanged: the stores localise prices.
+- **Curriculum** — English source with pt-BR translation
+  ([20-curriculum.md](./20-curriculum.md)).
+
+For legal review (release checklist §8): international users bring GDPR,
+COPPA and similar rules. In particular the minimum age of 12 was chosen
+under Brazilian law; COPPA sets 13 for the United States, and GDPR lets
+each EU country choose between 13 and 16.
+
+**Acceptance**:
+
+- ⬜ A new account with an unknown browser language is in English; one
+  with `Accept-Language: pt-BR` is in Portuguese.
+- ⬜ A user whose country is not Brazil sees USD prices and cannot check
+  out a BRL price; a Brazilian user sees BRL prices with instalments and
+  PIX / Boleto on the annual plan.
+- ⬜ A scenario, an AI-prompt lesson and an exercise show in Portuguese to
+  a pt-BR learner and in English to everyone else.
+- ⬜ Revenue reports show USD and BRL separately.
+
 ## Future (post-launch backlog)
 
 - Cloudflare Stream video pipeline + video lessons.

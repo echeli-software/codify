@@ -164,6 +164,11 @@ from the public footer, the sign-in screen and Settings.
       for online services used by minors) and the minor defaults in docs/15
       Phase 14, including the guardian confirmation before a minor's paid
       plan.
+- [ ] International launch (docs/15 Phase 15): confirm which rules apply
+      beyond LGPD (GDPR, UK GDPR, COPPA and the like), whether the minimum
+      age of 12 holds outside Brazil (COPPA: 13 in the United States; GDPR:
+      13–16 by country), tax on digital sales per market (Stripe Tax or
+      equivalent), and the consent banner's wording for the EU.
 - [ ] The privacy policy also covers the date of birth, the IP-derived
       country, web push and promotional email (all added in Phase 14).
 - [ ] Decide how long guardian confirmations (`GuardianConsent`) are kept.

@@ -58,7 +58,7 @@ These are aspirational benchmarks; they exist to align scope decisions, not as c
 1. **AI-usage as first-class subject matter** — not a sidebar. Prompt-grading, tool-use challenges, failure-mode hunts.
 2. **Soft skills with rigor** — branching scenarios + AI role-play + peer review, scored on rubrics, not just "watch this video".
 3. **Avatar economy** with a coin system that feels like a game, not a paywall — premium gives a multiplier, not exclusive access to advancement.
-4. **Brazilian-market polish** — PIX, parcelamento, BRL-first pricing, pt-BR primary locale, low-bandwidth-aware UX.
+4. **International first, with Brazilian-market polish** — English is the first language and USD the international currency; Portuguese (pt-BR) is the second language, and Brazilian users get BRL prices with PIX, Boleto and parcelamento (docs/15 Phase 15). Low-bandwidth-aware UX.
 5. **Engagement engineering as discipline** — single `RewardOrchestrator` for every reinforcement, animations + haptics + sound coupled, league system from launch.
 
 ## Anti-goals (things we explicitly will not do)
